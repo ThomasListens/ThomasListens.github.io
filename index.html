@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thomas LeRoy Meier - Links</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
+            background: #000000;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: white;
+        }
+
+        .container {
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .profile-section {
+            margin-bottom: 40px;
+        }
+
+        .profile-image {
+            width: 120px;
+            height: 120px;
+            border: 2px solid #333;
+            margin: 0 auto 20px;
+            background: #111;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            transition: transform 0.3s ease;
+            background-image: url('https://via.placeholder.com/120x120/111111/333333?text=IMAGE');
+            background-size: cover;
+            background-position: center;
+        }
+
+        .profile-image:hover {
+            transform: scale(1.05);
+        }
+
+        .profile-name {
+            font-size: 28px;
+            font-weight: normal;
+            margin-bottom: 10px;
+            letter-spacing: 4px;
+        }
+
+        .profile-description {
+            font-size: 16px;
+            opacity: 0.9;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        .links-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-width: 320px;
+            margin: 0 auto;
+        }
+
+        .link-item {
+            background: linear-gradient(135deg, 
+                rgba(0, 0, 0, 0.8) 0%, 
+                rgba(40, 40, 40, 0.9) 50%, 
+                rgba(0, 0, 0, 0.8) 100%); /* Dark gradient for contrast */
+            border: 1px solid #555;
+            border-radius: 3px;
+            padding: 18px 24px;
+            text-decoration: none;
+            color: #ffffff; /* Pure white text */
+            display: flex;
+            align-items: center;
+            font-weight: 500;
+            font-size: 18px;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            text-transform: uppercase;
+            z-index: 2;
+            backdrop-filter: blur(15px);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); /* Ensure text pops */
+        }
+
+        .link-item.left { justify-content: flex-start; }
+        .link-item.center { justify-content: center; }
+        .link-item.right { justify-content: flex-end; }
+
+        .link-item.physical-copy {
+            color: #ffffff; /* Keep text white */
+            font-weight: 500;
+            border-color: #ff4444;
+            background: linear-gradient(135deg, 
+                rgba(20, 0, 0, 0.9) 0%, 
+                rgba(60, 20, 20, 0.9) 50%, 
+                rgba(20, 0, 0, 0.9) 100%); /* Dark red gradient */
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+        }
+
+        .link-item:hover {
+            border-color: #aaa;
+            background: linear-gradient(135deg, 
+                rgba(20, 20, 20, 0.95) 0%, 
+                rgba(60, 60, 60, 0.95) 50%, 
+                rgba(20, 20, 20, 0.95) 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 255, 255, 0.15);
+            color: #ffffff; /* Ensure white on hover */
+        }
+
+        .link-item.physical-copy:hover {
+            border-color: #ff6666;
+            background: linear-gradient(135deg, 
+                rgba(40, 0, 0, 0.95) 0%, 
+                rgba(80, 30, 30, 0.95) 50%, 
+                rgba(40, 0, 0, 0.95) 100%);
+            box-shadow: 0 6px 20px rgba(255, 68, 68, 0.3);
+            color: #ffffff;
+        }
+
+        /* Add subtle gradient overlay */
+        .link-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, 
+                rgba(255, 255, 255, 0.03) 0%, 
+                rgba(255, 255, 255, 0.01) 100%);
+            pointer-events: none;
+        }
+
+        /* Sparse constellation lattice */
+        .background-lattice {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.2;
+            animation: constellationBreath 30s ease-in-out infinite;
+        }
+
+        @keyframes constellationBreath {
+            0%, 100% { 
+                opacity: 0.15; 
+                transform: scale(1) rotate(0deg);
+            }
+            50% { 
+                opacity: 0.3; 
+                transform: scale(1.02) rotate(0.2deg);
+            }
+        }
+
+        .lattice-node {
+            position: absolute;
+            background: radial-gradient(circle, 
+                rgba(255, 255, 255, 1) 0%, 
+                rgba(255, 255, 255, 0.8) 40%, 
+                rgba(255, 255, 255, 0) 100%);
+            border-radius: 50%;
+            width: 2px; /* Smaller */
+            height: 2px;
+            animation: stellarTwinkle 20s ease-in-out infinite;
+            transition: all 2s ease; /* Smoother */
+        }
+
+        @keyframes stellarTwinkle {
+            0%, 100% { 
+                opacity: 0.2; 
+                transform: scale(0.5);
+            }
+            25% { 
+                opacity: 0.8; 
+                transform: scale(1.5);
+            }
+            50% { 
+                opacity: 0.4; 
+                transform: scale(1);
+            }
+            75% { 
+                opacity: 0.9; 
+                transform: scale(1.8);
+            }
+        }
+
+        .lattice-connection {
+            position: absolute;
+            background: linear-gradient(90deg, 
+                rgba(255, 255, 255, 0) 0%, 
+                rgba(255, 255, 255, 0.3) 50%, 
+                rgba(255, 255, 255, 0) 100%);
+            height: 0.5px; /* Thinner */
+            transform-origin: left center;
+            animation: constellationFlow 25s ease-in-out infinite;
+            transition: all 3s ease;
+        }
+
+        @keyframes constellationFlow {
+            0%, 100% { 
+                opacity: 0.1; 
+            }
+            50% { 
+                opacity: 0.4; 
+            }
+        }
+
+        .link-icon {
+            font-size: 20px;
+            min-width: 20px;
+        }
+
+        .footer {
+            margin-top: 40px;
+            opacity: 0.7;
+            font-size: 14px;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 0 10px;
+            }
+            
+            .profile-name {
+                font-size: 24px;
+            }
+            
+            .link-item {
+                padding: 16px 20px;
+                font-size: 15px;
+            }
+        }
+
+        /* Glassmorphism effect */
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="profile-section">
+            <div class="profile-image"></div>
+            <h1 class="profile-name">Thomas LeRoy Meier</h1>
+        </div>
+
+        <div class="links-container">
+            <a href="https://open.spotify.com/artist/yourid" class="link-item left" target="_blank">
+                <span>SPOTIFY</span>
+            </a>
+
+            <a href="https://music.apple.com/artist/yourid" class="link-item right" target="_blank">
+                <span>APPLE MUSIC</span>
+            </a>
+
+            <a href="https://bere.al/yourusername" class="link-item center" target="_blank">
+                <span>BEREAL</span>
+            </a>
+
+            <a href="https://instagram.com/thomaslistens" class="link-item left" target="_blank">
+                <span>INSTAGRAM</span>
+            </a>
+
+            <a href="https://facebook.com/thomaslistens" class="link-item right" target="_blank">
+                <span>FACEBOOK</span>
+            </a>
+
+            <a href="mailto:your.email@example.com" class="link-item physical-copy center">
+                <span>PHYSICAL COPIES AVAILABLE ($30)</span>
+            </a>
+        </div>
+
+        <div class="footer">
+            <p>"When the air is clear, you might hear the sounds." - Pauline Oliveros</p>
+        </div>
+
+        <!-- Dynamic background lattice -->
+        <div class="background-lattice" id="backgroundLattice"></div>
+    </div>
+
+    <script>
+        // Mysterious audio system with sub bass and panning
+        let audioContext;
+        let masterGain;
+        let subBassOscillator;
+        let subBassGain;
+        let droneOscillator;
+        let droneGain;
+        let overtoneOscillators = [];
+        let overtoneGains = [];
+        let panners = [];
+        let audioInitialized = false;
+
+        // B fundamental = 246.94 Hz, Sub bass = 123.47 Hz (octave below)
+        const B_FUNDAMENTAL = 246.94;
+        const B_SUB_BASS = 123.47;
+
+        // First 16 overtones of B
+        const overtones = Array.from({length: 16}, (_, i) => B_FUNDAMENTAL * (i + 2));
+
+        function initAudioSystem() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+
+            if (!audioInitialized) {
+                // Master gain control
+                masterGain = audioContext.createGain();
+                masterGain.connect(audioContext.destination);
+                masterGain.gain.setValueAtTime(0.12, audioContext.currentTime);
+
+                // Create sub bass drone (always present, mysterious foundation)
+                subBassOscillator = audioContext.createOscillator();
+                subBassGain = audioContext.createGain();
+                
+                subBassOscillator.connect(subBassGain);
+                subBassGain.connect(masterGain);
+                
+                subBassOscillator.type = 'sine';
+                subBassOscillator.frequency.setValueAtTime(B_SUB_BASS, audioContext.currentTime);
+                subBassGain.gain.setValueAtTime(0.25, audioContext.currentTime);
+                
+                subBassOscillator.start();
+                
+                // Add gentle volume automation to sub bass
+                animateSubBass();
+
+                // Create main B drone 
+                droneOscillator = audioContext.createOscillator();
+                droneGain = audioContext.createGain();
+                
+                droneOscillator.connect(droneGain);
+                droneGain.connect(masterGain);
+                
+                droneOscillator.type = 'sine';
+                droneOscillator.frequency.setValueAtTime(B_FUNDAMENTAL, audioContext.currentTime);
+                droneGain.gain.setValueAtTime(0.2, audioContext.currentTime);
+                
+                droneOscillator.start();
+
+                // Create overtone oscillators with panning
+                overtones.forEach((freq, index) => {
+                    const osc = audioContext.createOscillator();
+                    const gain = audioContext.createGain();
+                    const panner = audioContext.createStereoPanner();
+                    
+                    osc.connect(gain);
+                    gain.connect(panner);
+                    panner.connect(masterGain);
+                    
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, audioContext.currentTime);
+                    gain.gain.setValueAtTime(0, audioContext.currentTime);
+                    
+                    // Random panning position
+                    const panPosition = (Math.random() - 0.5) * 1.8; // -0.9 to 0.9
+                    panner.pan.setValueAtTime(panPosition, audioContext.currentTime);
+                    
+                    osc.start();
+                    
+                    overtoneOscillators.push(osc);
+                    overtoneGains.push(gain);
+                    panners.push(panner);
+                });
+
+                audioInitialized = true;
+                startMysteriousOvertones();
+                console.log('Mysterious B drone system initialized with sub bass');
+            }
+        }
+
+        function animateSubBass() {
+            if (!audioInitialized) return;
+            
+            const currentTime = audioContext.currentTime;
+            const duration = Math.random() * 8 + 12; // 12-20 seconds
+            const targetVolume = 0.15 + Math.random() * 0.15; // 0.15-0.3
+            
+            // Gentle ebb and flow
+            subBassGain.gain.linearRampToValueAtTime(targetVolume, currentTime + duration);
+            
+            // Schedule next automation
+            setTimeout(() => animateSubBass(), duration * 800);
+        }
+
+        function startMysteriousOvertones() {
+            // Much slower, more mysterious fading
+            function animateOvertone(index) {
+                if (!audioInitialized) return;
+                
+                const gain = overtoneGains[index];
+                const panner = panners[index];
+                const currentTime = audioContext.currentTime;
+                
+                // Much longer, more mysterious timing
+                const fadeInTime = Math.random() * 8 + 4;   // 4-12 seconds
+                const holdTime = Math.random() * 12 + 6;    // 6-18 seconds  
+                const fadeOutTime = Math.random() * 10 + 5; // 5-15 seconds
+                
+                // Quieter, more ethereal
+                const volume = (Math.random() * 0.04 + 0.01) / Math.sqrt(index + 1);
+                
+                // Slowly shift panning during the note
+                const currentPan = panner.pan.value;
+                const newPan = Math.max(-0.9, Math.min(0.9, currentPan + (Math.random() - 0.5) * 0.6));
+                
+                // Very gradual fade in
+                gain.gain.linearRampToValueAtTime(volume, currentTime + fadeInTime);
+                
+                // Gentle pan shift during hold
+                panner.pan.linearRampToValueAtTime(newPan, currentTime + fadeInTime + holdTime * 0.5);
+                
+                // Hold
+                gain.gain.setValueAtTime(volume, currentTime + fadeInTime + holdTime);
+                
+                // Very gradual fade out
+                gain.gain.linearRampToValueAtTime(0, currentTime + fadeInTime + holdTime + fadeOutTime);
+                
+                // Much longer intervals between notes (more sparse and mysterious)
+                const nextTime = (fadeInTime + holdTime + fadeOutTime + Math.random() * 15 + 5) * 1000;
+                setTimeout(() => animateOvertone(index), nextTime);
+            }
+
+            // Start each overtone with much longer random delays
+            overtoneGains.forEach((_, index) => {
+                setTimeout(() => animateOvertone(index), Math.random() * 20000 + 5000);
+            });
+        }
+
+             // Sparse constellation generation
+        function generateSparseConstellation() {
+            const container = document.getElementById('backgroundLattice');
+            container.innerHTML = '';
+            
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            
+            const nodes = [];
+            const spacing = 150; // Much more sparse
+            
+            // Create far fewer nodes
+            for (let x = spacing; x < width - spacing; x += spacing) {
+                for (let y = spacing; y < height - spacing; y += spacing) {
+                    const centerX = width / 2;
+                    if (Math.abs(x - centerX) < 350) continue; // Avoid content area
+                    
+                    // Only create nodes occasionally 
+                    if (Math.random() < 0.3) { // 30% chance instead of 70%
+                        const harmonic = Math.floor(Math.random() * 16);
+                        const offsetX = (Math.random() - 0.5) * 60;
+                        const offsetY = (Math.random() - 0.5) * 60;
+                        
+                        const node = document.createElement('div');
+                        node.className = 'lattice-node';
+                        node.style.left = (x + offsetX) + 'px';
+                        node.style.top = (y + offsetY) + 'px';
+                        node.style.animationDelay = (Math.random() * 20) + 's';
+                        
+                        // Very slow, gentle movement
+                        const moveAnimation = node.animate([
+                            { transform: 'translate(0, 0)' },
+                            { transform: `translate(${Math.random() * 10 - 5}px, ${Math.random() * 10 - 5}px)` },
+                            { transform: 'translate(0, 0)' }
+                        ], {
+                            duration: Math.random() * 40000 + 30000, // 30-70 seconds
+                            iterations: Infinity,
+                            easing: 'ease-in-out'
+                        });
+                        
+                        container.appendChild(node);
+                        nodes.push({ 
+                            element: node, 
+                            x: x + offsetX, 
+                            y: y + offsetY
+                        });
+                    }
+                }
+            }
+            
+            // Connect only very close nodes, rarely
+            nodes.forEach((node, i) => {
+                nodes.slice(i + 1).forEach((otherNode) => {
+                    const distance = Math.sqrt(
+                        Math.pow(node.x - otherNode.x, 2) + 
+                        Math.pow(node.y - otherNode.y, 2)
+                    );
+                    
+                    // Only connect very close nodes, very rarely
+                    if (distance < spacing * 1.2 && Math.random() < 0.15) {
+                        const dx = otherNode.x - node.x;
+                        const dy = otherNode.y - node.y;
+                        const length = Math.sqrt(dx * dx + dy * dy);
+                        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                        
+                        const line = document.createElement('div');
+                        line.className = 'lattice-connection';
+                        line.style.left = node.x + 'px';
+                        line.style.top = node.y + 'px';
+                        line.style.width = length + 'px';
+                        line.style.transform = `rotate(${angle}deg)`;
+                        line.style.animationDelay = Math.random() * 25 + 's';
+                        
+                        container.appendChild(line);
+                    }
+                });
+            });
+        }
+
+        // Initialize everything
+        document.addEventListener('DOMContentLoaded', function() {
+            const links = document.querySelectorAll('.link-item');
+            
+            links.forEach((link, index) => {
+                link.style.animationDelay = `${index * 0.1}s`;
+                link.style.animation = 'fadeInUp 0.6s ease-out forwards';
+                link.style.opacity = '0';
+            });
+            
+            generateSparseConstellation();
+            
+            // Regenerate constellation less frequently for more mysterious shifts
+            setInterval(generateSparseConstellation, 45000); // Every 45 seconds
+            
+            window.addEventListener('resize', generateSparseConstellation);
+            
+            // Initialize audio on first interaction
+            document.addEventListener('click', initAudioSystem, { once: true });
+            document.addEventListener('keydown', initAudioSystem, { once: true });
+        });
+
+        // Add floating particles effect
+        function createParticle() {
+            const particle = document.createElement('div');
+            particle.style.position = 'fixed';
+            particle.style.width = '4px';
+            particle.style.height = '4px';
+            particle.style.background = 'rgba(255, 255, 255, 0.3)';
+            particle.style.borderRadius = '50%';
+            particle.style.pointerEvents = 'none';
+            particle.style.left = Math.random() * window.innerWidth + 'px';
+            particle.style.top = window.innerHeight + 'px';
+            particle.style.zIndex = '-1';
+            
+            document.body.appendChild(particle);
+            
+            const animation = particle.animate([
+                { transform: 'translateY(0px)', opacity: 1 },
+                { transform: `translateY(-${window.innerHeight + 100}px)`, opacity: 0 }
+            ], {
+                duration: Math.random() * 3000 + 2000,
+                easing: 'linear'
+            });
+            
+            animation.onfinish = () => particle.remove();
+        }
+        
+        // Create particles periodically
+        setInterval(createParticle, 500);
+    </script>
+</body>
+</html>
