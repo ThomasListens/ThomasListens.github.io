@@ -6,23 +6,19 @@
     <title>Thomas LeRoy Meier - Links</title>
     <style>
         * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+            margin: 0; padding: 0; box-sizing: border-box;
         }
-
         body {
             font-family: 'Courier New', 'Monaco', 'Menlo', 'Consolas', monospace;
-            background: #000000;
+            background: #000;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
-            color: #ffffff;
+            color: #fff;
             font-weight: normal;
         }
-
         .container {
             max-width: 400px;
             width: 100%;
@@ -31,262 +27,221 @@
             z-index: 10;
             position: relative;
         }
-
         @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(30px);}
+            to   { opacity: 1; transform: translateY(0);}
         }
-
         .profile-section {
             margin-bottom: 40px;
         }
-
         .profile-image {
-            width: 120px;
-            height: 120px;
+            width: 120px; height: 120px;
             border: 2px solid #333;
             margin: 0 auto 20px;
             background: #111;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: flex; align-items: center; justify-content: center;
             font-size: 48px;
             transition: transform 0.3s ease;
             background-image: url('https://via.placeholder.com/120x120/111111/333333?text=IMAGE');
-            background-size: cover;
-            background-position: center;
+            background-size: cover; background-position: center;
         }
-
-        .profile-image:hover {
-            transform: scale(1.05);
-        }
-
+        .profile-image:hover { transform: scale(1.05);}
         .profile-name {
-            font-size: 28px;
-            font-weight: normal;
-            margin-bottom: 10px;
-            letter-spacing: 1px;
-            color: #ffffff;
-            text-transform: none;
+            font-size: 28px; font-weight: normal;
+            margin-bottom: 10px; letter-spacing: 1px;
+            color: #fff; text-transform: none;
         }
-
         .profile-description {
-            font-size: 14px;
-            opacity: 0.8;
-            margin-bottom: 30px;
-            line-height: 1.4;
-            color: #ffffff;
-            letter-spacing: 0.5px;
+            font-size: 14px; opacity: 0.8; margin-bottom: 30px;
+            line-height: 1.4; color: #fff; letter-spacing: 0.5px;
         }
-
         .links-container {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            max-width: 320px;
-            margin: 0 auto;
+            display: flex; flex-direction: column; gap: 8px;
+            max-width: 320px; margin: 0 auto;
         }
-
         .link-item {
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(255,255,255,0.03);
             border: 1px solid #333;
             border-radius: 0px;
             padding: 16px 20px;
             text-decoration: none;
-            color: #ffffff;
-            display: flex;
-            align-items: center;
-            font-weight: normal;
-            font-size: 17px;
-            letter-spacing: 2.5px;
+            color: #fff;
+            display: flex; align-items: center;
+            font-weight: normal; font-size: 17px; letter-spacing: 2.5px;
             transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-            text-transform: uppercase;
-            z-index: 2;
+            position: relative; overflow: hidden;
+            text-transform: uppercase; z-index: 2;
+            min-height: 56px;
         }
-
-        .link-item.left { justify-content: flex-start; }
-        .link-item.center { justify-content: center; }
+        .link-item.left  { justify-content: flex-start; }
+        .link-item.center{ justify-content: center; }
         .link-item.right { justify-content: flex-end; }
-
         .link-item.physical-copy {
             color: #ff4444;
-            font-weight: normal;
             border-color: #444;
             text-transform: none;
-            font-size: 14px;
-            letter-spacing: 1.8px;
+            font-size: 14px; letter-spacing: 1.8px;
         }
-
         .link-item:hover {
-            border-color: #666;
-            background: rgba(255, 255, 255, 0.08);
-            transform: translateY(-1px);
-            color: #ffffff;
+            border-color: #666; background: rgba(255,255,255,0.08);
+            transform: translateY(-1px); color: #fff;
         }
-
         .link-item.physical-copy:hover {
-            border-color: #ff4444;
-            background: rgba(255, 68, 68, 0.05);
+            border-color: #ff4444; background: rgba(255,68,68,0.05);
         }
-
         .link-item::after {
             content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            width: 60%;
-            background: linear-gradient(to right, 
-                rgba(255, 255, 255, 0) 0%, 
-                rgba(255, 255, 255, 0.01) 70%, 
-                rgba(255, 255, 255, 0.02) 100%);
-            pointer-events: none;
-            z-index: 1;
+            position: absolute; top: 0; right: 0; bottom: 0; width: 60%;
+            background: linear-gradient(to right,rgba(255,255,255,0) 0%,rgba(255,255,255,0.01) 70%,rgba(255,255,255,0.02) 100%);
+            pointer-events: none; z-index: 1;
         }
 
+        /* Enhanced Lyric Whisper System */
         .lyric-whisper {
-            position: absolute;
-            font-size: 9px;
+            position: absolute; 
+            font-size: 12px; 
+            color: rgba(255, 68, 68, 0.4);
+            font-weight: 300; 
+            letter-spacing: 1.8px;
+            text-transform: uppercase;
+            pointer-events: none; 
+            z-index: 3;
             opacity: 0;
-            color: rgba(255, 68, 68, 0.25);
-            font-weight: 300;
-            letter-spacing: 0.8px;
-            text-transform: lowercase;
-            animation: whisperFade 18s ease-in-out infinite;
-            pointer-events: none;
-            z-index: 1;
-            white-space: nowrap;
+            text-shadow: 0 0 4px rgba(255, 68, 68, 0.2);
+            font-family: 'Courier New', monospace;
         }
 
-        @keyframes whisperFade {
-            0%, 25% { opacity: 0; transform: translateY(2px); }
-            40%, 60% { opacity: 0.2; transform: translateY(0px); }
-            100% { opacity: 0; transform: translateY(-1px); }
-        }
-
-        .lyric-char {
+        /* Cryptic letter positioning */
+        .lyric-whisper .letter {
             display: inline-block;
-            animation: subtleFloat 20s ease-in-out infinite;
+            position: relative;
         }
 
-        @keyframes subtleFloat {
-            0%, 100% { transform: translateY(0px); }
-            33% { transform: translateY(-0.5px); }
-            66% { transform: translateY(0.5px); }
+        .lyric-whisper .letter.up {
+            transform: translateY(-1px);
         }
 
-        /* Enhanced constellation lattice */
+        .lyric-whisper .letter.down {
+            transform: translateY(1px);
+        }
+
+        .lyric-whisper .letter.up2 {
+            transform: translateY(-2px);
+        }
+
+        .lyric-whisper .letter.down2 {
+            transform: translateY(2px);
+        }
+
+        /* Positioning for specific negative spaces */
+        .link-item:nth-child(1) .lyric-whisper.space-1 {
+            left: 25px; /* opposite side of SPOTIFY */
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .link-item:nth-child(2) .lyric-whisper.space-2 {
+            right: 25px; /* before APPLE MUSIC */
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .link-item:nth-child(3) .lyric-whisper.space-3 {
+            left: 20px; /* left of BEREAL */
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .link-item:nth-child(3) .lyric-whisper.space-4 {
+            right: 20px; /* right of BEREAL */
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .link-item:nth-child(4) .lyric-whisper.space-5 {
+            right: 25px; /* right of INSTAGRAM */
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .link-item:nth-child(5) .lyric-whisper.space-6 {
+            left: 25px; /* left of FACEBOOK */
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        /* Dynamic phrase animation */
+        .lyric-whisper.active {
+            animation: wordAppear 0.8s ease-in-out forwards;
+        }
+
+        @keyframes wordAppear {
+            0% { opacity: 0; transform: translateY(-50%) scale(0.9); }
+            50% { opacity: 0.6; transform: translateY(-50%) scale(1); }
+            100% { opacity: 0.4; transform: translateY(-50%) scale(1); }
+        }
+
+        .lyric-whisper.fade-out {
+            animation: wordFadeOut 2s ease-in-out forwards;
+        }
+
+        @keyframes wordFadeOut {
+            0% { opacity: 0.4; }
+            100% { opacity: 0; }
+        }
+
         .background-lattice {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            pointer-events: none;
-            z-index: 1;
-            opacity: 0.4;
-            animation: constellationBreath 30s ease-in-out infinite;
+            position: fixed; top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            pointer-events: none; z-index: 1; opacity: 0.3;
         }
-
-        @keyframes constellationBreath {
-            0%, 100% { 
-                opacity: 0.3; 
-                transform: scale(1) rotate(0deg);
-            }
-            50% { 
-                opacity: 0.6; 
-                transform: scale(1.02) rotate(0.2deg);
-            }
-        }
-
         .lattice-node {
             position: absolute;
-            background: radial-gradient(circle, 
-                rgba(255, 255, 255, 0.9) 0%, 
-                rgba(255, 255, 255, 0.7) 20%, 
-                rgba(255, 255, 255, 0.2) 60%,
-                rgba(255, 255, 255, 0) 100%);
-            border-radius: 50%;
-            width: 2px;
-            height: 2px;
-            animation: crystallineTwinkle 25s ease-in-out infinite;
-            box-shadow: 0 0 3px rgba(255, 255, 255, 0.2);
+            background: radial-gradient(circle,rgba(255,255,255,0.8) 0%,rgba(255,255,255,0.5) 30%,rgba(255,255,255,0.1) 70%,rgba(255,255,255,0) 100%);
+            border-radius: 50%; width: 3px; height: 3px;
+            box-shadow: 0 0 4px rgba(255,255,255,0.3);
+            animation: nodePulse 30s ease-in-out infinite;
         }
-
-        @keyframes crystallineTwinkle {
-            0%, 100% { 
-                opacity: 0.2; 
-                transform: scale(0.6);
-                box-shadow: 0 0 2px rgba(255, 255, 255, 0.1);
-            }
-            25% { 
-                opacity: 0.8; 
-                transform: scale(1);
-                box-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
-            }
-            50% { 
-                opacity: 0.4; 
-                transform: scale(0.8);
-                box-shadow: 0 0 3px rgba(255, 255, 255, 0.2);
-            }
-            75% { 
-                opacity: 0.6; 
-                transform: scale(1.1);
-                box-shadow: 0 0 5px rgba(255, 255, 255, 0.25);
-            }
+        @keyframes nodePulse {
+            0%,100%{opacity:0;transform:scale(0.3);}
+            25%{opacity:0.6;transform:scale(1);}
+            50%{opacity:0.8;transform:scale(1.2);}
+            75%{opacity:0.4;transform:scale(0.8);}
         }
-
         .lattice-connection {
             position: absolute;
-            background: linear-gradient(90deg, 
-                rgba(255, 255, 255, 0) 0%, 
-                rgba(255, 255, 255, 0.15) 50%, 
-                rgba(255, 255, 255, 0) 100%);
-            height: 0.5px;
-            transform-origin: left center;
-            animation: crystallineFlow 35s ease-in-out infinite;
-            box-shadow: 0 0 1px rgba(255, 255, 255, 0.1);
+            background: linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.2) 50%,rgba(255,255,255,0) 100%);
+            height: 1px; transform-origin: left center;
+            animation: connectionFlow 40s ease-in-out infinite;
+            box-shadow: 0 0 2px rgba(255,255,255,0.1);
         }
-
-        @keyframes crystallineFlow {
-            0%, 100% { 
-                opacity: 0.1; 
-            }
-            50% { 
-                opacity: 0.3; 
-            }
+        @keyframes connectionFlow {
+            0%,100%{opacity:0;transform:scaleX(0);}
+            25%{opacity:0.3;transform:scaleX(0.6);}
+            50%{opacity:0.5;transform:scaleX(1);}
+            75%{opacity:0.2;transform:scaleX(0.4);}
         }
-
         .footer {
-            margin-top: 40px;
-            opacity: 0.6;
+            margin-top: 50px;
+            opacity: 0.7;
             font-size: 12px;
-            color: #ffffff;
-            letter-spacing: 0.5px;
-            line-height: 1.3;
+            color: #fff; letter-spacing: 0.8px; line-height: 1.6; text-align: center;
         }
-
+        .footer .quote-line { display: block; margin-bottom: 2px;}
+        .footer .author { margin-top: 8px; opacity: 0.6; font-style: italic;}
         @media (max-width: 480px) {
             .container {
                 padding: 0 10px;
             }
-            
             .profile-name {
                 font-size: 24px;
             }
-            
             .link-item {
-                padding: 14px 18px;
-                font-size: 14px;
-                letter-spacing: 2px;
+                padding: 14px 18px; font-size: 14px; letter-spacing: 2px;
+            }
+            .lyric-whisper { 
+                font-size: 9px; 
+                letter-spacing: 1px;
             }
         }
     </style>
@@ -297,422 +252,522 @@
             <div class="profile-image"></div>
             <h1 class="profile-name">Thomas LeRoy Meier</h1>
         </div>
-
         <div class="links-container">
             <a href="https://open.spotify.com/artist/yourid" class="link-item left" target="_blank">
                 <span>SPOTIFY</span>
-                <div class="lyric-whisper" style="animation-delay: 2s; left: 15px; top: 20px; font-size: 8px;">its hard to breath</div>
+                <div class="lyric-whisper left-space phrase-1-word-1">
+                    <span class="letter">I</span><span class="letter up">T</span><span class="letter down">S</span>
+                </div>
             </a>
-
+            
             <a href="https://music.apple.com/artist/yourid" class="link-item right" target="_blank">
                 <span>APPLE MUSIC</span>
-                <div class="lyric-whisper" style="animation-delay: 5s; right: 15px; bottom: 15px; font-size: 10px;">this is all i am</div>
+                <div class="lyric-whisper right-space phrase-1-word-2">
+                    <span class="letter down">H</span><span class="letter">A</span><span class="letter up">R</span><span class="letter down2">D</span>
+                </div>
             </a>
-
+            
             <a href="https://bere.al/yourusername" class="link-item center" target="_blank">
                 <span>BEREAL</span>
-                <div class="lyric-whisper" style="animation-delay: 8s; left: 20px; bottom: 18px; font-size: 9px;">too dark to see</div>
+                <div class="lyric-whisper center-left phrase-1-word-3">
+                    <span class="letter up">T</span><span class="letter down">O</span>
+                </div>
+                <div class="lyric-whisper center-right phrase-1-word-4">
+                    <span class="letter">B</span><span class="letter up2">R</span><span class="letter down">E</span><span class="letter">A</span><span class="letter up">T</span><span class="letter down">H</span><span class="letter up">E</span>
+                </div>
+                <div class="lyric-whisper center-left phrase-2-word-3">
+                    <span class="letter down">A</span>
+                </div>
+                <div class="lyric-whisper center-right phrase-2-word-4">
+                    <span class="letter up">W</span><span class="letter down2">A</span><span class="letter up">Y</span>
+                </div>
             </a>
-
+            
             <a href="https://instagram.com/thomaslistens" class="link-item left" target="_blank">
                 <span>INSTAGRAM</span>
-                <div class="lyric-whisper" style="animation-delay: 11s; right: 18px; top: 22px; font-size: 11px;">nothing i can say</div>
+                <div class="lyric-whisper left-space phrase-2-word-1">
+                    <span class="letter up">L</span><span class="letter down">O</span><span class="letter">V</span><span class="letter up">E</span>
+                </div>
             </a>
-
+            
             <a href="https://facebook.com/thomaslistens" class="link-item right" target="_blank">
                 <span>FACEBOOK</span>
-                <div class="lyric-whisper" style="animation-delay: 14s; left: 12px; top: 18px; font-size: 8px;">love always knows</div>
+                <div class="lyric-whisper right-space phrase-2-word-2">
+                    <span class="letter down">F</span><span class="letter up">I</span><span class="letter">N</span><span class="letter up2">D</span><span class="letter down">S</span>
+                </div>
             </a>
-
+            
             <a href="mailto:your.email@example.com" class="link-item physical-copy center">
                 <span>Handmade Physical Copy &lt;3<br>($30)</span>
             </a>
         </div>
-
         <div class="footer">
-            <p>"When the air is clear, you might hear the sounds." - Pauline Oliveros</p>
+            <span class="quote-line">"When the air is clear,</span>
+            <span class="quote-line">you might hear the sounds."</span>
+            <span class="author">- Pauline Oliveros</span>
         </div>
-
         <!-- Dynamic background lattice -->
         <div class="background-lattice" id="backgroundLattice"></div>
     </div>
-
     <script>
-        // Enhanced audio system with shimmering and reverb
-        let audioContext;
-        let masterGain;
-        let reverbConvolver;
-        let dryGain;
-        let wetGain;
-        let subBassOscillator;
-        let subBassGain;
-        let droneOscillator;
-        let droneGain;
-        let overtoneOscillators = [];
-        let overtoneGains = [];
-        let panners = [];
-        let audioInitialized = false;
+    // Breathing cosmic soundscape - B drone with wandering harmonics
+let audioContext;
+let masterGain;
+let audioInitialized = false;
+let activeTones = [];
 
-        // Lower B frequencies - B1 for main drone, B0 for sub bass
-        const B_DRONE = 61.735;  // B1 - one octave lower than before
-        const B_SUB_BASS = 30.868;  // B0 - even deeper foundation
+const fundamental = 123.47; // B2 drone
 
-        // First 16 overtones of B1
-        const overtones = Array.from({length: 16}, (_, i) => B_DRONE * (i + 2));
+function createCloudTone(frequency, baseGain, breathRate, breathDepth, fadeInTime, sustainTime, fadeOutTime, startDelay) {
+    const ct = audioContext.currentTime;
+    
+    // Create oscillator and gain
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    // Create LFO for breathing
+    const lfo = audioContext.createOscillator();
+    const lfoGain = audioContext.createGain();
+    
+    // Configure LFO
+    lfo.type = 'sine';
+    lfo.frequency.setValueAtTime(breathRate, ct);
+    lfoGain.gain.setValueAtTime(baseGain * breathDepth, ct);
+    
+    // Connect LFO to modulate gain
+    lfo.connect(lfoGain);
+    lfoGain.connect(gainNode.gain);
+    
+    // Connect main audio path
+    oscillator.connect(gainNode);
+    gainNode.connect(masterGain);
+    
+    // Configure oscillator
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(frequency, ct);
+    
+    // Create envelope - gentle fade in, sustain, gentle fade out
+    gainNode.gain.setValueAtTime(0, ct + startDelay);
+    gainNode.gain.linearRampToValueAtTime(baseGain, ct + startDelay + fadeInTime);
+    gainNode.gain.setValueAtTime(baseGain, ct + startDelay + fadeInTime + sustainTime);
+    gainNode.gain.linearRampToValueAtTime(0, ct + startDelay + fadeInTime + sustainTime + fadeOutTime);
+    
+    // Start oscillators
+    oscillator.start(ct + startDelay);
+    lfo.start(ct + startDelay);
+    
+    // Stop after envelope completes
+    const totalTime = startDelay + fadeInTime + sustainTime + fadeOutTime;
+    oscillator.stop(ct + totalTime + 1);
+    lfo.stop(ct + totalTime + 1);
+    
+    // Store for tracking
+    activeTones.push({ 
+        osc: oscillator, 
+        lfo: lfo,
+        endTime: ct + totalTime
+    });
+    
+    return totalTime;
+}
 
-        // Create artificial reverb impulse response
-        function createReverbImpulse(audioContext, duration = 2, decay = 2) {
-            const sampleRate = audioContext.sampleRate;
-            const length = sampleRate * duration;
-            const impulse = audioContext.createBuffer(2, length, sampleRate);
-            
-            for (let channel = 0; channel < 2; channel++) {
-                const channelData = impulse.getChannelData(channel);
-                for (let i = 0; i < length; i++) {
-                    const n = length - i;
-                    channelData[i] = (Math.random() * 2 - 1) * Math.pow(n / length, decay);
-                }
+function createToneCycle(toneConfig) {
+    const { frequency, baseGain, breathRate, breathDepth, timing } = toneConfig;
+    
+    function scheduleTone() {
+        if (!audioInitialized) return;
+        
+        const fadeIn = timing.fadeIn + Math.random() * 5;    // 8-13s fade in
+        const sustain = timing.sustain + Math.random() * 10; // 15-25s sustain
+        const fadeOut = timing.fadeOut + Math.random() * 5;  // 8-13s fade out
+        const pause = timing.pause + Math.random() * 15;     // pause between appearances
+        
+        const totalTime = createCloudTone(
+            frequency,
+            baseGain,
+            breathRate + (Math.random() - 0.5) * 0.02, // slight breath variation
+            breathDepth,
+            fadeIn,
+            sustain,
+            fadeOut,
+            0
+        );
+        
+        // Schedule next appearance
+        setTimeout(() => scheduleTone(), (totalTime + pause) * 1000);
+    }
+    
+    // Initial delay before first appearance
+    setTimeout(() => scheduleTone(), timing.initialDelay * 1000);
+}
+
+function initAudioSystem() {
+    if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioContext.state === 'suspended') audioContext.resume();
+    
+    if (!audioInitialized) {
+        masterGain = audioContext.createGain();
+        masterGain.connect(audioContext.destination);
+        masterGain.gain.setValueAtTime(0.5, audioContext.currentTime); // Softer overall
+
+        // 1. B2 drone (1/1) - always present, gentle breathing
+        createBreathingTone(
+            fundamental,           // B2
+            0.08,                 // softer base gain
+            0.15,                 // breath rate (~9/min)
+            0.3,                  // 30% breath depth
+            0                     // immediate
+        );
+
+        // 2. Perfect fifth (3/2) - major triad member
+        createToneCycle({
+            frequency: fundamental * 3/2,     // F#3
+            baseGain: 0.05,                  // soft
+            breathRate: 0.13,
+            breathDepth: 0.25,
+            timing: {
+                fadeIn: 8,
+                sustain: 15,
+                fadeOut: 8,
+                pause: 10,
+                initialDelay: 5
             }
-            return impulse;
-        }
+        });
 
-        // Add gentle tremolo effect with ultra slow shimmer
-        function addShimmer(gain, audioContext, intensity = 0.08) {
-            const lfo = audioContext.createOscillator();
-            const lfoGain = audioContext.createGain();
-            
-            lfo.frequency.value = 0.02 + Math.random() * 0.03; // 0.02-0.05 Hz (ultra slow)
-            lfo.type = 'sine';
-            
-            lfoGain.gain.value = intensity; // Adjustable modulation depth
-            
-            lfo.connect(lfoGain);
-            lfoGain.connect(gain.gain);
-            
-            lfo.start();
-            return { lfo, lfoGain };
-        }
-
-        function initAudioSystem() {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        // 3. Major third (5/4) - highest, major triad member
+        createToneCycle({
+            frequency: fundamental * 5/4 * 4, // D#5 (two octaves above)
+            baseGain: 0.04,                  // soft but cuts through
+            breathRate: 0.14,
+            breathDepth: 0.2,
+            timing: {
+                fadeIn: 10,
+                sustain: 20,
+                fadeOut: 10,
+                pause: 15,
+                initialDelay: 8
             }
-            
-            if (audioContext.state === 'suspended') {
-                audioContext.resume();
+        });
+
+        // 4. Major seventh (15/8) - filling tone
+        createToneCycle({
+            frequency: fundamental * 15/8,    // A#3
+            baseGain: 0.03,                  // very soft
+            breathRate: 0.17,
+            breathDepth: 0.2,
+            timing: {
+                fadeIn: 12,
+                sustain: 18,
+                fadeOut: 12,
+                pause: 20,
+                initialDelay: 15
             }
+        });
 
-            if (!audioInitialized) {
-                // Create reverb
-                reverbConvolver = audioContext.createConvolver();
-                reverbConvolver.buffer = createReverbImpulse(audioContext, 2.5, 2.5);
-                
-                // Master gain and reverb routing
-                masterGain = audioContext.createGain();
-                dryGain = audioContext.createGain();
-                wetGain = audioContext.createGain();
-                
-                masterGain.connect(dryGain);
-                masterGain.connect(reverbConvolver);
-                reverbConvolver.connect(wetGain);
-                
-                dryGain.connect(audioContext.destination);
-                wetGain.connect(audioContext.destination);
-                
-                // 75% dry, 25% wet for more reverb
-                dryGain.gain.setValueAtTime(0.75, audioContext.currentTime);
-                wetGain.gain.setValueAtTime(0.25, audioContext.currentTime);
-                
-                masterGain.gain.setValueAtTime(0, audioContext.currentTime);
-                masterGain.gain.linearRampToValueAtTime(0.08, audioContext.currentTime + 10); // Slower, gentler fade in
-
-                // Create sub bass drone (deepest foundation)
-                subBassOscillator = audioContext.createOscillator();
-                subBassGain = audioContext.createGain();
-                
-                subBassOscillator.connect(subBassGain);
-                subBassGain.connect(masterGain);
-                
-                subBassOscillator.type = 'sine';
-                subBassOscillator.frequency.setValueAtTime(B_SUB_BASS, audioContext.currentTime);
-                subBassGain.gain.setValueAtTime(0, audioContext.currentTime);
-                subBassGain.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 8); 
-                
-                subBassOscillator.start();
-                
-                // Add very gentle shimmer to sub bass
-                addShimmer(subBassGain, audioContext, 0.03);
-                animateSubBass();
-
-                // Create main B drone
-                droneOscillator = audioContext.createOscillator();
-                droneGain = audioContext.createGain();
-                
-                droneOscillator.connect(droneGain);
-                droneGain.connect(masterGain);
-                
-                droneOscillator.type = 'sine';
-                droneOscillator.frequency.setValueAtTime(B_DRONE, audioContext.currentTime);
-                droneGain.gain.setValueAtTime(0, audioContext.currentTime);
-                droneGain.gain.linearRampToValueAtTime(0.2, audioContext.currentTime + 6); 
-                
-                droneOscillator.start();
-                
-                // Add shimmer to main drone
-                addShimmer(droneGain, audioContext, 0.04);
-
-                // Create overtone oscillators - ensure proper harmonic relationships
-                const harmonicOvertones = [
-                    B_DRONE * 2,    // Octave
-                    B_DRONE * 3,    // Perfect fifth above octave
-                    B_DRONE * 4,    // Two octaves
-                    B_DRONE * 5,    // Major third above two octaves
-                    B_DRONE * 6,    // Perfect fifth above two octaves
-                    B_DRONE * 7,    // Harmonic seventh
-                    B_DRONE * 8     // Three octaves
-                ];
-
-                harmonicOvertones.forEach((freq, index) => {
-                    const osc = audioContext.createOscillator();
-                    const gain = audioContext.createGain();
-                    const panner = audioContext.createStereoPanner();
-                    
-                    osc.connect(gain);
-                    gain.connect(panner);
-                    panner.connect(masterGain);
-                    
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(freq, audioContext.currentTime);
-                    gain.gain.setValueAtTime(0, audioContext.currentTime);
-                    
-                    // Gentle stereo panning
-                    const panPosition = (Math.random() - 0.5) * 0.8;
-                    panner.pan.setValueAtTime(panPosition, audioContext.currentTime);
-                    
-                    osc.start();
-                    
-                    // Add gentle shimmer to overtones
-                    addShimmer(gain, audioContext, 0.02);
-                    
-                    overtoneOscillators.push(osc);
-                    overtoneGains.push(gain);
-                    panners.push(panner);
-                });
-
-                audioInitialized = true;
-                startMysteriousOvertones();
-                console.log('Gentle B drone system initialized with proper overtones');
+        // 5. Septimal tritone (7/5) - octave above
+        createToneCycle({
+            frequency: fundamental * 7/5 * 2, // F4
+            baseGain: 0.025,                 // very soft
+            breathRate: 0.11,
+            breathDepth: 0.15,
+            timing: {
+                fadeIn: 15,
+                sustain: 12,
+                fadeOut: 15,
+                pause: 25,
+                initialDelay: 20
             }
-        }
+        });
 
-        function animateSubBass() {
-            if (!audioInitialized) return;
-            
-            const currentTime = audioContext.currentTime;
-            const duration = Math.random() * 20 + 25; // 25-45 seconds (much slower)
-            const targetVolume = 0.15 + Math.random() * 0.15; // 0.15-0.3 (gentler)
-            
-            // Extremely gentle volume changes
-            subBassGain.gain.linearRampToValueAtTime(targetVolume, currentTime + duration);
-            
-            setTimeout(() => animateSubBass(), duration * 900);
-        }
-
-        function startMysteriousOvertones() {
-            let activeOvertones = 0;
-            const maxActive = 2; // Maximum 2 overtones at once
-            
-            function animateOvertone(index) {
-                if (!audioInitialized) return;
-                
-                const gain = overtoneGains[index];
-                const panner = panners[index];
-                const currentTime = audioContext.currentTime;
-                
-                // Only proceed if we haven't exceeded max active overtones
-                if (activeOvertones >= maxActive) {
-                    setTimeout(() => animateOvertone(index), Math.random() * 20000 + 30000);
-                    return;
-                }
-                
-                activeOvertones++;
-                
-                // Ultra slow, surreal timing
-                const fadeInTime = Math.random() * 30 + 15;   // 15-45 seconds
-                const holdTime = Math.random() * 60 + 20;     // 20-80 seconds  
-                const fadeOutTime = Math.random() * 35 + 20;  // 20-55 seconds
-                
-                // More separated, clearer overtones
-                const baseVolume = 0.02 + Math.random() * 0.015; // 0.02-0.035
-                const volume = baseVolume / Math.sqrt(index + 1);
-                
-                // Slower, more deliberate panning
-                const currentPan = panner.pan.value;
-                const newPan = Math.max(-0.4, Math.min(0.4, currentPan + (Math.random() - 0.5) * 0.2));
-                
-                // Ultra slow fade in
-                gain.gain.linearRampToValueAtTime(volume, currentTime + fadeInTime);
-                
-                // Gentle pan shift during hold
-                panner.pan.linearRampToValueAtTime(newPan, currentTime + fadeInTime + holdTime * 0.7);
-                
-                // Hold
-                gain.gain.setValueAtTime(volume, currentTime + fadeInTime + holdTime);
-                
-                // Ultra slow fade out
-                gain.gain.linearRampToValueAtTime(0, currentTime + fadeInTime + holdTime + fadeOutTime);
-                
-                // Mark as inactive after fade out
-                setTimeout(() => {
-                    activeOvertones--;
-                }, (fadeInTime + holdTime + fadeOutTime) * 1000);
-                
-                // Much longer intervals for more separation
-                const nextTime = (fadeInTime + holdTime + fadeOutTime + Math.random() * 60 + 40) * 1000;
-                setTimeout(() => animateOvertone(index), nextTime);
+        // 6. Harmonic seventh (7/4) - most subtle
+        createToneCycle({
+            frequency: fundamental * 7/4 * 2, // A4
+            baseGain: 0.015,                 // barely there
+            breathRate: 0.19,
+            breathDepth: 0.1,
+            timing: {
+                fadeIn: 18,
+                sustain: 10,
+                fadeOut: 18,
+                pause: 30,
+                initialDelay: 30
             }
+        });
 
-            // Start each overtone with very long random delays for maximum separation
-            overtoneGains.forEach((_, index) => {
-                setTimeout(() => animateOvertone(index), Math.random() * 90000 + 30000); // 30-120 seconds
-            });
-        }
+        audioInitialized = true;
+        console.log('Cloud-like harmonic soundscape initialized');
+    }
+}
 
-        // Enhanced constellation generation with more visible crystalline lattice
-        function generateSparseConstellation() {
+// Keep the constant drone helper
+function createBreathingTone(frequency, baseGain, breathRate, breathDepth, startDelay = 0) {
+    const ct = audioContext.currentTime;
+    
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    const lfo = audioContext.createOscillator();
+    const lfoGain = audioContext.createGain();
+    
+    lfo.type = 'sine';
+    lfo.frequency.setValueAtTime(breathRate, ct);
+    lfoGain.gain.setValueAtTime(baseGain * breathDepth, ct);
+    
+    lfo.connect(lfoGain);
+    lfoGain.connect(gainNode.gain);
+    oscillator.connect(gainNode);
+    gainNode.connect(masterGain);
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(frequency, ct);
+    
+    // Gentle fade in for drone
+    gainNode.gain.setValueAtTime(0, ct);
+    gainNode.gain.linearRampToValueAtTime(baseGain, ct + 10); // 10 second fade in
+    
+    oscillator.start(ct + startDelay);
+    lfo.start(ct + startDelay);
+}
+
+        // ---- Dynamic lattice visuals ----
+        let latticeNodes = [];
+        let latticeConnections = [];
+        let isBuilding = true;
+        
+        function generateDynamicLattice() {
             const container = document.getElementById('backgroundLattice');
-            container.innerHTML = '';
-            
+            if (isBuilding) buildLattice(container);
+            else dissipateCurrentLattice();
+            isBuilding = !isBuilding;
+        }
+        
+        function buildLattice(container) {
             const width = window.innerWidth;
             const height = window.innerHeight;
+            const centerX = width / 2;
+            const spacing = 120;
+            latticeNodes = [];
+            latticeConnections = [];
             
-            const nodes = [];
-            const spacing = 100; // Closer spacing for more lattice visibility
-            
-            // Create crystalline constellation nodes
+            // Generate nodes with exclusion zone around content
             for (let x = spacing; x < width - spacing; x += spacing) {
                 for (let y = spacing; y < height - spacing; y += spacing) {
-                    const centerX = width / 2;
-                    if (Math.abs(x - centerX) < 250) continue; // Smaller avoid zone
-                    
-                    // Higher chance for more visible lattice
-                    if (Math.random() < 0.6) { // 60% chance
-                        const offsetX = (Math.random() - 0.5) * 40;
-                        const offsetY = (Math.random() - 0.5) * 40;
-                        
+                    if (Math.abs(x - centerX) < 300 && y > height * 0.2 && y < height * 0.8) continue;
+                    if (Math.random() < 0.7) {
+                        const offsetX = (Math.random() - 0.5) * 60;
+                        const offsetY = (Math.random() - 0.5) * 60;
                         const node = document.createElement('div');
                         node.className = 'lattice-node';
                         node.style.left = (x + offsetX) + 'px';
                         node.style.top = (y + offsetY) + 'px';
-                        node.style.animationDelay = (Math.random() * 25) + 's';
-                        
-                        // Very gentle crystalline floating movement
-                        const moveAnimation = node.animate([
-                            { transform: 'translate(0, 0)' },
-                            { transform: `translate(${Math.random() * 8 - 4}px, ${Math.random() * 8 - 4}px)` },
-                            { transform: 'translate(0, 0)' }
-                        ], {
-                            duration: Math.random() * 50000 + 40000, // 40-90 seconds
-                            iterations: Infinity,
-                            easing: 'ease-in-out'
-                        });
-                        
+                        node.style.animationDelay = (Math.random() * 30) + 's';
+                        node.style.opacity = '0';
+                        setTimeout(() => {
+                            if (node.parentNode) {
+                                node.style.transition = 'opacity 8s ease-in-out';
+                                node.style.opacity = '1';
+                            }
+                        }, Math.random() * 5000);
                         container.appendChild(node);
-                        nodes.push({ 
-                            element: node, 
-                            x: x + offsetX, 
-                            y: y + offsetY
-                        });
+                        latticeNodes.push({ element: node, x: x + offsetX, y: y + offsetY });
                     }
                 }
             }
-            
-            // Connect nearby nodes with more visible lattice lines
-            nodes.forEach((node, i) => {
-                nodes.slice(i + 1).forEach((otherNode) => {
+            // Connect after a delay
+            setTimeout(() => connectNodes(container), 3000);
+        }
+        
+        function connectNodes(container) {
+            latticeNodes.forEach((node, i) => {
+                latticeNodes.slice(i + 1).forEach((otherNode) => {
                     const distance = Math.sqrt(
-                        Math.pow(node.x - otherNode.x, 2) + 
+                        Math.pow(node.x - otherNode.x, 2) +
                         Math.pow(node.y - otherNode.y, 2)
                     );
-                    
-                    // Connect more nodes for better lattice visibility
-                    if (distance < spacing * 1.6 && Math.random() < 0.4) {
+                    if (distance < 180 && Math.random() < 0.4) {
                         const dx = otherNode.x - node.x;
                         const dy = otherNode.y - node.y;
                         const length = Math.sqrt(dx * dx + dy * dy);
                         const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-                        
                         const line = document.createElement('div');
                         line.className = 'lattice-connection';
                         line.style.left = node.x + 'px';
                         line.style.top = node.y + 'px';
                         line.style.width = length + 'px';
                         line.style.transform = `rotate(${angle}deg)`;
-                        line.style.animationDelay = Math.random() * 35 + 's';
-                        
+                        line.style.animationDelay = Math.random() * 40 + 's';
+                        line.style.opacity = '0';
+                        setTimeout(() => {
+                            if (line.parentNode) {
+                                line.style.transition = 'opacity 6s ease-in-out';
+                                line.style.opacity = '1';
+                            }
+                        }, Math.random() * 8000);
                         container.appendChild(line);
+                        latticeConnections.push(line);
                     }
                 });
             });
         }
+        
+        function dissipateCurrentLattice() {
+            [...latticeNodes, ...latticeConnections].forEach(item => {
+                const element = item.element || item;
+                if (element && element.parentNode) {
+                    element.style.transition = 'opacity 12s ease-in-out';
+                    element.style.opacity = '0';
+                    setTimeout(() => {
+                        if (element.parentNode) element.remove();
+                    }, 12000);
+                }
+            });
+            latticeNodes = [];
+            latticeConnections = [];
+        }
 
-        // Initialize everything
         document.addEventListener('DOMContentLoaded', function() {
-            const links = document.querySelectorAll('.link-item');
-            
-            links.forEach((link, index) => {
-                link.style.animationDelay = `${index * 0.1}s`;
+            // Lyric whisper system
+            const phrases = [
+                ["ITS", "HARD", "TO", "BREATHE"],
+                ["love", "always", "knows"],
+                ["THIS", "IS", "ALL", "I", "AM"],
+                ["love", "has", "a", "way"],
+                ["I", "WILL", "STAY"],
+                ["your", "heart", "will", "hear"],
+                ["its", "the", "light"],
+                ["TOO", "DARK", "TO", "SEE"],
+                ["love", "holds", "its", "own"]
+            ];
+
+            // Map negative spaces: 1=spotify left, 2=apple right, 3=bereal left, 4=bereal right, 5=instagram right, 6=facebook left
+            const negativeSpaces = [
+                document.querySelector('.space-1'),
+                document.querySelector('.space-2'), 
+                document.querySelector('.space-3'),
+                document.querySelector('.space-4'),
+                document.querySelector('.space-5'),
+                document.querySelector('.space-6')
+            ];
+
+            function createCrypticWord(word) {
+                const letters = word.split('');
+                const crypticClasses = ['', 'up', 'down', 'up2', 'down2'];
+                
+                return letters.map(letter => {
+                    const randomClass = Math.random() < 0.4 ? crypticClasses[Math.floor(Math.random() * crypticClasses.length)] : '';
+                    return `<span class="letter ${randomClass}">${letter}</span>`;
+                }).join('');
+            }
+
+            function displayPhrase(phraseWords) {
+                // Clear all whispers first
+                negativeSpaces.forEach(el => {
+                    if (el) {
+                        el.classList.remove('active', 'fade-out');
+                        el.innerHTML = '';
+                    }
+                });
+
+                // Randomly choose starting position (space 1 or 2)
+                const startPos = Math.random() > 0.5 ? 0 : 1; // Start at space 1 or 2
+                
+                // Display words cascading down through negative spaces
+                phraseWords.forEach((word, index) => {
+                    const spaceIndex = startPos + index;
+                    if (spaceIndex < negativeSpaces.length && negativeSpaces[spaceIndex]) {
+                        setTimeout(() => {
+                            const element = negativeSpaces[spaceIndex];
+                            element.innerHTML = createCrypticWord(word);
+                            element.classList.add('active');
+                        }, index * 800); // 0.8s between words
+                    }
+                });
+
+                // Fade out after phrase is complete
+                setTimeout(() => {
+                    negativeSpaces.forEach(el => {
+                        if (el && el.innerHTML) {
+                            el.classList.remove('active');
+                            el.classList.add('fade-out');
+                        }
+                    });
+                }, phraseWords.length * 800 + 4000); // Show complete phrase for 4s
+            }
+
+            function startLyricCycle() {
+                function nextPhrase() {
+                    const randomIndex = Math.floor(Math.random() * phrases.length);
+                    const phrase = phrases[randomIndex];
+                    
+                    displayPhrase(phrase);
+                    
+                    // Schedule next phrase (8-15 seconds after this one completes)
+                    const cycleDelay = (phrase.length * 800 + 4000 + 2000) + (Math.random() * 7000 + 8000);
+                    setTimeout(nextPhrase, cycleDelay);
+                }
+                
+                // Start first phrase after initial delay
+                setTimeout(nextPhrase, 4000);
+            }
+
+            // Animate staggered link fade-in
+            document.querySelectorAll('.link-item').forEach((link, idx) => {
+                link.style.animationDelay = `${idx * 0.1}s`;
                 link.style.animation = 'fadeInUp 0.6s ease-out forwards';
                 link.style.opacity = '0';
             });
             
-            generateSparseConstellation();
+            // Start lyric system
+            startLyricCycle();
             
-            // Regenerate constellation for very slow crystalline transformation
-            setInterval(generateSparseConstellation, 60000); // Every 60 seconds
+            // Start lattice visual
+            generateDynamicLattice();
+            setInterval(generateDynamicLattice, 45000);
+            window.addEventListener('resize', () => {
+                document.getElementById('backgroundLattice').innerHTML = '';
+                generateDynamicLattice();
+            });
             
-            window.addEventListener('resize', generateSparseConstellation);
-            
-            // Initialize audio on first interaction - add visual feedback
-            document.addEventListener('click', function() {
-                initAudioSystem();
-                console.log('Audio initialization triggered');
-            }, { once: true });
-            document.addEventListener('keydown', function() {
-                initAudioSystem();
-                console.log('Audio initialization triggered');
-            }, { once: true });
+            // Audio: trigger on first user input
+            function start() { initAudioSystem(); }
+            document.addEventListener('click', start, { once: true });
+            document.addEventListener('keydown', start, { once: true });
         });
 
-        // Slower, more spread out floating particles
-        function createParticle() {
+        // Subtle floating particles
+        function createEtherealParticle() {
             const particle = document.createElement('div');
             particle.style.position = 'fixed';
-            particle.style.width = '2px';
-            particle.style.height = '2px';
-            particle.style.background = 'rgba(255, 255, 255, 0.3)';
+            particle.style.width = '1px';
+            particle.style.height = '1px';
+            particle.style.background = 'rgba(255, 255, 255, 0.4)';
             particle.style.borderRadius = '50%';
             particle.style.pointerEvents = 'none';
             particle.style.left = Math.random() * window.innerWidth + 'px';
             particle.style.top = window.innerHeight + 'px';
             particle.style.zIndex = '0';
-            particle.style.boxShadow = '0 0 2px rgba(255, 255, 255, 0.2)';
+            particle.style.boxShadow = '0 0 3px rgba(255, 255, 255, 0.3)';
             
             document.body.appendChild(particle);
             
             const animation = particle.animate([
-                { transform: 'translateY(0px)', opacity: 0.6 },
-                { transform: `translateY(-${window.innerHeight + 100}px)`, opacity: 0 }
+                { 
+                    transform: 'translateY(0px) translateX(0px)', 
+                    opacity: 0.6 
+                },
+                { 
+                    transform: `translateY(-${window.innerHeight + 100}px) translateX(${(Math.random() - 0.5) * 200}px)`, 
+                    opacity: 0 
+                }
             ], {
-                duration: Math.random() * 8000 + 6000, // 6-14 seconds (much slower)
-                easing: 'linear'
+                duration: Math.random() * 12000 + 8000, // 8-20 seconds
+                easing: 'ease-out'
             });
             
             animation.onfinish = () => particle.remove();
         }
         
-        // Create particles much less frequently for more spread out effect
-        setInterval(createParticle, 2000); // Every 2 seconds instead of 800ms
+        // Create ethereal particles less frequently
+        setInterval(createEtherealParticle, 3000); // Every 3 seconds
     </script>
 </body>
 </html>
