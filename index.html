@@ -73,6 +73,51 @@
             text-transform: uppercase; z-index: 2;
             min-height: 56px;
         }
+        
+        /* Subtle constellation particles within links */
+        .link-constellation {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.1;
+        }
+        
+        .link-star {
+            position: absolute;
+            background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.3) 50%, transparent 100%);
+            border-radius: 50%;
+            width: 1px; height: 1px;
+            animation: starTwinkle 4s ease-in-out infinite;
+            box-shadow: 0 0 2px rgba(255,255,255,0.4);
+        }
+        
+        .link-connection {
+            position: absolute;
+            background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+            height: 0.5px;
+            transform-origin: left center;
+            animation: connectionPulse 6s ease-in-out infinite;
+        }
+        
+        @keyframes starTwinkle {
+            0%, 100% { opacity: 0.1; transform: scale(0.5); }
+            50% { opacity: 0.4; transform: scale(1.2); }
+        }
+        
+        @keyframes connectionPulse {
+            0%, 100% { opacity: 0; transform: scaleX(0); }
+            50% { opacity: 0.15; transform: scaleX(1); }
+        }
+        
+        /* Enhanced hover effects with constellation response */
+        .link-item:hover .link-constellation {
+            opacity: 0.25;
+        }
+        
+        .link-item:hover .link-star {
+            animation-duration: 2s; /* Faster twinkling on hover */
+        }
         .link-item.left  { justify-content: flex-start; }
         .link-item.center{ justify-content: center; }
         .link-item.right { justify-content: flex-end; }
@@ -96,19 +141,40 @@
             pointer-events: none; z-index: 1;
         }
 
-        /* Enhanced Lyric Whisper System */
+        /* Enhanced Lyric Whisper System - Death Note inspired subliminal effects */
         .lyric-whisper {
             position: absolute; 
             font-size: 12px; 
-            color: rgba(255, 68, 68, 0.4);
+            color: rgba(255, 68, 68, 0.25); /* More subtle base opacity */
             font-weight: 300; 
             letter-spacing: 1.8px;
             text-transform: uppercase;
             pointer-events: none; 
             z-index: 3;
             opacity: 0;
-            text-shadow: 0 0 4px rgba(255, 68, 68, 0.2);
+            text-shadow: 0 0 6px rgba(255, 68, 68, 0.3), 0 0 12px rgba(255, 68, 68, 0.1);
             font-family: 'Courier New', monospace;
+            filter: blur(0.5px); /* Slight blur for subliminal effect */
+        }
+
+        /* Glitch effect for single words */
+        .lyric-whisper.single-word {
+            animation-duration: 0.3s;
+            color: rgba(255, 68, 68, 0.6);
+            text-shadow: 
+                2px 0 rgba(255, 68, 68, 0.4),
+                -2px 0 rgba(68, 255, 255, 0.2),
+                0 0 8px rgba(255, 68, 68, 0.5);
+            filter: none;
+        }
+
+        /* Peripheral vision effect */
+        .lyric-whisper.peripheral {
+            font-size: 10px;
+            opacity: 0.15;
+            color: rgba(255, 255, 255, 0.3);
+            letter-spacing: 3px;
+            filter: blur(1px);
         }
 
         /* Cryptic letter positioning */
@@ -134,51 +200,74 @@
         }
 
         /* Positioning for specific negative spaces */
-        .link-item:nth-child(1) .lyric-whisper.space-1 {
-            left: 25px; /* opposite side of SPOTIFY */
+        .link-item:nth-child(1) .lyric-whisper {
+            right: 15%; /* position in right negative space of SPOTIFY */
             top: 50%;
             transform: translateY(-50%);
         }
 
-        .link-item:nth-child(2) .lyric-whisper.space-2 {
-            right: 25px; /* before APPLE MUSIC */
+        .link-item:nth-child(2) .lyric-whisper {
+            left: 15%; /* position in left negative space of APPLE MUSIC */
             top: 50%;
             transform: translateY(-50%);
         }
 
-        .link-item:nth-child(3) .lyric-whisper.space-3 {
-            left: 20px; /* left of BEREAL */
+        .link-item:nth-child(3) .lyric-whisper.left-space {
+            left: 15%; /* left negative space of BEREAL */
             top: 50%;
             transform: translateY(-50%);
         }
 
-        .link-item:nth-child(3) .lyric-whisper.space-4 {
-            right: 20px; /* right of BEREAL */
+        .link-item:nth-child(3) .lyric-whisper.right-space {
+            right: 15%; /* right negative space of BEREAL */
             top: 50%;
             transform: translateY(-50%);
         }
 
-        .link-item:nth-child(4) .lyric-whisper.space-5 {
-            right: 25px; /* right of INSTAGRAM */
+        .link-item:nth-child(4) .lyric-whisper {
+            right: 15%; /* position in right negative space of INSTAGRAM */
             top: 50%;
             transform: translateY(-50%);
         }
 
-        .link-item:nth-child(5) .lyric-whisper.space-6 {
-            left: 25px; /* left of FACEBOOK */
+        .link-item:nth-child(5) .lyric-whisper {
+            left: 15%; /* position in left negative space of FACEBOOK */
             top: 50%;
             transform: translateY(-50%);
         }
 
-        /* Dynamic phrase animation */
+        /* Dynamic phrase animation - multiple variants */
         .lyric-whisper.active {
             animation: wordAppear 0.8s ease-in-out forwards;
+        }
+
+        .lyric-whisper.single-word.active {
+            animation: glitchFlash 0.3s ease-in-out forwards;
+        }
+
+        .lyric-whisper.peripheral.active {
+            animation: subliminalFlash 0.2s ease-in-out forwards;
         }
 
         @keyframes wordAppear {
             0% { opacity: 0; transform: translateY(-50%) scale(0.9); }
             50% { opacity: 0.6; transform: translateY(-50%) scale(1); }
-            100% { opacity: 0.4; transform: translateY(-50%) scale(1); }
+            100% { opacity: 0.25; transform: translateY(-50%) scale(1); }
+        }
+
+        @keyframes glitchFlash {
+            0% { opacity: 0; transform: translateY(-50%) translateX(0); }
+            20% { opacity: 0.8; transform: translateY(-50%) translateX(2px); }
+            40% { opacity: 0.6; transform: translateY(-50%) translateX(-1px); }
+            60% { opacity: 0.9; transform: translateY(-50%) translateX(1px); }
+            80% { opacity: 0.4; transform: translateY(-50%) translateX(0); }
+            100% { opacity: 0; transform: translateY(-50%) translateX(0); }
+        }
+
+        @keyframes subliminalFlash {
+            0% { opacity: 0; }
+            50% { opacity: 0.2; }
+            100% { opacity: 0; }
         }
 
         .lyric-whisper.fade-out {
@@ -255,46 +344,33 @@
         <div class="links-container">
             <a href="https://open.spotify.com/artist/yourid" class="link-item left" target="_blank">
                 <span>SPOTIFY</span>
-                <div class="lyric-whisper left-space phrase-1-word-1">
-                    <span class="letter">I</span><span class="letter up">T</span><span class="letter down">S</span>
-                </div>
+                <div class="lyric-whisper"></div>
+                <div class="link-constellation"></div>
             </a>
             
             <a href="https://music.apple.com/artist/yourid" class="link-item right" target="_blank">
                 <span>APPLE MUSIC</span>
-                <div class="lyric-whisper right-space phrase-1-word-2">
-                    <span class="letter down">H</span><span class="letter">A</span><span class="letter up">R</span><span class="letter down2">D</span>
-                </div>
+                <div class="lyric-whisper"></div>
+                <div class="link-constellation"></div>
             </a>
             
-            <a href="https://bere.al/yourusername" class="link-item center" target="_blank">
-                <span>BEREAL</span>
-                <div class="lyric-whisper center-left phrase-1-word-3">
-                    <span class="letter up">T</span><span class="letter down">O</span>
-                </div>
-                <div class="lyric-whisper center-right phrase-1-word-4">
-                    <span class="letter">B</span><span class="letter up2">R</span><span class="letter down">E</span><span class="letter">A</span><span class="letter up">T</span><span class="letter down">H</span><span class="letter up">E</span>
-                </div>
-                <div class="lyric-whisper center-left phrase-2-word-3">
-                    <span class="letter down">A</span>
-                </div>
-                <div class="lyric-whisper center-right phrase-2-word-4">
-                    <span class="letter up">W</span><span class="letter down2">A</span><span class="letter up">Y</span>
-                </div>
+            <a href="http://bere.al/heliotropic" class="link-item center" target="_blank">
+                <span>BeReal</span>
+                <div class="lyric-whisper left-space"></div>
+                <div class="lyric-whisper right-space"></div>
+                <div class="link-constellation"></div>
             </a>
             
             <a href="https://instagram.com/thomaslistens" class="link-item left" target="_blank">
                 <span>INSTAGRAM</span>
-                <div class="lyric-whisper left-space phrase-2-word-1">
-                    <span class="letter up">L</span><span class="letter down">O</span><span class="letter">V</span><span class="letter up">E</span>
-                </div>
+                <div class="lyric-whisper"></div>
+                <div class="link-constellation"></div>
             </a>
             
             <a href="https://facebook.com/thomaslistens" class="link-item right" target="_blank">
                 <span>FACEBOOK</span>
-                <div class="lyric-whisper right-space phrase-2-word-2">
-                    <span class="letter down">F</span><span class="letter up">I</span><span class="letter">N</span><span class="letter up2">D</span><span class="letter down">S</span>
-                </div>
+                <div class="lyric-whisper"></div>
+                <div class="link-constellation"></div>
             </a>
             
             <a href="mailto:your.email@example.com" class="link-item physical-copy center">
@@ -624,28 +700,130 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             latticeConnections = [];
         }
 
+        // Create subtle constellation effects within each link
+        function createLinkConstellations() {
+            const linkConstellations = document.querySelectorAll('.link-constellation');
+            
+            linkConstellations.forEach((constellation, linkIndex) => {
+                // Create 3-5 stars per link
+                const starCount = Math.floor(Math.random() * 3) + 3;
+                const stars = [];
+                
+                for (let i = 0; i < starCount; i++) {
+                    const star = document.createElement('div');
+                    star.className = 'link-star';
+                    
+                    // Position stars avoiding text area (center 60%)
+                    let x, y;
+                    if (Math.random() > 0.5) {
+                        // Left or right edges
+                        x = Math.random() > 0.5 ? Math.random() * 20 : 80 + Math.random() * 20;
+                    } else {
+                        // Top or bottom areas
+                        x = 20 + Math.random() * 60;
+                        y = Math.random() > 0.5 ? Math.random() * 30 : 70 + Math.random() * 30;
+                    }
+                    
+                    if (y === undefined) y = 20 + Math.random() * 60;
+                    
+                    star.style.left = x + '%';
+                    star.style.top = y + '%';
+                    star.style.animationDelay = (Math.random() * 4) + 's';
+                    
+                    constellation.appendChild(star);
+                    stars.push({ element: star, x, y });
+                }
+                
+                // Create connections between nearby stars
+                stars.forEach((star, i) => {
+                    stars.slice(i + 1).forEach(otherStar => {
+                        const distance = Math.sqrt(
+                            Math.pow(star.x - otherStar.x, 2) + 
+                            Math.pow(star.y - otherStar.y, 2)
+                        );
+                        
+                        // Connect stars that are close but not too close
+                        if (distance < 40 && distance > 15 && Math.random() < 0.6) {
+                            const connection = document.createElement('div');
+                            connection.className = 'link-connection';
+                            
+                            const dx = otherStar.x - star.x;
+                            const dy = otherStar.y - star.y;
+                            const length = Math.sqrt(dx * dx + dy * dy);
+                            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                            
+                            connection.style.left = star.x + '%';
+                            connection.style.top = star.y + '%';
+                            connection.style.width = length + '%';
+                            connection.style.transform = `rotate(${angle}deg)`;
+                            connection.style.animationDelay = (Math.random() * 6) + 's';
+                            
+                            constellation.appendChild(connection);
+                        }
+                    });
+                });
+            });
+            
+            // Refresh constellations periodically for dynamic feel
+            setTimeout(() => {
+                linkConstellations.forEach(constellation => {
+                    constellation.innerHTML = '';
+                });
+                createLinkConstellations();
+            }, 30000); // Refresh every 30 seconds
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
-            // Lyric whisper system
+            // Lyric whisper system - subliminal cryptic messages from Thomas's music
             const phrases = [
+                // Intense/desperate phrases - ALL CAPS
                 ["ITS", "HARD", "TO", "BREATHE"],
-                ["love", "always", "knows"],
-                ["THIS", "IS", "ALL", "I", "AM"],
-                ["love", "has", "a", "way"],
+                ["TOO", "DARK", "TO", "SEE"],
                 ["I", "WILL", "STAY"],
+                ["THIS", "IS", "ALL", "I", "AM"],
+                ["BURNING", "ALIVE"],
+                ["I", "SEE", "YOU"],
+                ["DONT", "LET", "ME", "LIE"],
+                ["FOLLOW"],
+                ["should", "i", "go?"],
+                
+                // Gentle/intimate phrases - lowercase
+                ["love", "has", "a", "way"],
+                ["love", "always", "knows"],
+                ["love", "holds", "its", "own"],
                 ["your", "heart", "will", "hear"],
                 ["its", "the", "light"],
-                ["TOO", "DARK", "TO", "SEE"],
-                ["love", "holds", "its", "own"]
+                ["nowhere", "else", "to", "go"],
+                ["never", "knows"],
+                ["hear", "eye"],
+                ["hold", "on", "dearly"],
+                ["truth", "can", "take", "all", "night"],
+                
+                // Subliminal fragments - mixed case
+                ["BURNING"],
+                ["FOLLOW"],
+                ["LISTEN"],
+                ["REMEMBER"],
+                ["stay"],
+                ["see"],
+                ["hear"],
+                ["truth"],
+                ["HOLD"],
+                ["dearly"]
             ];
 
-            // Map negative spaces: 1=spotify left, 2=apple right, 3=bereal left, 4=bereal right, 5=instagram right, 6=facebook left
-            const negativeSpaces = [
-                document.querySelector('.space-1'),
-                document.querySelector('.space-2'), 
-                document.querySelector('.space-3'),
-                document.querySelector('.space-4'),
-                document.querySelector('.space-5'),
-                document.querySelector('.space-6')
+            // Get all lyric whisper elements
+            const whisperElements = Array.from(document.querySelectorAll('.lyric-whisper'));
+
+            // Define the sequential order of whisper positions
+            // 0: Spotify right, 1: Apple left, 2: BeReal left, 3: BeReal right, 4: Instagram right, 5: Facebook left
+            const whisperOrder = [
+                whisperElements[0], // Spotify
+                whisperElements[1], // Apple Music  
+                whisperElements[2], // BeReal left
+                whisperElements[3], // BeReal right
+                whisperElements[4], // Instagram
+                whisperElements[5]  // Facebook
             ];
 
             function createCrypticWord(word) {
@@ -658,55 +836,86 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                 }).join('');
             }
 
-            function displayPhrase(phraseWords) {
+            function displayPhrase(phraseWords, startPos) {
                 // Clear all whispers first
-                negativeSpaces.forEach(el => {
-                    if (el) {
-                        el.classList.remove('active', 'fade-out');
-                        el.innerHTML = '';
-                    }
+                whisperElements.forEach(el => {
+                    el.classList.remove('active', 'fade-out', 'single-word', 'peripheral');
+                    el.innerHTML = '';
                 });
 
-                // Randomly choose starting position (space 1 or 2)
-                const startPos = Math.random() > 0.5 ? 0 : 1; // Start at space 1 or 2
-                
-                // Display words cascading down through negative spaces
+                // Determine phrase type for different effects
+                const isSingleWord = phraseWords.length === 1;
+                const isPeripheral = Math.random() < 0.3; // 30% chance for peripheral effect
+
+                // Display words sequentially from the starting position
                 phraseWords.forEach((word, index) => {
-                    const spaceIndex = startPos + index;
-                    if (spaceIndex < negativeSpaces.length && negativeSpaces[spaceIndex]) {
+                    const positionIndex = startPos + index;
+                    if (positionIndex < whisperOrder.length && whisperOrder[positionIndex]) {
                         setTimeout(() => {
-                            const element = negativeSpaces[spaceIndex];
+                            const element = whisperOrder[positionIndex];
                             element.innerHTML = createCrypticWord(word);
+                            
+                            // Apply appropriate effect classes
+                            if (isSingleWord) {
+                                element.classList.add('single-word');
+                            } else if (isPeripheral) {
+                                element.classList.add('peripheral');
+                            }
+                            
                             element.classList.add('active');
-                        }, index * 800); // 0.8s between words
+                        }, index * (isSingleWord ? 0 : 400)); // Faster timing: 0.4s between words
                     }
                 });
 
-                // Fade out after phrase is complete
+                // Fade out timing based on phrase type
+                const sustainTime = isSingleWord ? 300 : 2000; // Single words flash quickly
                 setTimeout(() => {
-                    negativeSpaces.forEach(el => {
-                        if (el && el.innerHTML) {
-                            el.classList.remove('active');
-                            el.classList.add('fade-out');
+                    phraseWords.forEach((word, index) => {
+                        const positionIndex = startPos + index;
+                        if (positionIndex < whisperOrder.length && whisperOrder[positionIndex]) {
+                            whisperOrder[positionIndex].classList.remove('active');
+                            whisperOrder[positionIndex].classList.add('fade-out');
                         }
                     });
-                }, phraseWords.length * 800 + 4000); // Show complete phrase for 4s
+                }, phraseWords.length * (isSingleWord ? 0 : 400) + sustainTime);
             }
 
             function startLyricCycle() {
+                let lastStartPos = -1; // Track the last starting position
+                
                 function nextPhrase() {
                     const randomIndex = Math.floor(Math.random() * phrases.length);
                     const phrase = phrases[randomIndex];
                     
-                    displayPhrase(phrase);
+                    // Get valid starting positions for this phrase length
+                    const maxStartPos = Math.min(3, whisperOrder.length - phrase.length);
+                    const validPositions = [];
+                    for (let i = 0; i <= maxStartPos; i++) {
+                        validPositions.push(i);
+                    }
                     
-                    // Schedule next phrase (8-15 seconds after this one completes)
-                    const cycleDelay = (phrase.length * 800 + 4000 + 2000) + (Math.random() * 7000 + 8000);
+                    // Remove the last used position to avoid repetition (if possible)
+                    if (validPositions.length > 1 && validPositions.includes(lastStartPos)) {
+                        validPositions.splice(validPositions.indexOf(lastStartPos), 1);
+                    }
+                    
+                    // Choose a random position from remaining valid positions
+                    const startPos = validPositions[Math.floor(Math.random() * validPositions.length)];
+                    lastStartPos = startPos;
+                    
+                    displayPhrase(phrase, startPos);
+                    
+                    // Much faster cycles - Death Note psychological pressure
+                    const isSingleWord = phrase.length === 1;
+                    const baseDelay = isSingleWord ? 1500 : 3000; // Quick single words, moderate phrases
+                    const randomDelay = Math.random() * 2000 + 1000; // 1-3s additional randomness
+                    const cycleDelay = baseDelay + randomDelay;
+                    
                     setTimeout(nextPhrase, cycleDelay);
                 }
                 
-                // Start first phrase after initial delay
-                setTimeout(nextPhrase, 4000);
+                // Start first phrase immediately after page load - no waiting
+                setTimeout(nextPhrase, 1500);
             }
 
             // Animate staggered link fade-in
@@ -718,6 +927,9 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             
             // Start lyric system
             startLyricCycle();
+            
+            // Create link constellations
+            createLinkConstellations();
             
             // Start lattice visual
             generateDynamicLattice();
@@ -766,8 +978,6 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             animation.onfinish = () => particle.remove();
         }
         
-        // Create ethereal particles less frequently
-        setInterval(createEtherealParticle, 3000); // Every 3 seconds
     </script>
 </body>
 </html>
