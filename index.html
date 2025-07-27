@@ -43,7 +43,7 @@
             display: flex; align-items: center; justify-content: center;
             font-size: 48px;
             transition: transform 0.3s ease;
-            background-image: url('./TheWay.jpg'); /* Direct path to your album art */
+            background-image: url('./TheWay.jpg');
             background-size: cover; background-position: center;
             border-radius: 4px;
         }
@@ -56,7 +56,6 @@
             display: inline-block;
         }
         
-        /* Simple underline for name - no animation */
         .profile-name::after {
             content: '';
             position: absolute;
@@ -76,10 +75,9 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-left: -15px; /* More LEFT to perfectly split between Only and Way */
+            margin-left: -15px;
         }
         
-        /* Lyric whisper style flashes for album title */
         .letter {
             display: inline-block;
             opacity: 0;
@@ -110,7 +108,6 @@
             }
         }
 
-        /* Word flash similar to lyric whispers */
         .album-word {
             opacity: 0;
             position: relative;
@@ -140,7 +137,6 @@
             }
         }
 
-        /* Final reveal normalization */
         .album-title.final-reveal .album-word {
             opacity: 1;
             animation: none;
@@ -152,50 +148,33 @@
             animation: none;
         }
 
-        /* Cross-out effect for "Out" - precise width */
         .album-word.crossed-out::after {
             content: '';
             position: absolute;
             top: 50%;
-            left: 0;
+            left: -3px;
             width: 0;
             height: 3px;
-            background: linear-gradient(90deg, #ff0000, #cc0000, #ff0000);
+            background: #ff0000;
             transform: translateY(-50%);
             z-index: 10;
-            box-shadow: 
-                0 0 8px rgba(255,0,0,1),
-                0 0 16px rgba(255,0,0,0.6);
         }
         
         .album-word.crossed-out.show-cross::after {
-            animation: dramaCrossOut 0.4s ease-out forwards;
+            animation: simpleCrossOut 0.4s ease-out forwards;
         }
         
-        @keyframes dramaCrossOut {
+        @keyframes simpleCrossOut {
             0% {
                 width: 0;
                 opacity: 0;
             }
-            30% {
-                width: 100%;
-                opacity: 1;
-                height: 5px;
-                box-shadow: 
-                    0 0 12px rgba(255,0,0,1),
-                    0 0 24px rgba(255,0,0,0.8);
-            }
             100% {
-                width: 100%;
+                width: calc(100% + 6px);
                 opacity: 0.9;
-                height: 3px;
-                box-shadow: 
-                    0 0 8px rgba(255,0,0,1),
-                    0 0 16px rgba(255,0,0,0.6);
             }
         }
         
-        /* Enhanced blood drip - positioned directly under name in HTML */
         .blood-drip {
             position: absolute;
             width: 3px;
@@ -205,7 +184,7 @@
                 #990000 60%, 
                 #660000 100%);
             left: 50%;
-            top: 360px; /* Slightly higher - just touching the underline */
+            top: 360px;
             transform: translateX(-50%);
             height: 0;
             z-index: 1;
@@ -214,7 +193,6 @@
                 0 0 12px rgba(255,0,0,0.4);
             border-radius: 0 0 2px 2px;
             
-            /* Crisp fade-out using opacity animation instead of gradient */
             mask: linear-gradient(to bottom, 
                 black 0%, 
                 black 88%, 
@@ -225,7 +203,6 @@
                 transparent 100%);
         }
 
-        /* Blood drip animation */
         @keyframes bloodDrip {
             0% {
                 height: 0;
@@ -277,7 +254,6 @@
             }
         }
         
-        /* Subtle constellation particles within links */
         .link-constellation {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -313,13 +289,12 @@
             50% { opacity: 0.15; transform: scaleX(1); }
         }
         
-        /* Enhanced hover effects with constellation response */
         .link-item:hover .link-constellation {
             opacity: 0.25;
         }
         
         .link-item:hover .link-star {
-            animation-duration: 2s; /* Faster twinkling on hover */
+            animation-duration: 2s;
         }
         .link-item.left  { justify-content: flex-start; }
         .link-item.center{ justify-content: center; }
@@ -344,13 +319,12 @@
             pointer-events: none; z-index: 1;
         }
         
-        /* Media showcase section - delayed until after links */
         .media-showcase {
             margin: 40px auto;
             text-align: center;
             max-width: 400px;
             opacity: 0;
-            animation: none; /* Remove auto animation */
+            animation: none;
         }
 
         .media-showcase.reveal-media {
@@ -367,7 +341,6 @@
             opacity: 1;
         }
 
-        /* Slideshow styles */
         .slideshow-container {
             position: relative;
             max-width: 400px;
@@ -410,43 +383,39 @@
             transform: scale(1.2);
         }
 
-        /* Enhanced Lyric Whisper System - Death Note inspired subliminal effects */
         .lyric-whisper {
             position: absolute; 
             font-size: 12px; 
-            color: rgba(255, 68, 68, 0.25);
+            color: rgba(255, 68, 68, 0.4);
             font-weight: 300; 
             letter-spacing: 1.8px;
             text-transform: uppercase;
             pointer-events: none; 
             z-index: 3;
             opacity: 0;
-            text-shadow: 0 0 6px rgba(255, 68, 68, 0.3), 0 0 12px rgba(255, 68, 68, 0.1);
+            text-shadow: 0 0 8px rgba(255, 68, 68, 0.5), 0 0 15px rgba(255, 68, 68, 0.2);
             font-family: 'Courier New', monospace;
-            filter: blur(0.5px);
+            filter: blur(0.3px);
         }
 
-        /* Glitch effect for single words */
         .lyric-whisper.single-word {
             animation-duration: 0.3s;
-            color: rgba(255, 68, 68, 0.6);
+            color: rgba(255, 68, 68, 0.8);
             text-shadow: 
-                2px 0 rgba(255, 68, 68, 0.4),
-                -2px 0 rgba(68, 255, 255, 0.2),
-                0 0 8px rgba(255, 68, 68, 0.5);
+                2px 0 rgba(255, 68, 68, 0.6),
+                -2px 0 rgba(68, 255, 255, 0.3),
+                0 0 12px rgba(255, 68, 68, 0.7);
             filter: none;
         }
 
-        /* Peripheral vision effect */
         .lyric-whisper.peripheral {
             font-size: 10px;
-            opacity: 0.15;
-            color: rgba(255, 255, 255, 0.3);
+            opacity: 0.25;
+            color: rgba(255, 255, 255, 0.5);
             letter-spacing: 3px;
-            filter: blur(1px);
+            filter: blur(0.8px);
         }
 
-        /* Cryptic letter positioning */
         .lyric-whisper .letter {
             display: inline-block;
             position: relative;
@@ -468,7 +437,6 @@
             transform: translateY(2px);
         }
         
-        /* Positioning for specific negative spaces */
         .link-item:nth-child(1) .lyric-whisper {
             right: 15%;
             top: 50%;
@@ -505,7 +473,14 @@
             transform: translateY(-50%);
         }
 
-        /* Dynamic phrase animation - multiple variants */
+        /* Additional positioning variations for randomness */
+        .lyric-whisper.pos-top-left { top: 25%; left: 10%; transform: none; }
+        .lyric-whisper.pos-top-right { top: 25%; right: 10%; transform: none; }
+        .lyric-whisper.pos-bottom-left { bottom: 25%; left: 10%; transform: none; }
+        .lyric-whisper.pos-bottom-right { bottom: 25%; right: 10%; transform: none; }
+        .lyric-whisper.pos-center-left { top: 50%; left: 5%; transform: translateY(-50%); }
+        .lyric-whisper.pos-center-right { top: 50%; right: 5%; transform: translateY(-50%); }
+
         .lyric-whisper.active {
             animation: wordAppear 0.8s ease-in-out forwards;
         }
@@ -520,22 +495,22 @@
 
         @keyframes wordAppear {
             0% { opacity: 0; transform: translateY(-50%) scale(0.9); }
-            50% { opacity: 0.6; transform: translateY(-50%) scale(1); }
-            100% { opacity: 0.25; transform: translateY(-50%) scale(1); }
+            50% { opacity: 0.8; transform: translateY(-50%) scale(1); }
+            100% { opacity: 0.4; transform: translateY(-50%) scale(1); }
         }
 
         @keyframes glitchFlash {
             0% { opacity: 0; transform: translateY(-50%) translateX(0); }
-            20% { opacity: 0.8; transform: translateY(-50%) translateX(2px); }
-            40% { opacity: 0.6; transform: translateY(-50%) translateX(-1px); }
-            60% { opacity: 0.9; transform: translateY(-50%) translateX(1px); }
-            80% { opacity: 0.4; transform: translateY(-50%) translateX(0); }
+            20% { opacity: 1; transform: translateY(-50%) translateX(2px); }
+            40% { opacity: 0.8; transform: translateY(-50%) translateX(-1px); }
+            60% { opacity: 1; transform: translateY(-50%) translateX(1px); }
+            80% { opacity: 0.6; transform: translateY(-50%) translateX(0); }
             100% { opacity: 0; transform: translateY(-50%) translateX(0); }
         }
 
         @keyframes subliminalFlash {
             0% { opacity: 0; }
-            50% { opacity: 0.2; }
+            50% { opacity: 0.35; }
             100% { opacity: 0; }
         }
 
@@ -584,14 +559,73 @@
             opacity: 0;
             font-size: 12px;
             color: #fff; letter-spacing: 0.8px; line-height: 1.6; text-align: center;
-            animation: none; /* Remove auto animation */
+            animation: none;
         }
 
         .footer.reveal-footer {
             animation: fadeInUp 0.8s ease-out forwards;
         }
         .footer .quote-line { display: block; margin-bottom: 2px;}
-        .footer .author { margin-top: 8px; opacity: 0.6; font-style: italic;}
+        /* Ghost image system for alternate covers */
+        .ghost-image {
+            position: fixed;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0;
+            filter: blur(1px) grayscale(0.3);
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.05);
+            transition: opacity 8s ease-in-out, transform 20s linear;
+        }
+
+        .ghost-image.small {
+            width: 120px;
+            height: 120px;
+        }
+
+        .ghost-image.medium {
+            width: 180px;
+            height: 180px;
+        }
+
+        .ghost-image.large {
+            width: 250px;
+            height: 250px;
+        }
+
+        .ghost-image.active {
+            opacity: 0.15;
+        }
+
+        .ghost-image.ethereal {
+            opacity: 0.08;
+            filter: blur(2px) grayscale(0.7);
+        }
+
+        .ghost-image.peripheral {
+            opacity: 0.05;
+            filter: blur(3px) grayscale(0.9);
+        }
+
+        /* Ghost movement animations */
+        @keyframes ghostFloat {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            25% { transform: translate(-10px, -15px) rotate(1deg); }
+            50% { transform: translate(5px, -20px) rotate(-0.5deg); }
+            75% { transform: translate(-5px, -10px) rotate(0.5deg); }
+            100% { transform: translate(0, 0) rotate(0deg); }
+        }
+
+        @keyframes ghostDrift {
+            0% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+            100% { transform: translateY(-100vh) translateX(20px) rotate(2deg); }
+        }
+
+        @keyframes ghostOrbit {
+            0% { transform: rotate(0deg) translateX(150px) rotate(0deg); }
+            100% { transform: rotate(360deg) translateX(150px) rotate(-360deg); }
+        }
         @media (max-width: 480px) {
             .container {
                 padding: 0 10px;
@@ -646,7 +680,7 @@
                 <div class="link-constellation"></div>
             </a>
             
-            <a href="http://bere.al/heliotropic" class="link-item center" target="_blank" style="letter-spacing: 8px; padding-right: 14px;">
+            <a href="http://bere.al/heliotropic" class="link-item center" target="_blank" style="letter-spacing: 9px; padding-left: 28px;">
                 <span>BeReal</span>
                 <div class="lyric-whisper left-space"></div>
                 <div class="lyric-whisper right-space"></div>
@@ -670,7 +704,6 @@
             </a>
         </div>
         
-        <!-- Media showcase section -->
         <div class="media-showcase">
             <div class="showcase-image">
                 <img src="behind-the-scenes.jpg" alt="Behind the scenes" style="width: 100%; max-width: 400px; border: 1px solid #333; border-radius: 4px;">
@@ -683,7 +716,8 @@
             <span class="author">- Pauline Oliveros</span>
         </div>
         
-        <!-- Dynamic background lattice -->
+        <div class="background-cover"></div>
+        <div class="spotlight-mask" id="spotlight"></div>
         <div class="background-lattice" id="backgroundLattice"></div>
     </div>
     <script>
@@ -698,47 +732,35 @@ const fundamental = 123.47; // B2 drone
 function createCloudTone(frequency, baseGain, breathRate, breathDepth, fadeInTime, sustainTime, fadeOutTime, startDelay) {
     const ct = audioContext.currentTime;
     
-    // Create oscillator and gain
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
-    
-    // Create LFO for breathing
     const lfo = audioContext.createOscillator();
     const lfoGain = audioContext.createGain();
     
-    // Configure LFO
     lfo.type = 'sine';
     lfo.frequency.setValueAtTime(breathRate, ct);
     lfoGain.gain.setValueAtTime(baseGain * breathDepth, ct);
     
-    // Connect LFO to modulate gain
     lfo.connect(lfoGain);
     lfoGain.connect(gainNode.gain);
-    
-    // Connect main audio path
     oscillator.connect(gainNode);
     gainNode.connect(masterGain);
     
-    // Configure oscillator
     oscillator.type = 'sine';
     oscillator.frequency.setValueAtTime(frequency, ct);
     
-    // Create envelope - gentle fade in, sustain, gentle fade out
     gainNode.gain.setValueAtTime(0, ct + startDelay);
     gainNode.gain.linearRampToValueAtTime(baseGain, ct + startDelay + fadeInTime);
     gainNode.gain.setValueAtTime(baseGain, ct + startDelay + fadeInTime + sustainTime);
     gainNode.gain.linearRampToValueAtTime(0, ct + startDelay + fadeInTime + sustainTime + fadeOutTime);
     
-    // Start oscillators
     oscillator.start(ct + startDelay);
     lfo.start(ct + startDelay);
     
-    // Stop after envelope completes
     const totalTime = startDelay + fadeInTime + sustainTime + fadeOutTime;
     oscillator.stop(ct + totalTime + 1);
     lfo.stop(ct + totalTime + 1);
     
-    // Store for tracking
     activeTones.push({ 
         osc: oscillator, 
         lfo: lfo,
@@ -785,16 +807,8 @@ function initAudioSystem() {
         masterGain.connect(audioContext.destination);
         masterGain.gain.setValueAtTime(0.5, audioContext.currentTime);
 
-        // 1. B2 drone (1/1) - always present, gentle breathing
-        createBreathingTone(
-            fundamental,
-            0.08,
-            0.15,
-            0.3,
-            0
-        );
+        createBreathingTone(fundamental, 0.08, 0.15, 0.3, 0);
 
-        // 2. Perfect fifth (3/2) - major triad member
         createToneCycle({
             frequency: fundamental * 3/2,
             baseGain: 0.05,
@@ -809,7 +823,6 @@ function initAudioSystem() {
             }
         });
 
-        // 3. Major third (5/4) - highest, major triad member
         createToneCycle({
             frequency: fundamental * 5/4 * 4,
             baseGain: 0.04,
@@ -824,7 +837,6 @@ function initAudioSystem() {
             }
         });
 
-        // 4. Major seventh (15/8) - filling tone
         createToneCycle({
             frequency: fundamental * 15/8,
             baseGain: 0.03,
@@ -839,7 +851,6 @@ function initAudioSystem() {
             }
         });
 
-        // 5. Septimal tritone (7/5) - octave above
         createToneCycle({
             frequency: fundamental * 7/5 * 2,
             baseGain: 0.025,
@@ -854,7 +865,6 @@ function initAudioSystem() {
             }
         });
 
-        // 6. Harmonic seventh (7/4) - most subtle
         createToneCycle({
             frequency: fundamental * 7/4 * 2,
             baseGain: 0.015,
@@ -894,7 +904,6 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
     oscillator.type = 'sine';
     oscillator.frequency.setValueAtTime(frequency, ct);
     
-    // Gentle fade in for drone
     gainNode.gain.setValueAtTime(0, ct);
     gainNode.gain.linearRampToValueAtTime(baseGain, ct + 10);
     
@@ -902,7 +911,6 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
     lfo.start(ct + startDelay);
 }
 
-        // ---- Dynamic lattice visuals ----
         let latticeNodes = [];
         let latticeConnections = [];
         let isBuilding = true;
@@ -922,7 +930,6 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             latticeNodes = [];
             latticeConnections = [];
             
-            // Generate nodes with exclusion zone around content
             for (let x = spacing; x < width - spacing; x += spacing) {
                 for (let y = spacing; y < height - spacing; y += spacing) {
                     if (Math.abs(x - centerX) < 300 && y > height * 0.2 && y < height * 0.8) continue;
@@ -997,7 +1004,6 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             latticeConnections = [];
         }
 
-        // Create subtle constellation effects within each link
         function createLinkConstellations() {
             const linkConstellations = document.querySelectorAll('.link-constellation');
             
@@ -1064,109 +1070,92 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            // SNAPPY ALBUM TITLE REVEAL with height variability and final flash
             const albumTitle = document.querySelector('.album-title');
             const albumWords = document.querySelectorAll('.album-word');
             
-            // Set random Y positions for cryptic effect (letters)
             albumWords.forEach(word => {
                 const letters = word.querySelectorAll('.letter');
                 letters.forEach(letter => {
-                    const randomY = (Math.random() - 0.5) * 4; // -2px to +2px
+                    const randomY = (Math.random() - 0.5) * 4;
                     letter.style.setProperty('--random-y', `${randomY}px`);
                 });
             });
 
-            // Set height variability per word during flash - more variation
-            const wordHeights = ['12px', '-8px', '15px', '-6px']; // Bigger height differences
+            const wordHeights = ['12px', '-8px', '15px', '-6px'];
             albumWords.forEach((word, index) => {
                 word.style.setProperty('--word-flash-y', wordHeights[index]);
             });
 
-            // Quick word-by-word reveal with height variations
             let wordIndex = 0;
             const wordInterval = setInterval(() => {
                 if (wordIndex < albumWords.length) {
                     const word = albumWords[wordIndex];
                     
-                    // Apply height variation during flash
                     word.style.transform = `translateY(${wordHeights[wordIndex]})`;
                     word.classList.add('flash-word');
                     
-                    // Flash all letters in the word simultaneously
                     word.querySelectorAll('.letter').forEach(letter => {
                         letter.classList.add('flash');
                     });
                     
-                    // Schedule this word to fade out - even faster
                     setTimeout(() => {
-                        word.style.transition = 'opacity 0.15s ease-out'; // Even faster fade
+                        word.style.transition = 'opacity 0.15s ease-out';
                         word.style.opacity = '0';
                         word.style.filter = 'none';
                         word.style.textShadow = 'none';
                         word.style.animation = 'none';
-                    }, 350); // Shorter sustain (was 400ms)
+                    }, 350);
                     
                     wordIndex++;
                 } else {
                     clearInterval(wordInterval);
                     
-                    // Final flash after all words have had time to disappear
                     setTimeout(() => {
-                        // Reset all word positions and show them for final flash
                         albumWords.forEach((word, index) => {
-                            word.style.transform = 'translateY(0)'; // Normalize positions
+                            word.style.transform = 'translateY(0)';
                             word.style.transition = 'none';
                             word.style.opacity = '1';
                             
                             setTimeout(() => {
-                                // Quick final flash
                                 word.style.filter = 'brightness(2.5)';
                                 word.style.textShadow = '0 0 20px rgba(255,255,255,0.9)';
                                 word.style.transform = 'scale(1.05)';
                                 
-                                // Slightly longer final flash
                                 setTimeout(() => {
                                     word.style.filter = 'none';
                                     word.style.textShadow = 'none';
                                     word.style.transform = 'scale(1)';
                                 }, 150);
-                            }, index * 20); // Very tight stagger
+                            }, index * 20);
                         });
                         
-                        // Final reveal and cross-out
                         setTimeout(() => {
                             albumTitle.classList.add('final-reveal');
                             
-                            // Show cross-out on "Out"
                             setTimeout(() => {
                                 const lastWord = document.querySelector('.album-word.crossed-out');
                                 if (lastWord) {
                                     lastWord.classList.add('show-cross');
                                 }
                                 
-                                // Start blood drip
                                 setTimeout(() => {
                                     startBloodDrip();
                                 }, 200);
                             }, 150);
                         }, 200);
-                    }, 580); // Even faster final flash
+                    }, 580);
                 }
-            }, 300); // Keep that snappy 300ms timing!
+            }, 300);
 
-            // Blood drip - much simpler approach using direct CSS animation
             function startBloodDrip() {
                 const bloodDrip = document.querySelector('.blood-drip');
                 
-                // Simple CSS animation - no complex positioning calculations
                 bloodDrip.style.transition = 'height 2.5s cubic-bezier(0.4, 0, 0.2, 1)';
                 
                 setTimeout(() => {
-                    bloodDrip.style.height = '420px'; // Fixed length from its HTML position
+                    bloodDrip.style.height = '420px';
                 }, 50);
                 
-                // Reveal links as blood drips
                 const links = document.querySelectorAll('.link-item');
                 const revealDelay = 2500 / links.length;
                 
@@ -1174,12 +1163,10 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                     setTimeout(() => {
                         link.classList.add('reveal');
                         
-                        // Show media section after last link appears
                         if (index === links.length - 1) {
                             setTimeout(() => {
                                 document.querySelector('.media-showcase').classList.add('reveal-media');
                                 
-                                // Show footer after media
                                 setTimeout(() => {
                                     document.querySelector('.footer').classList.add('reveal-footer');
                                 }, 600);
@@ -1189,7 +1176,6 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                 });
             }
 
-            // Slideshow functionality
             window.showSlide = function(index) {
                 const slides = document.querySelectorAll('.slide');
                 const dots = document.querySelectorAll('.nav-dot');
@@ -1203,9 +1189,7 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                 }
             };
 
-            // Lyric whisper system - enhanced Death Note psychological pressure
             const phrases = [
-                // Intense/desperate phrases - ALL CAPS
                 ["ITS", "HARD", "TO", "BREATHE"],
                 ["TOO", "DARK", "TO", "SEE"],
                 ["I", "WILL", "STAY"],
@@ -1215,8 +1199,6 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                 ["DONT", "LET", "ME", "LIE"],
                 ["FOLLOW"],
                 ["should", "i", "go?"],
-                
-                // Gentle/intimate phrases - lowercase
                 ["love", "has", "a", "way"],
                 ["love", "always", "knows"],
                 ["love", "holds", "its", "own"],
@@ -1227,8 +1209,6 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                 ["hear", "eye"],
                 ["hold", "on", "dearly"],
                 ["truth", "can", "take", "all", "night"],
-                
-                // Subliminal fragments - mixed case
                 ["BURNING"],
                 ["FOLLOW"],
                 ["LISTEN"],
@@ -1242,14 +1222,7 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             ];
 
             const whisperElements = Array.from(document.querySelectorAll('.lyric-whisper'));
-            const whisperOrder = [
-                whisperElements[0], // Spotify
-                whisperElements[1], // Apple Music  
-                whisperElements[2], // BeReal left
-                whisperElements[3], // BeReal right
-                whisperElements[4], // Instagram
-                whisperElements[5]  // Facebook
-            ];
+            const whisperOrder = whisperElements.filter(el => el);
 
             function createCrypticWord(word) {
                 const letters = word.split('');
@@ -1264,41 +1237,117 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             function displayPhrase(phraseWords, startPos) {
                 // Clear all whispers first
                 whisperElements.forEach(el => {
-                    el.classList.remove('active', 'fade-out', 'single-word', 'peripheral');
-                    el.innerHTML = '';
+                    if (el) {
+                        el.classList.remove('active', 'fade-out', 'single-word', 'peripheral');
+                        // Remove any positioning classes
+                        el.classList.remove('pos-top-left', 'pos-top-right', 'pos-bottom-left', 'pos-bottom-right', 'pos-center-left', 'pos-center-right');
+                        el.innerHTML = '';
+                        // Remove debug styling
+                        el.style.border = '';
+                        el.style.background = '';
+                        el.style.opacity = '';
+                        el.style.color = '';
+                        el.style.fontSize = '';
+                        el.style.zIndex = '';
+                        el.style.position = '';
+                        el.style.top = '';
+                        el.style.left = '';
+                        el.style.transform = '';
+                        el.style.padding = '';
+                    }
                 });
 
-                // Determine phrase type for different effects
                 const isSingleWord = phraseWords.length === 1;
                 const isPeripheral = Math.random() < 0.3;
 
-                // Display words sequentially from the starting position
+                // Handle BeReal special case - determine which spaces to use (alternating, not often both)
+                let beRealSpaceStrategy = 'left'; // default to left
+                if (phraseWords.length === 1) {
+                    beRealSpaceStrategy = Math.random() < 0.5 ? 'left' : 'right';
+                } else if (phraseWords.length >= 2) {
+                    // For multi-word phrases, rarely use both (only 20% chance)
+                    const strategies = ['left', 'right', 'left', 'right', 'both']; // 80% single, 20% both
+                    beRealSpaceStrategy = strategies[Math.floor(Math.random() * strategies.length)];
+                }
+
+                // Create available positions for this phrase
+                let availablePositions = [];
+                
+                // Add regular positions
+                if (startPos + phraseWords.length <= 2) { // Can fit before BeReal
+                    for (let i = startPos; i < startPos + phraseWords.length && i < 2; i++) {
+                        availablePositions.push(i);
+                    }
+                }
+                
+                // Add BeReal positions based on strategy
+                if (startPos <= 2 && startPos + phraseWords.length > 2) {
+                    for (let i = Math.max(startPos, 0); i < 2; i++) {
+                        availablePositions.push(i);
+                    }
+                    
+                    const beRealIndex = 2;
+                    const wordsNeeded = Math.min(phraseWords.length - (2 - startPos), beRealSpaceStrategy === 'both' ? 2 : 1);
+                    
+                    if (beRealSpaceStrategy === 'left' || beRealSpaceStrategy === 'both') {
+                        availablePositions.push('bereal-left');
+                    }
+                    if ((beRealSpaceStrategy === 'right' || beRealSpaceStrategy === 'both') && wordsNeeded > 1) {
+                        availablePositions.push('bereal-right');
+                    }
+                }
+                
+                // Add remaining positions after BeReal
+                const remainingStart = Math.max(startPos, 3);
+                for (let i = remainingStart; i < startPos + phraseWords.length && i < whisperOrder.length; i++) {
+                    if (i >= 3) availablePositions.push(i);
+                }
+
                 phraseWords.forEach((word, index) => {
-                    const positionIndex = startPos + index;
-                    if (positionIndex < whisperOrder.length && whisperOrder[positionIndex]) {
+                    if (index < availablePositions.length) {
                         setTimeout(() => {
-                            const element = whisperOrder[positionIndex];
-                            element.innerHTML = createCrypticWord(word);
+                            const position = availablePositions[index];
+                            let element;
                             
-                            if (isSingleWord) {
-                                element.classList.add('single-word');
-                            } else if (isPeripheral) {
-                                element.classList.add('peripheral');
+                            if (position === 'bereal-left') {
+                                element = whisperOrder[2]; // BeReal left space
+                            } else if (position === 'bereal-right') {
+                                element = whisperOrder[3]; // BeReal right space
+                            } else {
+                                element = whisperOrder[position];
                             }
                             
-                            element.classList.add('active');
+                            if (element) {
+                                element.innerHTML = createCrypticWord(word);
+                                
+                                // NO random positioning for blood line links - they stay put!
+                                const isBeRealSpace = position === 'bereal-left' || position === 'bereal-right';
+                                // Removed all random positioning to prevent blood line conflicts
+                                
+                                if (isSingleWord) {
+                                    element.classList.add('single-word');
+                                } else if (isPeripheral) {
+                                    element.classList.add('peripheral');
+                                }
+                                
+                                element.classList.add('active');
+                                
+                                // Fix the letter visibility issue
+                                const letters = element.querySelectorAll('.letter');
+                                letters.forEach(letter => {
+                                    letter.style.opacity = '1';
+                                });
+                            }
                         }, index * (isSingleWord ? 0 : 400));
                     }
                 });
 
-                // Fade out timing based on phrase type
                 const sustainTime = isSingleWord ? 300 : 2000;
                 setTimeout(() => {
-                    phraseWords.forEach((word, index) => {
-                        const positionIndex = startPos + index;
-                        if (positionIndex < whisperOrder.length && whisperOrder[positionIndex]) {
-                            whisperOrder[positionIndex].classList.remove('active');
-                            whisperOrder[positionIndex].classList.add('fade-out');
+                    whisperElements.forEach(el => {
+                        if (el && el.classList.contains('active')) {
+                            el.classList.remove('active');
+                            el.classList.add('fade-out');
                         }
                     });
                 }, phraseWords.length * (isSingleWord ? 0 : 400) + sustainTime);
@@ -1311,12 +1360,27 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                     const randomIndex = Math.floor(Math.random() * phrases.length);
                     const phrase = phrases[randomIndex];
                     
-                    const maxStartPos = Math.min(3, whisperOrder.length - phrase.length);
-                    const validPositions = [];
-                    for (let i = 0; i <= maxStartPos; i++) {
-                        validPositions.push(i);
+                    // Smart starting position based on phrase length
+                    let validPositions = [];
+                    
+                    if (phrase.length >= 5) {
+                        // Long phrases (5+ words) must start at position 0
+                        validPositions = [0];
+                    } else if (phrase.length === 4) {
+                        // 4-word phrases can start at 0 or 1
+                        validPositions = [0, 1];
+                    } else if (phrase.length === 3) {
+                        // 3-word phrases can start at 0, 1, or 2
+                        validPositions = [0, 1, 2];
+                    } else if (phrase.length === 2) {
+                        // 2-word phrases can start at 0, 1, 2, or 3
+                        validPositions = [0, 1, 2, 3];
+                    } else {
+                        // Single words can start anywhere
+                        validPositions = [0, 1, 2, 3, 4];
                     }
                     
+                    // Avoid repeating the same start position if possible
                     if (validPositions.length > 1 && validPositions.includes(lastStartPos)) {
                         validPositions.splice(validPositions.indexOf(lastStartPos), 1);
                     }
@@ -1334,28 +1398,44 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                     setTimeout(nextPhrase, cycleDelay);
                 }
                 
-                // Start after title animation completes (much faster)
                 setTimeout(nextPhrase, 3000);
             }
 
-            // Start all systems
             startLyricCycle();
             createLinkConstellations();
             generateDynamicLattice();
             setInterval(generateDynamicLattice, 45000);
+            
+            // Simple spotlight system
+            const spotlight = document.getElementById('spotlight');
+            if (spotlight) {
+                function moveSpotlight() {
+                    const targetX = 10 + Math.random() * 80;
+                    const targetY = 10 + Math.random() * 80;
+                    
+                    spotlight.style.setProperty('--spotlight-x', targetX + '%');
+                    spotlight.style.setProperty('--spotlight-y', targetY + '%');
+                    
+                    const intensities = ['', 'intense', 'soft', 'pinpoint'];
+                    const currentIntensity = intensities[Math.floor(Math.random() * intensities.length)];
+                    spotlight.className = `spotlight-mask ${currentIntensity}`;
+                    
+                    setTimeout(moveSpotlight, 6000 + Math.random() * 8000);
+                }
+                
+                setTimeout(moveSpotlight, 5000);
+            }
             
             window.addEventListener('resize', () => {
                 document.getElementById('backgroundLattice').innerHTML = '';
                 generateDynamicLattice();
             });
             
-            // Audio: trigger on first user input
             function start() { initAudioSystem(); }
             document.addEventListener('click', start, { once: true });
             document.addEventListener('keydown', start, { once: true });
         });
 
-        // Subtle floating particles
         function createEtherealParticle() {
             const particle = document.createElement('div');
             particle.style.position = 'fixed';
