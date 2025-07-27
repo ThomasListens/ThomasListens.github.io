@@ -33,24 +33,213 @@
         }
         .profile-section {
             margin-bottom: 40px;
+            position: relative;
         }
         .profile-image {
-            width: 120px; height: 120px;
+            width: 300px; height: 300px;
             border: 2px solid #333;
             margin: 0 auto 20px;
             background: #111;
             display: flex; align-items: center; justify-content: center;
             font-size: 48px;
             transition: transform 0.3s ease;
-            background-image: url('https://via.placeholder.com/120x120/111111/333333?text=IMAGE');
+            background-image: url('your-album-cover.jpg');
             background-size: cover; background-position: center;
+            border-radius: 4px;
         }
         .profile-image:hover { transform: scale(1.05);}
         .profile-name {
             font-size: 28px; font-weight: normal;
-            margin-bottom: 10px; letter-spacing: 1px;
+            margin-bottom: 20px; letter-spacing: 1px;
             color: #fff; text-transform: none;
+            position: relative;
+            display: inline-block;
         }
+        
+        /* Simple underline for name - no animation */
+        .profile-name::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.5);
+        }
+        
+        .album-title {
+            font-size: 24px; font-weight: 300;
+            margin-bottom: 30px; letter-spacing: 2px;
+            color: #fff; text-transform: none;
+            position: relative;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: -15px; /* More LEFT to perfectly split between Only and Way */
+        }
+        
+        /* Lyric whisper style flashes for album title */
+        .letter {
+            display: inline-block;
+            opacity: 0;
+            position: relative;
+            transition: none;
+        }
+
+        .letter.flash {
+            animation: whisperFlash 0.2s ease-out forwards;
+        }
+
+        @keyframes whisperFlash {
+            0% {
+                opacity: 0;
+                transform: translateY(var(--random-y, 0)) scale(0.8);
+            }
+            50% {
+                opacity: 1;
+                transform: translateY(var(--random-y, 0)) scale(1.1);
+                filter: brightness(2) blur(0.5px);
+                text-shadow: 0 0 15px rgba(255,255,255,0.8);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(var(--random-y, 0)) scale(1);
+                filter: brightness(1) blur(0);
+                text-shadow: none;
+            }
+        }
+
+        /* Word flash similar to lyric whispers */
+        .album-word {
+            opacity: 0;
+            position: relative;
+            margin: 0 8px;
+        }
+
+        .album-word.flash-word {
+            animation: whisperWordFlash 0.3s ease-out forwards;
+        }
+
+        @keyframes whisperWordFlash {
+            0% {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            40% {
+                opacity: 1;
+                transform: scale(1.05);
+                filter: brightness(1.8) blur(0.5px);
+                text-shadow: 0 0 12px rgba(255,255,255,0.6);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+                filter: brightness(1) blur(0);
+                text-shadow: none;
+            }
+        }
+
+        /* Final reveal normalization */
+        .album-title.final-reveal .album-word {
+            opacity: 1;
+            animation: none;
+        }
+
+        .album-title.final-reveal .album-word .letter {
+            opacity: 1;
+            transform: translateY(0) !important;
+            animation: none;
+        }
+
+        /* Cross-out effect for "Out" - precise width */
+        .album-word.crossed-out::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #ff0000, #cc0000, #ff0000);
+            transform: translateY(-50%);
+            z-index: 10;
+            box-shadow: 
+                0 0 8px rgba(255,0,0,1),
+                0 0 16px rgba(255,0,0,0.6);
+        }
+        
+        .album-word.crossed-out.show-cross::after {
+            animation: dramaCrossOut 0.4s ease-out forwards;
+        }
+        
+        @keyframes dramaCrossOut {
+            0% {
+                width: 0;
+                opacity: 0;
+            }
+            30% {
+                width: 100%;
+                opacity: 1;
+                height: 5px;
+                box-shadow: 
+                    0 0 12px rgba(255,0,0,1),
+                    0 0 24px rgba(255,0,0,0.8);
+            }
+            100% {
+                width: 100%;
+                opacity: 0.9;
+                height: 3px;
+                box-shadow: 
+                    0 0 8px rgba(255,0,0,1),
+                    0 0 16px rgba(255,0,0,0.6);
+            }
+        }
+        
+        /* Enhanced blood drip - starts under name, ends at last link */
+        .blood-drip {
+            position: absolute;
+            width: 3px;
+            background: linear-gradient(to bottom, 
+                #ff0000 0%, 
+                #cc0000 30%, 
+                #990000 60%, 
+                #660000 100%);
+            left: 50%;
+            transform: translateX(-50%);
+            height: 0;
+            z-index: 1;
+            box-shadow: 
+                0 0 6px rgba(255,0,0,0.8),
+                0 0 12px rgba(255,0,0,0.4);
+            border-radius: 0 0 2px 2px;
+            
+            /* Crisp fade-out using opacity animation instead of gradient */
+            mask: linear-gradient(to bottom, 
+                black 0%, 
+                black 88%, 
+                transparent 100%);
+            -webkit-mask: linear-gradient(to bottom, 
+                black 0%, 
+                black 88%, 
+                transparent 100%);
+        }
+
+        /* Blood drip animation */
+        @keyframes bloodDrip {
+            0% {
+                height: 0;
+                opacity: 0;
+            }
+            10% {
+                height: 20px;
+                opacity: 1;
+            }
+            100% {
+                height: var(--drip-distance);
+                opacity: 0.9;
+            }
+        }
+      
         .profile-description {
             font-size: 14px; opacity: 0.8; margin-bottom: 30px;
             line-height: 1.4; color: #fff; letter-spacing: 0.5px;
@@ -72,6 +261,19 @@
             position: relative; overflow: hidden;
             text-transform: uppercase; z-index: 2;
             min-height: 56px;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        
+        .link-item.reveal {
+            animation: revealLink 0.8s ease-out forwards;
+        }
+        
+        @keyframes revealLink {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
         /* Subtle constellation particles within links */
@@ -140,12 +342,78 @@
             background: linear-gradient(to right,rgba(255,255,255,0) 0%,rgba(255,255,255,0.01) 70%,rgba(255,255,255,0.02) 100%);
             pointer-events: none; z-index: 1;
         }
+        
+        /* Media showcase section - delayed until after links */
+        .media-showcase {
+            margin: 40px auto;
+            text-align: center;
+            max-width: 400px;
+            opacity: 0;
+            animation: none; /* Remove auto animation */
+        }
+
+        .media-showcase.reveal-media {
+            animation: fadeInUp 0.8s ease-out forwards;
+        }
+
+        .showcase-image img, .showcase-video video {
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            opacity: 0.9;
+        }
+
+        .showcase-image img:hover, .showcase-video video:hover {
+            transform: scale(1.02);
+            opacity: 1;
+        }
+
+        /* Slideshow styles */
+        .slideshow-container {
+            position: relative;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .slide {
+            display: none;
+            animation: fadeInSlide 0.5s ease-in-out;
+        }
+
+        .slide.active {
+            display: block;
+        }
+
+        @keyframes fadeInSlide {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .slideshow-nav {
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        .nav-dot {
+            height: 8px;
+            width: 8px;
+            margin: 0 4px;
+            background-color: rgba(255,255,255,0.3);
+            border: none;
+            border-radius: 50%;
+            display: inline-block;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .nav-dot:hover, .nav-dot.active {
+            background-color: rgba(255,255,255,0.8);
+            transform: scale(1.2);
+        }
 
         /* Enhanced Lyric Whisper System - Death Note inspired subliminal effects */
         .lyric-whisper {
             position: absolute; 
             font-size: 12px; 
-            color: rgba(255, 68, 68, 0.25); /* More subtle base opacity */
+            color: rgba(255, 68, 68, 0.25);
             font-weight: 300; 
             letter-spacing: 1.8px;
             text-transform: uppercase;
@@ -154,7 +422,7 @@
             opacity: 0;
             text-shadow: 0 0 6px rgba(255, 68, 68, 0.3), 0 0 12px rgba(255, 68, 68, 0.1);
             font-family: 'Courier New', monospace;
-            filter: blur(0.5px); /* Slight blur for subliminal effect */
+            filter: blur(0.5px);
         }
 
         /* Glitch effect for single words */
@@ -198,40 +466,40 @@
         .lyric-whisper .letter.down2 {
             transform: translateY(2px);
         }
-
+        
         /* Positioning for specific negative spaces */
         .link-item:nth-child(1) .lyric-whisper {
-            right: 15%; /* position in right negative space of SPOTIFY */
+            right: 15%;
             top: 50%;
             transform: translateY(-50%);
         }
 
         .link-item:nth-child(2) .lyric-whisper {
-            left: 15%; /* position in left negative space of APPLE MUSIC */
+            left: 15%;
             top: 50%;
             transform: translateY(-50%);
         }
 
         .link-item:nth-child(3) .lyric-whisper.left-space {
-            left: 15%; /* left negative space of BEREAL */
+            left: 15%;
             top: 50%;
             transform: translateY(-50%);
         }
 
         .link-item:nth-child(3) .lyric-whisper.right-space {
-            right: 15%; /* right negative space of BEREAL */
+            right: 15%;
             top: 50%;
             transform: translateY(-50%);
         }
 
         .link-item:nth-child(4) .lyric-whisper {
-            right: 15%; /* position in right negative space of INSTAGRAM */
+            right: 15%;
             top: 50%;
             transform: translateY(-50%);
         }
 
         .link-item:nth-child(5) .lyric-whisper {
-            left: 15%; /* position in left negative space of FACEBOOK */
+            left: 15%;
             top: 50%;
             transform: translateY(-50%);
         }
@@ -278,7 +546,7 @@
             0% { opacity: 0.4; }
             100% { opacity: 0; }
         }
-
+        
         .background-lattice {
             position: fixed; top: 0; left: 0;
             width: 100vw; height: 100vh;
@@ -312,9 +580,14 @@
         }
         .footer {
             margin-top: 50px;
-            opacity: 0.7;
+            opacity: 0;
             font-size: 12px;
             color: #fff; letter-spacing: 0.8px; line-height: 1.6; text-align: center;
+            animation: none; /* Remove auto animation */
+        }
+
+        .footer.reveal-footer {
+            animation: fadeInUp 0.8s ease-out forwards;
         }
         .footer .quote-line { display: block; margin-bottom: 2px;}
         .footer .author { margin-top: 8px; opacity: 0.6; font-style: italic;}
@@ -324,6 +597,9 @@
             }
             .profile-name {
                 font-size: 24px;
+            }
+            .profile-image {
+                width: 250px; height: 250px;
             }
             .link-item {
                 padding: 14px 18px; font-size: 14px; letter-spacing: 2px;
@@ -340,48 +616,72 @@
         <div class="profile-section">
             <div class="profile-image"></div>
             <h1 class="profile-name">Thomas LeRoy Meier</h1>
+            <div class="album-title">
+                <span class="album-word">
+                    <span class="letter">T</span><span class="letter">h</span><span class="letter">e</span>
+                </span>
+                <span class="album-word">
+                    <span class="letter">O</span><span class="letter">n</span><span class="letter">l</span><span class="letter">y</span>
+                </span>
+                <span class="album-word">
+                    <span class="letter">W</span><span class="letter">a</span><span class="letter">y</span>
+                </span>
+                <span class="album-word crossed-out">
+                    <span class="letter">O</span><span class="letter">u</span><span class="letter">t</span>
+                </span>
+                <div class="blood-drip"></div>
+            </div>
         </div>
         <div class="links-container">
-            <a href="https://open.spotify.com/artist/yourid" class="link-item left" target="_blank">
+            <a href="https://open.spotify.com/artist/yourid" class="link-item left" target="_blank" style="padding-left: 28px;">
                 <span>SPOTIFY</span>
                 <div class="lyric-whisper"></div>
                 <div class="link-constellation"></div>
             </a>
             
-            <a href="https://music.apple.com/artist/yourid" class="link-item right" target="_blank">
+            <a href="https://music.apple.com/artist/yourid" class="link-item right" target="_blank" style="padding-left: 45px; font-size: 16px;">
                 <span>APPLE MUSIC</span>
                 <div class="lyric-whisper"></div>
                 <div class="link-constellation"></div>
             </a>
             
-            <a href="http://bere.al/heliotropic" class="link-item center" target="_blank">
+            <a href="http://bere.al/heliotropic" class="link-item center" target="_blank" style="letter-spacing: 8px; padding-right: 14px;">
                 <span>BeReal</span>
                 <div class="lyric-whisper left-space"></div>
                 <div class="lyric-whisper right-space"></div>
                 <div class="link-constellation"></div>
             </a>
             
-            <a href="https://instagram.com/thomaslistens" class="link-item left" target="_blank">
+            <a href="https://instagram.com/thomaslistens" class="link-item left" target="_blank" style="padding-right: 28px;">
                 <span>INSTAGRAM</span>
                 <div class="lyric-whisper"></div>
                 <div class="link-constellation"></div>
             </a>
             
-            <a href="https://facebook.com/thomaslistens" class="link-item right" target="_blank">
+            <a href="https://facebook.com/thomaslistens" class="link-item right" target="_blank" style="padding-left: 28px;">
                 <span>FACEBOOK</span>
                 <div class="lyric-whisper"></div>
                 <div class="link-constellation"></div>
             </a>
             
-            <a href="mailto:your.email@example.com" class="link-item physical-copy center">
-                <span>Handmade Physical Copy &lt;3<br>($30)</span>
+            <a href="https://buy.stripe.com/your-payment-link-here" class="link-item physical-copy center" target="_blank">
+                <span>Handmade Physical Copy &lt;3<br>($30 + shipping)</span>
             </a>
         </div>
+        
+        <!-- Media showcase section -->
+        <div class="media-showcase">
+            <div class="showcase-image">
+                <img src="behind-the-scenes.jpg" alt="Behind the scenes" style="width: 100%; max-width: 400px; border: 1px solid #333; border-radius: 4px;">
+            </div>
+        </div>
+
         <div class="footer">
             <span class="quote-line">"When the air is clear,</span>
             <span class="quote-line">you might hear the sounds."</span>
             <span class="author">- Pauline Oliveros</span>
         </div>
+        
         <!-- Dynamic background lattice -->
         <div class="background-lattice" id="backgroundLattice"></div>
     </div>
@@ -453,15 +753,15 @@ function createToneCycle(toneConfig) {
     function scheduleTone() {
         if (!audioInitialized) return;
         
-        const fadeIn = timing.fadeIn + Math.random() * 5;    // 8-13s fade in
-        const sustain = timing.sustain + Math.random() * 10; // 15-25s sustain
-        const fadeOut = timing.fadeOut + Math.random() * 5;  // 8-13s fade out
-        const pause = timing.pause + Math.random() * 15;     // pause between appearances
+        const fadeIn = timing.fadeIn + Math.random() * 5;
+        const sustain = timing.sustain + Math.random() * 10;
+        const fadeOut = timing.fadeOut + Math.random() * 5;
+        const pause = timing.pause + Math.random() * 15;
         
         const totalTime = createCloudTone(
             frequency,
             baseGain,
-            breathRate + (Math.random() - 0.5) * 0.02, // slight breath variation
+            breathRate + (Math.random() - 0.5) * 0.02,
             breathDepth,
             fadeIn,
             sustain,
@@ -469,11 +769,9 @@ function createToneCycle(toneConfig) {
             0
         );
         
-        // Schedule next appearance
         setTimeout(() => scheduleTone(), (totalTime + pause) * 1000);
     }
     
-    // Initial delay before first appearance
     setTimeout(() => scheduleTone(), timing.initialDelay * 1000);
 }
 
@@ -484,21 +782,21 @@ function initAudioSystem() {
     if (!audioInitialized) {
         masterGain = audioContext.createGain();
         masterGain.connect(audioContext.destination);
-        masterGain.gain.setValueAtTime(0.5, audioContext.currentTime); // Softer overall
+        masterGain.gain.setValueAtTime(0.5, audioContext.currentTime);
 
         // 1. B2 drone (1/1) - always present, gentle breathing
         createBreathingTone(
-            fundamental,           // B2
-            0.08,                 // softer base gain
-            0.15,                 // breath rate (~9/min)
-            0.3,                  // 30% breath depth
-            0                     // immediate
+            fundamental,
+            0.08,
+            0.15,
+            0.3,
+            0
         );
 
         // 2. Perfect fifth (3/2) - major triad member
         createToneCycle({
-            frequency: fundamental * 3/2,     // F#3
-            baseGain: 0.05,                  // soft
+            frequency: fundamental * 3/2,
+            baseGain: 0.05,
             breathRate: 0.13,
             breathDepth: 0.25,
             timing: {
@@ -512,8 +810,8 @@ function initAudioSystem() {
 
         // 3. Major third (5/4) - highest, major triad member
         createToneCycle({
-            frequency: fundamental * 5/4 * 4, // D#5 (two octaves above)
-            baseGain: 0.04,                  // soft but cuts through
+            frequency: fundamental * 5/4 * 4,
+            baseGain: 0.04,
             breathRate: 0.14,
             breathDepth: 0.2,
             timing: {
@@ -527,8 +825,8 @@ function initAudioSystem() {
 
         // 4. Major seventh (15/8) - filling tone
         createToneCycle({
-            frequency: fundamental * 15/8,    // A#3
-            baseGain: 0.03,                  // very soft
+            frequency: fundamental * 15/8,
+            baseGain: 0.03,
             breathRate: 0.17,
             breathDepth: 0.2,
             timing: {
@@ -542,8 +840,8 @@ function initAudioSystem() {
 
         // 5. Septimal tritone (7/5) - octave above
         createToneCycle({
-            frequency: fundamental * 7/5 * 2, // F4
-            baseGain: 0.025,                 // very soft
+            frequency: fundamental * 7/5 * 2,
+            baseGain: 0.025,
             breathRate: 0.11,
             breathDepth: 0.15,
             timing: {
@@ -557,8 +855,8 @@ function initAudioSystem() {
 
         // 6. Harmonic seventh (7/4) - most subtle
         createToneCycle({
-            frequency: fundamental * 7/4 * 2, // A4
-            baseGain: 0.015,                 // barely there
+            frequency: fundamental * 7/4 * 2,
+            baseGain: 0.015,
             breathRate: 0.19,
             breathDepth: 0.1,
             timing: {
@@ -575,7 +873,6 @@ function initAudioSystem() {
     }
 }
 
-// Keep the constant drone helper
 function createBreathingTone(frequency, baseGain, breathRate, breathDepth, startDelay = 0) {
     const ct = audioContext.currentTime;
     
@@ -598,7 +895,7 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
     
     // Gentle fade in for drone
     gainNode.gain.setValueAtTime(0, ct);
-    gainNode.gain.linearRampToValueAtTime(baseGain, ct + 10); // 10 second fade in
+    gainNode.gain.linearRampToValueAtTime(baseGain, ct + 10);
     
     oscillator.start(ct + startDelay);
     lfo.start(ct + startDelay);
@@ -648,7 +945,6 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                     }
                 }
             }
-            // Connect after a delay
             setTimeout(() => connectNodes(container), 3000);
         }
         
@@ -705,7 +1001,6 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             const linkConstellations = document.querySelectorAll('.link-constellation');
             
             linkConstellations.forEach((constellation, linkIndex) => {
-                // Create 3-5 stars per link
                 const starCount = Math.floor(Math.random() * 3) + 3;
                 const stars = [];
                 
@@ -713,13 +1008,10 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                     const star = document.createElement('div');
                     star.className = 'link-star';
                     
-                    // Position stars avoiding text area (center 60%)
                     let x, y;
                     if (Math.random() > 0.5) {
-                        // Left or right edges
                         x = Math.random() > 0.5 ? Math.random() * 20 : 80 + Math.random() * 20;
                     } else {
-                        // Top or bottom areas
                         x = 20 + Math.random() * 60;
                         y = Math.random() > 0.5 ? Math.random() * 30 : 70 + Math.random() * 30;
                     }
@@ -734,7 +1026,6 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                     stars.push({ element: star, x, y });
                 }
                 
-                // Create connections between nearby stars
                 stars.forEach((star, i) => {
                     stars.slice(i + 1).forEach(otherStar => {
                         const distance = Math.sqrt(
@@ -742,7 +1033,6 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                             Math.pow(star.y - otherStar.y, 2)
                         );
                         
-                        // Connect stars that are close but not too close
                         if (distance < 40 && distance > 15 && Math.random() < 0.6) {
                             const connection = document.createElement('div');
                             connection.className = 'link-connection';
@@ -764,17 +1054,167 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                 });
             });
             
-            // Refresh constellations periodically for dynamic feel
             setTimeout(() => {
                 linkConstellations.forEach(constellation => {
                     constellation.innerHTML = '';
                 });
                 createLinkConstellations();
-            }, 30000); // Refresh every 30 seconds
+            }, 30000);
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            // Lyric whisper system - subliminal cryptic messages from Thomas's music
+            // SNAPPY ALBUM TITLE REVEAL with height variability and final flash
+            const albumTitle = document.querySelector('.album-title');
+            const albumWords = document.querySelectorAll('.album-word');
+            
+            // Set random Y positions for cryptic effect (letters)
+            albumWords.forEach(word => {
+                const letters = word.querySelectorAll('.letter');
+                letters.forEach(letter => {
+                    const randomY = (Math.random() - 0.5) * 4; // -2px to +2px
+                    letter.style.setProperty('--random-y', `${randomY}px`);
+                });
+            });
+
+            // Set height variability per word during flash - more variation
+            const wordHeights = ['12px', '-8px', '15px', '-6px']; // Bigger height differences
+            albumWords.forEach((word, index) => {
+                word.style.setProperty('--word-flash-y', wordHeights[index]);
+            });
+
+            // Quick word-by-word reveal with height variations
+            let wordIndex = 0;
+            const wordInterval = setInterval(() => {
+                if (wordIndex < albumWords.length) {
+                    const word = albumWords[wordIndex];
+                    
+                    // Apply height variation during flash
+                    word.style.transform = `translateY(${wordHeights[wordIndex]})`;
+                    word.classList.add('flash-word');
+                    
+                    // Flash all letters in the word simultaneously
+                    word.querySelectorAll('.letter').forEach(letter => {
+                        letter.classList.add('flash');
+                    });
+                    
+                    // Schedule this word to fade out - faster timing
+                    setTimeout(() => {
+                        word.style.transition = 'opacity 0.18s ease-out'; // Faster fade
+                        word.style.opacity = '0';
+                        word.style.filter = 'none';
+                        word.style.textShadow = 'none';
+                        word.style.animation = 'none';
+                    }, 400); // Shorter sustain (was 456ms)
+                    
+                    wordIndex++;
+                } else {
+                    clearInterval(wordInterval);
+                    
+                    // Final flash after all words have had time to disappear
+                    setTimeout(() => {
+                        // Reset all word positions and show them for final flash
+                        albumWords.forEach((word, index) => {
+                            word.style.transform = 'translateY(0)'; // Normalize positions
+                            word.style.transition = 'none';
+                            word.style.opacity = '1';
+                            
+                            setTimeout(() => {
+                                // Quick final flash
+                                word.style.filter = 'brightness(2.5)';
+                                word.style.textShadow = '0 0 20px rgba(255,255,255,0.9)';
+                                word.style.transform = 'scale(1.05)';
+                                
+                                // Slightly longer final flash
+                                setTimeout(() => {
+                                    word.style.filter = 'none';
+                                    word.style.textShadow = 'none';
+                                    word.style.transform = 'scale(1)';
+                                }, 150);
+                            }, index * 20); // Very tight stagger
+                        });
+                        
+                        // Final reveal and cross-out
+                        setTimeout(() => {
+                            albumTitle.classList.add('final-reveal');
+                            
+                            // Show cross-out on "Out"
+                            setTimeout(() => {
+                                const lastWord = document.querySelector('.album-word.crossed-out');
+                                if (lastWord) {
+                                    lastWord.classList.add('show-cross');
+                                }
+                                
+                                // Start blood drip
+                                setTimeout(() => {
+                                    startBloodDrip();
+                                }, 200);
+                            }, 150);
+                        }, 200);
+                    }, 650); // Faster final flash timing
+                }
+            }, 300); // Keep that snappy 300ms timing!
+
+            // Blood drip - completely separate positioning approach
+            function startBloodDrip() {
+                const bloodDrip = document.querySelector('.blood-drip');
+                const profileName = document.querySelector('.profile-name');
+                
+                // Simple approach: start from name, drip down a fixed distance
+                const nameRect = profileName.getBoundingClientRect();
+                
+                // Position directly under the name
+                bloodDrip.style.position = 'fixed';
+                bloodDrip.style.left = '50%';
+                bloodDrip.style.top = `${nameRect.bottom + 8}px`; // 8px below name
+                bloodDrip.style.transform = 'translateX(-50%)';
+                bloodDrip.style.height = '0';
+                bloodDrip.style.zIndex = '100';
+                
+                // Animate to a fixed length that should hit the links
+                bloodDrip.style.transition = 'height 2.5s cubic-bezier(0.4, 0, 0.2, 1)';
+                
+                setTimeout(() => {
+                    bloodDrip.style.height = '425px'; // Just a bit further down
+                }, 50);
+                
+                // Reveal links as blood drips
+                const links = document.querySelectorAll('.link-item');
+                const revealDelay = 2500 / links.length;
+                
+                links.forEach((link, index) => {
+                    setTimeout(() => {
+                        link.classList.add('reveal');
+                        
+                        // Show media section after last link appears
+                        if (index === links.length - 1) {
+                            setTimeout(() => {
+                                document.querySelector('.media-showcase').classList.add('reveal-media');
+                                
+                                // Show footer after media
+                                setTimeout(() => {
+                                    document.querySelector('.footer').classList.add('reveal-footer');
+                                }, 600);
+                            }, 800);
+                        }
+                    }, 500 + (revealDelay * index));
+                });
+            }
+
+            // Slideshow functionality
+            window.showSlide = function(index) {
+                const slides = document.querySelectorAll('.slide');
+                const dots = document.querySelectorAll('.nav-dot');
+                
+                slides.forEach(slide => slide.classList.remove('active'));
+                dots.forEach(dot => dot.classList.remove('active'));
+                
+                if (slides[index]) {
+                    slides[index].classList.add('active');
+                    dots[index].classList.add('active');
+                }
+            };
+
+            // Lyric whisper system - enhanced Death Note psychological pressure
             const phrases = [
                 // Intense/desperate phrases - ALL CAPS
                 ["ITS", "HARD", "TO", "BREATHE"],
@@ -812,11 +1252,7 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                 ["dearly"]
             ];
 
-            // Get all lyric whisper elements
             const whisperElements = Array.from(document.querySelectorAll('.lyric-whisper'));
-
-            // Define the sequential order of whisper positions
-            // 0: Spotify right, 1: Apple left, 2: BeReal left, 3: BeReal right, 4: Instagram right, 5: Facebook left
             const whisperOrder = [
                 whisperElements[0], // Spotify
                 whisperElements[1], // Apple Music  
@@ -845,7 +1281,7 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
 
                 // Determine phrase type for different effects
                 const isSingleWord = phraseWords.length === 1;
-                const isPeripheral = Math.random() < 0.3; // 30% chance for peripheral effect
+                const isPeripheral = Math.random() < 0.3;
 
                 // Display words sequentially from the starting position
                 phraseWords.forEach((word, index) => {
@@ -855,7 +1291,6 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                             const element = whisperOrder[positionIndex];
                             element.innerHTML = createCrypticWord(word);
                             
-                            // Apply appropriate effect classes
                             if (isSingleWord) {
                                 element.classList.add('single-word');
                             } else if (isPeripheral) {
@@ -863,12 +1298,12 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                             }
                             
                             element.classList.add('active');
-                        }, index * (isSingleWord ? 0 : 400)); // Faster timing: 0.4s between words
+                        }, index * (isSingleWord ? 0 : 400));
                     }
                 });
 
                 // Fade out timing based on phrase type
-                const sustainTime = isSingleWord ? 300 : 2000; // Single words flash quickly
+                const sustainTime = isSingleWord ? 300 : 2000;
                 setTimeout(() => {
                     phraseWords.forEach((word, index) => {
                         const positionIndex = startPos + index;
@@ -879,61 +1314,47 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                     });
                 }, phraseWords.length * (isSingleWord ? 0 : 400) + sustainTime);
             }
-
+            
             function startLyricCycle() {
-                let lastStartPos = -1; // Track the last starting position
+                let lastStartPos = -1;
                 
                 function nextPhrase() {
                     const randomIndex = Math.floor(Math.random() * phrases.length);
                     const phrase = phrases[randomIndex];
                     
-                    // Get valid starting positions for this phrase length
                     const maxStartPos = Math.min(3, whisperOrder.length - phrase.length);
                     const validPositions = [];
                     for (let i = 0; i <= maxStartPos; i++) {
                         validPositions.push(i);
                     }
                     
-                    // Remove the last used position to avoid repetition (if possible)
                     if (validPositions.length > 1 && validPositions.includes(lastStartPos)) {
                         validPositions.splice(validPositions.indexOf(lastStartPos), 1);
                     }
                     
-                    // Choose a random position from remaining valid positions
                     const startPos = validPositions[Math.floor(Math.random() * validPositions.length)];
                     lastStartPos = startPos;
                     
                     displayPhrase(phrase, startPos);
                     
-                    // Much faster cycles - Death Note psychological pressure
                     const isSingleWord = phrase.length === 1;
-                    const baseDelay = isSingleWord ? 1500 : 3000; // Quick single words, moderate phrases
-                    const randomDelay = Math.random() * 2000 + 1000; // 1-3s additional randomness
+                    const baseDelay = isSingleWord ? 1500 : 3000;
+                    const randomDelay = Math.random() * 2000 + 1000;
                     const cycleDelay = baseDelay + randomDelay;
                     
                     setTimeout(nextPhrase, cycleDelay);
                 }
                 
-                // Start first phrase immediately after page load - no waiting
-                setTimeout(nextPhrase, 1500);
+                // Start after title animation completes (much faster)
+                setTimeout(nextPhrase, 3000);
             }
 
-            // Animate staggered link fade-in
-            document.querySelectorAll('.link-item').forEach((link, idx) => {
-                link.style.animationDelay = `${idx * 0.1}s`;
-                link.style.animation = 'fadeInUp 0.6s ease-out forwards';
-                link.style.opacity = '0';
-            });
-            
-            // Start lyric system
+            // Start all systems
             startLyricCycle();
-            
-            // Create link constellations
             createLinkConstellations();
-            
-            // Start lattice visual
             generateDynamicLattice();
             setInterval(generateDynamicLattice, 45000);
+            
             window.addEventListener('resize', () => {
                 document.getElementById('backgroundLattice').innerHTML = '';
                 generateDynamicLattice();
@@ -971,13 +1392,12 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                     opacity: 0 
                 }
             ], {
-                duration: Math.random() * 12000 + 8000, // 8-20 seconds
+                duration: Math.random() * 12000 + 8000,
                 easing: 'ease-out'
             });
             
             animation.onfinish = () => particle.remove();
         }
-        
     </script>
 </body>
 </html>
