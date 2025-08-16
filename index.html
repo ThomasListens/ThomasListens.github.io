@@ -42,10 +42,90 @@
             background: #111;
             display: flex; align-items: center; justify-content: center;
             font-size: 48px;
-            transition: transform 0.3s ease;
             background-image: url('./TOWO ALBUM COVER.jpg');
-            background-size: cover; background-position: center;
+            background-position: center;
             border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+            
+            /* Start with zoomed background - using transform instead of background-size */
+            background-size: cover;
+        }
+        
+        .profile-image::before {
+            content: '';
+            position: absolute;
+            top: -60%; left: -60%;
+            width: 220%; height: 220%;
+            background-image: url('./TOWO ALBUM COVER.jpg');
+            background-size: cover;
+            background-position: center;
+            z-index: 1;
+            transition: transform 2.5s ease-out;
+            transform: scale(1);
+        }
+        
+        .profile-image.slide-to-normal::before {
+            transform: scale(0.45);
+        }
+        
+        .profile-image:hover { 
+            transform: scale(1.05);
+            transition: transform 0.3s ease;
+        }
+        
+        .cryptic-flash {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-size: cover;
+            background-position: center;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 5;
+            border-radius: 4px;
+        }
+        
+        .cryptic-flash.flash-active {
+            animation: crypticGlitch 0.8s ease-in-out forwards;
+        }
+        
+        @keyframes crypticGlitch {
+            0% { 
+                opacity: 0; 
+                transform: translateX(0) scale(1);
+                filter: brightness(1);
+            }
+            10% { 
+                opacity: 0.95; 
+                transform: translateX(1px) scale(1.01);
+                filter: brightness(1.3) contrast(1.2);
+            }
+            20% { 
+                opacity: 0.85; 
+                transform: translateX(-1px) scale(1);
+                filter: brightness(1.1) contrast(1.1);
+            }
+            30% { 
+                opacity: 0.9; 
+                transform: translateX(1px) scale(1);
+                filter: brightness(1.2) contrast(1.15);
+            }
+            75% { 
+                opacity: 0.88; 
+                transform: translateX(0) scale(1);
+                filter: brightness(1.05) contrast(1.05);
+            }
+            90% { 
+                opacity: 0.7; 
+                transform: translateX(0) scale(1);
+                filter: brightness(1);
+            }
+            100% { 
+                opacity: 0; 
+                transform: translateX(0) scale(1);
+                filter: brightness(1);
+            }
         }
         .profile-image:hover { transform: scale(1.05);}
         .profile-name {
@@ -364,7 +444,7 @@
         .media-showcase {
             margin: 40px auto;
             text-align: center;
-            max-width: 400px;
+            max-width: 330px;
             opacity: 0;
             animation: none;
         }
@@ -378,6 +458,25 @@
     opacity: 0.9;
 }
 
+        .showcase-image img {
+    animation: subtleZoom 6.5s ease-in-out forwards;
+}
+
+@keyframes subtleZoom {
+    0% {
+        transform: scale(1);
+        opacity: 0.9;
+    }
+    85% {
+        transform: scale(1.03);
+        opacity: 0.95;
+    }
+    100% {
+        transform: scale(1.03);
+        opacity: 0.95;
+    }
+}
+
 
 
 
@@ -388,14 +487,14 @@
 
         .slideshow-container {
             position: relative;
-            max-width: 400px;
+            max-width: 330px;
             margin: 0 auto;
         }
 
         .slide {
     display: none;
     opacity: 0;
-    transition: opacity 0.8s ease-in-out;
+    transition: opacity 1.2s ease-in-out;
 }
 
 .slide.active {
@@ -405,6 +504,7 @@
 
 .slide.fading-out {
     opacity: 0;
+    transition: opacity 1.2s ease-in-out;
 }
 
         .slideshow-nav {
@@ -691,7 +791,11 @@
 <body>
     <div class="container">
         <div class="profile-section">
-            <div class="profile-image"></div>
+            <div class="profile-image">
+                <div class="cryptic-flash" id="crypticFlash1"></div>
+                <div class="cryptic-flash" id="crypticFlash2"></div>
+                <div class="cryptic-flash" id="crypticFlash3"></div>
+            </div>
             <h1 class="profile-name">Thomas LeRoy Meier</h1>
             <div class="blood-drip"></div>
             <div class="album-title">
@@ -710,13 +814,13 @@
             </div>
         </div>
         <div class="links-container">
-            <a href="https://open.spotify.com/artist/yourid" class="link-item left" target="_blank" style="padding-left: 28px;">
+            <a href="https://open.spotify.com/album/4MdzvojXVyZTk90v1wXqRI" class="link-item left" target="_blank" style="padding-left: 28px;">
                 <span>SPOTIFY</span>
                 <div class="lyric-whisper"></div>
                 <div class="link-constellation"></div>
             </a>
             
-            <a href="https://music.apple.com/artist/yourid" class="link-item right" target="_blank" style="padding-left: 45px; font-size: 16px;">
+            <a href="https://music.apple.com/us/album/the-only-way-out/1833467317" class="link-item right" target="_blank" style="padding-left: 45px; font-size: 16px;">
                 <span>APPLE MUSIC</span>
                 <div class="lyric-whisper"></div>
                 <div class="link-constellation"></div>
@@ -729,13 +833,13 @@
                 <div class="link-constellation"></div>
             </a>
             
-            <a href="https://instagram.com/thomaslistens" class="link-item left" target="_blank" style="padding-right: 28px;">
+            <a href="https://www.instagram.com/tlmeier" class="link-item left" target="_blank" style="padding-right: 28px;">
                 <span>INSTAGRAM</span>
                 <div class="lyric-whisper"></div>
                 <div class="link-constellation"></div>
             </a>
             
-            <a href="https://facebook.com/thomaslistens" class="link-item right" target="_blank" style="padding-left: 28px;">
+            <a href="https://www.facebook.com/tlmeier/" class="link-item right" target="_blank" style="padding-left: 28px;">
                 <span>FACEBOOK</span>
                 <div class="lyric-whisper"></div>
                 <div class="link-constellation"></div>
@@ -748,19 +852,34 @@
         
        <div class="media-showcase">
     <div class="slideshow-container">
-        <!-- Slide 1: TL1 Image -->
+        <!-- Slide 1: TL1 Image (6.5s) -->
         <div class="slide active" data-duration="6500">
             <div class="showcase-image">
-                <img src="TL1.jpg" alt="Behind the scenes - TL1" style="width: 400px; height: 400px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
+                <img src="TL1.jpg" alt="Behind the scenes - TL1" style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
             </div>
         </div>
         
-        <!-- Slide 2: TOWO Promo Video -->
+        <!-- Slide 2: TL2 Image (6.5s) -->
+        <div class="slide" data-duration="6500">
+            <div class="showcase-image">
+                <img src="TL2.jpg" alt="Behind the scenes - TL2" style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
+            </div>
+        </div>
+        
+        <!-- Slide 3: TL3 Image (6.5s) -->
+        <div class="slide" data-duration="6500">
+            <div class="showcase-image">
+                <img src="TL3.jpg" alt="Behind the scenes - TL3" style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
+            </div>
+        </div>
+        
+        <!-- Slide 4: TOWO Promo Video (auto-duration based on video length) -->
         <div class="slide" data-duration="0" data-video="true" data-audio="true">
             <div class="showcase-video">
-                <video style="width: 400px; height: 400px; object-fit: cover; border: 1px solid #333; border-radius: 4px;" 
+                <video style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;" 
        preload="auto" 
        playsinline
+       volume="0.35"
        onloadedmetadata="console.log('Video duration:', this.duration)" 
        onended="nextSlide()">
                     <source src="TOWO-Promo.mp4" type="video/mp4">
@@ -769,43 +888,37 @@
             </div>
         </div>
         
-        <!-- Slide 3: TL2 Image -->
+        <!-- Slide 5: TL1 Image repeat (6.5s) -->
         <div class="slide" data-duration="6500">
             <div class="showcase-image">
-                <img src="TL2.jpg" alt="Behind the scenes - TL2" style="width: 400px; height: 400px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
+                <img src="TL1.jpg" alt="Behind the scenes - TL1" style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
             </div>
         </div>
         
-        <!-- Slide 4: Cryptic Cut Video -->
+        <!-- Slide 6: TL2 Image repeat (6.5s) -->
+        <div class="slide" data-duration="6500">
+            <div class="showcase-image">
+                <img src="TL2.jpg" alt="Behind the scenes - TL2" style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
+            </div>
+        </div>
+        
+        <!-- Slide 7: TL3 Image repeat (6.5s) -->
+        <div class="slide" data-duration="6500">
+            <div class="showcase-image">
+                <img src="TL3.jpg" alt="Behind the scenes - TL3" style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
+            </div>
+        </div>
+        
+        <!-- Slide 8: Cryptic Cut Video (auto-duration based on video length) -->
         <div class="slide" data-duration="0" data-video="true" data-audio="true">
             <div class="showcase-video">
-                <video style="width: 400px; height: 400px; object-fit: cover; border: 1px solid #333; border-radius: 4px;" 
+                <video style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;" 
        preload="auto" 
        playsinline
+       volume="0.35"
        onloadedmetadata="console.log('Video duration:', this.duration)" 
        onended="nextSlide()">
                     <source src="Cryptic-Cut.mp4" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
-            </div>
-        </div>
-        
-        <!-- Slide 5: TL3 Image -->
-        <div class="slide" data-duration="6500">
-            <div class="showcase-image">
-                <img src="TL3.jpg" alt="Behind the scenes - TL3" style="width: 400px; height: 400px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
-            </div>
-        </div>
-        
-        <!-- Slide 6: Slideshow Video -->
-        <div class="slide" data-duration="0" data-video="true" data-audio="false">
-            <div class="showcase-video">
-                <video style="width: 400px; height: 400px; object-fit: cover; border: 1px solid #333; border-radius: 4px;" 
-       preload="auto" 
-       playsinline
-       onloadedmetadata="console.log('Video duration:', this.duration)" 
-       onended="nextSlide()">
-                    <source src="Slideshow.mp4" type="video/mp4">
                     Your browser does not support the video tag.
                 </video>
             </div>
@@ -827,8 +940,10 @@
     // Breathing cosmic soundscape - B drone with wandering harmonics
 let audioContext;
 let masterGain;
+let etherealLFOGain;
 let audioInitialized = false;
 let activeTones = [];
+let isDucking = false;
 
 const fundamental = 123.47; // B2 drone
 
@@ -908,7 +1023,20 @@ function initAudioSystem() {
     if (!audioInitialized) {
         masterGain = audioContext.createGain();
         masterGain.connect(audioContext.destination);
-        masterGain.gain.setValueAtTime(0.5, audioContext.currentTime);
+        masterGain.gain.setValueAtTime(0.3, audioContext.currentTime);
+
+        // Create ethereal volume fluctuations for the drone
+        const etherealLFO = audioContext.createOscillator();
+        etherealLFOGain = audioContext.createGain();
+        
+        etherealLFO.type = 'sine';
+        etherealLFO.frequency.setValueAtTime(0.05, audioContext.currentTime); // Very slow fluctuations
+        etherealLFOGain.gain.setValueAtTime(0.15, audioContext.currentTime); // Max 15% volume swing
+        
+        etherealLFO.connect(etherealLFOGain);
+        etherealLFOGain.connect(masterGain.gain);
+        
+        etherealLFO.start(audioContext.currentTime);
 
         createBreathingTone(fundamental, 0.08, 0.15, 0.3, 0);
 
@@ -1175,6 +1303,10 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
         document.addEventListener('DOMContentLoaded', function() {
             const albumTitle = document.querySelector('.album-title');
             const albumWords = document.querySelectorAll('.album-word');
+            const profileImage = document.querySelector('.profile-image');
+            
+            // Start the cover intro animation immediately
+            // profileImage.classList.add('intro-reveal');
             
             albumWords.forEach(word => {
                 const letters = word.querySelectorAll('.letter');
@@ -1255,6 +1387,9 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
 
             function startBloodDrip() {
                 const bloodDrip = document.querySelector('.blood-drip');
+                
+                // Start the cover zoom-out during blood drip
+                profileImage.classList.add('slide-to-normal');
                 
                 bloodDrip.style.transition = 'height 2.5s cubic-bezier(0.4, 0, 0.2, 1)';
                 
@@ -1453,6 +1588,9 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             generateDynamicLattice();
             setInterval(generateDynamicLattice, 45000);
             
+            // Start cryptic image flashing system
+            startCrypticFlashing();
+            
             // Simple spotlight system
             const spotlight = document.getElementById('spotlight');
             if (spotlight) {
@@ -1514,10 +1652,61 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             
             animation.onfinish = () => particle.remove();
         }
+
+        // Cryptic image flashing system
+        function startCrypticFlashing() {
+            const flashImages = [
+                'FlashPromo1.jpg',
+                'FlashPromo2.jpg', 
+                'FlashPromo3.jpg'
+            ];
+            
+            const flashElements = [
+                document.getElementById('crypticFlash1'),
+                document.getElementById('crypticFlash2'),
+                document.getElementById('crypticFlash3')
+            ];
+            
+            // Set background images
+            flashElements.forEach((element, index) => {
+                if (element) {
+                    element.style.backgroundImage = `url('./${flashImages[index]}')`;
+                }
+            });
+            
+            function triggerCrypticFlash() {
+                // Random chance of flash (70% chance every cycle)
+                if (Math.random() < 0.7) {
+                    const randomElement = flashElements[Math.floor(Math.random() * flashElements.length)];
+                    
+                    if (randomElement) {
+                        // Clear any existing animation
+                        randomElement.classList.remove('flash-active');
+                        
+                        // Trigger after small delay to ensure class removal
+                        setTimeout(() => {
+                            randomElement.classList.add('flash-active');
+                            
+                            // Remove class after animation completes
+                            setTimeout(() => {
+                                randomElement.classList.remove('flash-active');
+                            }, 800);
+                        }, 50);
+                    }
+                }
+                
+                // Schedule next flash between 8-15 seconds
+                const nextFlash = Math.random() * 7000 + 8000;
+                setTimeout(triggerCrypticFlash, nextFlash);
+            }
+            
+            // Start the flashing cycle after initial page setup
+            setTimeout(triggerCrypticFlash, 12000);
+        }
 // Enhanced slideshow system with better video handling and timeouts
 let currentSlide = 0;
 let slideInterval;
-let originalDroneGain = 0.5;
+let originalDroneGain = 0.3;
 
 function initializeSlideshow() {
     const slides = document.querySelectorAll('.slide');
@@ -1563,14 +1752,33 @@ function startSlideshow() {
             const hasAudio = currentSlideElement.getAttribute('data-audio') === 'true';
             
             const playVideo = () => {
-                if (hasAudio && audioInitialized && masterGain) {
-                    masterGain.gain.linearRampToValueAtTime(originalDroneGain * 0.1, audioContext.currentTime + 0.5);
+                // Always try to play the video, handle audio separately
+                video.currentTime = 0;
+                
+                // Handle audio ducking only if audio system is initialized
+                if (hasAudio && audioInitialized && masterGain && !isDucking) {
+                    isDucking = true;
+                    
+                    // Disconnect the ethereal LFO temporarily and duck smoothly
+                    if (etherealLFOGain) {
+                        etherealLFOGain.disconnect();
+                    }
+                    
+                    // Smooth exponential ramp to ducked level
+                    masterGain.gain.cancelScheduledValues(audioContext.currentTime);
+                    masterGain.gain.setValueAtTime(masterGain.gain.value, audioContext.currentTime);
+                    masterGain.gain.exponentialRampToValueAtTime(0.08, audioContext.currentTime + 4.0);
+                    
+                    video.volume = 0.35;
                     video.muted = false;
+                } else {
+                    // If audio not initialized, keep video muted but still play it
+                    video.muted = true;
+                    video.volume = 0.35;
                 }
                 
-                video.currentTime = 0;
                 video.play().then(() => {
-                    console.log(`Video playing: ${video.duration} seconds`);
+                    console.log(`Video playing: ${video.duration} seconds${video.muted ? ' (muted)' : ''}`);
                 }).catch(e => {
                     console.error('Video play failed:', e);
                     // Only skip if video truly can't play
@@ -1611,8 +1819,21 @@ function nextSlide() {
     
     const currentSlideElement = document.querySelector('.slide.active');
     
-    if (currentSlideElement && currentSlideElement.getAttribute('data-audio') === 'true' && audioInitialized && masterGain) {
-        masterGain.gain.linearRampToValueAtTime(originalDroneGain, audioContext.currentTime + 1.0);
+    // Handle audio restoration only if we were ducking and audio is initialized
+    if (currentSlideElement && currentSlideElement.getAttribute('data-audio') === 'true' && audioInitialized && masterGain && isDucking) {
+        isDucking = false;
+        
+        // Smooth exponential restoration
+        masterGain.gain.cancelScheduledValues(audioContext.currentTime);
+        masterGain.gain.setValueAtTime(masterGain.gain.value, audioContext.currentTime);
+        masterGain.gain.exponentialRampToValueAtTime(originalDroneGain, audioContext.currentTime + 5.0);
+        
+        // Reconnect ethereal fluctuations after restoration
+        setTimeout(() => {
+            if (etherealLFOGain && !isDucking) {
+                etherealLFOGain.connect(masterGain.gain);
+            }
+        }, 5000);
     }
     
     currentSlideElement.classList.add('fading-out');
@@ -1621,7 +1842,7 @@ function nextSlide() {
         currentSlide = (currentSlide + 1) % document.querySelectorAll('.slide').length;
         console.log(`Advancing to slide ${currentSlide}`);
         showSlide(currentSlide);
-    }, 800);
+    }, 1200);
 }
 
 function showSlide(index) {
@@ -1637,7 +1858,8 @@ function showSlide(index) {
         if (video) {
             video.pause();
             video.currentTime = 0;
-            video.muted = slide.getAttribute('data-audio') !== 'true';
+            // Keep videos muted by default, only unmute if audio is initialized
+            video.muted = !audioInitialized || slide.getAttribute('data-audio') !== 'true';
         }
     });
     
