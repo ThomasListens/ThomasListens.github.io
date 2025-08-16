@@ -374,9 +374,12 @@
         }
 
         .showcase-image img, .showcase-video video {
-            transition: transform 0.3s ease, opacity 0.3s ease;
-            opacity: 0.9;
-        }
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    opacity: 0.9;
+}
+
+
+
 
         .showcase-image img:hover, .showcase-video video:hover {
             transform: scale(1.02);
@@ -756,8 +759,10 @@
         <div class="slide" data-duration="0" data-video="true" data-audio="true">
             <div class="showcase-video">
                 <video style="width: 400px; height: 400px; object-fit: cover; border: 1px solid #333; border-radius: 4px;" 
-                       preload="metadata" onloadedmetadata="setVideoDuration(this)" 
-                       onended="nextSlide()" muted>
+       preload="auto" 
+       playsinline
+       onloadedmetadata="console.log('Video duration:', this.duration)" 
+       onended="nextSlide()">
                     <source src="TOWO-Promo.mp4" type="video/mp4">
                     Your browser does not support the video tag.
                 </video>
@@ -775,8 +780,10 @@
         <div class="slide" data-duration="0" data-video="true" data-audio="true">
             <div class="showcase-video">
                 <video style="width: 400px; height: 400px; object-fit: cover; border: 1px solid #333; border-radius: 4px;" 
-                       preload="metadata" onloadedmetadata="setVideoDuration(this)" 
-                       onended="nextSlide()" muted>
+       preload="auto" 
+       playsinline
+       onloadedmetadata="console.log('Video duration:', this.duration)" 
+       onended="nextSlide()">
                     <source src="Cryptic-Cut.mp4" type="video/mp4">
                     Your browser does not support the video tag.
                 </video>
@@ -794,8 +801,10 @@
         <div class="slide" data-duration="0" data-video="true" data-audio="false">
             <div class="showcase-video">
                 <video style="width: 400px; height: 400px; object-fit: cover; border: 1px solid #333; border-radius: 4px;" 
-                       muted preload="metadata" onloadedmetadata="setVideoDuration(this)" 
-                       onended="nextSlide()">
+       preload="auto" 
+       playsinline
+       onloadedmetadata="console.log('Video duration:', this.duration)" 
+       onended="nextSlide()">
                     <source src="Slideshow.mp4" type="video/mp4">
                     Your browser does not support the video tag.
                 </video>
@@ -1505,78 +1514,117 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             
             animation.onfinish = () => particle.remove();
         }
-// Enhanced slideshow system with audio management - fully automated
+// Enhanced slideshow system with better video handling and timeouts
 let currentSlide = 0;
 let slideInterval;
-let originalDroneGain = 0.5; // Store original drone volume
+let originalDroneGain = 0.5;
 
-// Initialize slideshow when blood drip reaches final link
 function initializeSlideshow() {
     const slides = document.querySelectorAll('.slide');
     if (slides.length === 0) return;
     
-    // Start with first slide
+    console.log('Starting slideshow initialization...');
+    
+    // Start immediately with first slide, don't wait for all videos
     showSlide(0);
-    startSlideshow();
+    
+    // Preload videos in background but don't block slideshow
+    preloadVideosInBackground();
+    
+    // Start the slideshow timer
+    setTimeout(() => startSlideshow(), 1000);
+}
+
+function preloadVideosInBackground() {
+    const videos = document.querySelectorAll('.showcase-video video');
+    console.log(`Found ${videos.length} videos to preload`);
+    
+    videos.forEach((video, index) => {
+        console.log(`Preloading video ${index + 1}: ${video.querySelector('source').src}`);
+        video.load();
+    });
 }
 
 function startSlideshow() {
     const currentSlideElement = document.querySelector('.slide.active');
-    if (!currentSlideElement) return;
+    if (!currentSlideElement) {
+        console.error('No active slide found!');
+        return;
+    }
     
     const isVideo = currentSlideElement.hasAttribute('data-video');
     const duration = parseInt(currentSlideElement.getAttribute('data-duration')) || 5000;
     
+    console.log(`Current slide: ${isVideo ? 'Video' : 'Image'}, Duration: ${duration}ms`);
+    
     if (isVideo) {
         const video = currentSlideElement.querySelector('video');
         if (video) {
-            // Handle audio management for videos with audio
             const hasAudio = currentSlideElement.getAttribute('data-audio') === 'true';
             
-            if (hasAudio && audioInitialized && masterGain) {
-                // Duck the drone audio when video with audio plays
-                masterGain.gain.setValueAtTime(masterGain.gain.value, audioContext.currentTime);
-                masterGain.gain.linearRampToValueAtTime(originalDroneGain * 0.25, audioContext.currentTime + 0.5);
+            const playVideo = () => {
+                if (hasAudio && audioInitialized && masterGain) {
+                    masterGain.gain.linearRampToValueAtTime(originalDroneGain * 0.1, audioContext.currentTime + 0.5);
+                    video.muted = false;
+                }
                 
-                // Unmute the video to play its audio
-                video.muted = false;
+                video.currentTime = 0;
+                video.play().then(() => {
+                    console.log(`Video playing: ${video.duration} seconds`);
+                }).catch(e => {
+                    console.error('Video play failed:', e);
+                    // Only skip if video truly can't play
+                    setTimeout(() => nextSlide(), 3000);
+                });
+            };
+            
+            // Wait for video to be ready
+            if (video.readyState >= 3) { // HAVE_FUTURE_DATA
+                console.log('Video ready, playing now');
+                playVideo();
+            } else {
+                console.log('Video buffering...');
+                video.addEventListener('canplaythrough', () => {
+                    console.log('Video fully buffered');
+                    playVideo();
+                }, { once: true });
             }
             
-            // Play video and wait for it to end (onended will call nextSlide)
-            video.currentTime = 0;
-            video.play().catch(e => {
-                console.log('Video autoplay blocked, advancing slideshow');
-                // Fallback: advance after estimated duration if autoplay fails
-                setTimeout(() => nextSlide(), 8000);
-            });
+            // Only advance when video ends naturally
+            video.addEventListener('ended', () => {
+                console.log('Video completed naturally');
+                nextSlide();
+            }, { once: true });
         }
     } else {
         // For images, use the specified duration
-        slideInterval = setTimeout(() => nextSlide(), duration);
+        console.log(`Image will display for ${duration}ms`);
+        slideInterval = setTimeout(() => {
+            console.log('Image timer complete, moving to next slide');
+            nextSlide();
+        }, duration);
     }
 }
 
 function nextSlide() {
+    console.log('Moving to next slide...');
+    
     const currentSlideElement = document.querySelector('.slide.active');
     
-    // Restore drone audio volume when leaving video with audio
     if (currentSlideElement && currentSlideElement.getAttribute('data-audio') === 'true' && audioInitialized && masterGain) {
-        masterGain.gain.setValueAtTime(masterGain.gain.value, audioContext.currentTime);
         masterGain.gain.linearRampToValueAtTime(originalDroneGain, audioContext.currentTime + 1.0);
     }
     
-    // Start fade out transition
     currentSlideElement.classList.add('fading-out');
     
-    // After fade completes, switch to next slide
     setTimeout(() => {
         currentSlide = (currentSlide + 1) % document.querySelectorAll('.slide').length;
+        console.log(`Advancing to slide ${currentSlide}`);
         showSlide(currentSlide);
-    }, 800); // Match the CSS transition duration
+    }, 800);
 }
 
 function showSlide(index) {
-    // Clear any existing interval
     if (slideInterval) {
         clearTimeout(slideInterval);
         slideInterval = null;
@@ -1584,34 +1632,29 @@ function showSlide(index) {
     
     const slides = document.querySelectorAll('.slide');
     
-    // Stop all videos and reset them
     slides.forEach(slide => {
         const video = slide.querySelector('video');
         if (video) {
             video.pause();
             video.currentTime = 0;
-            // Reset mute state based on data-audio attribute
             video.muted = slide.getAttribute('data-audio') !== 'true';
         }
     });
     
-    // Remove all active and fading states
     slides.forEach(slide => {
         slide.classList.remove('active', 'fading-out');
     });
     
     if (slides[index]) {
-        // Set new active slide
         slides[index].classList.add('active');
         currentSlide = index;
-        
-        // Start slideshow after transition completes
+        console.log(`Showing slide ${index}`);
         setTimeout(() => startSlideshow(), 300);
     }
-}
+}     
+    
 
 function setVideoDuration(video) {
-    // This function is called when video metadata loads
     console.log(`Video "${video.src}" duration: ${video.duration}s`);
 }
     </script>
