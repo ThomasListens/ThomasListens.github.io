@@ -820,7 +820,7 @@
                 <div class="link-constellation"></div>
             </a>
             
-            <a href="https://music.apple.com/us/album/the-only-way-out/1833467317" class="link-item right" target="_blank" style="padding-left: 45px; font-size: 16px;">
+            <a href="music://music.apple.com/us/album/the-only-way-out/1833467317" class="link-item right" target="_blank" style="padding-left: 45px; font-size: 16px;">
                 <span>APPLE MUSIC</span>
                 <div class="lyric-whisper"></div>
                 <div class="link-constellation"></div>
@@ -852,22 +852,22 @@
         
        <div class="media-showcase">
     <div class="slideshow-container">
-        <!-- Slide 1: TL1 Image (6.5s) -->
-        <div class="slide active" data-duration="6500">
+        <!-- Slide 1: TL1 Image (6s) -->
+        <div class="slide active" data-duration="6000">
             <div class="showcase-image">
                 <img src="TL1.jpg" alt="Behind the scenes - TL1" style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
             </div>
         </div>
         
-        <!-- Slide 2: TL2 Image (6.5s) -->
-        <div class="slide" data-duration="6500">
+        <!-- Slide 2: TL2 Image (4s) -->
+        <div class="slide" data-duration="4000">
             <div class="showcase-image">
                 <img src="TL2.jpg" alt="Behind the scenes - TL2" style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
             </div>
         </div>
         
-        <!-- Slide 3: TL3 Image (6.5s) -->
-        <div class="slide" data-duration="6500">
+        <!-- Slide 3: TL3 Image (4s) -->
+        <div class="slide" data-duration="4000">
             <div class="showcase-image">
                 <img src="TL3.jpg" alt="Behind the scenes - TL3" style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
             </div>
@@ -1412,15 +1412,18 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             document.querySelector('.footer').classList.add('reveal-footer');
         }, 600);
         
-        // Start slideshow after media showcase fades in
-        setTimeout(() => {
-            initializeSlideshow();
-        }, 1000);
+        // Don't start slideshow here - wait for blood drip to complete
         
     }, 800);
 }
                     }, 500 + (revealDelay * index));
                 });
+                
+                // Start slideshow AFTER blood drip completes (2.5s + small buffer)
+                setTimeout(() => {
+                    console.log('Blood drip complete, starting slideshow');
+                    initializeSlideshow();
+                }, 3000);
             }
 
             // FIXED LYRIC WHISPER SYSTEM
@@ -1741,10 +1744,17 @@ function startSlideshow() {
         return;
     }
     
+    // Double-check we don't have an existing timer
+    if (slideInterval) {
+        console.log('Clearing existing timer before starting new one');
+        clearTimeout(slideInterval);
+        slideInterval = null;
+    }
+    
     const isVideo = currentSlideElement.hasAttribute('data-video');
     const duration = parseInt(currentSlideElement.getAttribute('data-duration')) || 5000;
     
-    console.log(`Current slide: ${isVideo ? 'Video' : 'Image'}, Duration: ${duration}ms`);
+    console.log(`Starting slideshow for slide ${currentSlide}: ${isVideo ? 'Video' : 'Image'}, Duration: ${duration}ms`);
     
     if (isVideo) {
         const video = currentSlideElement.querySelector('video');
@@ -1846,6 +1856,7 @@ function nextSlide() {
 }
 
 function showSlide(index) {
+    // Clear any existing timers first
     if (slideInterval) {
         clearTimeout(slideInterval);
         slideInterval = null;
@@ -1870,8 +1881,10 @@ function showSlide(index) {
     if (slides[index]) {
         slides[index].classList.add('active');
         currentSlide = index;
-        console.log(`Showing slide ${index}`);
-        setTimeout(() => startSlideshow(), 300);
+        console.log(`Showing slide ${index}, waiting 500ms before starting timer`);
+        
+        // Wait longer before starting the slideshow to ensure clean state
+        setTimeout(() => startSlideshow(), 500);
     }
 }     
     
