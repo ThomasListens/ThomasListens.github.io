@@ -390,18 +390,19 @@
         }
 
         .slide {
-            display: none;
-            animation: fadeInSlide 0.5s ease-in-out;
-        }
+    display: none;
+    opacity: 0;
+    transition: opacity 0.8s ease-in-out;
+}
 
-        .slide.active {
-            display: block;
-        }
+.slide.active {
+    display: block;
+    opacity: 1;
+}
 
-        @keyframes fadeInSlide {
-            from { opacity: 0; transform: translateX(20px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
+.slide.fading-out {
+    opacity: 0;
+}
 
         .slideshow-nav {
             text-align: center;
@@ -742,11 +743,66 @@
             </a>
         </div>
         
-        <div class="media-showcase">
+       <div class="media-showcase">
+    <div class="slideshow-container">
+        <!-- Slide 1: TL1 Image -->
+        <div class="slide active" data-duration="6500">
             <div class="showcase-image">
-                <img src="behind-the-scenes.jpg" alt="Behind the scenes" style="width: 100%; max-width: 400px; border: 1px solid #333; border-radius: 4px;">
+                <img src="TL1.jpg" alt="Behind the scenes - TL1" style="width: 400px; height: 400px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
             </div>
         </div>
+        
+        <!-- Slide 2: TOWO Promo Video -->
+        <div class="slide" data-duration="0" data-video="true" data-audio="true">
+            <div class="showcase-video">
+                <video style="width: 400px; height: 400px; object-fit: cover; border: 1px solid #333; border-radius: 4px;" 
+                       preload="metadata" onloadedmetadata="setVideoDuration(this)" 
+                       onended="nextSlide()" muted>
+                    <source src="TOWO-Promo.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+        </div>
+        
+        <!-- Slide 3: TL2 Image -->
+        <div class="slide" data-duration="6500">
+            <div class="showcase-image">
+                <img src="TL2.jpg" alt="Behind the scenes - TL2" style="width: 400px; height: 400px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
+            </div>
+        </div>
+        
+        <!-- Slide 4: Cryptic Cut Video -->
+        <div class="slide" data-duration="0" data-video="true" data-audio="true">
+            <div class="showcase-video">
+                <video style="width: 400px; height: 400px; object-fit: cover; border: 1px solid #333; border-radius: 4px;" 
+                       preload="metadata" onloadedmetadata="setVideoDuration(this)" 
+                       onended="nextSlide()" muted>
+                    <source src="Cryptic-Cut.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+        </div>
+        
+        <!-- Slide 5: TL3 Image -->
+        <div class="slide" data-duration="6500">
+            <div class="showcase-image">
+                <img src="TL3.jpg" alt="Behind the scenes - TL3" style="width: 400px; height: 400px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
+            </div>
+        </div>
+        
+        <!-- Slide 6: Slideshow Video -->
+        <div class="slide" data-duration="0" data-video="true" data-audio="false">
+            <div class="showcase-video">
+                <video style="width: 400px; height: 400px; object-fit: cover; border: 1px solid #333; border-radius: 4px;" 
+                       muted preload="metadata" onloadedmetadata="setVideoDuration(this)" 
+                       onended="nextSlide()">
+                    <source src="Slideshow.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+        </div>
+    </div>
+</div>
 
         <div class="footer">
             <span class="quote-line">"When the air is clear,</span>
@@ -1205,30 +1261,23 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                         link.classList.add('reveal');
                         
                         if (index === links.length - 1) {
-                            setTimeout(() => {
-                                document.querySelector('.media-showcase').classList.add('reveal-media');
-                                
-                                setTimeout(() => {
-                                    document.querySelector('.footer').classList.add('reveal-footer');
-                                }, 600);
-                            }, 800);
-                        }
+    setTimeout(() => {
+        document.querySelector('.media-showcase').classList.add('reveal-media');
+        
+        setTimeout(() => {
+            document.querySelector('.footer').classList.add('reveal-footer');
+        }, 600);
+        
+        // Start slideshow after media showcase fades in
+        setTimeout(() => {
+            initializeSlideshow();
+        }, 1000);
+        
+    }, 800);
+}
                     }, 500 + (revealDelay * index));
                 });
             }
-
-            window.showSlide = function(index) {
-                const slides = document.querySelectorAll('.slide');
-                const dots = document.querySelectorAll('.nav-dot');
-                
-                slides.forEach(slide => slide.classList.remove('active'));
-                dots.forEach(dot => dot.classList.remove('active'));
-                
-                if (slides[index]) {
-                    slides[index].classList.add('active');
-                    dots[index].classList.add('active');
-                }
-            };
 
             // FIXED LYRIC WHISPER SYSTEM
             const phrases = [
@@ -1456,6 +1505,115 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             
             animation.onfinish = () => particle.remove();
         }
+// Enhanced slideshow system with audio management - fully automated
+let currentSlide = 0;
+let slideInterval;
+let originalDroneGain = 0.5; // Store original drone volume
+
+// Initialize slideshow when blood drip reaches final link
+function initializeSlideshow() {
+    const slides = document.querySelectorAll('.slide');
+    if (slides.length === 0) return;
+    
+    // Start with first slide
+    showSlide(0);
+    startSlideshow();
+}
+
+function startSlideshow() {
+    const currentSlideElement = document.querySelector('.slide.active');
+    if (!currentSlideElement) return;
+    
+    const isVideo = currentSlideElement.hasAttribute('data-video');
+    const duration = parseInt(currentSlideElement.getAttribute('data-duration')) || 5000;
+    
+    if (isVideo) {
+        const video = currentSlideElement.querySelector('video');
+        if (video) {
+            // Handle audio management for videos with audio
+            const hasAudio = currentSlideElement.getAttribute('data-audio') === 'true';
+            
+            if (hasAudio && audioInitialized && masterGain) {
+                // Duck the drone audio when video with audio plays
+                masterGain.gain.setValueAtTime(masterGain.gain.value, audioContext.currentTime);
+                masterGain.gain.linearRampToValueAtTime(originalDroneGain * 0.25, audioContext.currentTime + 0.5);
+                
+                // Unmute the video to play its audio
+                video.muted = false;
+            }
+            
+            // Play video and wait for it to end (onended will call nextSlide)
+            video.currentTime = 0;
+            video.play().catch(e => {
+                console.log('Video autoplay blocked, advancing slideshow');
+                // Fallback: advance after estimated duration if autoplay fails
+                setTimeout(() => nextSlide(), 8000);
+            });
+        }
+    } else {
+        // For images, use the specified duration
+        slideInterval = setTimeout(() => nextSlide(), duration);
+    }
+}
+
+function nextSlide() {
+    const currentSlideElement = document.querySelector('.slide.active');
+    
+    // Restore drone audio volume when leaving video with audio
+    if (currentSlideElement && currentSlideElement.getAttribute('data-audio') === 'true' && audioInitialized && masterGain) {
+        masterGain.gain.setValueAtTime(masterGain.gain.value, audioContext.currentTime);
+        masterGain.gain.linearRampToValueAtTime(originalDroneGain, audioContext.currentTime + 1.0);
+    }
+    
+    // Start fade out transition
+    currentSlideElement.classList.add('fading-out');
+    
+    // After fade completes, switch to next slide
+    setTimeout(() => {
+        currentSlide = (currentSlide + 1) % document.querySelectorAll('.slide').length;
+        showSlide(currentSlide);
+    }, 800); // Match the CSS transition duration
+}
+
+function showSlide(index) {
+    // Clear any existing interval
+    if (slideInterval) {
+        clearTimeout(slideInterval);
+        slideInterval = null;
+    }
+    
+    const slides = document.querySelectorAll('.slide');
+    
+    // Stop all videos and reset them
+    slides.forEach(slide => {
+        const video = slide.querySelector('video');
+        if (video) {
+            video.pause();
+            video.currentTime = 0;
+            // Reset mute state based on data-audio attribute
+            video.muted = slide.getAttribute('data-audio') !== 'true';
+        }
+    });
+    
+    // Remove all active and fading states
+    slides.forEach(slide => {
+        slide.classList.remove('active', 'fading-out');
+    });
+    
+    if (slides[index]) {
+        // Set new active slide
+        slides[index].classList.add('active');
+        currentSlide = index;
+        
+        // Start slideshow after transition completes
+        setTimeout(() => startSlideshow(), 300);
+    }
+}
+
+function setVideoDuration(video) {
+    // This function is called when video metadata loads
+    console.log(`Video "${video.src}" duration: ${video.duration}s`);
+}
     </script>
 </body>
 </html>
