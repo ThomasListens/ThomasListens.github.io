@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Metabolic Harmonics v15</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f7f6f3;
+  --panel: #ffffff;
+  --text: #1a1a1a;
+  --dim: #666;
+  --border: #e0e0e0;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'IBM Plex Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.container {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  grid-template-rows: auto 1fr 130px 130px;
+  min-height: 100vh;
+}
+
+.header {
+  grid-column: 1 / -1;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--panel);
+}
+.header h1 { font-size: 16px; font-weight: 600; }
+.header-meta { font-size: 10px; color: var(--dim); font-family: 'IBM Plex Mono', monospace; }
+
+.sidebar {
+  grid-row: 2 / -1;
+  padding: 20px;
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+  font-size: 12px;
+  overflow-y: auto;
+}
+.sidebar h3 {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--dim);
+  margin: 18px 0 10px;
+}
+.sidebar h3:first-child { margin-top: 0; }
+
+.condition-btn {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  margin-bottom: 6px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.condition-btn:hover { background: #f0f0f0; }
+.condition-btn.active { background: var(--text); color: white; border-color: var(--text); }
+.condition-btn small { display: block; font-size: 9px; color: var(--dim); margin-top: 3px; }
+.condition-btn.active small { color: rgba(255,255,255,0.6); }
+.condition-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.scale-toggle {
+  display: flex; align-items: center; gap: 8px;
+  margin: 10px 0; cursor: pointer; font-size: 11px;
+}
+.scale-toggle input { width: 14px; height: 14px; }
+
+.color-select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 11px;
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+.gradient-legend { 
+  margin-top: 16px; 
+  padding: 12px; 
+  background: #f5f5f5; 
+  border-radius: 6px; 
+}
+.gradient-legend h4 { 
+  font-size: 9px; 
+  text-transform: uppercase; 
+  letter-spacing: 0.5px; 
+  color: var(--dim); 
+  margin-bottom: 8px; 
+}
+.gradient-bar {
+  height: 16px; 
+  border-radius: 3px;
+  margin-bottom: 6px;
+}
+.gradient-bar.combined {
+  background: linear-gradient(90deg,
+    #1a5f7a 0%,
+    #2d6a4f 20%,
+    #b5651d 40%,
+    #bc6c5c 60%,
+    #7d5a8c 80%,
+    #5c4a5e 100%);
+}
+.gradient-bar.complexity {
+  background: linear-gradient(90deg, hsl(200,70%,50%) 0%, hsl(340,65%,55%) 100%);
+}
+.gradient-bar.prime {
+  background: linear-gradient(90deg,
+    #1a5f7a 0%,
+    #2d6a4f 20%,
+    #b5651d 40%,
+    #bc6c5c 60%,
+    #7d5a8c 80%,
+    #5c4a5e 100%);
+}
+.gradient-bar.spectral {
+  background: linear-gradient(90deg, 
+    hsl(0, 60%, 50%) 0%, 
+    hsl(45, 70%, 50%) 25%, 
+    hsl(120, 50%, 40%) 50%, 
+    hsl(200, 60%, 45%) 75%, 
+    hsl(280, 50%, 50%) 100%);
+}
+.gradient-labels { 
+  display: flex; 
+  justify-content: space-between; 
+  font-size: 8px; 
+  color: var(--dim); 
+}
+
+.voice-indicator {
+  margin-top: 16px;
+  padding: 10px;
+  background: #f0f0f0;
+  border-radius: 6px;
+}
+.voice-indicator h4 {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+.voice-dots {
+  display: flex;
+  gap: 4px;
+}
+.voice-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ddd;
+  transition: background 0.2s, transform 0.2s;
+}
+.voice-dot.active {
+  background: #5a9;
+  transform: scale(1.1);
+}
+
+.zoom-hint {
+  margin-top: 16px;
+  padding: 10px;
+  background: #f0f7ff;
+  border-radius: 6px;
+  font-size: 10px;
+  color: #4a7a9a;
+  line-height: 1.5;
+}
+
+.viz {
+  position: relative;
+  background: var(--bg);
+  overflow: hidden;
+  min-height: 180px;
+}
+
+/* Organic breathing animation on bars */
+.bars-container {
+  transition: opacity 0.5s ease;
+}
+
+.bar {
+  cursor: pointer;
+  transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1), 
+              opacity 0.3s ease,
+              filter 0.5s ease;
+  transform-origin: bottom center;
+  transform-box: fill-box;
+}
+
+.bar.in-range {
+  transform: scaleX(1.8) scaleY(1.06);
+  filter: brightness(1.05) saturate(1.2);
+}
+
+.bar.focused {
+  transform: scaleX(2.5) scaleY(1.12);
+  filter: brightness(1.1) saturate(1.4);
+}
+
+.bar.dimmed {
+  opacity: 0.3;
+}
+
+.threshold-line {
+  stroke: rgba(0,0,0,0.1);
+  stroke-width: 1;
+  stroke-dasharray: 3,3;
+  pointer-events: none;
+}
+
+/* Crosshair cursor */
+.crosshair-v, .crosshair-h {
+  stroke: rgba(0,0,0,0.08);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.axis text { font-family: 'IBM Plex Mono', monospace; font-size: 9px; fill: var(--dim); }
+.axis path, .axis line { stroke: #e0e0e0; }
+
+.info {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: center;
+  padding: 20px 28px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  gap: 12px;
+}
+.info-item { text-align: center; }
+.info-item .label { 
+  font-size: 9px; 
+  text-transform: uppercase; 
+  letter-spacing: 0.8px; 
+  color: var(--dim); 
+  margin-bottom: 6px; 
+}
+.info-item .value { 
+  font-size: 15px; 
+  font-weight: 600; 
+  font-family: 'IBM Plex Mono', monospace; 
+}
+
+.audio-panel {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #0a0a0a;
+  padding: 14px 20px;
+  gap: 16px;
+}
+.audio-section {
+  display: flex;
+  flex-direction: column;
+}
+.audio-section label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #555;
+  margin-bottom: 6px;
+}
+.audio-section canvas { 
+  flex: 1;
+  width: 100%; 
+  border-radius: 4px;
+  background: #0f0f0f;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(247,246,243,0.96);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 100;
+  transition: opacity 0.4s;
+}
+.overlay.hidden { opacity: 0; pointer-events: none; }
+.play-circle {
+  width: 80px; height: 80px;
+  border: 2px solid var(--text);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+  transition: all 0.2s;
+}
+.overlay:hover .play-circle { background: var(--text); }
+.overlay:hover .play-circle svg { fill: white; }
+.play-circle svg { fill: var(--text); margin-left: 4px; }
+.overlay p { font-size: 12px; color: var(--dim); }
+
+.progress-bar {
+  position: absolute;
+  bottom: 0; left: 0;
+  height: 3px;
+  background: var(--text);
+  width: 0%;
+}
+
+.zoom-reset {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 6px 12px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 10;
+}
+.zoom-reset.visible { opacity: 1; }
+.zoom-reset:hover { background: #f5f5f5; }
+</style>
+</head>
+
+<body>
+<div class="container">
+  <header class="header">
+    <h1>Metabolic Harmonics</h1>
+    <div class="header-meta" id="headerMeta">Loading...</div>
+  </header>
+
+  <aside class="sidebar">
+    <h3>Data Source</h3>
+    <button class="condition-btn active" data-condition="healthy">
+      Healthy Reference
+      <small>curatedMetagenomicData · 14,562 samples</small>
+    </button>
+    <button class="condition-btn" data-condition="gut">
+      Healthy Gut Only
+      <small>Stool samples filtered</small>
+    </button>
+    <button class="condition-btn" data-condition="schiz" disabled>
+      Schizophrenia
+      <small>Coming soon</small>
+    </button>
+
+    <h3>Display</h3>
+    <label class="scale-toggle">
+      <input type="checkbox" id="scaleToggle" checked>
+      Symlog scale
+    </label>
+    
+    <select class="color-select" id="colorMode">
+      <option value="combined">Prime Family + Complexity</option>
+      <option value="complexity">Complexity (n×d)</option>
+      <option value="prime">Prime Limit</option>
+      <option value="spectral">Frequency (spectral)</option>
+    </select>
+
+    <div class="gradient-legend">
+      <h4 id="legendTitle">Prime Family + Complexity</h4>
+      <div class="gradient-bar combined" id="gradientBar"></div>
+      <div class="gradient-labels">
+        <span id="legendMin">2-limit</span>
+        <span id="legendMax">13+ limit</span>
+      </div>
+    </div>
+    
+    <div class="voice-indicator">
+      <h4>Active Voices (<span id="voiceCount">0</span>/8)</h4>
+      <div class="voice-dots" id="voiceDots">
+        <div class="voice-dot"></div>
+        <div class="voice-dot"></div>
+        <div class="voice-dot"></div>
+        <div class="voice-dot"></div>
+        <div class="voice-dot"></div>
+        <div class="voice-dot"></div>
+        <div class="voice-dot"></div>
+        <div class="voice-dot"></div>
+      </div>
+    </div>
+    
+    <div class="zoom-hint">
+      <strong>Explore:</strong> Hover to reveal harmonics. 
+      Move up to filter by amplitude.
+      Scroll to zoom. Double-click to reset.
+    </div>
+  </aside>
+
+  <div class="viz" id="viz">
+    <button class="zoom-reset" id="zoomReset">Reset</button>
+    <div class="overlay" id="overlay">
+      <div class="play-circle">
+        <svg width="24" height="24" viewBox="0 0 24 24">
+          <polygon points="6,3 20,12 6,21"/>
+        </svg>
+      </div>
+      <p id="overlayText">Loading...</p>
+    </div>
+    <svg id="chart"></svg>
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+
+  <div class="info">
+    <div class="info-item"><div class="label">Pathway</div><div class="value" id="infoPathway">—</div></div>
+    <div class="info-item"><div class="label">Ratio</div><div class="value" id="infoRatio">—</div></div>
+    <div class="info-item"><div class="label">Frequency</div><div class="value" id="infoFreq">—</div></div>
+    <div class="info-item"><div class="label">Amplitude</div><div class="value" id="infoAmp">—</div></div>
+    <div class="info-item"><div class="label">Prime Limit</div><div class="value" id="infoPrime">—</div></div>
+  </div>
+
+  <div class="audio-panel">
+    <div class="audio-section">
+      <label>Waveform</label>
+      <canvas id="oscCanvas"></canvas>
+    </div>
+    <div class="audio-section">
+      <label>Spectrum</label>
+      <canvas id="specCanvas"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let pathwayData = [];
+let audioCtx, analyser, masterGain;
+let buildBuffer, loopBuffer;
+let loopSource = null;
+let isBuilding = false;
+let buildComplete = false;
+
+// Voice management
+const MAX_VOICES = 8;
+let voiceQueue = [];
+
+// D3 elements
+let svg, defs, chartArea, xScale, yScale, xScaleOriginal, bars, barsContainer;
+let crosshairV, crosshairH, thresholdLine;
+let width, height, margin;
+let zoom;
+let currentTransform = d3.zoomIdentity;
+
+// Hover state
+let activeBars = new Set();
+let focusedBar = null;
+
+// Organic animation
+let breathePhase = 0;
+let lastTime = 0;
+
+// Color mode
+let colorMode = 'combined';
+
+// ============================================================
+// ORGANIC COLOR PALETTE
+// ============================================================
+const ORGANIC_PALETTE = {
+  2: { h: 195, s: 0.65, l: 0.35 },  // Deep teal
+  3: { h: 150, s: 0.55, l: 0.32 },  // Forest green
+  5: { h: 32, s: 0.70, l: 0.42 },   // Warm amber
+  7: { h: 12, s: 0.55, l: 0.52 },   // Terracotta
+  11: { h: 280, s: 0.40, l: 0.45 }, // Muted purple
+  13: { h: 320, s: 0.35, l: 0.38 }, // Dusty mauve
+  17: { h: 220, s: 0.20, l: 0.40 }  // Slate
+};
+
+// ============================================================
+// PRIME ANALYSIS
+// ============================================================
+function getPrimeLimit(ratioStr) {
+  const [num, den] = ratioStr.split('/').map(Number);
+  const primes = [2, 3, 5, 7, 11, 13];
+  let maxPrime = 2;
+  
+  let n = num, d = den;
+  for (const p of primes) {
+    while (n % p === 0) { n /= p; maxPrime = Math.max(maxPrime, p); }
+    while (d % p === 0) { d /= p; maxPrime = Math.max(maxPrime, p); }
+  }
+  
+  if (n > 1 || d > 1) return 'higher';
+  return maxPrime;
+}
+
+function getPrimeLimitNumber(ratioStr) {
+  const limit = getPrimeLimit(ratioStr);
+  if (limit === 'higher') return 17;
+  return limit;
+}
+
+// ============================================================
+// COLOR SCHEMES
+// ============================================================
+function getColor(d, mode) {
+  const maxComplex = Math.max(...pathwayData.map(p => p.complexity));
+  const maxFreq = Math.max(...pathwayData.map(p => p.frequency));
+  const primeLimit = getPrimeLimitNumber(d.ratio);
+  
+  switch(mode) {
+    case 'combined':
+      // Organic palette: prime → base color, complexity → mute it
+      const base = ORGANIC_PALETTE[primeLimit] || ORGANIC_PALETTE[17];
+      const complexityT = d.complexity / maxComplex;
+      // More complex = desaturated and slightly darker
+      const s = base.s * (1 - complexityT * 0.5);
+      const l = base.l * (1 - complexityT * 0.25);
+      return d3.hsl(base.h, s, l).toString();
+      
+    case 'spectral':
+      const freqT = Math.log(d.frequency / 100) / Math.log(maxFreq / 100);
+      // Warmer, more muted spectral
+      return d3.hsl(freqT * 280, 0.55, 0.45).toString();
+      
+    case 'prime':
+      const p = ORGANIC_PALETTE[primeLimit] || ORGANIC_PALETTE[17];
+      return d3.hsl(p.h, p.s, p.l).toString();
+      
+    case 'complexity':
+    default:
+      const t = Math.pow(d.complexity / maxComplex, 0.4);
+      return d3.interpolateHsl(
+        d3.hsl(195, 0.6, 0.4),
+        d3.hsl(340, 0.5, 0.45)
+      )(t);
+  }
+}
+
+function updateColors() {
+  bars.each(function(d) {
+    const color = getColor(d, colorMode);
+    const gradId = `grad-${pathwayData.indexOf(d)}`;
+    
+    d3.select(`#${gradId} stop:first-child`).attr('stop-color', color);
+    d3.select(`#${gradId} stop:last-child`).attr('stop-color', color);
+  });
+  
+  const gradBar = document.getElementById('gradientBar');
+  gradBar.className = `gradient-bar ${colorMode}`;
+  
+  const legendTitle = document.getElementById('legendTitle');
+  const legendMin = document.getElementById('legendMin');
+  const legendMax = document.getElementById('legendMax');
+  
+  switch(colorMode) {
+    case 'combined':
+      legendTitle.textContent = 'Prime Family + Complexity';
+      legendMin.textContent = '2-limit (vivid)';
+      legendMax.textContent = '13+ (muted)';
+      break;
+    case 'spectral':
+      legendTitle.textContent = 'Frequency';
+      legendMin.textContent = '100 Hz';
+      legendMax.textContent = 'High';
+      break;
+    case 'prime':
+      legendTitle.textContent = 'Prime Limit';
+      legendMin.textContent = '2 (octave)';
+      legendMax.textContent = '13+';
+      break;
+    default:
+      legendTitle.textContent = 'Complexity (n×d)';
+      legendMin.textContent = '1 (consonant)';
+      legendMax.textContent = Math.max(...pathwayData.map(d => d.complexity));
+  }
+}
+
+// ============================================================
+// LOAD DATA
+// ============================================================
+async function loadData() {
+  try {
+    const resp = await fetch('pathways_656.json');
+    pathwayData = await resp.json();
+    pathwayData = pathwayData.filter(d => d.amp > 0.000001);
+    
+    pathwayData.forEach(d => {
+      d.primeLimit = getPrimeLimit(d.ratio);
+      d.primeLimitNum = getPrimeLimitNumber(d.ratio);
+    });
+    
+    document.getElementById('headerMeta').textContent = 
+      `${pathwayData.length} pathways · 100 Hz fundamental · just intonation`;
+    document.getElementById('overlayText').textContent = 'Click to begin';
+    
+    console.log(`Loaded ${pathwayData.length} pathways`);
+    initVisualization();
+    
+  } catch (e) {
+    console.error('Failed to load data:', e);
+    document.getElementById('overlayText').textContent = 'Error loading pathways_656.json';
+  }
+}
+
+// ============================================================
+// AUDIO
+// ============================================================
+async function initAudio() {
+  if (audioCtx) return;
+  
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+  
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.85;
+  
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  
+  masterGain.connect(analyser);
+  analyser.connect(audioCtx.destination);
+  
+  try {
+    const [buildResp, loopResp] = await Promise.all([
+      fetch('wavetable_build.wav'),
+      fetch('wavetable_loop.wav')
+    ]);
+    
+    const [buildArr, loopArr] = await Promise.all([
+      buildResp.arrayBuffer(),
+      loopResp.arrayBuffer()
+    ]);
+    
+    [buildBuffer, loopBuffer] = await Promise.all([
+      audioCtx.decodeAudioData(buildArr),
+      audioCtx.decodeAudioData(loopArr)
+    ]);
+    
+    console.log(`Audio loaded`);
+  } catch (e) {
+    console.warn('WAV files not found');
+  }
+  
+  drawAudioViz();
+}
+
+async function playBuild() {
+  if (!audioCtx || !buildBuffer) return;
+  
+  isBuilding = true;
+  
+  const source = audioCtx.createBufferSource();
+  source.buffer = buildBuffer;
+  source.connect(masterGain);
+  source.start();
+  
+  source.onended = () => {
+    isBuilding = false;
+    buildComplete = true;
+    startLoop();
+  };
+}
+
+function startLoop() {
+  if (!loopBuffer) return;
+  
+  loopSource = audioCtx.createBufferSource();
+  loopSource.buffer = loopBuffer;
+  loopSource.loop = true;
+  loopSource.connect(masterGain);
+  loopSource.start();
+}
+
+// ============================================================
+// VOICE MANAGEMENT - Zero gravity feel: longer envelopes
+// ============================================================
+function updateVoiceIndicator() {
+  const count = voiceQueue.length;
+  document.getElementById('voiceCount').textContent = count;
+  
+  const dots = document.querySelectorAll('.voice-dot');
+  dots.forEach((dot, i) => {
+    dot.classList.toggle('active', i < count);
+  });
+}
+
+function addVoice(d, isFocused = false) {
+  if (!audioCtx) return;
+  if (voiceQueue.some(v => v.pathway === d.pathway)) return;
+  
+  while (voiceQueue.length >= MAX_VOICES) {
+    const oldest = voiceQueue.shift();
+    fadeOutVoice(oldest);
+  }
+  
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  
+  osc.type = 'sine';
+  osc.frequency.value = d.frequency;
+  gain.gain.value = 0;
+  
+  osc.connect(gain);
+  gain.connect(masterGain);
+  osc.start();
+  
+  // Longer, more gentle attack (zero gravity feel)
+  const targetGain = isFocused ? 0.14 : 0.07;
+  gain.gain.setTargetAtTime(targetGain, audioCtx.currentTime, 0.12); // 120ms time constant
+  
+  const voice = {
+    pathway: d.pathway,
+    osc,
+    gain,
+    startTime: audioCtx.currentTime,
+    isFocused
+  };
+  
+  voiceQueue.push(voice);
+  updateVoiceIndicator();
+  
+  if (!isFocused) {
+    setTimeout(() => {
+      removeVoice(d.pathway);
+    }, 800); // Longer sustain
+  }
+}
+
+function fadeOutVoice(voice) {
+  const { osc, gain } = voice;
+  const now = audioCtx.currentTime;
+  
+  gain.gain.cancelScheduledValues(now);
+  gain.gain.setTargetAtTime(0, now, 0.25); // Longer release
+  
+  setTimeout(() => {
+    try {
+      osc.stop();
+      gain.disconnect();
+    } catch(e) {}
+  }, 500);
+}
+
+function removeVoice(pathway) {
+  const idx = voiceQueue.findIndex(v => v.pathway === pathway);
+  if (idx === -1) return;
+  
+  const voice = voiceQueue[idx];
+  fadeOutVoice(voice);
+  voiceQueue.splice(idx, 1);
+  updateVoiceIndicator();
+}
+
+function removeAllVoices() {
+  voiceQueue.forEach(voice => fadeOutVoice(voice));
+  voiceQueue = [];
+  updateVoiceIndicator();
+}
+
+// ============================================================
+// AUDIO VISUALIZATION
+// ============================================================
+const oscCanvas = document.getElementById('oscCanvas');
+const specCanvas = document.getElementById('specCanvas');
+const oscCtx = oscCanvas.getContext('2d');
+const specCtx = specCanvas.getContext('2d');
+
+function resizeCanvases() {
+  oscCanvas.width = oscCanvas.offsetWidth * 2;
+  oscCanvas.height = oscCanvas.offsetHeight * 2;
+  specCanvas.width = specCanvas.offsetWidth * 2;
+  specCanvas.height = specCanvas.offsetHeight * 2;
+}
+resizeCanvases();
+window.addEventListener('resize', resizeCanvases);
+
+const timeData = new Uint8Array(2048);
+const freqData = new Uint8Array(1024);
+
+function drawAudioViz() {
+  requestAnimationFrame(drawAudioViz);
+  if (!analyser) return;
+  
+  const oscW = oscCanvas.width;
+  const oscH = oscCanvas.height;
+  const specW = specCanvas.width;
+  const specH = specCanvas.height;
+  
+  // Oscilloscope
+  analyser.getByteTimeDomainData(timeData);
+  oscCtx.fillStyle = '#0f0f0f';
+  oscCtx.fillRect(0, 0, oscW, oscH);
+  
+  oscCtx.strokeStyle = '#1a1a1a';
+  oscCtx.lineWidth = 1;
+  oscCtx.beginPath();
+  oscCtx.moveTo(0, oscH / 2);
+  oscCtx.lineTo(oscW, oscH / 2);
+  oscCtx.stroke();
+  
+  // Organic waveform color (subtle green-blue)
+  oscCtx.strokeStyle = '#5a9a8a';
+  oscCtx.lineWidth = 2;
+  oscCtx.beginPath();
+  const sliceW = oscW / timeData.length;
+  for (let i = 0; i < timeData.length; i++) {
+    const v = timeData[i] / 128;
+    const y = (v * oscH) / 2;
+    i === 0 ? oscCtx.moveTo(0, y) : oscCtx.lineTo(i * sliceW, y);
+  }
+  oscCtx.stroke();
+  
+  // Spectrum with organic colors
+  analyser.getByteFrequencyData(freqData);
+  specCtx.fillStyle = '#0f0f0f';
+  specCtx.fillRect(0, 0, specW, specH);
+  
+  const numBars = 80;
+  const barW = specW / numBars;
+  
+  for (let i = 0; i < numBars; i++) {
+    const logIndex = Math.floor(Math.pow(i / numBars, 2) * freqData.length * 0.6);
+    const value = freqData[Math.min(logIndex, freqData.length - 1)];
+    const h = (value / 255) * specH * 0.9;
+    
+    // Organic gradient: teal → amber → mauve
+    const t = i / numBars;
+    const hue = 180 - t * 160; // 180 (teal) → 20 (amber)
+    const sat = 45 + (value / 255) * 25;
+    const light = 30 + (value / 255) * 20;
+    
+    specCtx.fillStyle = `hsl(${hue}, ${sat}%, ${light}%)`;
+    specCtx.fillRect(i * barW + 1, specH - h, barW - 2, h);
+  }
+}
+
+// ============================================================
+// ORGANIC BREATHING ANIMATION
+// ============================================================
+function animateBreathing(timestamp) {
+  requestAnimationFrame(animateBreathing);
+  
+  if (!buildComplete) return;
+  
+  const delta = timestamp - lastTime;
+  lastTime = timestamp;
+  
+  // Very slow breathing: ~20 second cycle
+  breathePhase += delta * 0.0003;
+  
+  // Subtle opacity modulation (±2%)
+  const breathe = Math.sin(breathePhase) * 0.02 + 1;
+  
+  // Apply to bars container
+  if (barsContainer) {
+    barsContainer.style('opacity', breathe);
+  }
+}
+
+// ============================================================
+// VISUALIZATION
+// ============================================================
+function initVisualization() {
+  const vizEl = document.getElementById('viz');
+  margin = { top: 20, right: 30, bottom: 40, left: 55 };
+  width = vizEl.clientWidth - margin.left - margin.right;
+  height = vizEl.clientHeight - margin.top - margin.bottom;
+  
+  const maxFreq = Math.max(...pathwayData.map(d => d.frequency));
+  const maxAmp = Math.max(...pathwayData.map(d => d.amp));
+  
+  const svgEl = d3.select('#chart')
+    .attr('width', width + margin.left + margin.right)
+    .attr('height', height + margin.top + margin.bottom);
+  
+  svg = svgEl.append('g')
+    .attr('transform', `translate(${margin.left},${margin.top})`);
+  
+  svg.append('defs')
+    .append('clipPath')
+    .attr('id', 'chart-clip')
+    .append('rect')
+    .attr('width', width)
+    .attr('height', height);
+  
+  defs = svg.select('defs');
+  
+  chartArea = svg.append('g')
+    .attr('class', 'chart-area')
+    .attr('clip-path', 'url(#chart-clip)');
+  
+  // Scales
+  xScale = d3.scaleLog()
+    .domain([90, maxFreq * 1.1])
+    .range([0, width]);
+  
+  xScaleOriginal = xScale.copy();
+  
+  yScale = d3.scaleSymlog()
+    .constant(0.0001)
+    .domain([0, maxAmp * 1.1])
+    .range([height, 0]);
+  
+  const widthScale = d3.scaleSqrt()
+    .domain([0, maxAmp])
+    .range([2, 8]);
+  
+  // Create gradients
+  pathwayData.forEach((d, i) => {
+    const color = getColor(d, colorMode);
+    const grad = defs.append('linearGradient')
+      .attr('id', `grad-${i}`)
+      .attr('x1', '0%').attr('y1', '100%')
+      .attr('x2', '0%').attr('y2', '0%');
+    
+    grad.append('stop')
+      .attr('offset', '0%')
+      .attr('stop-color', color)
+      .attr('stop-opacity', 1);
+    
+    grad.append('stop')
+      .attr('offset', '100%')
+      .attr('stop-color', color)
+      .attr('stop-opacity', 0.55);
+  });
+  
+  // Axes
+  const xAxis = d3.axisBottom(xScale)
+    .tickValues([100, 150, 200, 300, 400, 500, 750, 1000, 1500, 2000, 3000, 5000])
+    .tickFormat(d => d >= 1000 ? (d/1000) + 'k' : d);
+  
+  svg.append('g')
+    .attr('class', 'axis x-axis')
+    .attr('transform', `translate(0,${height})`)
+    .call(xAxis);
+  
+  svg.append('text')
+    .attr('x', width / 2)
+    .attr('y', height + 32)
+    .attr('text-anchor', 'middle')
+    .attr('fill', '#999')
+    .attr('font-size', '9px')
+    .text('Frequency (Hz)');
+  
+  svg.append('g')
+    .attr('class', 'axis y-axis')
+    .call(d3.axisLeft(yScale).ticks(4).tickFormat(d3.format('.2f')));
+  
+  // Crosshairs (for pinpoint precision)
+  crosshairV = chartArea.append('line')
+    .attr('class', 'crosshair-v')
+    .attr('y1', 0)
+    .attr('y2', height)
+    .style('opacity', 0);
+  
+  crosshairH = chartArea.append('line')
+    .attr('class', 'crosshair-h')
+    .attr('x1', 0)
+    .attr('x2', width)
+    .style('opacity', 0);
+  
+  thresholdLine = chartArea.append('line')
+    .attr('class', 'threshold-line')
+    .attr('x1', 0)
+    .attr('x2', width)
+    .style('opacity', 0);
+  
+  // Render order: high amplitude first (back)
+  const renderOrder = [...pathwayData].sort((a, b) => b.amp - a.amp);
+  
+  // Bars container for breathing animation
+  barsContainer = chartArea.append('g')
+    .attr('class', 'bars-container');
+  
+  bars = barsContainer.selectAll('rect')
+    .data(renderOrder)
+    .enter()
+    .append('rect')
+    .attr('class', 'bar')
+    .attr('x', d => xScale(d.frequency) - widthScale(d.amp) / 2)
+    .attr('y', height)
+    .attr('width', d => widthScale(d.amp))
+    .attr('height', 0)
+    .attr('fill', d => `url(#grad-${pathwayData.indexOf(d)})`);
+  
+  // Mouse tracking
+  chartArea.append('rect')
+    .attr('class', 'mouse-tracker')
+    .attr('width', width)
+    .attr('height', height)
+    .attr('fill', 'transparent')
+    .on('mousemove', handleMouseMove)
+    .on('mouseleave', handleMouseLeave);
+  
+  // Zoom
+  zoom = d3.zoom()
+    .scaleExtent([1, 60])
+    .translateExtent([[0, 0], [width, height]])
+    .extent([[0, 0], [width, height]])
+    .on('zoom', zoomed);
+  
+  svgEl.call(zoom);
+  svgEl.on('dblclick.zoom', resetZoom);
+  document.getElementById('zoomReset').addEventListener('click', resetZoom);
+  
+  // Start breathing animation
+  requestAnimationFrame(animateBreathing);
+  
+  console.log(`Rendered ${pathwayData.length} bars`);
+}
+
+// ============================================================
+// PINPOINT MOUSE HANDLING
+// ============================================================
+function handleMouseMove(event) {
+  if (isBuilding) return;
+  
+  const [mx, my] = d3.pointer(event);
+  const mouseFreq = xScale.invert(mx);
+  const mouseAmp = yScale.invert(my);
+  
+  // Show crosshairs
+  crosshairV.attr('x1', mx).attr('x2', mx).style('opacity', 1);
+  crosshairH.attr('y1', my).attr('y2', my).style('opacity', 1);
+  
+  // Tighter frequency window: 3% at 1x zoom, scales with zoom
+  const freqWindow = mouseFreq * 0.03 / Math.sqrt(currentTransform.k);
+  const minFreq = mouseFreq - freqWindow;
+  const maxFreq = mouseFreq + freqWindow;
+  
+  // Find bars that:
+  // 1. Are within the frequency window
+  // 2. Their top (y position) is above the mouse (bar reaches mouse height)
+  const barsInRange = [];
+  let closestBar = null;
+  let closestDist = Infinity;
+  
+  const maxAmp = Math.max(...pathwayData.map(d => d.amp));
+  const widthScale = d3.scaleSqrt().domain([0, maxAmp]).range([2, 8]);
+  
+  pathwayData.forEach(d => {
+    const barX = xScale(d.frequency);
+    const barTop = yScale(d.amp);
+    const barWidth = widthScale(d.amp);
+    
+    // Pixel-based hit detection for X (more intuitive)
+    const hitMargin = Math.max(8, barWidth / 2 + 4);
+    const inXRange = Math.abs(barX - mx) <= hitMargin;
+    
+    // Bar must reach up to mouse Y position
+    const barReachesMouse = barTop <= my;
+    
+    if (inXRange && barReachesMouse) {
+      barsInRange.push(d);
+      
+      const dist = Math.abs(barX - mx);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestBar = d;
+      }
+    }
+  });
+  
+  // Visual states
+  const barsInRangeSet = new Set(barsInRange);
+  
+  bars.classed('in-range', d => barsInRangeSet.has(d) && d !== closestBar)
+      .classed('focused', d => d === closestBar)
+      .classed('dimmed', d => !barsInRangeSet.has(d));
+  
+  // Audio
+  barsInRange.forEach(d => {
+    addVoice(d, d === closestBar);
+  });
+  
+  // Info
+  if (closestBar) {
+    document.getElementById('infoPathway').textContent = closestBar.pathway;
+    document.getElementById('infoRatio').textContent = closestBar.ratio;
+    document.getElementById('infoFreq').textContent = closestBar.frequency.toFixed(1) + ' Hz';
+    document.getElementById('infoAmp').textContent = closestBar.amp.toFixed(6);
+    document.getElementById('infoPrime').textContent = closestBar.primeLimit + '-limit';
+  }
+  
+  activeBars = barsInRangeSet;
+  focusedBar = closestBar;
+}
+
+function handleMouseLeave() {
+  if (isBuilding) return;
+  
+  bars.classed('in-range', false)
+      .classed('focused', false)
+      .classed('dimmed', false);
+  
+  crosshairV.style('opacity', 0);
+  crosshairH.style('opacity', 0);
+  thresholdLine.style('opacity', 0);
+  
+  removeAllVoices();
+  activeBars.clear();
+  focusedBar = null;
+  
+  document.getElementById('infoPathway').textContent = '—';
+  document.getElementById('infoRatio').textContent = '—';
+  document.getElementById('infoFreq').textContent = '—';
+  document.getElementById('infoAmp').textContent = '—';
+  document.getElementById('infoPrime').textContent = '—';
+}
+
+// ============================================================
+// ZOOM
+// ============================================================
+function zoomed(event) {
+  currentTransform = event.transform;
+  const newXScale = currentTransform.rescaleX(xScaleOriginal);
+  xScale = newXScale;
+  
+  const maxAmp = Math.max(...pathwayData.map(d => d.amp));
+  const widthScale = d3.scaleSqrt().domain([0, maxAmp]).range([2, 8]);
+  
+  const domain = newXScale.domain();
+  const allTicks = [100, 150, 200, 300, 400, 500, 750, 1000, 1500, 2000, 3000, 5000, 7500, 10000];
+  const visibleTicks = allTicks.filter(t => t >= domain[0] && t <= domain[1]);
+  
+  svg.select('.x-axis')
+    .call(d3.axisBottom(newXScale)
+      .tickValues(visibleTicks)
+      .tickFormat(d => d >= 1000 ? (d/1000) + 'k' : d));
+  
+  bars.attr('x', d => newXScale(d.frequency) - widthScale(d.amp) / 2);
+  
+  crosshairH.attr('x2', width);
+  
+  document.getElementById('zoomReset').classList.toggle('visible', currentTransform.k > 1);
+}
+
+function resetZoom() {
+  d3.select('#chart')
+    .transition()
+    .duration(400)
+    .call(zoom.transform, d3.zoomIdentity);
+}
+
+// ============================================================
+// BUILD ANIMATION - Zero gravity: slower emergence
+// ============================================================
+function animateBuild() {
+  const sorted = [...pathwayData].sort((a, b) => a.complexity - b.complexity);
+  const n = sorted.length;
+  const totalTime = buildBuffer ? buildBuffer.duration * 1000 : 23400;
+  
+  sorted.forEach((d, i) => {
+    const progress = i / n;
+    const eased = Math.pow(progress, 4);
+    const delay = eased * totalTime;
+    
+    setTimeout(() => {
+      bars.filter(dd => dd === d)
+        .transition()
+        .duration(250) // Longer emergence
+        .ease(d3.easeCubicOut) // Gentle deceleration
+        .attr('y', yScale(d.amp))
+        .attr('height', Math.max(1, height - yScale(d.amp)));
+      
+      document.getElementById('progressBar').style.width = `${(i + 1) / n * 100}%`;
+    }, delay);
+  });
+}
+
+// ============================================================
+// SCALE TOGGLE
+// ============================================================
+document.getElementById('scaleToggle').addEventListener('change', (e) => {
+  const useSymlog = e.target.checked;
+  const maxAmp = Math.max(...pathwayData.map(d => d.amp));
+  
+  yScale = useSymlog
+    ? d3.scaleSymlog().constant(0.0001).domain([0, maxAmp * 1.1]).range([height, 0])
+    : d3.scaleLinear().domain([0, maxAmp * 1.1]).range([height, 0]);
+  
+  svg.select('.y-axis')
+    .transition().duration(400)
+    .call(d3.axisLeft(yScale).ticks(4).tickFormat(d3.format('.2f')));
+  
+  bars.transition().duration(400)
+    .attr('y', d => yScale(d.amp))
+    .attr('height', d => Math.max(1, height - yScale(d.amp)));
+});
+
+// ============================================================
+// COLOR MODE
+// ============================================================
+document.getElementById('colorMode').addEventListener('change', (e) => {
+  colorMode = e.target.value;
+  updateColors();
+});
+
+// ============================================================
+// START
+// ============================================================
+document.getElementById('overlay').addEventListener('click', async () => {
+  document.getElementById('overlay').classList.add('hidden');
+  await initAudio();
+  playBuild();
+  animateBuild();
+});
+
+loadData();
+</script>
+</body>
+</html>
