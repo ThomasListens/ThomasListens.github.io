@@ -1,0 +1,2023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HUMAnN3 Harmonics</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { font-family: 'Inter', sans-serif; background: #fafafa; height: 100%; overflow: hidden; }
+        
+        .app {
+            display: grid;
+            grid-template-columns: 460px 1fr;
+            grid-template-rows: 85fr 15fr;
+            height: 100vh;
+        }
+        
+        .sidebar {
+            grid-row: 1 / 3;
+            display: flex;
+            flex-direction: column;
+            background: #f0f0f0;
+            border-right: 1px solid #e0e0e0;
+            overflow: hidden;
+        }
+        
+        .sidebar-header {
+            padding: 28px 28px 24px;
+            background: #fff;
+            border-bottom: 1px solid #e0e0e0;
+            text-align: center;
+        }
+        
+        .sidebar-header h1 {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .title-meta {
+            color: #1a1a1a;
+        }
+        
+        .title-bolic {
+            color: #fff;
+            -webkit-text-stroke: 2px #1a1a1a;
+        }
+        
+        .title-harmonics {
+            background: linear-gradient(135deg, 
+                hsl(210, 55%, 48%) 0%,
+                hsl(160, 50%, 42%) 25%,
+                hsl(45, 60%, 48%) 50%,
+                hsl(20, 55%, 48%) 75%,
+                hsl(335, 50%, 50%) 100%
+            );
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .sidebar-header .meta {
+            font-size: 13px;
+            color: #888;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .sidebar-content {
+            flex: 1;
+            padding: 22px 28px;
+            overflow-y: auto;
+        }
+        
+        .panel {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 14px;
+        }
+        
+        .panel-title {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #666;
+            margin-bottom: 12px;
+        }
+        
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            text-align: left;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.15s ease;
+        }
+        .btn:hover { background: #f5f5f5; border-color: #bbb; }
+        .btn.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+        .btn small { display: block; font-size: 13px; color: #888; margin-top: 6px; }
+        .btn.active small { color: rgba(255,255,255,0.6); }
+        
+        .ctrl {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 16px;
+            font-size: 16px;
+        }
+        .ctrl:last-child { margin-bottom: 0; }
+        .ctrl input[type=checkbox] { width: 22px; height: 22px; cursor: pointer; }
+        .ctrl label { cursor: pointer; }
+        
+        .volume-ctrl {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .volume-ctrl label {
+            font-size: 14px;
+            color: #555;
+        }
+        .volume-ctrl input[type=range] {
+            width: 100%;
+            height: 8px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #e0e0e0;
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+        }
+        .volume-ctrl input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #1a1a1a;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+        .volume-ctrl input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+        .volume-ctrl input[type=range]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #1a1a1a;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+        .volume-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: #888;
+            text-align: right;
+        }
+        
+        .focused-panel {
+            background: linear-gradient(145deg, #f0f5ff, #e8eeff);
+            border: 2px solid #b8c8f0;
+        }
+        
+        .pathway-name {
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.3;
+    height: 52px; /* Reduced height */
+    color: #2563eb;
+    word-break: break-word;
+    overflow: hidden;
+}
+        
+        .pathway-amp {
+            font-size: 28px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            color: #1e40af;
+            margin: 10px 0;
+        }
+        
+        .pathway-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #c0d0e8;
+        }
+        
+        .pathway-detail .k {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .pathway-detail .v {
+            font-size: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
+            margin-top: 4px;
+            color: #333;
+        }
+        
+        .freq-display {
+            text-align: center;
+            padding: 22px;
+            background: #fff;
+            border-radius: 12px;
+            margin-top: 20px;
+            border: 1px solid #ddd;
+        }
+        .freq-display .label {
+            font-size: 13px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        .freq-display .value {
+            font-size: 46px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            margin: 12px 0;
+            color: #1a1a1a;
+        }
+        .freq-display .ratio {
+            font-size: 22px;
+            color: #2563eb;
+            font-weight: 500;
+        }
+        
+        .viz {
+            position: relative;
+            background: #fff;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .bar { transform-origin: bottom center; transform-box: fill-box; }
+        .axis text { font: 11px 'JetBrains Mono', monospace; fill: #888; }
+        .axis path, .axis line { stroke: #ddd; }
+        
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.96);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 100;
+            transition: opacity 0.4s ease;
+        }
+        .overlay.hidden { opacity: 0; pointer-events: none; }
+        
+        .play-btn {
+            width: 84px;
+            height: 84px;
+            border: 2px solid #1a1a1a;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .overlay:hover .play-btn { background: #1a1a1a; transform: scale(1.05); }
+        .overlay:hover .play-btn svg { fill: #fff; }
+        .play-btn svg { fill: #1a1a1a; margin-left: 4px; }
+        .overlay p { margin-top: 20px; font-size: 15px; color: #666; }
+        
+        .zoom-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            padding: 12px 24px;
+            background: #fff;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            opacity: 0;
+            z-index: 10;
+            transition: all 0.2s ease;
+        }
+        .zoom-btn:hover { background: #f0f0f0; border-color: #999; }
+        .zoom-btn.show { opacity: 1; }
+        
+        .progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            background: #2563eb;
+            width: 0;
+            transition: width 0.1s ease;
+        }
+        
+        .bottom {
+            grid-column: 2;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            background: #f0f0f0;
+            gap: 1px;
+        }
+        
+        .audio-box {
+            background: #fff;
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+        }
+        .audio-box .label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #666;
+            margin-bottom: 6px;
+        }
+        .audio-box canvas {
+            flex: 1;
+            width: 100%;
+            min-height: 40px;
+            background: #080808;
+            border-radius: 6px;
+        }
+        
+        .cursor-label { pointer-events: none; }
+        
+        /* MOBILE */
+        @media (max-width: 900px) {
+            .app {
+                grid-template-columns: 1fr;
+                grid-template-rows: 35vh auto 20vh;
+                overflow-y: auto;
+            }
+            .sidebar {
+                grid-row: 2;
+                border-right: none;
+                border-top: 1px solid #e0e0e0;
+                border-bottom: 1px solid #e0e0e0;
+                overflow: visible;
+            }
+            .sidebar-header { padding: 16px 20px; }
+            .sidebar-header h1 { font-size: 28px; }
+            .sidebar-content { padding: 16px 20px; }
+            .panel { padding: 16px; margin-bottom: 14px; }
+            .panel-title { font-size: 11px; margin-bottom: 12px; }
+            .btn { padding: 12px 16px; margin-bottom: 10px; font-size: 14px; }
+            .btn small { font-size: 11px; margin-top: 4px; }
+            .pathway-name { font-size: 18px; min-height: 44px; }
+            .pathway-amp { font-size: 28px; margin: 12px 0; }
+            .pathway-details { gap: 12px; margin-top: 14px; padding-top: 14px; }
+            .pathway-detail .k { font-size: 10px; }
+            .pathway-detail .v { font-size: 15px; }
+            .freq-display { padding: 16px; margin-top: 14px; }
+            .freq-display .value { font-size: 36px; margin: 8px 0; }
+            .freq-display .ratio { font-size: 18px; }
+            .viz { grid-row: 1; grid-column: 1; border-bottom: none; }
+            .bottom { grid-row: 3; grid-column: 1; }
+            .audio-box { padding: 8px 12px; }
+            .audio-box .label { font-size: 9px; margin-bottom: 4px; }
+            .zoom-btn { padding: 8px 16px; font-size: 12px; top: 10px; right: 10px; }
+            .play-btn { width: 64px; height: 64px; }
+            .overlay p { font-size: 13px; margin-top: 14px; }
+        }
+        
+        @media (max-width: 500px) {
+            .app { grid-template-rows: 30vh auto 15vh; }
+            .sidebar-header h1 { font-size: 22px; }
+            .pathway-details { grid-template-columns: 1fr 1fr; }
+            .pathway-detail:nth-child(3) { grid-column: 1 / -1; }
+            .freq-display .value { font-size: 30px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1><span class="title-meta">HUMAnN3</span> <span class="title-harmonics">Harmonics</span></h1>
+                <div class="meta" id="meta">656 MetaCyc pathways · mapped by consonance (n×d)</div>
+            </div>
+            
+            <div class="sidebar-content">
+                <div class="panel">
+                    <div class="panel-title">Data Source</div>
+                    <button class="btn active" data-src="healthy">Healthy Controls<small>14,562 samples (All Sites) · curatedMetagenomicData v3.8</small></button>
+                    <button class="btn" data-src="pd">Parkinson's Disease<small>31 stool samples · Bedarf et al. 2017</small></button>
+                    <button class="btn" data-src="schiz">Schizophrenia<small>90 stool samples · Zhu et al. 2020</small></button>
+                </div>
+                
+                <div class="panel focused-panel">
+                    <div class="panel-title">Focused Pathway</div>
+                    <div class="pathway-name" id="pName">—</div>
+                    <div class="pathway-amp" id="pAmp">—</div>
+                    <div class="pathway-details">
+                        <div class="pathway-detail"><span class="k">Ratio</span><div class="v" id="pRatio">—</div></div>
+                        <div class="pathway-detail"><span class="k">Frequency</span><div class="v" id="pFreq">—</div></div>
+                        <div class="pathway-detail"><span class="k">Complexity</span><div class="v" id="pComp">—</div></div>
+                    </div>
+                </div>
+                
+                <div class="panel">
+                    <div class="panel-title">Display</div>
+                    <div class="ctrl">
+                        <input type="checkbox" id="symlog" checked>
+                        <label for="symlog">Symlog Scale</label>
+                    </div>
+                </div>
+                
+                <div class="panel">
+                    <div class="panel-title">Audio</div>
+                    <div class="volume-ctrl">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <label for="masterVol">Master Volume</label>
+                            <span class="volume-value" id="volDisplay">70%</span>
+                        </div>
+                        <input type="range" id="masterVol" min="0" max="100" value="70">
+                    </div>
+                </div>
+            </div>
+        </aside>
+        
+        <div class="viz" id="viz">
+            <button class="zoom-btn" id="zoomBtn">Reset Zoom</button>
+            <div class="overlay" id="overlay">
+                <div class="play-btn">
+                    <svg width="30" height="30" viewBox="0 0 24 24"><polygon points="6,3 20,12 6,21"/></svg>
+                </div>
+                <p id="overlayTxt">Loading...</p>
+            </div>
+            <svg id="chart"></svg>
+            <div class="progress" id="progress"></div>
+        </div>
+        
+        <div class="bottom">
+            <div class="audio-box"><div class="label">Waveform</div><canvas id="waveCanvas"></canvas></div>
+            <div class="audio-box"><div class="label">Spectrogram</div><canvas id="specCanvas"></canvas></div>
+        </div>
+    </div>
+
+<script>
+// ============================================
+// STATE & CONFIGURATION
+// ============================================
+let data = [];
+let actx, analyser, master, loopGain, duckGain, pingDelay, pingOut;
+let reverbNode, reverbGain, dryGain;
+let focusOsc = null, focusGain = null, focusFilter = null;
+let fundOsc, fundGain;
+let currentFocusedBar = null, dwellTargetBar = null;
+let buildBuf, loopBuf, loopSrc, buildSrc;
+let isBuilding = false, ready = false;
+let velocityDecayTimer = null;
+let lastMoveTime = 0;
+
+let tFocusVol = 0, tFundVol = 0, tDuck = 1;
+let cFocusVol = 0, cFundVol = 0, cDuck = 1;
+
+let masterVolume = 0.7;
+let sampleRate = 44100;
+
+const FUND = 100;
+const MIN_FOCUS_HEIGHT = 14;
+const CROSSFADE_DURATION = 0.4;
+
+let svg, chart, xScale, yScale, xOrig, bars, wScale, W, H, M, zoom, zoomK = 1;
+let useSymlog = true;
+let mouseX = null, inViz = false, lastX = null, lastT = 0, vel = 0, sVel = 0;
+let hoveredBar = null, dwellStart = null, focusAmt = 0;
+let barStates = new Map(), time = 0, rms = 0, lastPing = 0;
+let spectrogramData = [];
+let isLinearExploration = false;
+let cursorLabelOpacity = 0;
+let isFocusMode = false;
+let sweepGain = null;
+let sweepGainValue = 0;
+let focusGainValue = 0;
+let targetSweepGain = 0;
+let targetFocusGain = 0;
+
+// Transition state
+let isTransitioning = false;
+let transitionStartAmps = new Map();
+let transitionEndAmps = new Map();
+let transitionProgress = 0;
+let loopStartTime = 0;
+
+// Data state
+let allPathways = [];
+let conditions = {};
+let allConditions = {};
+let currentCondition = 'healthy';
+let timingData = null;
+let loopBuffers = {};
+let baseBarData = []; // Always use healthy data as base for bars
+
+const SPEC_HISTORY = 80;
+
+const PRIMES = {
+    2:  { h: 210, s: 55, l: 48 },
+    3:  { h: 160, s: 50, l: 42 },
+    5:  { h: 45,  s: 60, l: 48 },
+    7:  { h: 20,  s: 55, l: 48 },
+    11: { h: 335, s: 50, l: 50 },
+    13: { h: 270, s: 45, l: 52 },
+    x:  { h: 220, s: 25, l: 50 }
+};
+
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+function eqLoudnessGain(freq) {
+    if (freq < 150) return 1.5;
+    if (freq < 300) return 1.3;
+    if (freq < 500) return 1.15;
+    if (freq < 800) return 1.0;
+    if (freq < 2000) return 0.95;
+    if (freq < 5000) return 0.95;
+    if (freq < 8000) return 1.0;
+    if (freq < 10000) return 1.0;
+    if (freq < 12000) return 1.15;
+    if (freq < 15000) return 1.25;
+    return 1.35;
+}
+
+function factors(n) {
+    const f = {};
+    [2, 3, 5, 7, 11, 13].forEach(p => {
+        while (n % p === 0) { f[p] = (f[p] || 0) + 1; n /= p; }
+    });
+    if (n > 1) f.x = 1;
+    return f;
+}
+
+function ratioF(r) {
+    const [n, d] = r.split('/').map(Number);
+    const nf = factors(n), df = factors(d);
+    const a = { ...nf };
+    for (const [p, c] of Object.entries(df)) a[p] = (a[p] || 0) + c;
+    return a;
+}
+
+function primeL(r) {
+    const f = ratioF(r);
+    const ps = [2, 3, 5, 7, 11, 13].filter(p => f[p]);
+    return f.x ? 'higher' : (ps.length ? Math.max(...ps) : 2);
+}
+
+function getCol(d, mF) {
+    const f = ratioF(d.ratio);
+    const tot = Object.values(f).reduce((a, b) => a + b, 0);
+    let h = 0, s = 0, l = 0;
+    for (const [p, c] of Object.entries(f)) {
+        const col = PRIMES[p] || PRIMES.x;
+        const w = c / tot;
+        h += col.h * w;
+        s += col.s * w;
+        l += col.l * w;
+    }
+    return { h, s, l };
+}
+
+function getGlobalMax() {
+    const healthyData = allConditions['healthy'] || [];
+    return healthyData.length > 0 
+        ? Math.max(...healthyData.map(d => d.amp)) 
+        : (data.length > 0 ? Math.max(...data.map(d => d.amp)) : 1);
+}
+
+function createReverbImpulse(duration = 2.5, decay = 2.0) {
+    const length = actx.sampleRate * duration;
+    const impulse = actx.createBuffer(2, length, actx.sampleRate);
+    
+    for (let channel = 0; channel < 2; channel++) {
+        const channelData = impulse.getChannelData(channel);
+        for (let i = 0; i < length; i++) {
+            channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+        }
+    }
+    return impulse;
+}
+
+// ============================================
+// DATA LOADING
+// ============================================
+async function load() {
+    try {
+        const [dataResp, timingResp] = await Promise.all([
+            fetch('metabolic_unified.json'),
+            fetch('timing_unified.json').catch(() => null)
+        ]);
+        
+        const fullData = await dataResp.json();
+        allPathways = fullData.pathways;
+        conditions = fullData.conditions;
+        if (timingResp) timingData = await timingResp.json();
+        
+        // Pre-build condition data arrays
+        for (const [condKey, condInfo] of Object.entries(conditions)) {
+            const key = condInfo.key;
+            allConditions[condKey] = allPathways
+                .filter(p => p[key] > 1e-9)
+                .map(p => ({
+                    pathway: p.pathway,
+                    name: p.name,
+                    ratio: p.ratio,
+                    frequency: p.frequency,
+                    complexity: p.complexity,
+                    amp: p[key]
+                }));
+        }
+        
+        loadCondition('healthy');
+        document.getElementById('overlayTxt').textContent = 'Click to begin';
+        
+    } catch (e) {
+        console.error('Load error:', e);
+        document.getElementById('overlayTxt').textContent = 'Error loading data';
+    }
+}
+
+function loadCondition(condition) {
+    currentCondition = condition;
+    data = allConditions[condition] || [];
+    
+    if (data.length === 0) {
+        console.warn(`No data for condition: ${condition}`);
+        return;
+    }
+    
+    const mF = Math.max(...data.map(d => d.frequency));
+    const mA = getGlobalMax();
+    
+    data.forEach((d, i) => {
+        d.i = i;
+        d.pl = primeL(d.ratio);
+        d.col = getCol(d, mF);
+        d.ar = d.amp / mA;
+        d.boost = d.ar > 0.3 ? 1 : d.ar > 0.1 ? 2 : d.ar > 0.03 ? 4 : 6;
+    });
+    
+    // Store base bar data from healthy (first load)
+    if (condition === 'healthy' && baseBarData.length === 0) {
+        baseBarData = data.map(d => ({ ...d })); // Deep copy
+    }
+    
+    if (svg) {
+        d3.select('#chart').selectAll('*').remove();
+        barStates.clear();
+        initViz();
+        if (ready) {
+            bars.attr('y', d => yScale(d.amp))
+                .attr('height', d => Math.max(2, H - yScale(d.amp)));
+        }
+    } else {
+        initViz();
+    }
+}
+
+// ============================================
+// DATASET TRANSITIONS
+// ============================================
+async function switchCondition(condition) {
+    if (condition === currentCondition) return;
+    if (isTransitioning) return;
+    if (!allConditions[condition]) return;
+    
+    isTransitioning = true;
+    transitionProgress = 0;
+    
+    console.log(`Starting transition: ${currentCondition} → ${condition}`);
+    
+    // Build amplitude maps
+    transitionStartAmps.clear();
+    transitionEndAmps.clear();
+    
+    // Get START amplitudes from current bar states
+    bars.each(function(d) {
+        transitionStartAmps.set(d.pathway, d.amp || 0);
+    });
+    
+    // Get END amplitudes from target condition
+    const newConditionData = allConditions[condition] || [];
+    const newAmpsMap = new Map();
+    newConditionData.forEach(d => {
+        newAmpsMap.set(d.pathway, d);
+    });
+    
+    // Set end amplitudes for ALL bars (use 0 if pathway not in new condition)
+    bars.each(function(d) {
+        const newData = newAmpsMap.get(d.pathway);
+        transitionEndAmps.set(d.pathway, newData ? newData.amp : 0);
+    });
+    
+    console.log(`Transition maps: ${transitionStartAmps.size} start, ${transitionEndAmps.size} end`);
+    
+    // Update current condition reference
+    currentCondition = condition;
+    data = newConditionData;
+    
+    // Recalculate data properties
+    const mF = data.length > 0 ? Math.max(...data.map(d => d.frequency)) : 1000;
+    const mA = getGlobalMax();
+    
+    data.forEach((d, i) => {
+        d.i = i;
+        d.pl = primeL(d.ratio);
+        d.col = getCol(d, mF);
+        d.ar = d.amp / mA;
+        d.boost = d.ar > 0.3 ? 1 : d.ar > 0.1 ? 2 : d.ar > 0.03 ? 4 : 6;
+    });
+    
+    const TRANSITION_MS = 1500;
+    const startTime = performance.now();
+    
+    function animateTransition() {
+        const elapsed = performance.now() - startTime;
+        transitionProgress = Math.min(elapsed / TRANSITION_MS, 1);
+        
+        // Smooth ease-in-out
+        const eased = transitionProgress < 0.5
+            ? 4 * transitionProgress * transitionProgress * transitionProgress
+            : 1 - Math.pow(-2 * transitionProgress + 2, 3) / 2;
+        
+        bars.each(function(d) {
+            const startAmp = transitionStartAmps.get(d.pathway) || 0;
+            const endAmp = transitionEndAmps.get(d.pathway) || 0;
+            d._interpAmp = startAmp + (endAmp - startAmp) * eased;
+        });
+        
+        if (transitionProgress < 1) {
+            requestAnimationFrame(animateTransition);
+        } else {
+            finishTransition();
+        }
+    }
+    
+    requestAnimationFrame(animateTransition);
+    
+    // Audio crossfade
+    if (actx && ready) {
+        try {
+            if (!loopBuffers[condition]) {
+                const loopResp = await fetch(`loop_${condition}.wav`);
+                const loopArr = await loopResp.arrayBuffer();
+                loopBuffers[condition] = await actx.decodeAudioData(loopArr);
+            }
+            crossfadeToLoopSynced(loopBuffers[condition]);
+        } catch (e) {
+            console.log(`Loop for ${condition} not found`);
+        }
+    }
+}
+
+function finishTransition() {
+    const mA = getGlobalMax();
+    
+    // Build lookup from current condition data
+    const currentAmps = new Map();
+    data.forEach(d => currentAmps.set(d.pathway, d));
+    
+    // Update bar bound data IN PLACE
+    bars.each(function(d) {
+        const currentData = currentAmps.get(d.pathway);
+        
+        if (currentData) {
+            d.amp = currentData.amp;
+            d.ar = currentData.ar;
+            d.boost = currentData.boost;
+        } else {
+            d.amp = 0;
+            d.ar = 0;
+            d.boost = 6;
+        }
+        
+        delete d._interpAmp;
+    });
+    
+    // Ensure barStates exist for all bars
+    bars.each(function(d) {
+        if (!barStates.has(d.pathway)) {
+            barStates.set(d.pathway, {
+                exc: 0, sx: 1, sy: 1, sw: 1, op: 1,
+                hue: d.col ? d.col.h : 200,
+                bp: Math.random() * Math.PI * 2,
+                bs: 0.02 + Math.random() * 0.03
+            });
+        }
+    });
+    
+    transitionStartAmps.clear();
+    transitionEndAmps.clear();
+    isTransitioning = false;
+    
+    console.log(`Transition complete: ${currentCondition}, bars updated`);
+}
+
+function crossfadeToLoopSynced(newBuffer) {
+    if (!actx || !newBuffer) return;
+    
+    const now = actx.currentTime;
+    const FADE_TIME = 2.0;  // Longer crossfade for smoother transition
+    
+    let startOffset = 0;
+    if (loopSrc && loopStartTime !== undefined && loopBuf) {
+        const elapsed = now - loopStartTime;
+        startOffset = elapsed % loopBuf.duration;
+    }
+    
+    const oldSrc = loopSrc;
+    const oldGain = loopGain;
+    
+    // Create new loop gain - start at true zero
+    const newLoopGain = actx.createGain();
+    newLoopGain.gain.setValueAtTime(0, now);
+    // Use linear ramp for first bit to avoid exponential issue with zero
+    newLoopGain.gain.linearRampToValueAtTime(0.05, now + 0.1);
+    newLoopGain.gain.exponentialRampToValueAtTime(0.65, now + FADE_TIME);
+    
+    // Route through both dry and reverb paths
+    newLoopGain.connect(dryGain);
+    newLoopGain.connect(reverbNode);
+    
+    const newSrc = actx.createBufferSource();
+    newSrc.buffer = newBuffer;
+    newSrc.loop = true;
+    newSrc.connect(newLoopGain);
+    newSrc.start(now, startOffset);
+    
+    if (oldSrc && oldGain) {
+        oldGain.gain.setValueAtTime(oldGain.gain.value, now);
+        // Fade out old loop smoothly
+        oldGain.gain.exponentialRampToValueAtTime(0.001, now + FADE_TIME * 0.8);
+        oldGain.gain.linearRampToValueAtTime(0, now + FADE_TIME);
+        
+        setTimeout(() => {
+            try {
+                oldSrc.stop();
+                oldSrc.disconnect();
+                oldGain.disconnect();
+            } catch (e) {}
+        }, FADE_TIME * 1000 + 200);
+    }
+    
+    loopSrc = newSrc;
+    loopGain = newLoopGain;
+    loopBuf = newBuffer;
+    loopStartTime = now - startOffset;
+}
+
+// ============================================
+// AUDIO INITIALIZATION
+// ============================================
+async function initAudio() {
+    if (actx) return;
+    
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    sampleRate = actx.sampleRate;
+    if (actx.state === 'suspended') await actx.resume();
+    
+    master = actx.createGain();
+    master.gain.value = masterVolume;
+    
+    // Reverb - more noticeable
+    reverbNode = actx.createConvolver();
+    reverbNode.buffer = createReverbImpulse(3.0, 1.8);  // Longer, slower decay
+    
+    reverbGain = actx.createGain();
+    reverbGain.gain.value = 0.5;  // More wet signal
+    
+    dryGain = actx.createGain();
+    dryGain.gain.value = 0.7;  // Less dry
+    
+    duckGain = actx.createGain();
+    duckGain.gain.value = 1;
+    
+    // Ping delay
+    pingDelay = actx.createDelay(1);
+    pingDelay.delayTime.value = 0.12;
+    
+    const pingFb = actx.createGain();
+    pingFb.gain.value = 0.2;
+    
+    const pingFilt = actx.createBiquadFilter();
+    pingFilt.type = 'lowpass';
+    pingFilt.frequency.value = 5000;
+    
+    pingOut = actx.createGain();
+    pingOut.gain.value = 0.11;
+    
+    pingDelay.connect(pingFb);
+    pingFb.connect(pingFilt);
+    pingFilt.connect(pingDelay);
+    pingDelay.connect(pingOut);
+    pingOut.connect(master);
+    
+    // Fundamental
+    fundOsc = actx.createOscillator();
+    fundOsc.type = 'sine';
+    fundOsc.frequency.value = FUND;
+    
+    fundGain = actx.createGain();
+    fundGain.gain.value = 0;
+    
+    fundOsc.connect(fundGain);
+    fundGain.connect(master);
+    fundOsc.start();
+    
+    // Loop with reverb routing
+    loopGain = actx.createGain();
+    loopGain.gain.value = 0.65;
+    
+    loopGain.connect(dryGain);
+    loopGain.connect(reverbNode);
+    reverbNode.connect(reverbGain);
+    
+    dryGain.connect(duckGain);
+    reverbGain.connect(duckGain);
+    duckGain.connect(master);
+    
+    // MASTER REVERB - subtle glue reverb at end of chain
+    const masterReverb = actx.createConvolver();
+    masterReverb.buffer = createReverbImpulse(1.5, 3.0);  // Short, dense reverb
+    
+    const masterReverbGain = actx.createGain();
+    masterReverbGain.gain.value = 0.15;  // Subtle - just for glue
+    
+    const masterDry = actx.createGain();
+    masterDry.gain.value = 0.92;
+    
+    // Route master through final reverb
+    master.connect(masterDry);
+    master.connect(masterReverb);
+    masterReverb.connect(masterReverbGain);
+    
+    // Analyser
+    analyser = actx.createAnalyser();
+    analyser.fftSize = 4096;
+    analyser.smoothingTimeConstant = 0.8;
+    
+    masterDry.connect(analyser);
+    masterReverbGain.connect(analyser);
+    analyser.connect(actx.destination);
+    
+    // Load audio
+    try {
+        const [br, lr] = await Promise.all([
+            fetch('build_unified.wav'),
+            fetch(`loop_${currentCondition}.wav`)
+        ]);
+        const [ba, la] = await Promise.all([br.arrayBuffer(), lr.arrayBuffer()]);
+        [buildBuf, loopBuf] = await Promise.all([
+            actx.decodeAudioData(ba),
+            actx.decodeAudioData(la)
+        ]);
+        loopBuffers[currentCondition] = loopBuf;
+    } catch (e) {
+        console.log('Audio files not found');
+    }
+    
+    requestAnimationFrame(smoothAudio);
+    drawAudio();
+}
+
+function smoothAudio() {
+    requestAnimationFrame(smoothAudio);
+    if (!actx) return;
+    
+    const focusSmooth = 0.04;
+    const duckSmooth = 0.03;
+    
+    cFocusVol += (tFocusVol - cFocusVol) * focusSmooth;
+    cFundVol += (tFundVol - cFundVol) * focusSmooth;
+    cDuck += (tDuck - cDuck) * duckSmooth;
+    
+    if (focusGain) {
+        focusGain.gain.setTargetAtTime(cFocusVol, actx.currentTime, 0.02);
+    }
+    fundGain.gain.setTargetAtTime(cFundVol, actx.currentTime, 0.02);
+    duckGain.gain.setTargetAtTime(cDuck, actx.currentTime, 0.04);
+}
+
+function pingBar(bar) {
+    if (!actx || !bar) return;
+    if (sVel < 50) return;
+    
+    const now = performance.now();
+    if (now - lastPing < 50) return;
+    lastPing = now;
+    
+    const eqGain = eqLoudnessGain(bar.frequency);
+    const sweepAmount = Math.min(1, sVel / 150);
+    const focusFade = 1 - focusAmt;
+    const vol = Math.min(0.07, Math.max(0, (sVel - 50) / 550)) * eqGain * focusFade * sweepAmount;
+    
+    if (vol < 0.001) return;
+    
+    const osc = actx.createOscillator();
+    const env = actx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.value = bar.frequency;
+    
+    env.gain.setValueAtTime(0, actx.currentTime);
+    env.gain.linearRampToValueAtTime(vol, actx.currentTime + 0.008);
+    env.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.07);
+    
+    osc.connect(env);
+    env.connect(pingDelay);
+    osc.start();
+    osc.stop(actx.currentTime + 0.1);
+}
+
+function startFocusTone(bar) {
+    if (!actx || !bar) return;
+    
+    if (focusOsc && currentFocusedBar && currentFocusedBar !== bar) {
+        const now = actx.currentTime;
+        const XFADE_TIME = 0.15;
+        
+        const oldOsc = focusOsc;
+        const oldGain = focusGain;
+        const oldFilter = focusFilter;
+        
+        if (oldGain) {
+            oldGain.gain.setValueAtTime(oldGain.gain.value, now);
+            oldGain.gain.exponentialRampToValueAtTime(0.001, now + XFADE_TIME);
+        }
+        
+        focusOsc = actx.createOscillator();
+        focusGain = actx.createGain();
+        focusFilter = actx.createBiquadFilter();
+        
+        focusFilter.type = 'lowpass';
+        focusFilter.frequency.value = 9000;
+        focusFilter.Q.value = 0.5;
+        
+        focusOsc.type = 'sine';
+        focusOsc.frequency.value = bar.frequency;
+        focusGain.gain.setValueAtTime(0.001, now);
+        
+        focusOsc.connect(focusGain);
+        focusGain.connect(focusFilter);
+        focusFilter.connect(master);
+        focusOsc.start();
+        
+        setTimeout(() => {
+            try {
+                oldOsc.stop();
+                oldOsc.disconnect();
+                oldGain.disconnect();
+                if (oldFilter) oldFilter.disconnect();
+            } catch (e) {}
+        }, XFADE_TIME * 1000 + 50);
+        
+    } else if (!focusOsc) {
+        focusOsc = actx.createOscillator();
+        focusGain = actx.createGain();
+        focusFilter = actx.createBiquadFilter();
+        
+        focusFilter.type = 'lowpass';
+        focusFilter.frequency.value = 9000;
+        focusFilter.Q.value = 0.5;
+        
+        focusOsc.type = 'sine';
+        focusOsc.frequency.value = bar.frequency;
+        focusGain.gain.value = 0;
+        
+        focusOsc.connect(focusGain);
+        focusGain.connect(focusFilter);
+        focusFilter.connect(master);
+        focusOsc.start();
+    }
+    
+    currentFocusedBar = bar;
+}
+
+function updateFocusVolume() {
+    if (!currentFocusedBar) return;
+    
+    const bar = currentFocusedBar;
+    const eqGain = eqLoudnessGain(bar.frequency);
+    const abundanceScale = 0.5 + (bar.ar * 0.5);
+    const baseVol = 0.06;  // Reduced from 0.11
+    const focusCurve = Math.pow(focusAmt, 0.7);
+    
+    tFocusVol = baseVol * focusCurve * eqGain * abundanceScale;
+    tFundVol = 0.06 * focusCurve * abundanceScale;
+    
+    const baseDuck = 0.4;
+    const abundanceDuck = (1 - bar.ar) * 0.35;
+    tDuck = 1 - (focusCurve * (baseDuck + abundanceDuck));
+    tDuck = Math.max(tDuck, 0.15);
+}
+
+function stopFocusTone() {
+    if (focusOsc && focusGain && actx) {
+        const now = actx.currentTime;
+        const FADE_TIME = 0.2;
+        
+        focusGain.gain.setValueAtTime(focusGain.gain.value, now);
+        focusGain.gain.exponentialRampToValueAtTime(0.001, now + FADE_TIME);
+        
+        const oldOsc = focusOsc;
+        const oldGain = focusGain;
+        const oldFilter = focusFilter;
+        
+        focusOsc = null;
+        focusGain = null;
+        focusFilter = null;
+        
+        setTimeout(() => {
+            try {
+                oldOsc.stop();
+                oldOsc.disconnect();
+                oldGain.disconnect();
+                if (oldFilter) oldFilter.disconnect();
+            } catch (e) {}
+        }, FADE_TIME * 1000 + 50);
+    }
+    
+    tFocusVol = 0;
+    tFundVol = 0.005;
+    tDuck = 0.98;
+    currentFocusedBar = null;
+    dwellTargetBar = null;
+    isLinearExploration = false;
+    isFocusMode = false;
+}
+
+async function playBuild() {
+    if (!actx || !buildBuf) {
+        isBuilding = true;
+        setTimeout(() => {
+            isBuilding = false;
+            ready = true;
+            clearInfo();
+            requestAnimationFrame(animate);
+        }, 3000);
+        return;
+    }
+    
+    isBuilding = true;
+    
+    const buildGain = actx.createGain();
+    buildGain.gain.value = 1;
+    buildGain.connect(master);
+    
+    buildSrc = actx.createBufferSource();
+    buildSrc.buffer = buildBuf;
+    buildSrc.connect(buildGain);
+    buildSrc.start();
+    
+    const buildDuration = buildBuf.duration;
+    const crossfadeStart = buildDuration - 0.5;
+    
+    setTimeout(() => {
+        if (loopBuf) {
+            const now = actx.currentTime;
+            
+            buildGain.gain.setValueAtTime(1, now);
+            buildGain.gain.linearRampToValueAtTime(0, now + CROSSFADE_DURATION);
+            
+            loopGain.gain.setValueAtTime(0, now);
+            loopGain.gain.linearRampToValueAtTime(0.65, now + CROSSFADE_DURATION);
+            
+            loopSrc = actx.createBufferSource();
+            loopSrc.buffer = loopBuf;
+            loopSrc.loop = true;
+            loopSrc.connect(loopGain);
+            loopSrc.start();
+            loopStartTime = now;
+        }
+    }, crossfadeStart * 1000);
+    
+    buildSrc.onended = () => {
+        isBuilding = false;
+        ready = true;
+        clearInfo();
+        
+        if (!loopSrc && loopBuf) {
+            startLoop();
+        }
+        
+        requestAnimationFrame(animate);
+    };
+}
+
+function startLoop() {
+    if (!loopBuf) return;
+    loopSrc = actx.createBufferSource();
+    loopSrc.buffer = loopBuf;
+    loopSrc.loop = true;
+    loopSrc.connect(loopGain);
+    loopSrc.start();
+    loopStartTime = actx.currentTime;
+}
+
+// ============================================
+// AUDIO VISUALIZATION
+// ============================================
+const waveCanvas = document.getElementById('waveCanvas');
+const specCanvas = document.getElementById('specCanvas');
+const waveCtx = waveCanvas.getContext('2d');
+const specCtx = specCanvas.getContext('2d');
+let timeBuf, freqBuf;
+
+function initAudioBuffers() {
+    if (analyser) {
+        timeBuf = new Uint8Array(analyser.fftSize);
+        freqBuf = new Uint8Array(analyser.frequencyBinCount);
+    } else {
+        timeBuf = new Uint8Array(2048);
+        freqBuf = new Uint8Array(1024);
+    }
+}
+
+function resizeC() {
+    waveCanvas.width = waveCanvas.offsetWidth * 2;
+    waveCanvas.height = waveCanvas.offsetHeight * 2;
+    specCanvas.width = specCanvas.offsetWidth * 2;
+    specCanvas.height = specCanvas.offsetHeight * 2;
+    spectrogramData = [];
+}
+
+resizeC();
+window.addEventListener('resize', resizeC);
+
+function drawAudio() {
+    requestAnimationFrame(drawAudio);
+    if (!analyser) return;
+    
+    if (!timeBuf) initAudioBuffers();
+    
+    analyser.getByteTimeDomainData(timeBuf);
+    
+    let sum = 0;
+    for (let i = 0; i < timeBuf.length; i++) {
+        const v = (timeBuf[i] - 128) / 128;
+        sum += v * v;
+    }
+    rms = Math.sqrt(sum / timeBuf.length);
+    
+    const ww = waveCanvas.width, wh = waveCanvas.height;
+    waveCtx.fillStyle = '#080808';
+    waveCtx.fillRect(0, 0, ww, wh);
+    waveCtx.strokeStyle = '#22c55e';
+    waveCtx.lineWidth = 2.5;
+    waveCtx.beginPath();
+    
+    const waveGain = 2.5;
+    const centerY = wh / 2;
+    
+    for (let i = 0; i < timeBuf.length; i++) {
+        const x = (i / timeBuf.length) * ww;
+        const sample = (timeBuf[i] - 128) / 128;
+        const y = centerY - (sample * centerY * waveGain);
+        i === 0 ? waveCtx.moveTo(x, y) : waveCtx.lineTo(x, y);
+    }
+    waveCtx.stroke();
+    
+    analyser.getByteFrequencyData(freqBuf);
+    
+    const sw = specCanvas.width, sh = specCanvas.height;
+    const sliceH = Math.ceil(sh / SPEC_HISTORY);
+    
+    const nyquist = sampleRate / 2;
+    const binCount = freqBuf.length;
+    const freqPerBin = nyquist / binCount;
+    
+    const numDisplayBins = 200;
+    const slice = new Uint8Array(numDisplayBins);
+    
+    for (let i = 0; i < numDisplayBins; i++) {
+        const t = i / numDisplayBins;
+        const curved = Math.pow(t, 1.8);
+        const maxFreq = 18000;
+        const freq = 50 + curved * (maxFreq - 50);
+        const binIndex = Math.floor(freq / freqPerBin);
+        
+        if (binIndex < binCount) {
+            let val = freqBuf[binIndex];
+            if (freq < 200) val *= 0.4;
+            else if (freq < 500) val *= 0.6;
+            else if (freq < 1000) val *= 0.8;
+            slice[i] = Math.min(255, val);
+        } else {
+            slice[i] = 0;
+        }
+    }
+    
+    spectrogramData.push(slice);
+    if (spectrogramData.length > SPEC_HISTORY) spectrogramData.shift();
+    
+    specCtx.fillStyle = '#080808';
+    specCtx.fillRect(0, 0, sw, sh);
+    
+    for (let t = 0; t < spectrogramData.length; t++) {
+        const row = spectrogramData[t];
+        const y = sh - ((t + 1) / SPEC_HISTORY) * sh;
+        
+        for (let f = 0; f < row.length; f++) {
+            const x = (f / row.length) * sw;
+            const w = sw / row.length + 1;
+            const v = row[f] / 255;
+            const boostedV = Math.min(1, Math.pow(v, 0.7) * 1.2);
+            const hue = 280 - boostedV * 250;
+            const sat = 70 + boostedV * 25;
+            const lit = Math.max(3, boostedV * 55);
+            specCtx.fillStyle = `hsl(${hue},${sat}%,${lit}%)`;
+            specCtx.fillRect(x, y, w, sliceH + 1);
+        }
+    }
+}
+
+// ============================================
+// SCALES
+// ============================================
+function createSymlogScale(mA) {
+    return d3.scaleSymlog().constant(0.0001).domain([0, mA * 1.1]).range([H, 0]);
+}
+
+function createLinearScale(mA) {
+    return d3.scaleLinear().domain([0, mA * 1.1]).range([H, 0]);
+}
+
+function transitionScale(toSymlog) {
+    if (isTransitioning) {
+        document.getElementById('symlog').checked = useSymlog;
+        return;
+    }
+    
+    useSymlog = toSymlog;
+    const mA = getGlobalMax();
+    const newScale = toSymlog ? createSymlogScale(mA) : createLinearScale(mA);
+    
+    bars.transition()
+        .duration(600)
+        .ease(d3.easeCubicInOut)
+        .attr('y', d => newScale(Math.max(d.amp, 1e-9)))
+        .attr('height', d => Math.max(2, H - newScale(Math.max(d.amp, 1e-9))));
+    
+    svg.select('.y-axis')
+        .transition()
+        .duration(600)
+        .ease(d3.easeCubicInOut)
+        .call(d3.axisLeft(newScale).ticks(5).tickFormat(d3.format('.2f')));
+    
+    setTimeout(() => { yScale = newScale; }, 600);
+}
+
+// ============================================
+// VISUALIZATION
+// ============================================
+function initViz() {
+    const el = document.getElementById('viz');
+    M = { top: 24, right: 24, bottom: 40, left: 60 };
+    W = el.clientWidth - M.left - M.right;
+    H = el.clientHeight - M.top - M.bottom;
+    
+    if (W < 100) W = el.clientWidth - 20;
+    if (H < 100) H = el.clientHeight - 20;
+    
+    const mF = Math.max(...data.map(d => d.frequency));
+    const mA = getGlobalMax();
+    
+    const svgEl = d3.select('#chart')
+        .attr('width', W + M.left + M.right)
+        .attr('height', H + M.top + M.bottom);
+    
+    svg = svgEl.append('g')
+        .attr('transform', `translate(${M.left},${M.top})`);
+    
+    const defs = svg.append('defs');
+    
+    defs.append('clipPath')
+        .attr('id', 'clip')
+        .append('rect')
+        .attr('width', W)
+        .attr('height', H);
+    
+    chart = svg.append('g').attr('clip-path', 'url(#clip)');
+    
+    xScale = d3.scaleLog().domain([90, mF * 1.1]).range([0, W]);
+    xOrig = xScale.copy();
+    
+    yScale = createSymlogScale(mA);
+    wScale = d3.scaleSqrt().domain([0, mA]).range([2.5, 10]);
+    
+    // Gradients - create for all baseBarData entries
+    const gradientData = baseBarData.length > 0 ? baseBarData : data;
+    gradientData.forEach((d, i) => {
+        const c = d.col;
+        const g = defs.append('linearGradient')
+            .attr('id', `gr${i}`)
+            .attr('x1', '0%').attr('y1', '100%')
+            .attr('x2', '0%').attr('y2', '0%');
+        
+        g.append('stop').attr('class', 's0')
+            .attr('offset', '0%')
+            .attr('stop-color', `hsl(${c.h},${c.s}%,${c.l}%)`);
+        g.append('stop').attr('class', 's1')
+            .attr('offset', '60%')
+            .attr('stop-color', `hsl(${c.h},${c.s}%,${c.l + 12}%)`);
+        g.append('stop').attr('class', 's2')
+            .attr('offset', '100%')
+            .attr('stop-color', `hsl(${c.h},${c.s - 10}%,${c.l + 8}%)`)
+            .attr('stop-opacity', 0.7);
+    });
+    
+    // Axes
+    const defaultTicks = [100, 150, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 6000];
+    
+    svg.append('g')
+        .attr('class', 'axis x-axis')
+        .attr('transform', `translate(0,${H})`)
+        .call(d3.axisBottom(xScale)
+            .tickValues(defaultTicks.filter(v => v <= mF * 1.1))
+            .tickFormat(d => d >= 1000 ? (d / 1000) + 'k' : d));
+    
+    svg.append('g')
+        .attr('class', 'axis y-axis')
+        .call(d3.axisLeft(yScale).ticks(5).tickFormat(d3.format('.2f')));
+    
+    // Bars - ALWAYS use baseBarData (healthy) for bindings
+    const barData = baseBarData.length > 0 ? baseBarData : data;
+
+    // Update amplitudes from current condition
+    const currentAmps = new Map();
+    data.forEach(d => currentAmps.set(d.pathway, d));
+
+    const order = [...barData]
+        .map(d => {
+            const current = currentAmps.get(d.pathway);
+            return {
+                ...d,
+                amp: current ? current.amp : 0,
+                ar: current ? current.ar : 0,
+                boost: current ? current.boost : 6
+            };
+        })
+        .sort((a, b) => b.amp - a.amp);
+
+    bars = chart.append('g')
+        .selectAll('rect')
+        .data(order, d => d.pathway)
+        .enter()
+        .append('rect')
+        .attr('class', 'bar')
+        .attr('x', d => xScale(d.frequency) - wScale(Math.max(d.amp, 1e-9)) / 2)
+        .attr('y', H)
+        .attr('width', d => wScale(Math.max(d.amp, 1e-9)))
+        .attr('height', 0)
+        .attr('fill', d => `url(#gr${d.i})`)
+        .attr('rx', 1);
+    
+    // Cursor
+    chart.append('line')
+        .attr('id', 'cursor')
+        .attr('y1', 0).attr('y2', H)
+        .attr('stroke', '#666')
+        .attr('stroke-dasharray', '4,4')
+        .attr('opacity', 0);
+    
+    const cursorGroup = chart.append('g')
+        .attr('id', 'cursorGroup')
+        .attr('class', 'cursor-label')
+        .attr('opacity', 0);
+    
+    cursorGroup.append('rect')
+        .attr('id', 'cursorBg')
+        .attr('fill', 'rgba(255,255,255,0.95)')
+        .attr('stroke', 'rgba(0,0,0,0.1)')
+        .attr('stroke-width', 1)
+        .attr('rx', 8).attr('ry', 8);
+    
+    cursorGroup.append('text')
+        .attr('id', 'cursorPathway')
+        .attr('font-size', '12px')
+        .attr('font-family', 'Inter')
+        .attr('font-weight', '600')
+        .attr('fill', '#2563eb');
+    
+    cursorGroup.append('text')
+        .attr('id', 'cursorRatio')
+        .attr('font-size', '15px')
+        .attr('font-family', 'JetBrains Mono')
+        .attr('font-weight', '500')
+        .attr('fill', '#1a1a1a');
+    
+    cursorGroup.append('text')
+        .attr('id', 'cursorFreq')
+        .attr('font-size', '11px')
+        .attr('font-family', 'JetBrains Mono')
+        .attr('fill', '#666');
+    
+    // Bar states
+    const stateData = baseBarData.length > 0 ? baseBarData : data;
+    stateData.forEach(d => barStates.set(d.pathway, {
+        exc: 0, sx: 1, sy: 1, sw: 1, op: 1,
+        hue: d.col.h,
+        bp: Math.random() * Math.PI * 2,
+        bs: 0.02 + Math.random() * 0.03
+    }));
+    
+    svgEl.on('mousemove', onMove).on('mouseleave', onLeave);
+    
+        svgEl.on('touchmove', function(e) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        onMove.call(this, { clientX: touch.clientX, clientY: touch.clientY });
+    });
+    svgEl.on('touchend', onLeave);
+    
+    zoom = d3.zoom()
+        .scaleExtent([1, 50])
+        .translateExtent([[0, 0], [W, H]])
+        .extent([[0, 0], [W, H]])
+        .on('zoom', onZoom);
+    
+    svgEl.call(zoom);
+    svgEl.on('dblclick.zoom', resetZoom);
+    
+    document.getElementById('zoomBtn').onclick = resetZoom;
+}
+
+// ============================================
+// INTERACTION
+// ============================================
+function onMove(e) {
+    if (isBuilding || !ready) return;
+    
+    const [px, py] = d3.pointer(e);
+    const now = performance.now();
+    
+    if (px < M.left || px > M.left + W || py < M.top || py > M.top + H) {
+        inViz = false;
+        return;
+    }
+    
+    inViz = true;
+    const cx = px - M.left;
+    lastMoveTime = now;
+    
+    if (lastX !== null) {
+        const dt = Math.max(now - lastT, 1);
+        vel = Math.abs(cx - lastX) / dt * 1000;
+    } else {
+        vel = 0;
+    }
+    lastX = cx;
+    lastT = now;
+    mouseX = cx;
+    
+    if (vel < sVel) {
+        sVel += (vel - sVel) * 0.35;
+    } else {
+        sVel += (vel - sVel) * 0.15;
+    }
+    
+    if (velocityDecayTimer) {
+        clearInterval(velocityDecayTimer);
+    }
+    velocityDecayTimer = setInterval(() => {
+        const timeSinceMove = performance.now() - lastMoveTime;
+        if (timeSinceMove > 50) {
+            sVel *= 0.8;
+            vel *= 0.8;
+            
+            if (sVel < 5) {
+                sVel = 0;
+                vel = 0;
+                clearInterval(velocityDecayTimer);
+                velocityDecayTimer = null;
+            }
+            
+            if (inViz && mouseX !== null) {
+                updateInteractionState();
+            }
+        }
+    }, 30);
+    
+    updateInteractionState();
+}
+
+function updateInteractionState() {
+    const now = performance.now();
+    
+    // Find nearest bar - search through BARS, not data array
+    let near = null, nearD = Infinity;
+    const baseHit = 26, hitScale = Math.sqrt(zoomK);
+    
+    bars.each(function(d) {
+        // Skip zero-amplitude bars
+        const amp = (isTransitioning && d._interpAmp !== undefined) ? d._interpAmp : d.amp;
+        if (amp < 1e-9) return;
+        
+        const bx = xScale(d.frequency);
+        const bw = wScale(Math.max(amp, 1e-9));
+        const dist = Math.abs(mouseX - bx);
+        const hit = Math.max(bw / 2 + baseHit / hitScale, 20);
+        
+        if (dist < hit && dist < nearD) {
+            nearD = dist;
+            near = d;
+        }
+    });
+    
+    const sweeping = sVel > 50;
+    
+    isLinearExploration = !sweeping && near !== null;
+    
+    // Removed: fLabel/fValue/fRatio display
+    // document.getElementById('fLabel').textContent = sweeping ? 'Sweep' : (near ? 'Focus' : 'Idle');
+    // document.getElementById('fValue').textContent = near ? near.frequency.toFixed(0) : '—';
+    // document.getElementById('fRatio').textContent = near ? near.ratio : '';
+    
+    hoveredBar = near;
+    
+    if (near) {
+        if (sweeping) {
+            pingBar(near);
+            const st = barStates.get(near.pathway);
+            if (st) st.exc = Math.max(st.exc, Math.min(sVel / 280, 0.55));
+            
+            dwellStart = null;
+            dwellTargetBar = null;
+            isFocusMode = false;
+            
+            focusAmt = Math.max(focusAmt - 0.06, 0);
+            if (focusAmt < 0.01) stopFocusTone();
+        } else {
+            if (near !== dwellTargetBar) {
+                dwellStart = now;
+                dwellTargetBar = near;
+            }
+            
+            const dwell = dwellStart ? now - dwellStart : 0;
+            
+            // Faster focus activation (80ms instead of 150ms)
+            if (dwell > 80) {
+                focusAmt = Math.min((dwell - 80) / 300, 1);  // Faster ramp too
+                isFocusMode = true;
+                if (currentFocusedBar !== near) startFocusTone(near);
+                updateFocusVolume();
+                updateInfo(near);
+            }
+        }
+    } else {
+        dwellStart = null;
+        dwellTargetBar = null;
+        isFocusMode = false;
+        focusAmt = Math.max(focusAmt - 0.06, 0);  // Faster fadeout
+        if (focusAmt < 0.01) stopFocusTone();
+    }
+}
+
+function onLeave() {
+    inViz = false;
+    mouseX = null;
+    lastX = null;
+    hoveredBar = null;
+    dwellStart = null;
+    dwellTargetBar = null;
+    focusAmt = 0;
+    vel = 0;
+    sVel = 0;
+    cursorLabelOpacity = 0;
+    isFocusMode = false;
+    stopFocusTone();
+    clearInfo();
+    
+    // Removed freq display
+    // document.getElementById('fLabel').textContent = 'Idle';
+    // document.getElementById('fValue').textContent = '—';
+    // document.getElementById('fRatio').textContent = '';
+}
+
+function updateInfo(d) {
+    document.getElementById('pName').textContent = d.name || d.pathway;
+    document.getElementById('pAmp').textContent = d.amp.toFixed(4);
+    document.getElementById('pRatio').textContent = d.ratio;
+    document.getElementById('pFreq').textContent = d.frequency.toFixed(1) + ' Hz';
+    document.getElementById('pComp').textContent = d.complexity;
+}
+
+function clearInfo() {
+    document.getElementById('pName').textContent = '—';
+    document.getElementById('pAmp').textContent = '—';
+    document.getElementById('pRatio').textContent = '—';
+    document.getElementById('pFreq').textContent = '—';
+    document.getElementById('pComp').textContent = '—';
+    // Removed freq display
+    // document.getElementById('fLabel').textContent = 'Idle';
+    // document.getElementById('fValue').textContent = '—';
+    // document.getElementById('fRatio').textContent = '';
+}
+
+// ============================================
+// ANIMATION
+// ============================================
+function animate(ts) {
+    requestAnimationFrame(animate);
+    time = ts * 0.001;
+    
+    const modulationScale = isTransitioning ? 0.3 : 1.0;
+    const globalBreath = Math.sin(time * 0.8) * 0.005 * modulationScale;
+    
+    const cursor = d3.select('#cursor');
+    const cursorGroup = d3.select('#cursorGroup');
+    
+    if (inViz && mouseX !== null) {
+        cursor.attr('x1', mouseX).attr('x2', mouseX).attr('opacity', 0.5);
+        
+        if (isFocusMode && hoveredBar && focusAmt > 0.2) {
+            const targetOpacity = Math.min(focusAmt, 0.9);
+            cursorLabelOpacity += (targetOpacity - cursorLabelOpacity) * 0.04;
+            
+            const labelX = mouseX + 18;
+            const barY = yScale(hoveredBar.amp);
+            const labelY = Math.max(Math.min(barY - 20, H - 80), 10);
+            
+            const pathwayText = hoveredBar.pathway.length > 22 
+                ? hoveredBar.pathway.substring(0, 20) + '...' 
+                : hoveredBar.pathway;
+            
+            d3.select('#cursorPathway')
+                .attr('x', labelX + 12)
+                .attr('y', labelY + 20)
+                .text(pathwayText);
+            
+            d3.select('#cursorRatio')
+                .attr('x', labelX + 12)
+                .attr('y', labelY + 40)
+                .text(hoveredBar.ratio);
+            
+            d3.select('#cursorFreq')
+                .attr('x', labelX + 12)
+                .attr('y', labelY + 56)
+                .text(hoveredBar.frequency.toFixed(1) + ' Hz');
+            
+            d3.select('#cursorBg')
+                .attr('x', labelX)
+                .attr('y', labelY)
+                .attr('width', 150)
+                .attr('height', 68);
+            
+            cursorGroup.attr('opacity', cursorLabelOpacity);
+        } else {
+            cursorLabelOpacity += (0 - cursorLabelOpacity) * 0.06;
+            cursorGroup.attr('opacity', cursorLabelOpacity);
+        }
+    } else {
+        cursor.attr('opacity', 0);
+        cursorLabelOpacity = 0;
+        cursorGroup.attr('opacity', 0);
+    }
+    
+    bars.each(function(d) {
+        const st = barStates.get(d.pathway);
+        if (!st) return;
+        
+        const el = d3.select(this);
+        const isFoc = currentFocusedBar === d;
+        const isHov = hoveredBar === d;
+        
+        const amp = (isTransitioning && d._interpAmp !== undefined)
+            ? d._interpAmp
+            : d.amp;
+        
+        if (amp < 1e-10 && !isTransitioning) {
+            el.attr('opacity', 0);
+            return;
+        }
+        
+        let tgt = 0;
+        if (isFoc) {
+            tgt = 0.35 + focusAmt * 0.65;
+        } else if (inViz && mouseX !== null) {
+            const bx = xScale(d.frequency);
+            const dist = Math.abs(mouseX - bx);
+            if (dist < 100) {
+                tgt = Math.min(sVel / 300, 0.4) * (1 - dist / 100);
+            }
+        }
+        
+        const lr = tgt > st.exc ? 0.08 : 0.03;
+        st.exc += (tgt - st.exc) * lr;
+        
+        const growth = st.exc * d.boost;
+        
+        const focusBoost = isFoc ? 0.15 : 0;
+        const widthBoost = isFoc ? 1.35 : 1;
+        
+        const tsx = 1 + Math.min(growth * 0.18, 0.35) + focusBoost;
+        const tsy = 1 + Math.min(growth * 0.14, 0.4) + focusBoost;
+        const tsw = widthBoost;
+        
+        const barBreath = Math.sin(time * st.bs * 4 + st.bp) * 0.012 * modulationScale;
+        const totalBreath = barBreath + globalBreath;
+        
+        const hueShift = st.exc * 18;
+        const satBoost = st.exc * 10;
+        const lightBoost = st.exc * 8;
+        
+        st.sx += (tsx * (1 + totalBreath) - st.sx) * 0.06;
+        st.sy += (tsy * (1 + totalBreath) - st.sy) * 0.06;
+        st.sw += (tsw - st.sw) * 0.08;
+        
+        let barY = yScale(Math.max(amp, 1e-9));
+        let barHeight = Math.max(2, H - barY);
+        
+        if (isFoc && barHeight < MIN_FOCUS_HEIGHT) {
+            barHeight = MIN_FOCUS_HEIGHT;
+            barY = H - MIN_FOCUS_HEIGHT;
+        }
+        
+        const baseWidth = wScale(Math.max(amp, 1e-9));
+        const scaledWidth = baseWidth * st.sw;
+        
+        let targetOp = 1;
+        if (isTransitioning) {
+            if (amp < 1e-9) {
+                targetOp = 0;
+            } else {
+                targetOp = Math.min(1, amp / 1e-6);
+            }
+        } else if (inViz && mouseX !== null) {
+            const bx = xScale(d.frequency);
+            const dist = Math.abs(mouseX - bx);
+            
+            if (isFoc || isHov) {
+                targetOp = 1;
+            } else if (dist < 50) {
+                targetOp = 0.35 + (dist / 50) * 0.25;
+            } else if (dist < 120) {
+                targetOp = 0.6 + ((dist - 50) / 70) * 0.3;
+            } else if (dist < 200) {
+                targetOp = 0.9 + ((dist - 120) / 80) * 0.1;
+            }
+        }
+        st.op += (targetOp - st.op) * 0.1;
+        
+        el.attr('x', xScale(d.frequency) - scaledWidth / 2)
+          .attr('y', barY)
+          .attr('width', scaledWidth)
+          .attr('height', barHeight)
+          .attr('transform', `scale(${st.sx},${st.sy})`)
+          .style('opacity', st.op);
+        
+        const g = d3.select(`#gr${d.i}`);
+        if (g.size() > 0 && d.col) {
+            const c = d.col;
+            g.select('.s0').attr('stop-color', `hsl(${c.h + hueShift},${c.s + satBoost}%,${c.l + lightBoost}%)`);
+            g.select('.s1').attr('stop-color', `hsl(${c.h + hueShift},${c.s + satBoost}%,${c.l + 12 + lightBoost}%)`);
+        }
+        
+        const glow = st.exc * 0.4;
+        if (glow > 0.03) {
+            el.style('filter', `drop-shadow(0 0 ${glow * 8}px hsla(${d.col ? d.col.h + hueShift : 200},60%,55%,${glow * 0.55}))`);
+        } else {
+            el.style('filter', 'none');
+        }
+    });
+}
+
+// ============================================
+// ZOOM
+// ============================================
+function onZoom(e) {
+    const t = e.transform;
+    zoomK = t.k;
+    xScale = t.rescaleX(xOrig);
+    
+    const dom = xScale.domain();
+    
+    let ticks;
+    if (zoomK > 10) {
+        ticks = [100, 110, 120, 130, 140, 150, 175, 200, 225, 250, 275, 300, 350, 400, 450, 500, 600, 700, 800, 900, 1000, 1200, 1500, 2000, 2500, 3000, 4000, 5000, 6000];
+    } else if (zoomK > 3) {
+        ticks = [100, 125, 150, 175, 200, 250, 300, 400, 500, 600, 750, 1000, 1250, 1500, 2000, 2500, 3000, 4000, 5000, 6000];
+    } else {
+        ticks = [100, 150, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 6000];
+    }
+    
+    const visibleTicks = ticks.filter(v => v >= dom[0] && v <= dom[1]);
+    
+    svg.select('.x-axis')
+        .call(d3.axisBottom(xScale)
+            .tickValues(visibleTicks)
+            .tickFormat(d => d >= 1000 ? (d / 1000) + 'k' : d));
+    
+    bars.attr('x', d => xScale(d.frequency) - wScale(Math.max(d.amp, 1e-9)) / 2);
+    
+    document.getElementById('zoomBtn').classList.toggle('show', t.k > 1);
+}
+
+function resetZoom() {
+    d3.select('#chart').transition().duration(400).call(zoom.transform, d3.zoomIdentity);
+}
+
+// ============================================
+// BUILD ANIMATION
+// ============================================
+function animateBuild() {
+    const sorted = [...data].sort((a, b) => a.complexity - b.complexity);
+    const n = sorted.length;
+    
+    let entryTimes;
+    const BUILD_DUR = 6.0;
+    
+    if (timingData && timingData.entryTimes) {
+        entryTimes = timingData.entryTimes;
+    } else {
+        const k = 3.5;
+        entryTimes = sorted.map((_, i) => {
+            const progress = i / (n - 1);
+            return BUILD_DUR * (1 - Math.exp(-k * progress)) / (1 - Math.exp(-k));
+        });
+    }
+    
+    sorted.forEach((d, i) => {
+        const delay = (entryTimes[i] || 0) * 1000;
+        const gap = i < n - 1 ? ((entryTimes[i + 1] || 0) - (entryTimes[i] || 0)) * 1000 : 30;
+        const duration = Math.max(30, Math.min(350, gap * 1.5));
+        
+        setTimeout(() => {
+            bars.filter(dd => dd.pathway === d.pathway)
+                .transition()
+                .duration(duration)
+                .ease(d3.easeCubicOut)
+                .attr('y', yScale(d.amp))
+                .attr('height', Math.max(2, H - yScale(d.amp)));
+            
+            document.getElementById('pName').textContent = d.name || d.pathway;
+            document.getElementById('pRatio').textContent = d.ratio;
+            document.getElementById('pFreq').textContent = d.frequency.toFixed(1) + ' Hz';
+            document.getElementById('pComp').textContent = d.complexity;
+            document.getElementById('fValue').textContent = d.frequency.toFixed(0);
+            document.getElementById('fRatio').textContent = d.ratio;
+            
+            document.getElementById('progress').style.width = `${(i + 1) / n * 100}%`;
+        }, delay);
+    });
+}
+
+// ============================================
+// EVENT BINDINGS
+// ============================================
+document.getElementById('symlog').onchange = e => {
+    transitionScale(e.target.checked);
+};
+
+document.getElementById('masterVol').oninput = e => {
+    masterVolume = e.target.value / 100;
+    document.getElementById('volDisplay').textContent = e.target.value + '%';
+    if (master) {
+        master.gain.setTargetAtTime(masterVolume, actx.currentTime, 0.05);
+    }
+};
+
+document.querySelectorAll('.btn[data-src]').forEach(btn => {
+    btn.onclick = async () => {
+        const src = btn.dataset.src;
+        document.querySelectorAll('.btn[data-src]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        if (ready) {
+            await switchCondition(src);
+        } else {
+            currentCondition = src;
+        }
+    };
+});
+
+document.getElementById('overlay').onclick = async () => {
+    document.getElementById('overlay').classList.add('hidden');
+    await initAudio();
+    playBuild();
+    animateBuild();
+};
+
+window.addEventListener('resize', () => {
+    resizeC();
+    
+    const el = document.getElementById('viz');
+    const newW = el.clientWidth - M.left - M.right;
+    const newH = el.clientHeight - M.top - M.bottom;
+    
+    if (Math.abs(newW - W) > 50 || Math.abs(newH - H) > 50) {
+        d3.select('#chart').selectAll('*').remove();
+        barStates.clear();
+        if (data.length > 0) {
+            initViz();
+            if (ready) {
+                bars.attr('y', d => yScale(d.amp))
+                    .attr('height', d => Math.max(2, H - yScale(d.amp)));
+            }
+        }
+    }
+});
+
+// ============================================
+// INITIALIZE
+// ============================================
+load();
+</script>
+</body>
+</html>
