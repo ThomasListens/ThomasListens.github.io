@@ -3372,6 +3372,20 @@ Always verify taxonomic range.
 
  async function initAudio() {
     try {
+        // Show loading state on play button
+        const playBtn = document.getElementById('playBtn');
+        const mobilePlayBtn = document.querySelector('.mobile-play-btn');
+        if (playBtn) {
+            playBtn.dataset.originalText = playBtn.textContent;
+            playBtn.textContent = 'Loading...';
+            playBtn.disabled = true;
+        }
+        if (mobilePlayBtn) {
+            mobilePlayBtn.dataset.originalText = mobilePlayBtn.textContent;
+            mobilePlayBtn.textContent = '...';
+            mobilePlayBtn.disabled = true;
+        }
+        
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         
         // Create nodes
@@ -3394,8 +3408,14 @@ Always verify taxonomic range.
         pipGain.gain.value = PIP_VOLUME;
         pipGain.connect(masterGain);  // ← FIXED: goes through master
         
-        // Load worklet
-        await audioContext.audioWorklet.addModule('js/microbiome-sonification-v13.js');
+        // Load worklet - use mobile version on mobile
+        const isMobile = window.matchMedia('(max-width: 900px)').matches;
+        const workletPath = isMobile 
+            ? 'js/microbiome-sonification-v13mobile.js'
+            : 'js/microbiome-sonification-v13.js';
+        console.log('Loading worklet:', workletPath);
+        
+        await audioContext.audioWorklet.addModule(workletPath);
         workletNode = new AudioWorkletNode(audioContext, 'microbiome-sonification-processor', {
             numberOfInputs: 0,
             numberOfOutputs: 1,
@@ -3468,10 +3488,35 @@ Always verify taxonomic range.
         masterGain.connect(analyser);
         analyser.connect(audioContext.destination);
         
+        // Restore play button
+        const playBtnRestore = document.getElementById('playBtn');
+        const mobilePlayBtnRestore = document.querySelector('.mobile-play-btn');
+        if (playBtnRestore) {
+            playBtnRestore.textContent = playBtnRestore.dataset.originalText || '▶ Play';
+            playBtnRestore.disabled = false;
+        }
+        if (mobilePlayBtnRestore) {
+            mobilePlayBtnRestore.textContent = mobilePlayBtnRestore.dataset.originalText || '▶';
+            mobilePlayBtnRestore.disabled = false;
+        }
+        
         console.log('Audio initialized successfully (all sources → analyser)');
         return true;
     } catch (err) {
         console.error('Audio init error:', err);
+        
+        // Restore button on error too
+        const playBtnErr = document.getElementById('playBtn');
+        const mobilePlayBtnErr = document.querySelector('.mobile-play-btn');
+        if (playBtnErr) {
+            playBtnErr.textContent = playBtnErr.dataset.originalText || '▶ Play';
+            playBtnErr.disabled = false;
+        }
+        if (mobilePlayBtnErr) {
+            mobilePlayBtnErr.textContent = mobilePlayBtnErr.dataset.originalText || '▶';
+            mobilePlayBtnErr.disabled = false;
+        }
+        
         return false;
     }
 }
@@ -5009,7 +5054,7 @@ async function updatePathwaySummary(pathwayId) {
                 if (isScrubbing && scrubberX !== null) {
                     spectrumCtx.save();
                     
-                    // Vertical line - rich red, thinner
+                    // Vertical line - rich red, thin
                     spectrumCtx.strokeStyle = '#dc2626';
                     spectrumCtx.lineWidth = 1;
                     spectrumCtx.setLineDash([]);
@@ -5017,12 +5062,6 @@ async function updatePathwaySummary(pathwayId) {
                     spectrumCtx.moveTo(scrubberX, 0);
                     spectrumCtx.lineTo(scrubberX, height);
                     spectrumCtx.stroke();
-                    
-                    // Touch indicator circle - higher up (1/4 from top)
-                    spectrumCtx.fillStyle = 'rgba(220, 38, 38, 0.15)';
-                    spectrumCtx.beginPath();
-                    spectrumCtx.arc(scrubberX, height * 0.25, 25, 0, Math.PI * 2);
-                    spectrumCtx.fill();
                     
                     spectrumCtx.restore();
                 }
