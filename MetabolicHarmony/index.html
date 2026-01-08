@@ -1454,6 +1454,450 @@
     background: #dcfce7;
     color: #166534;
 }
+
+/* Hide mobile-only elements on desktop */
+.mobile-audio-overlay {
+    display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE LAYOUT - CLEAN REWRITE
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 900px) {
+    /* Base reset - NO overflow restrictions */
+    html, body {
+        height: auto;
+        overflow: visible; /* ✅ REQUIRED for sticky - NO overflow-x:hidden! */
+    }
+    
+    /* Prevent horizontal scroll without breaking sticky */
+    body {
+        max-width: 100vw;
+    }
+    
+    /* Main container - simple vertical stack */
+    .app-container {
+        display: block;
+        height: auto;
+        overflow: visible; /* ✅ REQUIRED for sticky */
+        max-width: 100vw;
+    }
+    
+    /* ═══ SIDEBAR - Becomes top section ═══ */
+    .sidebar {
+        position: relative;
+        width: 100%;
+        border-right: none;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        overflow: visible; /* ✅ REQUIRED for sticky */
+        overflow-x: clip; /* Safe alternative to hidden */
+    }
+    
+    .title-section {
+        padding-bottom: 6px;
+        border-bottom: 1px solid #e5e5e5;
+    }
+    
+    .app-title { font-size: 1.3rem; }
+    .app-subtitle { font-size: 0.75rem; }
+    
+    .mode-section {
+        padding: 4px 0;
+        border-bottom: none;
+    }
+    
+    .mode-btn {
+        padding: 7px 10px;
+        font-size: 0.7rem;
+    }
+    
+    .mode-btn .mode-sub { font-size: 0.5rem; }
+    
+    /* Hide nav/controls in sidebar - show after viz */
+    .sidebar .nav-section,
+    .sidebar .controls-section {
+        display: none;
+    }
+    
+    /* ═══ MAIN CONTENT - NO overflow restrictions ═══ */
+    .main-content {
+        display: block;
+        height: auto;
+        overflow: visible; /* ✅ REQUIRED for sticky */
+        position: relative;
+    }
+    
+    /* ═══ VISUALIZATION - STICKY ═══ */
+    .viz-container {
+        position: -webkit-sticky; /* ✅ Safari prefix */
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        width: 100%;
+        height: 30vh;
+        min-height: 150px;
+        max-height: 220px;
+        border-bottom: 1px solid #e5e5e5;
+        background: #fff;
+        overflow-x: clip; /* Safe - doesn't break sticky */
+    }
+    
+    /* Spectrum canvas - leave room for audio panel */
+    #spectrumCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: calc(100% - 68px) !important;
+        height: 100% !important;
+        z-index: 1;
+    }
+    
+    /* Mobile audio overlay */
+    .mobile-audio-overlay {
+        display: flex !important;
+        flex-direction: column;
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 68px;
+        height: 100%;
+        background: #fff;
+        border-left: 1px solid #e5e5e5;
+        font-family: 'JetBrains Mono', monospace;
+        z-index: 5;
+    }
+    
+    /* Mobile oscilloscope */
+    .mobile-scope {
+        height: 55px;
+        min-height: 55px;
+        background: #111;
+        flex-shrink: 0;
+    }
+    
+    .mobile-scope canvas,
+    #mobileScopeCanvas {
+        width: 100% !important;
+        height: 100% !important;
+        display: block;
+    }
+    
+    .mobile-audio-overlay .audio-val {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        text-align: center;
+        padding: 2px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .mobile-audio-overlay .audio-val:last-child {
+        border-bottom: none;
+    }
+    
+    .mobile-audio-overlay .val {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #111;
+        line-height: 1.1;
+    }
+    
+    .mobile-audio-overlay .lbl {
+        font-size: 0.4rem;
+        color: #888;
+        text-transform: uppercase;
+    }
+    
+    /* Play button */
+    .play-btn {
+        position: absolute;
+        bottom: 50%;
+        left: calc(50% - 60px);
+        transform: translateY(50%);
+        width: 54px;
+        height: 54px;
+        z-index: 20;
+        pointer-events: auto !important;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: rgba(0,0,0,0.1);
+    }
+    
+    .play-btn.playing {
+        width: 40px;
+        height: 40px;
+        bottom: 8px;
+        left: 8px;
+        transform: none;
+    }
+    
+    /* Hide axis labels on mobile */
+    .axis-label { display: none; }
+    .zoom-hint { display: none; }
+    .reset-zoom-btn { display: none; }
+    
+    /* Hide desktop audio sidebar */
+    .bottom-audio {
+        display: none !important;
+    }
+    
+    /* ═══ BOTTOM SECTION - All scrollable content ═══ */
+    .bottom-section {
+        display: block;
+        height: auto;
+        overflow: visible; /* ✅ REQUIRED for sticky */
+    }
+    
+    .bottom-main {
+        display: block;
+        overflow: visible; /* ✅ REQUIRED for sticky */
+    }
+    
+    /* Pathway info bar */
+    .tier-pathway {
+        grid-template-columns: auto 1fr;
+        gap: 8px;
+        padding: 10px 12px;
+    }
+    
+    .pathway-metrics { display: none; }
+    .pathway-name { font-size: 0.68rem; }
+    .pathway-id { font-size: 0.6rem; padding: 3px 6px; }
+    .pathway-cat-info .cat-label { font-size: 0.52rem; }
+    .pathway-cat-info .subcat-label { font-size: 0.45rem; }
+    
+    /* Documentation */
+    .tier-summary {
+        padding: 10px;
+        min-height: auto;
+    }
+    
+    .docs-text { font-size: 0.72rem; }
+    .docs-indent { font-size: 0.68rem; }
+    
+    /* Pathway summary text */
+    .pathway-summary-text { font-size: 0.7rem; line-height: 1.4; }
+    .pathway-summary-link { font-size: 0.65rem; }
+    
+    /* ═══ MOBILE NAV - Duplicated after docs ═══ */
+    .mobile-nav {
+        display: block !important;
+        padding: 12px;
+        background: #f9f9f9;
+        border-top: 1px solid #e5e5e5;
+    }
+    
+    .mobile-nav .nav-tagline {
+        font-size: 0.72rem;
+        margin-bottom: 10px;
+    }
+    
+    .mobile-nav .nav-btn {
+        display: flex;
+        padding: 12px;
+        margin-bottom: 8px;
+    }
+    
+    .mobile-nav .nav-btn-title { font-size: 0.9rem; }
+    .mobile-nav .nav-btn-title::after { width: 40px; }
+    .mobile-nav .nav-btn-sub { font-size: 0.65rem; }
+    
+    .mobile-nav .key-findings-section {
+        margin-top: 12px;
+        padding: 10px;
+        background: #fff;
+    }
+    
+    .mobile-nav .key-finding-btn {
+        padding: 10px;
+    }
+    
+    .mobile-nav .key-finding-btn .finding-title {
+        font-size: 0.8rem;
+    }
+    
+    /* ═══ MOBILE CONTROLS ═══ */
+    .mobile-controls {
+        display: block !important;
+        padding: 12px;
+        background: #fff;
+        border-top: 1px solid #e5e5e5;
+    }
+    
+    .mobile-controls h3 {
+        font-size: 0.7rem;
+        margin-bottom: 10px;
+    }
+    
+    .mobile-controls .control-group {
+        margin-bottom: 14px;
+    }
+    
+    .mobile-controls .control-group label {
+        font-size: 0.7rem;
+    }
+    
+    .mobile-controls .slider-value {
+        font-size: 0.7rem;
+    }
+    
+    .mobile-controls .category-fader {
+        grid-template-columns: 90px 16px 1fr;
+        height: 32px;
+    }
+    
+    .mobile-controls .category-btn .label {
+        font-size: 0.6rem;
+    }
+    
+    /* Mobile subcategory section */
+    .mobile-subcategory-section {
+        background: #f8f8f8;
+        padding: 10px;
+        border-radius: 6px;
+        margin-top: 8px;
+    }
+    
+    .mobile-subcategory-section .subcategory-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 8px;
+    }
+    
+    .mobile-subcategory-section .subcat-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+    
+    .mobile-subcategory-section .subcat-label {
+        font-size: 0.65rem;
+        font-weight: 500;
+        color: #555;
+        flex: 1;
+    }
+    
+    .mobile-subcategory-section .subcat-nav-btn {
+        width: 24px;
+        height: 24px;
+        border: 1px solid #ddd;
+        background: #fff;
+        border-radius: 4px;
+        font-size: 1rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .mobile-subcategory-section .subcat-nav-btn:active {
+        background: #eee;
+    }
+    
+    .mobile-subcategory-section .mobile-solo-btn,
+    .mobile-subcategory-section .mobile-stop-btn {
+        width: 24px;
+        height: 24px;
+        border: 1px solid #ddd;
+        background: #fff;
+        border-radius: 4px;
+        font-size: 0.65rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    
+    .mobile-subcategory-section .mobile-solo-btn.active {
+        background: #fbbf24;
+        border-color: #f59e0b;
+        color: #000;
+    }
+    
+    .mobile-subcategory-section .mobile-stop-btn.has-active {
+        background: #ef4444;
+        border-color: #dc2626;
+        color: #fff;
+    }
+    
+    .mobile-subcategory-faders {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-height: 150px;
+        overflow-y: auto;
+    }
+    
+    .mobile-subcategory-faders .subcategory-fader {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        align-items: center;
+        gap: 8px;
+        height: 30px;
+    }
+    
+    .mobile-subcategory-faders .subcat-btn {
+        font-size: 0.6rem;
+        padding: 6px 8px;
+        text-align: left;
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .mobile-subcategory-faders .subcat-btn.cycling {
+        animation: mobile-pulse var(--pulse-duration, 350ms) ease-in-out infinite;
+        background: var(--cat-color-light, #dcfce7);
+        border-color: var(--cat-color, #22c55e);
+        color: var(--cat-color, #22c55e);
+        font-weight: 600;
+    }
+    
+    @keyframes mobile-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+    
+    .mobile-subcategory-faders input[type="range"] {
+        height: 4px;
+    }
+    
+    /* References */
+    .tier-refs {
+        padding: 12px;
+        font-size: 0.65rem;
+        line-height: 1.6;
+    }
+    
+    /* Finding display */
+    .finding-quote { padding: 10px 12px; }
+    .finding-quote p { font-size: 0.75rem; }
+    .metabolite-chip, .pathway-chip { font-size: 0.7rem; padding: 4px 8px; }
+    .finding-clinical { padding: 8px 10px; }
+    .finding-clinical p { font-size: 0.75rem; }
+    
+    /* Modal */
+    .modal { width: 95vw; max-height: 90vh; }
+    .modal-header h2 { font-size: 1rem; }
+    .methods-text { font-size: 0.72rem; }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+    .app-title { font-size: 1.15rem; }
+    .app-subtitle { font-size: 0.7rem; }
+    .mode-btn { padding: 6px 8px; font-size: 0.65rem; }
+    .viz-container { height: 28vh; min-height: 140px; }
+    .mobile-audio-overlay .val { font-size: 0.75rem; }
+    .play-btn { width: 48px; height: 48px; }
+}
     </style>
 </head>
 <body>
@@ -1621,6 +2065,25 @@
                 <span class="zoom-hint">Scroll to zoom · Drag to pan · Double-click to reset</span>
                 <button class="reset-zoom-btn" id="resetZoomBtn">Reset Zoom</button>
                 <button class="play-btn" id="playBtn"><svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5v14l11-7z"/></svg></button>
+                
+                <!-- Mobile-only audio info overlay -->
+                <div class="mobile-audio-overlay" id="mobileAudioOverlay">
+                    <div class="mobile-scope">
+                        <canvas id="mobileScopeCanvas"></canvas>
+                    </div>
+                    <div class="audio-val">
+                        <div class="val" id="mobileRatio">1/1</div>
+                        <div class="lbl">ratio</div>
+                    </div>
+                    <div class="audio-val">
+                        <div class="val" id="mobileHz">660</div>
+                        <div class="lbl">hz</div>
+                    </div>
+                    <div class="audio-val">
+                        <div class="val" id="mobileCents">0</div>
+                        <div class="lbl">cents</div>
+                    </div>
+                </div>
             </div>
             <div class="bottom-section">
                 <!-- Main content area (3 tiers stacked) -->
@@ -1710,6 +2173,132 @@
                             
                             <div class="finding-clinical" id="findingClinical">
                                 <p id="findingClinicalText"></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- ═══ MOBILE-ONLY: Navigation (hidden on desktop) ═══ -->
+                    <div class="mobile-nav" style="display:none;">
+                        <div class="nav-tagline">Listen to your Gut</div>
+                        <div class="nav-buttons">
+                            <button class="nav-btn mobile-nav-btn active" data-view="healthy">
+                                <span class="indicator"></span>
+                                <div class="nav-btn-text">
+                                    <span class="nav-btn-title">Healthy Reference</span>
+                                    <span class="nav-btn-sub">Curated Pathways</span>
+                                </div>
+                            </button>
+                            <button class="nav-btn mobile-nav-btn ms-compare-btn" data-view="ms">
+                                <span class="indicator"></span>
+                                <div class="nav-btn-text">
+                                    <span class="nav-btn-title">Multiple Sclerosis</span>
+                                    <span class="nav-btn-sub">Cantoni 2022; Smusz 2025</span>
+                                </div>
+                            </button>
+                        </div>
+                        <div class="key-findings-section mobile-findings" id="mobileKeyFindings">
+                            <h4>Key Research Findings</h4>
+                            <div class="key-findings-grid">
+                                <button class="key-finding-btn mobile-finding-btn kynurenine-btn disabled" data-finding="kynurenine" disabled>
+                                    <span class="finding-dot" style="background: #8b5cf6;"></span>
+                                    <div class="finding-text">
+                                        <span class="finding-title">Kynurenine Pathway</span>
+                                        <span class="finding-direction depleted">neurotoxic shift</span>
+                                    </div>
+                                </button>
+                                <button class="key-finding-btn mobile-finding-btn energy-btn disabled" data-finding="energy" disabled>
+                                    <span class="finding-dot" style="background: #22c55e;"></span>
+                                    <div class="finding-text">
+                                        <span class="finding-title">Energy Metabolism</span>
+                                        <span class="finding-direction depleted">mitochondrial stress</span>
+                                    </div>
+                                </button>
+                                <button class="key-finding-btn mobile-finding-btn scfa-btn disabled" data-finding="fermentation" disabled>
+                                    <span class="finding-dot" style="background: #06b6d4;"></span>
+                                    <div class="finding-text">
+                                        <span class="finding-title">SCFA Depletion</span>
+                                        <span class="finding-direction">immune disruption</span>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- ═══ MOBILE-ONLY: Controls (hidden on desktop) ═══ -->
+                    <div class="mobile-controls" style="display:none;">
+                        <h3>Controls</h3>
+                        <div class="control-group">
+                            <label>Master Volume</label>
+                            <div class="slider-row">
+                                <input type="range" class="mobile-volume-slider" min="0" max="100" value="40">
+                                <span class="slider-value mobile-volume-value">40%</span>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label>Category Mix</label>
+                            <div class="category-faders mobile-category-faders">
+                                <div class="category-fader" data-category="energy">
+                                    <button class="category-btn mobile-category-btn" data-category="energy">
+                                        <span class="dot" style="background:#22c55e;"></span>
+                                        <span class="label">Energy</span>
+                                    </button>
+                                    <button class="hide-toggle mobile-hide-toggle" data-category="energy"></button>
+                                    <input type="range" class="mobile-cat-slider" data-category="energy" min="0" max="100" value="100">
+                                </div>
+                                <div class="category-fader" data-category="biosynthesis">
+                                    <button class="category-btn mobile-category-btn" data-category="biosynthesis">
+                                        <span class="dot" style="background:#3b82f6;"></span>
+                                        <span class="label">Biosynthesis</span>
+                                    </button>
+                                    <button class="hide-toggle mobile-hide-toggle" data-category="biosynthesis"></button>
+                                    <input type="range" class="mobile-cat-slider" data-category="biosynthesis" min="0" max="100" value="100">
+                                </div>
+                                <div class="category-fader" data-category="degradation">
+                                    <button class="category-btn mobile-category-btn" data-category="degradation">
+                                        <span class="dot" style="background:#f59e0b;"></span>
+                                        <span class="label">Degradation</span>
+                                    </button>
+                                    <button class="hide-toggle mobile-hide-toggle" data-category="degradation"></button>
+                                    <input type="range" class="mobile-cat-slider" data-category="degradation" min="0" max="100" value="100">
+                                </div>
+                                <div class="category-fader" data-category="salvage">
+                                    <button class="category-btn mobile-category-btn" data-category="salvage">
+                                        <span class="dot" style="background:#ec4899;"></span>
+                                        <span class="label">Salvage</span>
+                                    </button>
+                                    <button class="hide-toggle mobile-hide-toggle" data-category="salvage"></button>
+                                    <input type="range" class="mobile-cat-slider" data-category="salvage" min="0" max="100" value="100">
+                                </div>
+                                <div class="category-fader" data-category="other">
+                                    <button class="category-btn mobile-category-btn" data-category="other">
+                                        <span class="dot" style="background:#6b7280;"></span>
+                                        <span class="label">Other</span>
+                                    </button>
+                                    <button class="hide-toggle mobile-hide-toggle" data-category="other"></button>
+                                    <input type="range" class="mobile-cat-slider" data-category="other" min="0" max="100" value="100">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Subcategory Section -->
+                        <div class="control-group mobile-subcategory-section">
+                            <div class="subcategory-header">
+                                <span class="subcat-indicator mobile-subcat-indicator" id="mobileSubcatIndicator" style="background:#22c55e;"></span>
+                                <label class="subcat-label" id="mobileSubcatLabel">Energy</label>
+                                <button class="subcat-nav-btn mobile-subcat-next" id="mobileSubcatNext">›</button>
+                                <button class="solo-all-btn mobile-solo-btn" id="mobileSoloBtn" title="Solo sequences">S</button>
+                                <button class="stop-all-btn mobile-stop-btn" id="mobileStopBtn" title="Stop all">■</button>
+                            </div>
+                            <div class="subcategory-faders mobile-subcategory-faders" id="mobileSubcategoryFaders">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                        
+                        <div class="control-group">
+                            <label>Fundamental Frequency</label>
+                            <div class="slider-row">
+                                <input type="range" class="mobile-fundamental-slider" min="200" max="1200" value="660">
+                                <span class="slider-value mobile-fundamental-value">660 Hz</span>
                             </div>
                         </div>
                     </div>
@@ -2298,12 +2887,84 @@ Always verify taxonomic range.
         const vizContainer = document.getElementById('vizContainer');
         const spectrumCanvas = document.getElementById('spectrumCanvas');
         const spectrumCtx = spectrumCanvas.getContext('2d');
-        const scopeCanvas = document.getElementById('scopeCanvas');
-        const scopeCtx = scopeCanvas.getContext('2d');
         const resetZoomBtn = document.getElementById('resetZoomBtn');
         const subcategoryFaders = document.getElementById('subcategoryFaders');
         const subcatIndicator = document.getElementById('subcatIndicator');
         const subcatLabel = document.getElementById('subcatLabel');
+        
+        // Oscilloscope - switches between desktop and mobile canvas
+        let scopeCanvas, scopeCtx;
+        const desktopScopeCanvas = document.getElementById('scopeCanvas');
+        const mobileScopeCanvas = document.getElementById('mobileScopeCanvas');
+        
+        function updateActiveScope() {
+            const isMobile = window.matchMedia('(max-width: 900px)').matches;
+            const targetCanvas = isMobile ? mobileScopeCanvas : desktopScopeCanvas;
+            
+            // Only switch if we have a valid target
+            if (!targetCanvas) {
+                console.warn('Scope canvas not found, using fallback');
+                scopeCanvas = desktopScopeCanvas;
+            } else {
+                scopeCanvas = targetCanvas;
+            }
+            
+            if (scopeCanvas) {
+                scopeCtx = scopeCanvas.getContext('2d', { willReadFrequently: true });
+                resizeScopeCanvas();
+                console.log('Active scope:', scopeCanvas.id, 'isMobile:', isMobile);
+            }
+        }
+        
+        function resizeScopeCanvas() {
+            if (!scopeCanvas || !scopeCtx) return;
+            
+            const dpr = window.devicePixelRatio || 1;
+            const rect = scopeCanvas.getBoundingClientRect();
+            
+            // If canvas has no size yet, try parent
+            let width = rect.width;
+            let height = rect.height;
+            
+            if (width === 0 || height === 0) {
+                const parent = scopeCanvas.parentElement;
+                if (parent) {
+                    const parentRect = parent.getBoundingClientRect();
+                    width = parentRect.width || 60;
+                    height = parentRect.height || 40;
+                }
+            }
+            
+            if (width > 0 && height > 0) {
+                scopeCanvas.width = width * dpr;
+                scopeCanvas.height = height * dpr;
+                scopeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            }
+        }
+        
+        // Initialize scope - may need to retry for mobile
+        function initScope() {
+            updateActiveScope();
+            
+            // Retry after a short delay for mobile layout
+            setTimeout(updateActiveScope, 100);
+            setTimeout(updateActiveScope, 500);
+        }
+        
+        // Initialize on load
+        if (document.readyState === 'complete') {
+            initScope();
+        } else {
+            window.addEventListener('load', initScope);
+        }
+        
+        // Switch canvas on resize
+        window.addEventListener('resize', updateActiveScope);
+        
+        // Also update on orientation change (mobile)
+        window.addEventListener('orientationchange', () => {
+            setTimeout(updateActiveScope, 100);
+        });
 
         // ===========================================
         // HELPERS
@@ -2697,6 +3358,14 @@ Always verify taxonomic range.
             document.getElementById('centsValue').textContent = Math.round(cents);
             document.getElementById('intervalValue').textContent = ratio[0] * ratio[1];
             
+            // Sync mobile audio display
+            const mobileRatio = document.getElementById('mobileRatio');
+            const mobileHz = document.getElementById('mobileHz');
+            const mobileCents = document.getElementById('mobileCents');
+            if (mobileRatio) mobileRatio.textContent = ratio[0] + '/' + ratio[1];
+            if (mobileHz) mobileHz.textContent = Math.round(freq);
+            if (mobileCents) mobileCents.textContent = Math.round(cents);
+            
             // Update pathway detail panel (bottom left)
             updatePathwayDetailPanel(pathway);
         }
@@ -3032,7 +3701,9 @@ async function updatePathwaySummary(pathwayId) {
         // ===========================================
         // CONTROL HANDLERS
         // ===========================================
-        playBtn.addEventListener('click', async () => {
+        
+        // Handle both click and touch for mobile compatibility
+        async function handlePlayToggle() {
             if (!audioContext) {
                 const success = await initAudio();
                 if (!success) {
@@ -3071,6 +3742,14 @@ async function updatePathwaySummary(pathwayId) {
                 playIcon.innerHTML = '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>';
                 vizContainer.classList.add('active');
             }
+        }
+        
+        playBtn.addEventListener('click', handlePlayToggle);
+        
+        // Touch handler for mobile - prevents issues with touch-to-click delay
+        playBtn.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            handlePlayToggle();
         });
         
         function startVisualCascade(direction, duration) {
@@ -3296,8 +3975,8 @@ async function updatePathwaySummary(pathwayId) {
             
             section.classList.add('enabled');
             
-            // Enable all finding buttons
-            grid.querySelectorAll('.key-finding-btn').forEach(btn => {
+            // Enable all finding buttons (desktop AND mobile)
+            document.querySelectorAll('.key-finding-btn').forEach(btn => {
                 btn.disabled = false;
                 btn.classList.remove('disabled');
             });
@@ -3310,8 +3989,8 @@ async function updatePathwaySummary(pathwayId) {
             
             section.classList.remove('enabled');
             
-            // Disable all finding buttons
-            grid.querySelectorAll('.key-finding-btn').forEach(btn => {
+            // Disable all finding buttons (desktop AND mobile)
+            document.querySelectorAll('.key-finding-btn').forEach(btn => {
                 btn.disabled = true;
                 btn.classList.add('disabled');
                 btn.classList.remove('active');
@@ -3665,10 +4344,9 @@ async function updatePathwaySummary(pathwayId) {
             spectrumCtx.scale(dpr, dpr);
             spectrumCanvas.style.width = rect.width + 'px';
             spectrumCanvas.style.height = rect.height + 'px';
-            const scopeRect = scopeCanvas.parentElement.getBoundingClientRect();
-            scopeCanvas.width = scopeRect.width * dpr;
-            scopeCanvas.height = scopeRect.height * dpr;
-            scopeCtx.scale(dpr, dpr);
+            
+            // Resize oscilloscope (uses the active canvas - desktop or mobile)
+            resizeScopeCanvas();
         }
 
         // ===========================================
@@ -4366,29 +5044,45 @@ async function updatePathwaySummary(pathwayId) {
 // ===========================================
 
 function drawOscilloscope() {
-    const width = scopeCanvas.width / (window.devicePixelRatio || 1);
-    const height = scopeCanvas.height / (window.devicePixelRatio || 1);
+    if (!scopeCanvas || !scopeCtx) {
+        requestAnimationFrame(drawOscilloscope);
+        return;
+    }
+    
+    const dpr = window.devicePixelRatio || 1;
+    const width = scopeCanvas.width / dpr;
+    const height = scopeCanvas.height / dpr;
+    
+    // Detect if we're on mobile (dark bg) or desktop (light bg)
+    const isMobile = window.matchMedia('(max-width: 900px)').matches;
     
     if (!isPlaying || !analyser) {
         // Idle state
-        scopeCtx.fillStyle = '#fff';
-        scopeCtx.fillRect(0, 0, width, height);
-        scopeCtx.strokeStyle = '#ddd';
+        if (isMobile) {
+            scopeCtx.fillStyle = '#111';
+            scopeCtx.fillRect(0, 0, width, height);
+            scopeCtx.strokeStyle = '#333';
+        } else {
+            scopeCtx.fillStyle = '#fff';
+            scopeCtx.fillRect(0, 0, width, height);
+            scopeCtx.strokeStyle = '#ddd';
+        }
         scopeCtx.lineWidth = 1;
         scopeCtx.beginPath();
         scopeCtx.moveTo(0, height / 2);
         scopeCtx.lineTo(width, height / 2);
         scopeCtx.stroke();
+        
         requestAnimationFrame(drawOscilloscope);
         return;
     }
     
-    // Always draw spectrograph as base layer
-    drawSpectrograph(width, height);
+    // Draw spectrograph
+    drawSpectrograph(width, height, isMobile);
     
-    // Overlay waveform when focused
+    // Overlay waveform when focused (on both desktop and mobile)
     if (focusedPathway) {
-        drawWaveformOverlay(width, height);
+        drawWaveformOverlay(width, height, isMobile);
     }
     
     requestAnimationFrame(drawOscilloscope);
@@ -4397,8 +5091,11 @@ function drawOscilloscope() {
 // ===========================================
 // SPECTROGRAPH (base layer)
 // ===========================================
-function drawSpectrograph(width, height) {
-    if (!analyser) return;
+function drawSpectrograph(width, height, isMobile = false) {
+    if (!analyser) {
+        console.log('No analyser');
+        return;
+    }
     
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
@@ -4408,12 +5105,49 @@ function drawSpectrograph(width, height) {
     const fundamental = CONFIG.fundamental || 660;
     const binSize = sampleRate / (bufferLength * 2);
     
-    const minRatio = 1 / 8;
-    const maxRatio = 16;
+    // Narrower range for mobile (smaller display)
+    const minRatio = isMobile ? 1 / 4 : 1 / 8;
+    const maxRatio = isMobile ? 8 : 16;
     const minFreq = fundamental * minRatio;
     const maxFreq = fundamental * maxRatio;
     
-    // Shift existing image left
+    // Mobile: simple bar visualization (no scrolling spectrogram)
+    if (isMobile) {
+        // Clear with dark background
+        scopeCtx.fillStyle = '#111';
+        scopeCtx.fillRect(0, 0, width, height);
+        
+        // Draw frequency bars
+        const numBars = Math.min(width, 30);
+        const barWidth = width / numBars;
+        
+        for (let i = 0; i < numBars; i++) {
+            const normalizedX = i / numBars;
+            const logMin = Math.log2(minFreq);
+            const logMax = Math.log2(maxFreq);
+            const freq = Math.pow(2, logMin + normalizedX * (logMax - logMin));
+            
+            const binIndex = Math.round(freq / binSize);
+            let value = 0;
+            if (binIndex >= 0 && binIndex < bufferLength) {
+                value = dataArray[binIndex];
+            }
+            
+            const barHeight = (value / 255) * height * 0.9;
+            const brightness = Math.floor(150 + (value / 255) * 105);
+            
+            scopeCtx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
+            scopeCtx.fillRect(
+                i * barWidth + 1, 
+                height - barHeight, 
+                barWidth - 1, 
+                barHeight
+            );
+        }
+        return;
+    }
+    
+    // Desktop: scrolling spectrogram
     const imageData = scopeCtx.getImageData(1, 0, width - 1, height);
     scopeCtx.putImageData(imageData, 0, 0);
     
@@ -4438,8 +5172,8 @@ function drawSpectrograph(width, height) {
         const freqBoost = 1 + (1 - normalizedY) * 0.5;
         value = Math.min(255, value * freqBoost);
         
-        // Inverted colors
-        const brightness = 255 - value;
+        // Mobile: light on dark | Desktop: dark on light
+        const brightness = isMobile ? Math.floor(value * 0.9) : (255 - value);
         
         scopeCtx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
         scopeCtx.fillRect(width - 1, y, 1, 1);
@@ -4449,7 +5183,7 @@ function drawSpectrograph(width, height) {
 // ===========================================
 // WAVEFORM OVERLAY (on top of spectrograph)
 // ===========================================
-function drawWaveformOverlay(width, height) {
+function drawWaveformOverlay(width, height, isMobile = false) {
     if (!focusedPathway) return;
     if (!audioContext) return;
     
@@ -4474,11 +5208,15 @@ function drawWaveformOverlay(width, height) {
     const numCycles = Math.floor(width / pixelsPerCycle);
     
     // Semi-transparent background for waveform area
-    scopeCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    if (isMobile) {
+        scopeCtx.fillStyle = 'rgba(17, 17, 17, 0.9)'; // Dark bg for mobile
+    } else {
+        scopeCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    }
     scopeCtx.fillRect(0, 0, width, height);
     
     // Draw cycle markers (subtle vertical lines)
-    scopeCtx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
+    scopeCtx.strokeStyle = isMobile ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)';
     scopeCtx.lineWidth = 1;
     for (let i = 1; i <= numCycles; i++) {
         const x = i * pixelsPerCycle;
@@ -4491,7 +5229,7 @@ function drawWaveformOverlay(width, height) {
     }
     
     // Center line
-    scopeCtx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+    scopeCtx.strokeStyle = isMobile ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
     scopeCtx.lineWidth = 1;
     scopeCtx.beginPath();
     scopeCtx.moveTo(0, height / 2);
@@ -4512,8 +5250,8 @@ function drawWaveformOverlay(width, height) {
     const sliceWidth = width / points.length;
     const gain = 0.75;
     
-    scopeCtx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
-    scopeCtx.lineWidth = 3;
+    scopeCtx.strokeStyle = isMobile ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)';
+    scopeCtx.lineWidth = isMobile ? 2 : 3;
     scopeCtx.beginPath();
     for (let i = 0; i < points.length; i++) {
         const v = points[i] * gain;
@@ -4525,8 +5263,8 @@ function drawWaveformOverlay(width, height) {
     scopeCtx.stroke();
     
     // Draw main waveform
-    scopeCtx.strokeStyle = '#000';
-    scopeCtx.lineWidth = 1.5;
+    scopeCtx.strokeStyle = isMobile ? '#fff' : '#000';
+    scopeCtx.lineWidth = isMobile ? 1.5 : 1.5;
     scopeCtx.beginPath();
     for (let i = 0; i < points.length; i++) {
         const v = points[i] * gain;
@@ -4536,6 +5274,9 @@ function drawWaveformOverlay(width, height) {
         else scopeCtx.lineTo(x, y);
     }
     scopeCtx.stroke();
+    
+    // Skip labels on mobile (too small)
+    if (isMobile) return;
     
     // Cycle count label (bottom left)
     scopeCtx.fillStyle = 'rgba(0, 0, 0, 0.4)';
@@ -4555,21 +5296,147 @@ function drawWaveformOverlay(width, height) {
         // ===========================================
         // CANVAS INTERACTIONS
         // ===========================================
-            spectrumCanvas.addEventListener('click', (e) => {
-                if (isPanning) return;
+        
+        // Desktop click - focus pathway
+        spectrumCanvas.addEventListener('click', (e) => {
+            if (isPanning) return;
+            // Skip on mobile - handled by touch events
+            if ('ontouchstart' in window && e.sourceCapabilities?.firesTouchEvents) return;
 
-                const rect = spectrumCanvas.getBoundingClientRect();
-                const mouseX = e.clientX - rect.left;
-                const mouseY = e.clientY - rect.top;
+            const rect = spectrumCanvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
 
-                const clicked = findPathwayAtPoint(mouseX, mouseY);
+            const clicked = findPathwayAtPoint(mouseX, mouseY);
 
-                if (clicked) {
-                    setFocusedPathway(clicked);
-                } else {
-                    clearFocus(); // ✅ THIS is the key
+            if (clicked) {
+                setFocusedPathway(clicked);
+            } else {
+                clearFocus();
+            }
+        });
+        
+        // ===========================================
+        // MOBILE TOUCH - Tap to pip, Long-press to focus, Drag to explore
+        // ===========================================
+        let touchStartTime = 0;
+        let touchStartPos = { x: 0, y: 0 };
+        let longPressTimer = null;
+        let touchedPathway = null;
+        let isDraggingToExplore = false;
+        let lastDragPipTime = 0;
+        const LONG_PRESS_DURATION = 500; // ms - slightly longer for easier use
+        const DRAG_PIP_INTERVAL = 150; // ms between pips while dragging
+        
+        spectrumCanvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length !== 1) return;
+            
+            const touch = e.touches[0];
+            const rect = spectrumCanvas.getBoundingClientRect();
+            const touchX = touch.clientX - rect.left;
+            const touchY = touch.clientY - rect.top;
+            
+            touchStartTime = Date.now();
+            touchStartPos = { x: touch.clientX, y: touch.clientY };
+            touchedPathway = findPathwayAtPoint(touchX, touchY);
+            isDraggingToExplore = false;
+            
+            if (touchedPathway) {
+                // Start long-press timer for focus
+                longPressTimer = setTimeout(() => {
+                    // Long press detected - focus the pathway
+                    setFocusedPathway(touchedPathway);
+                    // Vibrate if available
+                    if (navigator.vibrate) navigator.vibrate(30);
+                    touchedPathway = null; // Prevent tap action
+                }, LONG_PRESS_DURATION);
+            }
+        }, { passive: true });
+        
+        spectrumCanvas.addEventListener('touchmove', (e) => {
+            if (e.touches.length !== 1) return;
+            
+            const touch = e.touches[0];
+            const dx = Math.abs(touch.clientX - touchStartPos.x);
+            const dy = Math.abs(touch.clientY - touchStartPos.y);
+            
+            // If moved enough, cancel long-press and start drag-to-explore
+            if (dx > 10 || dy > 10) {
+                if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
                 }
-            });
+                isDraggingToExplore = true;
+                
+                // Find pathway under finger and pip it
+                const rect = spectrumCanvas.getBoundingClientRect();
+                const touchX = touch.clientX - rect.left;
+                const touchY = touch.clientY - rect.top;
+                const pathwayUnderFinger = findPathwayAtPoint(touchX, touchY);
+                
+                if (pathwayUnderFinger) {
+                    const now = Date.now();
+                    // Throttle pips while dragging
+                    if (now - lastDragPipTime > DRAG_PIP_INTERVAL) {
+                        // Only pip if it's a different pathway than last
+                        if (!hoveredPathway || hoveredPathway.id !== pathwayUnderFinger.id) {
+                            playPip(pathwayUnderFinger);
+                            updatePathwayInfo(pathwayUnderFinger);
+                            hoveredPathway = pathwayUnderFinger;
+                            lastDragPipTime = now;
+                        }
+                    }
+                }
+            }
+        }, { passive: true });
+        
+        spectrumCanvas.addEventListener('touchend', (e) => {
+            // Clear long-press timer
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+            
+            const touchDuration = Date.now() - touchStartTime;
+            
+            // If we were dragging, just end
+            if (isDraggingToExplore) {
+                isDraggingToExplore = false;
+                touchedPathway = null;
+                return;
+            }
+            
+            // If it was a short tap and we have a pathway
+            if (touchDuration < LONG_PRESS_DURATION && touchedPathway) {
+                // Tap = pip (play sound briefly)
+                if (isPlaying) {
+                    // Just update the display, the pathway is already sounding
+                    updatePathwayInfo(touchedPathway);
+                    hoveredPathway = touchedPathway;
+                } else {
+                    // Not playing - pip the pathway
+                    playPip(touchedPathway);
+                    updatePathwayInfo(touchedPathway);
+                }
+            } else if (touchDuration < LONG_PRESS_DURATION && !touchedPathway) {
+                // Tapped empty space - clear focus (easy unfocus!)
+                if (focusedPathway) {
+                    clearFocus();
+                    if (navigator.vibrate) navigator.vibrate(15); // Light feedback
+                }
+            }
+            
+            touchedPathway = null;
+        }, { passive: true });
+        
+        spectrumCanvas.addEventListener('touchcancel', () => {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+            touchedPathway = null;
+            isDraggingToExplore = false;
+        }, { passive: true });
 
         spectrumCanvas.addEventListener('dblclick', (e) => {
             if (!isZoomed()) return;
@@ -4879,7 +5746,242 @@ function drawWaveformOverlay(width, height) {
         drawOscilloscope();
         loadPathwaySummaries();
         
-        console.log('Metabolic Harmony v5.3 - Ship-Ready Key Findings');
+        // ===========================================
+        // MOBILE: Sync controls between desktop and mobile
+        // ===========================================
+        
+        // Sync mobile volume slider with desktop
+        const mobileVolumeSlider = document.querySelector('.mobile-volume-slider');
+        const mobileVolumeValue = document.querySelector('.mobile-volume-value');
+        const desktopVolumeSlider = document.getElementById('volumeSlider');
+        const desktopVolumeValue = document.getElementById('volumeValue');
+        
+        if (mobileVolumeSlider && desktopVolumeSlider) {
+            mobileVolumeSlider.addEventListener('input', function() {
+                desktopVolumeSlider.value = this.value;
+                desktopVolumeSlider.dispatchEvent(new Event('input'));
+                mobileVolumeValue.textContent = this.value + '%';
+            });
+            
+            desktopVolumeSlider.addEventListener('input', function() {
+                mobileVolumeSlider.value = this.value;
+                mobileVolumeValue.textContent = this.value + '%';
+            });
+        }
+        
+        // Sync mobile fundamental slider
+        const mobileFundSlider = document.querySelector('.mobile-fundamental-slider');
+        const mobileFundValue = document.querySelector('.mobile-fundamental-value');
+        const desktopFundSlider = document.getElementById('fundamentalSlider');
+        const desktopFundValue = document.getElementById('fundamentalValue');
+        
+        if (mobileFundSlider && desktopFundSlider) {
+            mobileFundSlider.addEventListener('input', function() {
+                desktopFundSlider.value = this.value;
+                desktopFundSlider.dispatchEvent(new Event('input'));
+                mobileFundValue.textContent = this.value + ' Hz';
+            });
+            
+            desktopFundSlider.addEventListener('input', function() {
+                mobileFundSlider.value = this.value;
+                mobileFundValue.textContent = this.value + ' Hz';
+            });
+        }
+        
+        // Sync mobile category sliders
+        document.querySelectorAll('.mobile-cat-slider').forEach(mobileSlider => {
+            const cat = mobileSlider.dataset.category;
+            const desktopSlider = document.querySelector(`#categoryFaders input[data-category="${cat}"]`);
+            
+            if (desktopSlider) {
+                mobileSlider.addEventListener('input', function() {
+                    desktopSlider.value = this.value;
+                    desktopSlider.dispatchEvent(new Event('input'));
+                });
+                
+                desktopSlider.addEventListener('input', function() {
+                    mobileSlider.value = this.value;
+                });
+            }
+        });
+        
+        // Mobile category buttons - switch subcategory view
+        document.querySelectorAll('.mobile-category-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const cat = this.dataset.category;
+                mobileActiveCategory = cat;
+                updateMobileSubcategoryUI(cat);
+            });
+        });
+        
+        // Track mobile active category
+        let mobileActiveCategory = 'energy';
+        const MOBILE_CATEGORY_ORDER = ['energy', 'biosynthesis', 'degradation', 'salvage', 'other'];
+        
+        // Populate mobile subcategories for a category
+        function updateMobileSubcategoryUI(category) {
+            const container = document.getElementById('mobileSubcategoryFaders');
+            const indicator = document.getElementById('mobileSubcatIndicator');
+            const label = document.getElementById('mobileSubcatLabel');
+            
+            if (!container) return;
+            
+            const catColors = {
+                energy: '#22c55e',
+                biosynthesis: '#3b82f6',
+                degradation: '#f59e0b',
+                salvage: '#ec4899',
+                other: '#6b7280'
+            };
+            
+            const catNames = {
+                energy: 'Energy',
+                biosynthesis: 'Biosynthesis',
+                degradation: 'Degradation',
+                salvage: 'Salvage',
+                other: 'Other'
+            };
+            
+            indicator.style.background = catColors[category] || '#888';
+            label.textContent = catNames[category] || category;
+            
+            // Use SUBCATEGORY_MAP for ordering (same as desktop)
+            const subcats = SUBCATEGORY_MAP[category] || [];
+            
+            container.innerHTML = '';
+            
+            if (subcats.length === 0) {
+                container.innerHTML = '<div style="font-size:0.6rem;color:#888;padding:8px;">No subcategories</div>';
+                return;
+            }
+            
+            subcats.forEach(sub => {
+                const fader = document.createElement('div');
+                fader.className = 'subcategory-fader';
+                fader.dataset.subcategory = sub.id;
+                fader.dataset.category = category;
+                fader.innerHTML = `
+                    <button class="subcat-btn mobile-subcat-btn" data-subcat="${sub.id}" data-category="${category}">${sub.label}</button>
+                    <input type="range" class="mobile-subcat-slider" data-subcat="${sub.id}" data-category="${category}" min="0" max="100" value="${Math.round((CONFIG.subcategoryGains[sub.id] ?? 1) * 100)}">
+                `;
+                container.appendChild(fader);
+            });
+            
+            // Add event listeners for mobile subcategory controls
+            container.querySelectorAll('.mobile-subcat-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const subcat = this.dataset.subcat;
+                    const cat = this.dataset.category;
+                    // Call toggleSubcategoryCycle directly with mobile button
+                    toggleSubcategoryCycle(subcat, cat, this);
+                });
+            });
+            
+            container.querySelectorAll('.mobile-subcat-slider').forEach(slider => {
+                slider.addEventListener('input', function() {
+                    const subcat = this.dataset.subcat;
+                    setSubcategoryGain(subcat, parseInt(this.value) / 100);
+                });
+            });
+        }
+        
+        // Mobile subcategory navigation (right arrow only - cycles through)
+        document.getElementById('mobileSubcatNext')?.addEventListener('click', () => {
+            const idx = MOBILE_CATEGORY_ORDER.indexOf(mobileActiveCategory);
+            const newIdx = idx >= MOBILE_CATEGORY_ORDER.length - 1 ? 0 : idx + 1;
+            mobileActiveCategory = MOBILE_CATEGORY_ORDER[newIdx];
+            updateMobileSubcategoryUI(mobileActiveCategory);
+        });
+        
+        // Mobile solo button
+        document.getElementById('mobileSoloBtn')?.addEventListener('click', function() {
+            const desktopSolo = document.getElementById('soloAllBtn');
+            if (desktopSolo) desktopSolo.click();
+            this.classList.toggle('active');
+        });
+        
+        // Mobile stop button
+        document.getElementById('mobileStopBtn')?.addEventListener('click', function() {
+            stopAllSequences();
+            this.classList.remove('has-active');
+            // Also clear cycling state from mobile buttons
+            document.querySelectorAll('.mobile-subcat-btn.cycling').forEach(btn => {
+                btn.classList.remove('cycling');
+            });
+        });
+        
+        // Initialize mobile subcategories with Energy
+        updateMobileSubcategoryUI('energy');
+        
+        // Sync mobile nav buttons with desktop
+        document.querySelectorAll('.mobile-nav-btn').forEach(mobileBtn => {
+            mobileBtn.addEventListener('click', function() {
+                const view = this.dataset.view;
+                const desktopBtn = document.querySelector(`.sidebar .nav-btn[data-view="${view}"]`);
+                if (desktopBtn) {
+                    desktopBtn.click();
+                }
+                // Update mobile button states
+                document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+        
+        // Sync mobile finding buttons - call focusKeyFinding directly
+        document.querySelectorAll('.mobile-finding-btn').forEach(mobileBtn => {
+            console.log('Attaching handler to mobile finding btn:', mobileBtn.dataset.finding);
+            mobileBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                console.log('Mobile finding clicked!', this.dataset.finding, 'disabled:', this.disabled);
+                
+                if (this.disabled) {
+                    console.log('Button is disabled, returning');
+                    return;
+                }
+                
+                const findingId = this.dataset.finding;
+                console.log('Calling focusKeyFinding with:', findingId);
+                console.log('MS_KEY_FINDINGS available:', !!window.MS_KEY_FINDINGS);
+                
+                focusKeyFinding(findingId);
+            });
+        });
+        
+        console.log('Mobile finding buttons attached:', document.querySelectorAll('.mobile-finding-btn').length);
+        
+        // When MS mode is enabled/disabled, sync mobile finding buttons
+        const msCompareBtn = document.getElementById('msCompareBtn');
+        if (msCompareBtn) {
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.attributeName === 'class') {
+                        const isActive = msCompareBtn.classList.contains('active');
+                        document.querySelectorAll('.mobile-finding-btn').forEach(btn => {
+                            if (isActive) {
+                                btn.classList.remove('disabled');
+                                btn.disabled = false;
+                            } else {
+                                btn.classList.add('disabled');
+                                btn.disabled = true;
+                            }
+                        });
+                        // Update mobile MS button
+                        const mobileMsBtn = document.querySelector('.mobile-nav-btn[data-view="ms"]');
+                        if (mobileMsBtn) {
+                            if (isActive) {
+                                mobileMsBtn.classList.add('active');
+                                document.querySelector('.mobile-nav-btn[data-view="healthy"]')?.classList.remove('active');
+                            }
+                        }
+                    }
+                });
+            });
+            observer.observe(msCompareBtn, { attributes: true });
+        }
+        
+        console.log('Metabolic Harmony v5.3 - Mobile Ready');
         if (typeof PATHWAY_DATA !== 'undefined') console.log('Loaded ' + PATHWAY_DATA.ALL_PATHWAYS.length + ' pathways');
         if (Object.keys(PATHWAY_SUMMARIES).length > 0) console.log('Loaded ' + Object.keys(PATHWAY_SUMMARIES).length + ' pathway summaries');
     </script>
