@@ -5513,6 +5513,8 @@ function drawWaveformOverlay(width, height, isMobile = false) {
             
             const center = getPinchCenter(touches, rect);
             pinchCenterX = center.x;
+            
+            console.log('Pinch START:', { distance: initialPinchDistance, zoom: initialZoomRange, centerX: pinchCenterX });
         }
         
         function updatePinch(touches, rect, canvasWidth) {
@@ -5544,9 +5546,12 @@ function drawWaveformOverlay(width, height, isMobile = false) {
             // Apply with bounds
             ZOOM.minFreq = Math.max(20, Math.pow(10, newMinLog));
             ZOOM.maxFreq = Math.min(20000, Math.pow(10, newMaxLog));
+            
+            console.log('Pinch UPDATE:', { scale: scale.toFixed(2), newMin: ZOOM.minFreq.toFixed(0), newMax: ZOOM.maxFreq.toFixed(0) });
         }
         
         function endPinch() {
+            console.log('Pinch END:', { finalMin: ZOOM.minFreq.toFixed(0), finalMax: ZOOM.maxFreq.toFixed(0) });
             isPinching = false;
             initialPinchDistance = null;
             initialZoomRange = null;
