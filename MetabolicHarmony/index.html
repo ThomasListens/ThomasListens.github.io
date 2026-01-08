@@ -1162,7 +1162,7 @@
             color: #111;
         }
         .audio-item.consonance {
-            background: #ffffff;
+            background: #f9fafb;
         }
         .audio-item.consonance .value {
             font-size: 1.1rem;
@@ -2131,7 +2131,7 @@
                             <div id="healthyDocs">
                                 <div class="docs-label">Documentation & Methods</div>
                                 <div class="docs-text">
-                                    <p>This harmonic model of the human gut microbiome is based on <a href="#" onclick="openMethods(); return false;" class="docs-link">4,869 healthy samples</a> collected from <a href="https://waldronlab.io/curatedMetagenomicData/" target="_blank" class="docs-link">curatedMetagenomicData</a>. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3245006/" target="_blank" class="docs-link">Metabolic pathways</a> represent chains of enzymatic and biochemical reactions. A unique harmonic ratio was mapped to each pathway:</p>
+                                    <p>This harmonic model of the human gut microbiome is based on <a href="#" onclick="openMethods(); return false;" class="docs-link">4,869 healthy samples</a> collected from <a href="https://waldronlab.io/curatedMetagenomicData/" target="_blank" class="docs-link">curatedMetagenomicData</a>. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3245006/" target="_blank" class="docs-link">Metabolic pathways</a> represent chains of enzymatic and biochemical reactions. A unique harmonic ratio was mapped to each pathway in <strong>one</strong> of <em>two</em> ways:</p>
                                     <span class="docs-indent"><strong>by Consonance</strong> — Pathways ranked by prevalence tier, then by abundance. The most consonant ratios (lowest n×d) assigned to the highest-ranked pathways from raw HUMAnN3 output.</span>
                                     <span class="docs-indent"><strong>by Composition</strong> — <a href="#" onclick="openCurated(); return false;" class="docs-link">350 curated pathways</a> mapped using prime-limit structures. Energy uses 2-limit (octaves), biosynthesis 5–7 limit, degradation subharmonics. <a href="https://github.com/ThomasListens/ThomasListens.github.io/blob/main/MetabolicHarmony/MetabolicHarmony_v6.ipynb" target="_blank" class="docs-link">View Score →</a></span>
                                 </div>
@@ -2857,13 +2857,13 @@ Always verify taxonomic range.
         const SEQUENCE_PIP_INTERVAL = 180;
         
         // Focus settings
-        const FOCUS_BOOST_DB = 3;
-        const FOCUS_DUCK_DB = -5;
+        const FOCUS_BOOST_DB = 5;
+        const FOCUS_DUCK_DB = -8;
         const FOCUS_MIN_VISUAL_HEIGHT = 0.25;
         
         // Category boost settings (when category is highlighted)
-        const CATEGORY_BOOST_DB = 5;
-        const CATEGORY_DUCK_DB = -5;
+        const CATEGORY_BOOST_DB = 6;
+        const CATEGORY_DUCK_DB = -6;
         
         let pipGain = null;
         const pathwayHoverIntensity = new Map();
@@ -5471,8 +5471,8 @@ function drawWaveformOverlay(width, height, isMobile = false) {
                     const newMinLog = minLog - range * panAmount;
                     const newMaxLog = maxLog - range * panAmount;
                     
-                    // Don't pan past minimum frequency
-                    if (Math.pow(10, newMinLog) >= 20) {
+                    // Don't pan past minimum frequency (use defaultMin, not 20)
+                    if (Math.pow(10, newMinLog) >= ZOOM.defaultMin) {
                         ZOOM.minFreq = Math.pow(10, newMinLog);
                         ZOOM.maxFreq = Math.pow(10, newMaxLog);
                     }
@@ -5485,8 +5485,8 @@ function drawWaveformOverlay(width, height, isMobile = false) {
                     const newMinLog = minLog + range * panAmount;
                     const newMaxLog = maxLog + range * panAmount;
                     
-                    // Don't pan past maximum frequency
-                    if (Math.pow(10, newMaxLog) <= 20000) {
+                    // Don't pan past maximum frequency (use defaultMax)
+                    if (Math.pow(10, newMaxLog) <= ZOOM.defaultMax) {
                         ZOOM.minFreq = Math.pow(10, newMinLog);
                         ZOOM.maxFreq = Math.pow(10, newMaxLog);
                     }
