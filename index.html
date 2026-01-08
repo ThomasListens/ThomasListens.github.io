@@ -5044,28 +5044,19 @@ async function updatePathwaySummary(pathwayId) {
             // MOBILE SCRUBBER - Draw scrubber line when active
             // ═══════════════════════════════════════════════════════════════════════
             const isMobile = window.matchMedia('(max-width: 900px)').matches;
-            if (isMobile && typeof isScrubbing !== 'undefined') {
-                // Animate zoom
-                const targetZoom = isScrubbing ? SCRUB_ZOOM : 1;
-                if (typeof scrubberZoom !== 'undefined') {
-                    scrubberZoom += (targetZoom - scrubberZoom) * ZOOM_SPEED;
-                }
+            if (isMobile && typeof isScrubbing !== 'undefined' && isScrubbing && scrubberX !== null) {
+                spectrumCtx.save();
                 
-                // Draw scrubber line when active
-                if (isScrubbing && scrubberX !== null) {
-                    spectrumCtx.save();
-                    
-                    // Vertical line - rich red, thin
-                    spectrumCtx.strokeStyle = '#dc2626';
-                    spectrumCtx.lineWidth = 1;
-                    spectrumCtx.setLineDash([]);
-                    spectrumCtx.beginPath();
-                    spectrumCtx.moveTo(scrubberX, 0);
-                    spectrumCtx.lineTo(scrubberX, height);
-                    spectrumCtx.stroke();
-                    
-                    spectrumCtx.restore();
-                }
+                // Vertical line - rich red, thin
+                spectrumCtx.strokeStyle = '#dc2626';
+                spectrumCtx.lineWidth = 1;
+                spectrumCtx.setLineDash([]);
+                spectrumCtx.beginPath();
+                spectrumCtx.moveTo(scrubberX, 0);
+                spectrumCtx.lineTo(scrubberX, height);
+                spectrumCtx.stroke();
+                
+                spectrumCtx.restore();
             }
             
             // Peristalsis wave
@@ -5391,23 +5382,35 @@ function drawWaveformOverlay(width, height, isMobile = false) {
         });
         
         // ===========================================
-        // MOBILE TOUCH - Scrubber Mode
+        // MOBILE TOUCH - Scrubber Mode with Pinch Zoom
         // ===========================================
         let isScrubbing = false;
         let scrubberX = null;
-        let scrubberZoom = 1;
-        let scrubberCenterFreq = null;
         let lastPippedPathway = null;
-        let scrubberAnimationFrame = null;
         
         // Hold-to-focus
         let holdTimer = null;
         let holdPathway = null;
         const HOLD_DURATION = 900; // ms to hold for focus
         
-        // Target zoom when scrubbing (shows narrower freq range)
-        const SCRUB_ZOOM = 3;
-        const ZOOM_SPEED = 0.15; // How fast zoom animates
+        // Pinch zoom
+        let isPinching = false;
+        let initialPinchDistance = null;
+        let initialZoomRange = null;
+        let pinchCenterX = null;
+        
+        function getPinchDistance(touches) {
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+        
+        function getPinchCenter(touches, rect) {
+            return {
+                x: ((touches[0].clientX + touches[1].clientX) / 2) - rect.left,
+                y: ((touches[0].clientY + touches[1].clientY) / 2) - rect.top
+            };
+        }
         
         function startScrubbing(touchX, canvasWidth) {
             // If already focused, any touch clears focus
@@ -5427,7 +5430,6 @@ function drawWaveformOverlay(width, height, isMobile = false) {
             
             // Find pathway at this position and pip it
             const pathway = findPathwayAtX(touchX, canvasWidth);
-            console.log('Scrubber start:', { touchX, canvasWidth, pathway: pathway?.id, pipGain: !!pipGain, audioContext: !!audioContext });
             
             if (pathway && pathway !== lastPippedPathway) {
                 playPip(pathway);
@@ -5453,8 +5455,6 @@ function drawWaveformOverlay(width, height, isMobile = false) {
             if (!isScrubbing) return;
             
             scrubberX = touchX;
-            const freq = xToFreq(touchX, canvasWidth);
-            scrubberCenterFreq = freq;
             
             // Find pathway at this position
             const pathway = findPathwayAtX(touchX, canvasWidth);
@@ -5495,6 +5495,62 @@ function drawWaveformOverlay(width, height, isMobile = false) {
                 holdTimer = null;
             }
             holdPathway = null;
+        }
+        
+        function startPinch(touches, rect, canvasWidth) {
+            isPinching = true;
+            isScrubbing = false;
+            scrubberX = null;
+            
+            // Clear hold timer
+            if (holdTimer) {
+                clearTimeout(holdTimer);
+                holdTimer = null;
+            }
+            
+            initialPinchDistance = getPinchDistance(touches);
+            initialZoomRange = { min: ZOOM.minFreq, max: ZOOM.maxFreq };
+            
+            const center = getPinchCenter(touches, rect);
+            pinchCenterX = center.x;
+        }
+        
+        function updatePinch(touches, rect, canvasWidth) {
+            if (!isPinching || !initialPinchDistance) return;
+            
+            const currentDistance = getPinchDistance(touches);
+            const scale = currentDistance / initialPinchDistance;
+            
+            // Get center frequency
+            const center = getPinchCenter(touches, rect);
+            const minLog = Math.log10(initialZoomRange.min);
+            const maxLog = Math.log10(initialZoomRange.max);
+            const centerRatio = (pinchCenterX - 40) / (canvasWidth - 60);
+            const centerLog = minLog + centerRatio * (maxLog - minLog);
+            
+            // Calculate new range (pinch out = zoom in = smaller range)
+            const oldRange = maxLog - minLog;
+            const newRange = oldRange / scale;
+            
+            // Clamp zoom
+            const minRange = 0.5; // About 3x zoom max
+            const maxRange = Math.log10(ZOOM.defaultMax) - Math.log10(ZOOM.defaultMin);
+            const clampedRange = Math.max(minRange, Math.min(maxRange, newRange));
+            
+            // Center the new range on pinch center
+            const newMinLog = centerLog - clampedRange * centerRatio;
+            const newMaxLog = centerLog + clampedRange * (1 - centerRatio);
+            
+            // Apply with bounds
+            ZOOM.minFreq = Math.max(20, Math.pow(10, newMinLog));
+            ZOOM.maxFreq = Math.min(20000, Math.pow(10, newMaxLog));
+        }
+        
+        function endPinch() {
+            isPinching = false;
+            initialPinchDistance = null;
+            initialZoomRange = null;
+            pinchCenterX = null;
         }
         
         function findPathwayAtX(x, canvasWidth) {
@@ -5556,30 +5612,54 @@ function drawWaveformOverlay(width, height, isMobile = false) {
         spectrumCanvas.addEventListener('touchstart', (e) => {
             const isMobile = window.matchMedia('(max-width: 900px)').matches;
             if (!isMobile) return;
-            if (e.touches.length !== 1) return;
-            e.preventDefault(); // Prevent scroll
+            e.preventDefault();
             
-            const touch = e.touches[0];
             const rect = spectrumCanvas.getBoundingClientRect();
-            const touchX = touch.clientX - rect.left;
             const canvasWidth = rect.width;
             
-            startScrubbing(touchX, canvasWidth);
+            if (e.touches.length === 2) {
+                // Two fingers - start pinch zoom
+                startPinch(e.touches, rect, canvasWidth);
+            } else if (e.touches.length === 1 && !isPinching) {
+                // One finger - scrubber
+                const touch = e.touches[0];
+                const touchX = touch.clientX - rect.left;
+                startScrubbing(touchX, canvasWidth);
+            }
         }, { passive: false });
         
         spectrumCanvas.addEventListener('touchmove', (e) => {
             const isMobile = window.matchMedia('(max-width: 900px)').matches;
             if (!isMobile) return;
-            if (!isScrubbing || e.touches.length !== 1) return;
             e.preventDefault();
             
-            const touch = e.touches[0];
             const rect = spectrumCanvas.getBoundingClientRect();
-            const touchX = touch.clientX - rect.left;
             const canvasWidth = rect.width;
             
-            updateScrubber(touchX, canvasWidth);
+            if (e.touches.length === 2 && isPinching) {
+                // Two fingers - update pinch
+                updatePinch(e.touches, rect, canvasWidth);
+            } else if (e.touches.length === 1 && isScrubbing) {
+                // One finger - update scrubber
+                const touch = e.touches[0];
+                const touchX = touch.clientX - rect.left;
+                updateScrubber(touchX, canvasWidth);
+            }
         }, { passive: false });
+        
+        spectrumCanvas.addEventListener('touchend', (e) => {
+            if (isPinching && e.touches.length < 2) {
+                endPinch();
+            }
+            if (isScrubbing && e.touches.length === 0) {
+                endScrubbing();
+            }
+        }, { passive: true });
+        
+        spectrumCanvas.addEventListener('touchcancel', (e) => {
+            endPinch();
+            endScrubbing();
+        }, { passive: true });
         
         spectrumCanvas.addEventListener('touchend', (e) => {
             endScrubbing();

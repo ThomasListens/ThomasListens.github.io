@@ -1330,9 +1330,9 @@ class HarmonicCloudEngine {
             grainDurationMax: 0.2,     // 4ms maximum
             
             // Density - grains per second (the texture)
-            baseDensity: 200,            // Base grains/second
+            baseDensity: 80,            // Base grains/second
             minDensity: 50,             // Sparse trickle
-            maxDensity: 200,             // Rushing stream
+            maxDensity: 120,             // Rushing stream
             
             // Envelope shape - no clicks
             grainAttack: 0.045,         // 0.5ms attack
