@@ -4,51 +4,102 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Metabolic Harmony | Gut Microbiome Sonification</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Noto+Serif:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { height: 100%; overflow: hidden; }
-        body { font-family: 'Segoe UI', -apple-system, sans-serif; background: #fafafa; color: #1a1a1a; line-height: 1.4; }
+        body { font-family: 'Noto Serif', 'Noto Naskh Arabic', Georgia, serif; background: #fafafa; color: #1a1a1a; line-height: 1.5; }
         .app-container { display: grid; grid-template-columns: 340px 1fr; height: 100vh; }
-        .sidebar { background: #fff; border-right: 1px solid #e5e5e5; padding: 16px 16px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
-        .app-title { font-size: 2rem; font-weight: 600; color: #111; line-height: 1.2; text-align: center; }
-        .app-subtitle { font-size: 1.1rem; color: #666; font-weight: 400; margin-top: 2px; text-align: center; }
-        .title-section { padding-bottom: 12px; border-bottom: 3px solid #e5e5e5; }
-        .nav-btn-text { font-size: 1.1rem; display: block; text-align: left; line-height: 1.3; }
-        .nav-btn-title { font-weight: 600; }
-        .nav-btn-sub { display: block; font-size: 0.7rem; color: #888; font-weight: 400; }
-        .nav-btn.active .nav-btn-sub { color: rgba(255, 255, 255, 0.7); }
-        .nav-section h3, .controls-section h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: #999; margin-bottom: 8px; font-weight: 600; text-align: center; }
-        .nav-tagline { font-weight: 400; font-style: italic; color: #999; text-transform: none; letter-spacing:.6cap }
-        .nav-buttons { display: flex; flex-direction: column; gap: 6px; }
-        .nav-btn { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 5px; cursor: pointer; transition: all 0.2s; font-size: 1.4rem; color: #333; }
+        .sidebar { background: #fff; border-right: 1px solid #e5e5e5; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+.app-title {
+    font-size: 1.8rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+}
+
+.app-title .outline {
+    color: transparent;
+    -webkit-text-stroke: 1px #111;
+}
+.app-title .subtle {
+    text-shadow: inset 0.5px 0.5px 0 #fff;
+}
+.app-title .solid {
+    color: #111;
+}
+   .app-title .metabolic {
+       font-weight: 700;  /* heavier to compensate for outline */
+   }
+.app-title .harmony {
+    color: #111;
+}
+.app-subtitle .hollow {
+    color: #e2e2e2;
+    -webkit-text-stroke: 0.3px #000000;
+}
+        .app-subtitle { font-size: 1rem; color: #666; font-weight: 400; margin-top: 2px; text-align: center; }
+        .title-section { padding-bottom: 8px; border-bottom: 3px solid #e5e5e5; }
+        .nav-btn-text { font-size: 1rem; display: block; text-align: left; line-height: 1.2; }
+        .nav-btn-title { font-weight: 600; letter-spacing: .07ch; }
+        .nav-btn-title::after {
+  content: '';
+  width: 86px;
+  height: 1px;
+  background: #888;
+  margin-left: 9px;
+  display: inline-block;
+  vertical-align: middle;
+}
+        .nav-btn-sub { display: block; font-size: 0.68rem; color: #777; font-weight: 400; }
+        .nav-btn.active .nav-btn-sub { color: rgba(255, 255, 255, 0.9); }
+        .nav-btn.active .nav-btn-title { color: #fff; }
+        .nav-section h3, .controls-section h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: #999; margin-bottom: 6px; font-weight: 600; text-align: center; }
+        .nav-tagline { 
+            font-family: 'Noto Serif', Georgia, serif;
+            font-weight: 400; 
+            font-style: italic; 
+            color: #777; 
+            text-transform: none; 
+            letter-spacing: 0.22em;
+            font-size: 0.78rem;
+            margin-bottom: 6px;
+            text-align: center;
+            padding: 2px 0;
+        }
+        .nav-buttons { display: flex; flex-direction: column; gap: 5px; }
+        .nav-btn { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 5px; cursor: pointer; transition: all 0.2s; font-size: 1.2rem; color: #333; }
         .nav-btn:hover { background: #f0f0f0; border-color: #ccc; }
         .nav-btn.active { background: #111; color: #fff; border-color: #111; }
         .nav-btn .indicator { width: 8px; height: 8px; border-radius: 50%; background: #ddd; flex-shrink: 0; }
         .nav-btn.active .indicator { background: #22c55e; }
         
-        /* Key Findings Section */
-        .key-findings-section { margin-top: 12px; padding: 10px; background: #f8f8f8; border: 1px solid #e5e5e5; border-radius: 6px; opacity: 0.6; transition: opacity 0.3s; }
-        .key-findings-section.enabled { opacity: 1; background: #fff; }
-        .key-findings-section h4 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; margin-bottom: 6px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
-        .findings-status { font-size: 0.6rem; color: #999; font-weight: 400; text-transform: none; letter-spacing: 0; }
-        .key-findings-section.enabled .findings-status { display: none; }
-        
-        /* Key Findings Grid */
-        .key-findings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
-        .key-finding-btn { display: flex; align-items: center; gap: 8px; padding: 7px 9px; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 4px; cursor: pointer; transition: all 0.2s; text-align: left; }
-        .key-finding-btn.disabled { cursor: not-allowed; opacity: 0.5; }
-        .key-finding-btn:not(.disabled):hover { background: #f0f0f0; border-color: #ccc; }
-        .key-finding-btn.active { border-width: 2px; background: #fff; }
-        .key-finding-btn .finding-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-        .key-finding-btn .finding-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-        .key-finding-btn .finding-title { font-size: 0.68rem; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .key-finding-btn .finding-direction { font-size: 0.58rem; color: #888; }
-        .key-finding-btn .finding-direction.depleted { color: #666; }
-        .key-finding-btn .finding-direction.elevated { color: #666; }
+/* Key Findings Section */
+.key-findings-section { margin-top: 8px; padding: 10px; background: #f8f8f8; border: 1px solid #e5e5e5; border-radius: 8px; opacity: 0.6; transition: opacity 0.3s; }
+.key-findings-section.enabled { opacity: 1; background: #fff; }
+.key-findings-section h4 { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; color: #888; margin-bottom: 8px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.key-findings-section h4 a { color: #3b82f6; text-decoration: none; }
+.key-findings-section h4 a:hover { text-decoration: underline; }
+.findings-status { font-size: 0.55rem; color: #aaa; font-weight: 400; text-transform: none; letter-spacing: 0; }
+.key-findings-section.enabled .findings-status { display: none; }
+
+/* Key Findings Grid */
+.key-findings-grid { display: flex; flex-direction: column; gap: 3px; }
+.key-finding-btn { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #fff; border: 1px solid #e5e5e5; border-radius: 5px; cursor: pointer; text-align: left; transition: all 0.12s ease; }
+.key-finding-btn.disabled { cursor: not-allowed; opacity: 0.5; background: #fafafa; }
+.key-finding-btn:not(.disabled):hover { background: #f8f8f8; border-color: #d0d0d0; }
+.key-finding-btn.active { background: #fff; border-color: #999; border-width: 1.5px; }
+.key-finding-btn .finding-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.key-finding-btn .finding-text { display: flex; align-items: baseline; gap: 8px; }
+.key-finding-btn .finding-title { font-size: 0.73rem; font-weight: 600; color: #333; }
+.key-finding-btn .finding-expansion { display: block; font-size: 0.58rem; font-weight: 400; color: #888; letter-spacing: 0.02em; margin-top: 1px; }
+.key-finding-btn .finding-direction { font-size: 0.65rem; color: #999; font-weight: 400; }
         
         /* Special button styling */
         .key-finding-btn.kynurenine-btn:not(.disabled) { border-color: #8b5cf6; background: #faf5ff; }
         .key-finding-btn.kynurenine-btn.active { border-color: #7c3aed; background: #f3e8ff; }
+        .key-finding-btn.energy-btn:not(.disabled) { border-color: #22c55e; background: #f0fdf4; }
+        .key-finding-btn.energy-btn.active { border-color: #16a34a; background: #dcfce7; }
         .key-finding-btn.scfa-btn:not(.disabled) { border-color: #06b6d4; background: #ecfeff; }
         .key-finding-btn.scfa-btn.active { border-color: #0891b2; background: #cffafe; }
         
@@ -59,8 +110,15 @@
         /* MS Compare Button special styling */
         .ms-compare-btn { border-color: #a855f7; }
         .ms-compare-btn:hover { background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); }
-        .ms-compare-btn.active { background: linear-gradient(135deg, #f3e8ff 0%, #ede9fe 100%); border-color: #7c3aed; }
+        .ms-compare-btn.active { 
+            background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); 
+            border-color: #5b21b6; 
+            color: #fff;
+        }
+        .ms-compare-btn.active .nav-btn-title { color: #fff; }
+        .ms-compare-btn.active .nav-btn-sub { color: rgba(255, 255, 255, 0.9); }
         .ms-compare-btn .indicator { background: #a855f7; }
+        .ms-compare-btn.active .indicator { background: #22c55e; }
         
         /* Dynamic Study Info Panel (replaces docs-panel when finding active) */
         .study-info-panel { padding: 12px 16px; background: #fff; border: 1px solid #e5e5e5; border-radius: 6px; }
@@ -79,53 +137,241 @@
         .study-info-panel .citation a { color: #3b82f6; text-decoration: none; }
         .study-info-panel .citation a:hover { text-decoration: underline; }
         
-        .controls-section { margin-top: auto; }
-        .control-group { margin-bottom: 14px; }
-        .control-group label { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.7rem; color: #666; margin-bottom: 6px; font-weight: 500; }
-        .control-group label .hint { font-weight: 400; color: #999; font-size: 0.6rem; }
+        .controls-section { margin-top: 8px; }
+        .control-group { margin-bottom: 10px; }
+        .control-group label { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.65rem; color: #666; margin-bottom: 4px; font-weight: 500; }
+        .control-group label .hint { font-weight: 400; color: #999; font-size: 0.55rem; }
         .slider-row { display: flex; align-items: center; gap: 8px; }
         input[type="range"] { flex: 1; height: 4px; -webkit-appearance: none; background: #e0e0e0; border-radius: 2px; outline: none; }
         input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: #333; border-radius: 50%; cursor: pointer; }
-        .slider-value { font-size: 0.7rem; color: #333; min-width: 42px; text-align: right; font-variant-numeric: tabular-nums; }
-        .category-faders { display: flex; flex-direction: column; gap: 6px; }
-        .category-fader { display: grid; grid-template-columns: 10px 70px 1fr 28px; align-items: center; gap: 6px; }
-        .category-dot { width: 10px; height: 10px; border-radius: 50%; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; border: 2px solid transparent; }
-        .category-dot:hover { transform: scale(1.3); }
-        .category-dot.focused { box-shadow: 0 0 0 3px rgba(0,0,0,0.15); transform: scale(1.2); }
-        .category-label { font-size: 0.65rem; color: #555; cursor: pointer; transition: color 0.15s; user-select: none; }
-        .category-label:hover { color: #111; }
-        .category-label.focused { color: #111; font-weight: 600; }
-        .category-fader input[type="range"] { height: 3px; }
-        .category-fader .fader-value { font-size: 0.65rem; color: #999; text-align: right; }
+        .slider-value { font-size: 0.65rem; color: #333; min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
         
-        /* Dynamic subcategory section - FIXED HEIGHT based on biosynthesis (7 items) */
-        .subcategory-section { margin-top: 2px; }
-        .subcategory-header { font-size: 0.65rem; color: #666; margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
-        .subcategory-header .cat-indicator { width: 6px; height: 6px; border-radius: 50%; }
+        /* Subcategory Faders - Compact: [dot+label btn] [slider] - click to sequence */
+        .subcategory-section { margin-top: 2px; min-height: 180px; }
+        .subcategory-header { font-size: 0.6rem; color: #666; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+        .subcategory-header .cat-indicator { width: 5px; height: 5px; border-radius: 50%; }
+        .subcat-nav-btn {
+            width: 16px;
+            height: 16px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            color: #888;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            padding: 0;
+            line-height: 1;
+        }
+        .subcat-nav-btn:hover {
+            background: #eee;
+            border-color: #ccc;
+            color: #555;
+        }
+        .subcat-nav-btn:active {
+            background: #e0e0e0;
+        }
+        .stop-all-btn {
+            width: 16px;
+            height: 16px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            color: #999;
+            font-size: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            opacity: 0.5;
+        }
+        .stop-all-btn:hover {
+            background: #ef4444;
+            border-color: #dc2626;
+            color: #fff;
+            opacity: 1;
+        }
+        .stop-all-btn.has-active {
+            opacity: 1;
+            background: #fef2f2;
+            border-color: #fca5a5;
+            color: #ef4444;
+        }
+        
+        .solo-all-btn {
+            background: transparent;
+            border: 1px solid #22c55e;
+            color: #22c55e;
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 9px;
+            font-weight: bold;
+            margin-left: auto;
+            margin-right: 4px;
+            opacity: 0.5;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .solo-all-btn:hover {
+            opacity: 1;
+            background: rgba(34, 197, 94, 0.1);
+        }
+        .solo-all-btn.active {
+            background: #22c55e;
+            color: white;
+            opacity: 1;
+        }
+        
         .subcategory-faders { 
             display: flex; 
             flex-direction: column; 
-            gap: 5px; 
-            padding-left: 10px; 
+            gap: 3px; 
+            padding-left: 8px; 
             border-left: 2px solid #22c55e; 
             transition: border-color 0.3s; 
-            height: 161px;  /* Fixed height for 7 items (7 * 23px) */
+            max-height: 150px;
             overflow-y: auto;
         }
-        .subcategory-fader { display: grid; grid-template-columns: 10px 80px 1fr 24px; align-items: center; gap: 5px; min-height: 18px; }
-        .subcat-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.5; cursor: pointer; transition: transform 0.15s, opacity 0.15s; }
-        .subcat-dot:hover { transform: scale(1.5); opacity: 0.8; }
-        .subcat-dot.cycling { opacity: 1; animation: pulse 1s infinite; }
-        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.4); } }
-        .subcat-label { font-size: 0.6rem; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; transition: color 0.15s; }
-        .subcat-label:hover { color: #333; }
-        .subcategory-fader input[type="range"] { height: 2px; }
-        .subcategory-fader .fader-value { font-size: 0.6rem; color: #999; text-align: right; }
+        .subcategory-fader { 
+            display: grid; 
+            grid-template-columns: 110px 1fr; 
+            align-items: center; 
+            gap: 6px; 
+            height: 22px;
+        }
+
+        .subcat-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 6px;
+            background: #fafafa;
+            border: 1px solid #e5e5e5;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.15s;
+            overflow: hidden;
+            --cat-color: #22c55e;  /* Default, set dynamically */
+            --cat-color-light: #dcfce7;
+        }
+
+        .subcat-btn:hover {
+            background: #f0f0f0;
+            border-color: #d0d0d0;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        }
+
+        .subcat-btn:active {
+            background: #e8e8e8;
+            transform: translateY(1px);
+        }
+
+        /* Active/cycling state - fills with category color */
+        .subcat-btn.cycling {
+            background: var(--cat-color-light);
+            border-color: var(--cat-color);
+            box-shadow: 0 0 0 1px var(--cat-color);
+        }
+        
+        .subcat-btn.cycling .label {
+            color: #222;
+            font-weight: 600;
+        }
+
+        .subcat-btn .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            transition: opacity 0.3s, transform 0.15s;
+        }
+
+        .subcat-btn:hover .dot {
+            opacity: 0.8;
+        }
+
+        /* Tempo-synced pulse animation */
+        .subcat-btn.cycling .dot {
+            animation: tempo-pulse var(--pulse-duration, 350ms) ease-in-out infinite;
+        }
+
+        @keyframes tempo-pulse {
+            0%, 100% { transform: scale(1); opacity: 0.7; }
+            50% { transform: scale(1.4); opacity: 1; }
+        }
+
+        .subcat-btn .label {
+            font-size: 0.55rem;
+            color: #444;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .subcategory-fader input[type="range"] { 
+            width: 100%;
+            height: 3px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #e8e8e8;
+            border-radius: 2px;
+            outline: none;
+            cursor: pointer;
+        }
+        .subcategory-fader input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 10px;
+            height: 10px;
+            background: #555;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .subcategory-fader input[type="range"]::-moz-range-thumb {
+            width: 10px;
+            height: 10px;
+            background: #555;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
         
         .main-content { display: flex; flex-direction: column; height: 100vh; }
-        .viz-container { height: 60vh; min-height: 150px; position: relative; background: #fff; border-bottom: 1px solid #e5e5e5; flex-shrink: 0; }
+        .viz-container { 
+            height: 60vh; 
+            min-height: 150px; 
+            position: relative; 
+            background: #fff; 
+            border-bottom: 1px solid #e5e5e5; 
+            flex-shrink: 0; 
+            transition: background-color 0.4s ease;
+        }
+        .viz-container.dark-mode {
+            background: #111;
+            border-bottom-color: #333;
+        }
+        .viz-container.mode-transition {
+            animation: mode-flash 0.3s ease-out;
+        }
+        @keyframes mode-flash {
+            0% { filter: brightness(1); }
+            30% { filter: brightness(0.7); }
+            100% { filter: brightness(1); }
+        }
         .viz-container::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(196, 196, 196, 0.9); z-index: 1; pointer-events: none; opacity: 1; transition: opacity 0.3s ease; }
         .viz-container.active::before { opacity: 0; }
+        .viz-container.dark-mode::before { background: rgba(30, 30, 30, 0.9); }
+        .viz-container.dark-mode .axis-label { color: #666; }
+        .viz-container.dark-mode .zoom-hint { color: #555; }
         #spectrumCanvas { width: 100%; height: 100%; display: block; cursor: grab; }
         #spectrumCanvas:active { cursor: grabbing; }
         .axis-label { position: absolute; font-size: 0.6rem; color: #999; text-transform: uppercase; letter-spacing: 0.1em; }
@@ -150,45 +396,111 @@
         /* Main content area (3 tiers stacked) */
         .bottom-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
         
-        /* Tier 1: Selected Pathway (top, compact) */
+        /* Tier 1: Selected Pathway (top, stable layout) */
         .tier-pathway { 
             background: #fff; 
             border-bottom: 1px solid #e5e5e5; 
-            padding: 12px 20px;
+            padding: 10px 16px;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 14px;
+            flex-shrink: 0;
+            min-height: 48px;
+        }
+        .pathway-identity-box {
+            display: flex;
+            align-items: stretch;
+            background: #f0fdf4;  /* Default energy light green, updated dynamically */
+            border-radius: 5px;
+            overflow: hidden;
+            min-width: 200px;
+            max-width: 280px;
+        }
+        .pathway-identity-box.energy { background: #f0fdf4; }
+        .pathway-identity-box.biosynthesis { background: #eff6ff; }
+        .pathway-identity-box.degradation { background: #fef2f2; }
+        .pathway-identity-box.salvage { background: #fefce8; }
+        .pathway-identity-box.other { background: #f9fafb; }
+        .pathway-identity-box.superpathways { background: #faf5ff; }
+        
+        .pathway-id { 
+            font-family: 'JetBrains Mono', 'Consolas', monospace; 
+            font-size: 0.72rem; 
+            font-weight: 700;
+            color: #fff; 
+            background: #22c55e;
+            padding: 6px 10px; 
             display: flex;
             align-items: center;
-            gap: 12px;
-            flex-shrink: 0;
+            justify-content: center;
+            min-width: 90px;
+            max-width: 140px;
         }
-        .pathway-id { 
-            font-family: 'Consolas', 'Monaco', monospace; 
-            font-size: 0.9rem; 
+        .pathway-id.energy { background: #22c55e; }
+        .pathway-id.biosynthesis { background: #3b82f6; }
+        .pathway-id.degradation { background: #ef4444; }
+        .pathway-id.salvage { background: #ca8a04; }
+        .pathway-id.other { background: #6b7280; }
+        .pathway-id.superpathways { background: #8b5cf6; }
+        
+        /* Dynamic font size for long IDs */
+        .pathway-id.long-id { font-size: 0.6rem; }
+        .pathway-id.very-long-id { font-size: 0.52rem; }
+        
+        .pathway-cat-info {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 1px;
+            padding: 4px 10px;
+        }
+        .pathway-cat-info .cat-label {
+            font-size: 0.65rem;
             font-weight: 600;
-            color: #16a34a; 
-            background: #f0fdf4; 
-            padding: 4px 10px; 
-            border-radius: 4px; 
-            flex-shrink: 0;
+            color: #333;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
         }
+        .pathway-cat-info .subcat-label {
+            font-size: 0.58rem;
+            color: #666;
+        }
+        
         .pathway-name { 
-            font-size: 0.95rem; 
-            color: #111; 
-            flex: 1;
+            font-size: 0.85rem; 
+            color: #333; 
             min-width: 0;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            font-weight: 400;
         }
-        .pathway-meta-inline {
+        .pathway-metrics {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 14px;
             flex-shrink: 0;
-            color: #666;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.68rem;
+        }
+        .pathway-metric {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 1px;
+        }
+        .pathway-metric .value { 
+            color: #333; 
+            font-weight: 500; 
             font-size: 0.75rem;
         }
-        .pathway-meta-inline .separator { color: #ccc; }
-        .pathway-meta-inline .meta-muted { color: #999; font-size: 0.7rem; }
+        .pathway-metric .label { 
+            color: #999; 
+            font-size: 0.55rem; 
+            text-transform: uppercase; 
+            letter-spacing: 0.03em; 
+        }
         .category-badge { 
             display: inline-block; 
             padding: 3px 10px; 
@@ -203,13 +515,300 @@
         .category-badge.other, .category-badge.superpathways { background: #f3f4f6; color: #374151; }
         
         /* Tier 2: Main Summary (middle, flexible) */
+        /* Healthy content - two column split */
+        .healthy-two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .healthy-about, .healthy-pathway-detail {
+            min-width: 0;
+        }
+        .healthy-header {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #999;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .healthy-description {
+            font-size: 0.78rem;
+            color: #333;
+            line-height: 1.5;
+            margin: 0 0 8px 0;
+        }
+        .healthy-mode {
+            font-size: 0.72rem;
+            color: #555;
+            line-height: 1.45;
+            margin: 0 0 4px 0;
+        }
+        .healthy-mode strong {
+            color: #333;
+        }
+        
+        /* === TIER SUMMARY - Main Content Area === */
         .tier-summary {
             flex: 1;
-            padding: 16px 20px;
-            background: #fafafa;
-            border-bottom: 1px solid #e5e5e5;
+            padding: 14px 20px;
+            overflow: hidden;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Pathway Summary Section - fixed height, top half */
+        .pathway-summary-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #eee;
+            min-height: 0;
+        }
+        .pathway-summary-text {
+            font-size: 1rem;
+            color: #333;
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .pathway-summary-link {
+            display: inline-block;
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .pathway-summary-link:hover {
+            text-decoration: underline;
+        }
+        
+        /* Documentation Section - bottom half */
+        .docs-section {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            padding-top: 12px;
+            min-height: 0;
             overflow-y: auto;
         }
+        .docs-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #999;
+            margin-bottom: 8px;
+            font-weight: 600;
+            flex-shrink: 0;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .docs-text {
+            font-size: 0.88rem;
+            color: #444;
+            line-height: 1.6;
+        }
+        .docs-text p {
+            margin: 0 0 8px 0;
+        }
+        .docs-text p.docs-cta {
+            font-family: 'Noto Serif', Georgia, serif;
+            font-style: italic;
+            font-size: 0.84rem;
+            color: #777;
+            margin-top: 12px;
+            letter-spacing: 0.06em;
+        }
+        .docs-text strong {
+            color: #222;
+            font-weight: 600;
+        }
+        .docs-text a.docs-link {
+            color: #2563eb;
+            text-decoration: none;
+            border-bottom: 1px dotted #93c5fd;
+            transition: all 0.15s ease;
+        }
+        .docs-text a.docs-link:hover {
+            color: #1d4ed8;
+            border-bottom-color: #2563eb;
+        }
+        .docs-indent {
+            display: block;
+            margin-left: 16px;
+            margin-top: 10px;
+            padding-left: 10px;
+            border-left: 2px solid #e5e5e5;
+        }
+        .docs-indent + .docs-indent {
+            margin-top: 8px;
+        }
+        
+        /* Finding Content - takes full space */
+        #findingContent {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        
+        .finding-header {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .finding-title-block {
+            display: flex;
+            flex-direction: column;
+        }
+        .finding-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: #333;
+        }
+        #findingContent .finding-expansion {
+            font-size: 0.7rem;
+            color: #888;
+            font-weight: 400;
+            letter-spacing: 0.01em;
+            margin-top: -1px;
+        }
+        .finding-subtitle {
+            font-size: 0.9rem;
+            color: #666;
+            font-style: italic;
+        }
+        .finding-header .close-btn {
+            margin-left: auto;
+        }
+        
+        .finding-quote {
+            background: #f8f9fa;
+            border-left: 3px solid #8b5cf6;
+            padding: 10px 14px;
+            margin: 0 0 12px 0;
+            border-radius: 0 6px 6px 0;
+        }
+        .finding-quote p {
+            font-size: 0.95rem;
+            font-style: italic;
+            color: #333;
+            line-height: 1.5;
+            margin: 0 0 4px 0;
+        }
+        .finding-quote cite {
+            font-size: 0.75rem;
+            color: #666;
+            font-style: normal;
+        }
+        
+        .finding-evidence, .finding-pathways {
+            margin-bottom: 10px;
+        }
+        .evidence-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #888;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .metabolite-chips, .pathway-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .metabolite-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            background: #f5f5f5;
+            border-radius: 14px;
+            font-size: 0.8rem;
+        }
+        .metabolite-chip .dir {
+            font-weight: 700;
+        }
+        .metabolite-chip .dir.depleted { color: #dc2626; }
+        .metabolite-chip .dir.elevated { color: #16a34a; }
+        .metabolite-chip .p-val {
+            color: #888;
+            font-size: 0.7rem;
+        }
+        
+        .pathway-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            background: #fefce8;
+            border: 1px solid #fef08a;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+        }
+        .pathway-chip .dir {
+            font-weight: 700;
+        }
+        .pathway-chip .dir.depleted { color: #dc2626; }
+        .pathway-chip .dir.elevated { color: #16a34a; }
+        
+        .finding-clinical {
+            background: #f0fdf4;
+            border-left: 3px solid #22c55e;
+            padding: 8px 12px;
+            border-radius: 0 4px 4px 0;
+            margin-top: auto;
+        }
+        .finding-clinical p {
+            font-size: 0.85rem;
+            color: #166534;
+            line-height: 1.45;
+            margin: 0;
+        }
+        
+        /* When finding is active, hide refs */
+        .finding-active .tier-refs {
+            display: none;
+        }
+        
+        /* References Footer */
+        .tier-refs {
+            padding: 6px 16px;
+            background: #fafafa;
+            border-top: 1px solid #eee;
+            font-size: 0.75rem;
+            color: #888;
+            text-align: center;
+        }
+        .tier-refs a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+        .tier-refs a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Close button */
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            color: #999;
+            cursor: pointer;
+            padding: 0 4px;
+        }
+        .close-btn:hover {
+            color: #333;
+        }
+        
         .summary-header {
             font-size: 0.65rem;
             text-transform: uppercase;
@@ -255,105 +854,112 @@
             gap: 12px;
             margin-bottom: 12px;
         }
-        .finding-color-bar {
-            width: 4px;
-            height: 36px;
-            border-radius: 2px;
-            background: var(--finding-color, #8b5cf6);
-            flex-shrink: 0;
-        }
         .finding-quote {
             background: linear-gradient(135deg, #f8f9fa 0%, #f0f4f8 100%);
             border-left: 3px solid var(--finding-color, #8b5cf6);
             padding: 10px 14px;
-            margin: 0 0 14px 0;
+            margin: 0 0 12px 0;
             border-radius: 0 6px 6px 0;
         }
         .finding-quote p {
-            font-size: 0.82rem;
+            font-size: 0.78rem;
             font-style: italic;
             color: #333;
             line-height: 1.5;
-            margin: 0 0 6px 0;
+            margin: 0 0 4px 0;
         }
         .finding-quote cite {
-            font-size: 0.68rem;
+            font-size: 0.65rem;
             color: #666;
             font-style: normal;
         }
+        .finding-quote cite a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+        .finding-quote cite a:hover { text-decoration: underline; }
+        
+        .finding-section {
+            margin-bottom: 12px;
+        }
         .section-label {
-            font-size: 0.65rem;
+            font-size: 0.6rem;
             text-transform: uppercase;
             letter-spacing: 0.06em;
             color: #888;
             margin-bottom: 6px;
             font-weight: 600;
         }
-        .finding-data-section {
-            margin-bottom: 14px;
+        
+        /* Metabolite chips - horizontal flow */
+        .metabolite-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
         }
-        .metabolite-table {
-            width: 100%;
-            border-collapse: collapse;
+        .metabolite-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: #f5f5f5;
+            border-radius: 20px;
             font-size: 0.72rem;
         }
-        .metabolite-table th {
-            text-align: left;
-            padding: 4px 6px;
-            background: #f5f5f5;
-            font-weight: 600;
-            color: #555;
-            border-bottom: 1px solid #ddd;
-        }
-        .metabolite-table td {
-            padding: 4px 6px;
-            border-bottom: 1px solid #eee;
+        .metabolite-chip .name {
             color: #333;
         }
-        .metabolite-table .elevated {
-            color: #16a34a;
+        .metabolite-chip .dir {
             font-weight: 700;
+            font-size: 0.85rem;
         }
-        .metabolite-table .depleted {
-            color: #dc2626;
-            font-weight: 700;
-        }
-        .metabolite-table .note {
+        .metabolite-chip .dir.depleted { color: #dc2626; }
+        .metabolite-chip .dir.elevated { color: #16a34a; }
+        .metabolite-chip .p-val {
             color: #888;
-            font-size: 0.68rem;
-            font-style: italic;
+            font-size: 0.65rem;
         }
-        .finding-inference {
+        
+        /* Pathway list - clean inline */
+        .pathway-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .pathway-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
             background: #fefce8;
-            padding: 10px 12px;
-            border-radius: 6px;
-            margin-bottom: 12px;
             border: 1px solid #fef08a;
+            border-radius: 4px;
+            font-size: 0.72rem;
         }
-        .finding-inference p {
-            font-size: 0.76rem;
+        .pathway-chip .pathway-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.68rem;
             color: #713f12;
-            line-height: 1.5;
-            margin: 0;
+            font-weight: 600;
         }
-        .inference-limitation {
-            font-size: 0.7rem !important;
-            color: #a16207 !important;
-            margin-top: 8px !important;
-            padding-top: 8px;
-            border-top: 1px dashed #fde047;
+        .pathway-chip .pathway-dir {
+            font-weight: 700;
+            font-size: 0.85rem;
         }
+        .pathway-chip .pathway-dir.depleted { color: #dc2626; }
+        .pathway-chip .pathway-dir.elevated { color: #16a34a; }
+        
+        /* Clinical note */
         .finding-clinical {
             background: #f0fdf4;
-            padding: 10px 12px;
-            border-radius: 6px;
-            margin-bottom: 10px;
-            border: 1px solid #bbf7d0;
+            padding: 8px 10px;
+            border-radius: 4px;
+            border-left: 3px solid #22c55e;
         }
         .finding-clinical p {
-            font-size: 0.76rem;
+            font-size: 0.72rem;
             color: #166534;
-            line-height: 1.5;
+            line-height: 1.45;
             margin: 0;
         }
         .finding-citation {
@@ -402,105 +1008,172 @@
   text-decoration: underline;
 }
         
-        /* Tier 3: Documentation & Methods (larger footer) */
-        .tier-docs {
-            background: #fff;
-            padding: 14px 20px;
-            flex-shrink: 0;
-            min-height: 70px;
+        .docs-intro {
+            font-size: 0.72rem;
+            color: #555;
+            line-height: 1.45;
+            margin-bottom: 6px;
+            margin-top: 0;
         }
-        .docs-header {
-            font-size: 0.65rem;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: #999;
-            margin-bottom: 8px;
-            font-weight: 600;
-        }
-        .docs-content {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .docs-content .legend {
-            display: flex;
-            gap: 14px;
-            flex-wrap: wrap;
-        }
-        .legend-item { 
-            display: flex; 
-            align-items: center; 
-            gap: 5px; 
-            font-size: 0.7rem; 
-            color: #555; 
-        }
-        .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
-        .docs-content .sources {
-            font-size: 0.7rem;
-            color: #666;
-            line-height: 1.4;
-        }
-        .docs-content .sources a {
+        .docs-intro a {
             color: #3b82f6;
             text-decoration: none;
         }
-        .docs-content .sources a:hover { text-decoration: underline; }
-        .docs-methods {
-            font-size: 0.7rem;
+        .docs-intro a:hover { text-decoration: underline; }
+        
+        /* Pathway detail panel */
+        .pathway-detail-content {
+            font-size: 0.72rem;
+            color: #555;
+            line-height: 1.45;
+        }
+        .pathway-detail-placeholder {
+            color: #999;
+            font-style: italic;
+            margin: 0;
+        }
+        .pathway-detail-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        .pathway-detail-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        .pathway-detail-summary {
+            color: #555;
+            margin-bottom: 6px;
+        }
+        .pathway-detail-link {
+            font-size: 0.65rem;
+        }
+        .pathway-detail-link a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+        .pathway-detail-link a:hover { text-decoration: underline; }
+        
+        .docs-references {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding-top: 8px;
+            border-top: 1px solid #eee;
+        }
+        .docs-references a {
+            display: flex;
+            flex-direction: column;
+            text-decoration: none;
+            text-align: center;
+            flex: 1;
+        }
+        .docs-references .ref-name {
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: #3b82f6;
+        }
+        .docs-references .ref-desc {
+            font-size: 0.58rem;
             color: #888;
-            line-height: 1.4;
-            margin-top: 4px;
+            margin-top: 1px;
+        }
+        .docs-references a:hover .ref-name {
+            text-decoration: underline;
+        }
+        
+        /* Inline references */
+        .docs-references-inline {
+            font-size: 0.65rem;
+            color: #777;
+            margin-top: 6px;
+        }
+        .docs-references-inline a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .docs-references-inline a:hover {
+            text-decoration: underline;
+        }
+        .docs-references-inline .ref-dot {
+            color: #bbb;
+            margin: 0 2px;
+        }
+        .docs-references-inline .ref-sep {
+            color: #ddd;
+            margin: 0 8px;
         }
         
         /* Audio sidebar (right side) */
         .bottom-audio { 
-            width: 200px; 
-            background: #111; 
+            width: 160px; 
+            background: #fff; 
             display: flex; 
             flex-direction: column; 
             flex-shrink: 0;
-            border-left: 1px solid #333;
+            border-left: 1px solid #e5e5e5;
         }
-        .audio-section { 
-            padding: 12px 14px; 
-            border-bottom: 1px solid #333; 
-        }
-        .audio-header {
-            font-size: 0.6rem;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: #666;
-            margin-bottom: 8px;
-            font-weight: 600;
-        }
-        .ratio-display { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 8px; 
-        }
-        .ratio-item { text-align: center; }
-        .ratio-item .value { font-size: 1rem; font-weight: 600; color: #fff; }
-        .ratio-item .label { font-size: 0.6rem; color: #666; text-transform: uppercase; }
         .scope-section { 
-            padding: 8px 10px; 
-            flex: 1; 
-            display: flex; 
-            flex-direction: column; 
+            padding: 6px; 
+            border-bottom: 1px solid #e5e5e5;
         }
         .oscilloscope { 
             width: 100%; 
-            flex: 1; 
-            min-height: 40px; 
-            background: #000; 
+            height: 80px; 
+            background: #111; 
             border-radius: 4px; 
         }
         #scopeCanvas { width: 100%; height: 100%; }
+        .audio-section { 
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+        .audio-item {
+            padding: 10px 12px;
+            text-align: center;
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .audio-item:last-child {
+            border-bottom: none;
+        }
+        .audio-item .value { 
+            font-size: 1.2rem; 
+            font-weight: 600; 
+            color: #333;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .audio-item .label { 
+            font-size: 0.55rem; 
+            color: #888; 
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 2px;
+        }
+        .audio-item.ratio-main .value {
+            font-size: 1.6rem;
+            color: #111;
+        }
+        .audio-item.consonance {
+            background: #f9fafb;
+        }
+        .audio-item.consonance .value {
+            font-size: 1.1rem;
+        }
         .signature { 
-            padding: 8px; 
+            padding: 10px 8px; 
+            font-family: 'Noto Serif', Georgia, serif;
             font-size: 0.75rem; 
-            color: #444; 
+            color: #888; 
             font-style: italic; 
             text-align: center; 
+            border-top: 1px solid #eee;
+            margin-top: auto;
+            letter-spacing: 0.1em;
         }
         .modal-overlay {
         position: fixed;
@@ -559,23 +1232,259 @@
   white-space: pre-wrap;
   color: #222;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   v4.0 ADDITIONS - Mode Toggle, Mute Buttons, Subcategory Hints
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Mode Toggle Section */
+.mode-section {
+    padding: 4px 0 10px 0;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+.mode-toggle {
+    display: flex;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #222;
+}
+
+.mode-btn {
+    flex: 1;
+    padding: 10px 12px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 500;
+    transition: all 0.25s ease;
+    text-align: center;
+}
+
+.mode-btn[data-mode="composed"] {
+    background: #fff;
+    color: #222;
+}
+
+.mode-btn[data-mode="consonance"] {
+    background: #111;
+    color: #fff;
+}
+
+.mode-btn[data-mode="composed"].active {
+    background: #fff;
+    color: #111;
+    font-weight: 700;
+}
+
+.mode-btn[data-mode="consonance"].active {
+    background: #000;
+    color: #fff;
+    font-weight: 700;
+}
+
+.mode-btn:not(.active) {
+    opacity: 0.85;
+}
+
+.mode-btn:not(.active):hover {
+    opacity: 0.9;
+}
+
+.mode-btn .mode-sub {
+    display: block;
+    font-size: 0.55rem;
+    font-weight: 400;
+    margin-top: 2px;
+    opacity: 0.7;
+}
+
+/* Category Faders - Compact layout: [dot+label button] [hide toggle] [slider] */
+.category-faders { display: flex; flex-direction: column; gap: 4px; }
+.category-fader { 
+    display: grid; 
+    grid-template-columns: 100px 18px 1fr; 
+    align-items: center; 
+    gap: 6px;
+    height: 26px;
+    transition: opacity 0.2s;
+}
+
+.category-fader.muted {
+    opacity: 0.4;
+}
+
+.category-fader.muted .category-btn {
+    opacity: 0.5;
+}
+
+.category-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    background: #f8f8f8;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.category-btn:hover {
+    background: #f0f0f0;
+    border-color: #ccc;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.category-btn:active {
+    background: #e8e8e8;
+    transform: translateY(1px);
+}
+
+.category-btn.focused {
+    background: #e0e0e0;
+    border-color: #bbb;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.08);
+}
+
+.category-btn .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.category-btn .label {
+    font-size: 0.62rem;
+    color: #333;
+    font-weight: 500;
+}
+
+.hide-toggle {
+    width: 12px;
+    height: 12px;
+    background: #333;
+    border: 2px solid #333;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.hide-toggle:hover {
+    background: #555;
+    border-color: #555;
+}
+
+.hide-toggle:active {
+    transform: scale(0.9);
+}
+
+.hide-toggle.hidden {
+    background: transparent;
+    border-color: #aaa;
+}
+
+/* Slider styling - no numbers */
+.category-fader input[type="range"] {
+    width: 100%;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #e0e0e0;
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+.category-fader input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 11px;
+    height: 11px;
+    background: #333;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.category-fader input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+}
+
+.category-fader input[type="range"]::-moz-range-thumb {
+    width: 11px;
+    height: 11px;
+    background: #333;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+/* Animation for cycling */
+@keyframes pulse-glow {
+    0%, 100% { 
+        transform: scale(1); 
+        box-shadow: 0 0 2px currentColor;
+    }
+    50% { 
+        transform: scale(1.3); 
+        box-shadow: 0 0 6px currentColor;
+    }
+}
+
+/* Mode badge in summary */
+.mode-badge {
+    display: inline-block;
+    font-size: 0.55rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.mode-badge.composed {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.mode-badge.consonance {
+    background: #dcfce7;
+    color: #166534;
+}
     </style>
 </head>
 <body>
     <div class="app-container">
         <aside class="sidebar">
             <div class="title-section">
-                <h1 class="app-title">Metabolic Harmony</h1>
-                <p class="app-subtitle">The Human Gut Microbiome Sonified</p>
+<h1 class="app-title"><span class="solid">Metab</span><span class="hollow">o</span><span class="solid">lic</span> <span class="hollow">Harm</span><span class="solid">o</span><span class="hollow">ny</span></h1>
+<p class="app-subtitle"><span class="hollow">The Human Gut Microbiome Sonified</span></p>
+            </div>
+            
+            <!-- MODE TOGGLE - Composed vs Consonance -->
+            <div class="mode-section">
+                <div class="mode-toggle" id="modeToggle">
+                    <button class="mode-btn active" data-mode="composed">
+                        Composed
+                        <span class="mode-sub">Prime architecture</span>
+                    </button>
+                    <button class="mode-btn" data-mode="consonance">
+                        Consonance
+                        <span class="mode-sub">Abundance ranking</span>
+                    </button>
+                </div>
             </div>
             <nav class="nav-section">
-                <h3><span class="nav-tagline"> "Listen to your Gut"</span></h3>
+                <div class="nav-tagline">Listen to your Gut</div>
                 <div class="nav-buttons">
                     <button class="nav-btn active" data-view="healthy">
                         <span class="indicator"></span>
                         <div class="nav-btn-text">
                             <span class="nav-btn-title">Healthy Reference</span>
-                            <span class="nav-btn-sub">600 Curated Pathways • Mapped by Consonance</span>
+                            <span class="nav-btn-sub" id="healthyNavSub">389 Curated Pathways • curatedMetagenomicData</span>
                         </div>
                     </button>
                     
@@ -584,25 +1493,17 @@
                         <span class="indicator"></span>
                         <div class="nav-btn-text">
                             <span class="nav-btn-title">Multiple Sclerosis</span>
-                            <span class="nav-btn-sub">Metabolite Data Characterization</span>
+                            <span class="nav-btn-sub">Cantoni et al. 2022; Smusz et al. 2025</span>
                         </div>
                     </button>
                 </div>
                 
                 <!-- Key Findings Section - disabled until MS mode active -->
                 <div class="key-findings-section" id="keyFindingsSection">
-                    <h4>Key Research Findings <span class="findings-status" id="findingsStatus">(enable MS comparison)</span></h4>
+                    <h4>Key Research Findings • <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12471209/" target="_blank">PMC12471209</a> (2025)<span></h4>   
+                  <!--  </span> class="findings-status" id="findingsStatus">(enable MS comparison)</span></h4> -->
                     
                     <div class="key-findings-grid" id="keyFindingsGrid">
-                        <!-- SCFA Depletion - Strongest evidence -->
-                        <button class="key-finding-btn scfa-btn disabled" data-finding="fermentation" disabled>
-                            <span class="finding-dot" style="background: #06b6d4;"></span>
-                            <div class="finding-text">
-                                <span class="finding-title">SCFA Depletion</span>
-                                <span class="finding-direction depleted">gut-brain axis</span>
-                            </div>
-                        </button>
-                        
                         <!-- Kynurenine - Neurotoxic shift -->
                         <button class="key-finding-btn kynurenine-btn disabled" data-finding="kynurenine" disabled>
                             <span class="finding-dot" style="background: #8b5cf6;"></span>
@@ -611,24 +1512,34 @@
                                 <span class="finding-direction depleted">neurotoxic shift</span>
                             </div>
                         </button>
-                        
+
                         <!-- Energy Metabolism - Mitochondrial -->
-                        <button class="key-finding-btn disabled" data-finding="energy" disabled>
+                        <button class="key-finding-btn energy-btn disabled" data-finding="energy" disabled>
                             <span class="finding-dot" style="background: #22c55e;"></span>
                             <div class="finding-text">
                                 <span class="finding-title">Energy Metabolism</span>
                                 <span class="finding-direction depleted">mitochondrial stress</span>
                             </div>
                         </button>
-                    </div>
-                    
-                    <p class="findings-citation">
+                  
+
+
+                        <!-- SCFA Depletion - Strongest evidence -->
+                        <button class="key-finding-btn scfa-btn disabled" data-finding="fermentation" disabled>
+                            <span class="finding-dot" style="background: #06b6d4;"></span>
+                            <div class="finding-text">
+            <span class="finding-title">SCFA Depletion</span>
+            <span class="finding-direction">immune disruption</span>
+                            </div>
+                        </button>
+                        
+                    <!--<p class="findings-citation">
                         Based on <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12471209/" target="_blank">PMC12471209</a> (2025)
-                    </p>
+                    </p> -->
                 </div>
             </nav>
             <div class="controls-section">
-                <h3>Controls</h3>
+             <!--   <h3>Controls</h3> -->
                 <div class="control-group">
                     <label>Master Volume</label>
                     <div class="slider-row">
@@ -637,50 +1548,47 @@
                     </div>
                 </div>
                 <div class="control-group">
-                    <label>Fundamental Frequency</label>
-                    <div class="slider-row">
-                        <input type="range" id="fundamentalSlider" min="200" max="1200" value="660">
-                        <span class="slider-value" id="fundamentalValue">660 Hz</span>
-                    </div>
-                </div>
-                <div class="control-group">
-                    <label>Category Mix <span class="hint">click to focus</span></label>
+                    <label>Category Mix</label>
                     <div class="category-faders" id="categoryFaders">
                         <div class="category-fader" data-category="energy">
-                            <span class="category-dot" style="background:#22c55e;" title="Focus Energy"></span>
-                            <span class="category-label" data-category="energy">Energy</span>
+                            <button class="category-btn" data-category="energy">
+                                <span class="dot" style="background:#22c55e;"></span>
+                                <span class="label">Energy</span>
+                            </button>
+                            <button class="hide-toggle" data-category="energy" title="Hide"></button>
                             <input type="range" data-category="energy" min="0" max="100" value="100">
-                            <span class="fader-value">100</span>
                         </div>
                         <div class="category-fader" data-category="biosynthesis">
-                            <span class="category-dot" style="background:#3b82f6;" title="Focus Biosynthesis"></span>
-                            <span class="category-label" data-category="biosynthesis">Biosynthesis</span>
+                            <button class="category-btn" data-category="biosynthesis">
+                                <span class="dot" style="background:#3b82f6;"></span>
+                                <span class="label">Biosynthesis</span>
+                            </button>
+                            <button class="hide-toggle" data-category="biosynthesis" title="Hide"></button>
                             <input type="range" data-category="biosynthesis" min="0" max="100" value="100">
-                            <span class="fader-value">100</span>
                         </div>
                         <div class="category-fader" data-category="degradation">
-                            <span class="category-dot" style="background:#ef4444;" title="Focus Degradation"></span>
-                            <span class="category-label" data-category="degradation">Degradation</span>
+                            <button class="category-btn" data-category="degradation">
+                                <span class="dot" style="background:#ef4444;"></span>
+                                <span class="label">Degradation</span>
+                            </button>
+                            <button class="hide-toggle" data-category="degradation" title="Hide"></button>
                             <input type="range" data-category="degradation" min="0" max="100" value="100">
-                            <span class="fader-value">100</span>
                         </div>
                         <div class="category-fader" data-category="salvage">
-                            <span class="category-dot" style="background:#eab308;" title="Focus Salvage"></span>
-                            <span class="category-label" data-category="salvage">Salvage</span>
+                            <button class="category-btn" data-category="salvage">
+                                <span class="dot" style="background:#eab308;"></span>
+                                <span class="label">Salvage</span>
+                            </button>
+                            <button class="hide-toggle" data-category="salvage" title="Hide"></button>
                             <input type="range" data-category="salvage" min="0" max="100" value="100">
-                            <span class="fader-value">100</span>
                         </div>
                         <div class="category-fader" data-category="other">
-                            <span class="category-dot" style="background:#6b7280;" title="Focus Other"></span>
-                            <span class="category-label" data-category="other">Other</span>
+                            <button class="category-btn" data-category="other">
+                                <span class="dot" style="background:#6b7280;"></span>
+                                <span class="label">Other</span>
+                            </button>
+                            <button class="hide-toggle" data-category="other" title="Hide"></button>
                             <input type="range" data-category="other" min="0" max="100" value="100">
-                            <span class="fader-value">100</span>
-                        </div>
-                        <div class="category-fader" data-category="superpathways">
-                            <span class="category-dot" style="background:#8b5cf6;" title="Focus Superpathways"></span>
-                            <span class="category-label" data-category="superpathways">Super</span>
-                            <input type="range" data-category="superpathways" min="0" max="100" value="100">
-                            <span class="fader-value">100</span>
                         </div>
                     </div>
                 </div>
@@ -688,9 +1596,19 @@
                     <div class="subcategory-header">
                         <span class="cat-indicator" id="subcatIndicator" style="background:#22c55e;"></span>
                         <span id="subcatLabel">Energy Subcategories</span>
+                        <button class="subcat-nav-btn" id="subcatNext" title="Next category">›</button>
+                        <button class="solo-all-btn" id="soloAllBtn" title="Solo active sequences">S</button>
+                        <button class="stop-all-btn" id="stopAllBtn" title="Stop all sequences">■</button>
                     </div>
                     <div class="subcategory-faders" id="subcategoryFaders">
                         <!-- Dynamically populated -->
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Fundamental Frequency</label>
+                    <div class="slider-row">
+                        <input type="range" id="fundamentalSlider" min="200" max="1200" value="660">
+                        <span class="slider-value" id="fundamentalValue">660 Hz</span>
                     </div>
                 </div>
             </div>
@@ -708,134 +1626,128 @@
                 <!-- Main content area (3 tiers stacked) -->
                 <div class="bottom-main">
                     
-                    <!-- Tier 1: Selected Pathway (compact horizontal bar) -->
+                    <!-- Tier 1: Selected Pathway (stable grid layout) -->
                     <div class="tier-pathway">
-                        <span class="pathway-id" id="pwdId">PWY-1042</span>
+                        <div class="pathway-identity-box energy" id="pwdIdentityBox">
+                            <span class="pathway-id energy" id="pwdId">PWY-1042</span>
+                            <div class="pathway-cat-info">
+                                <span class="cat-label" id="pwdCategory">ENERGY</span>
+                                <span class="subcat-label" id="pwdSubcat">Glycolysis</span>
+                            </div>
+                        </div>
                         <span class="pathway-name" id="pwdName">glycolysis IV (plant cytosol)</span>
-                        <div class="pathway-meta-inline">
-                            <span class="category-badge energy" id="pwdCategory">ENERGY</span>
-                            <span class="separator">·</span>
-                            <span id="pwdSubcat">Glycolysis</span>
-                            <span class="separator">·</span>
-                            <span class="meta-muted">
-                            <span id="pwdAbundance">—</span> abd
-                            </span>
-                            <span class="separator">·</span>
-                            <span class="meta-muted">
-                            <span id="pwdPrev">99.9%</span> prev
-                            </span>
+                        <div class="pathway-metrics">
+                            <div class="pathway-metric">
+                                <span class="value" id="pwdAbundance">—</span>
+                                <span class="label">abd</span>
+                            </div>
+                            <div class="pathway-metric">
+                                <span class="value" id="pwdPrev">99.9%</span>
+                                <span class="label">prev</span>
+                            </div>
                         </div>
                     </div>
                     
-                    <!-- Tier 2: Main Summary (flexible middle area) -->
+                    <!-- Tier 2: Main Content Area -->
                     <div class="tier-summary" id="tierSummary">
-                        <div class="summary-header">
-                            <span id="summaryHeaderText">About This Visualization</span>
-                            <button class="close-btn" id="closeSummaryBtn" style="display: none;" title="Clear">✕</button>
+                        
+                        <!-- Pathway Summary (always visible, updates on hover) -->
+                        <div class="pathway-summary-section" id="pathwaySummarySection">
+                            <div class="pathway-summary-text" id="pathwaySummaryText">
+                                Hover over a pathway to see its description from MetaCyc.
+                            </div>
+                            <a class="pathway-summary-link" id="pathwaySummaryLink" href="#" target="_blank" style="display:none;">View on MetaCyc →</a>
                         </div>
                         
-                        <!-- Default healthy gut content -->
-                        <div id="healthyContent">
-                            <div class="summary-title">The Human Gut Microbiome</div>
-                            <div class="summary-subtitle">600 Curated Metabolic Pathways Sonified</div>
-                            <div class="summary-text" id="summaryText">
-                                Each vertical bar represents a metabolic pathway found in the healthy human gut microbiome. 
-                                Pathways are mapped to harmonic ratios based on their metabolic function—energy pathways 
-                                occupy consonant intervals (2-5), biosynthesis uses higher primes (7-13), and degradation 
-                                mirrors biosynthesis in the lower register. The result is a living sonic portrait of 
-                                microbial metabolism.
-                            </div>
-                        </div>
-                        
-                        <!-- MS comparison content (hidden by default) -->
-                        <div id="msContent" style="display: none;">
-                            <div class="summary-title" id="msSummaryTitle">Multiple Sclerosis Metabolic Inference</div>
-                            <div class="summary-subtitle" id="msSummarySubtitle">Pathway-level changes inferred from metabolomics data</div>
-                            <div class="summary-text" id="msSummaryText">
-                                Based on a systematic review of 29 metabolomics studies in MS patients, we infer 
-                                pathway-level alterations from reported metabolite changes. Highlighted pathways 
-                                show hypothesized dysregulation—elevated pathways may indicate compensatory 
-                                activation or upstream accumulation, while depleted pathways suggest reduced 
-                                microbial function or increased host consumption.
-                            </div>
-                            <div class="summary-findings" id="msSummaryFindings">
-                                <!-- Populated dynamically when a finding is focused -->
-                            </div>
-                        </div>
-                        
-                        <!-- Key finding detail content (hidden by default) -->
-                        <div id="findingContent" style="display: none;">
-                            <div class="finding-header">
-                                <div class="finding-color-bar" id="findingColorBar"></div>
-                                <div>
-                                    <div class="summary-title" id="findingTitle">Kynurenine Pathway</div>
-                                    <div class="summary-subtitle" id="findingSubtitle">Neurotoxic Imbalance</div>
+                        <!-- Documentation (swaps between healthy/MS modes) -->
+                        <div class="docs-section" id="docsSection">
+                            <!-- Healthy mode docs -->
+                            <div id="healthyDocs">
+                                <div class="docs-label">Documentation & Methods</div>
+                                <div class="docs-text">
+                                    <p>This harmonic model of the human gut microbiome is based on <a href="#" onclick="openMethods(); return false;" class="docs-link">4,869 healthy samples</a> collected from <a href="https://waldronlab.io/curatedMetagenomicData/" target="_blank" class="docs-link">curatedMetagenomicData</a>. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3245006/" target="_blank" class="docs-link">Metabolic pathways</a> represent chains of enzymatic and biochemical reactions. A unique harmonic ratio was mapped to each pathway:</p>
+                                    <span class="docs-indent"><strong>by Consonance</strong> — Pathways ranked by prevalence tier, then by abundance. The most consonant ratios (lowest n×d) assigned to the highest-ranked pathways from raw HUMAnN3 output.</span>
+                                    <span class="docs-indent"><strong>by Composition</strong> — <a href="#" onclick="openCurated(); return false;" class="docs-link">350 curated pathways</a> mapped using prime-limit structures. Energy uses 2-limit (octaves), biosynthesis 5–7 limit, degradation subharmonics. <a href="https://github.com/ThomasListens/ThomasListens.github.io/blob/main/MetabolicHarmony/MetabolicHarmony_v6.ipynb" target="_blank" class="docs-link">View Score →</a></span>
                                 </div>
                             </div>
                             
-                            <!-- Quote from paper - lead with scientific conclusion -->
-                            <blockquote class="finding-quote" id="findingQuote">
+                            <!-- MS mode docs -->
+                            <div id="msDocs" style="display: none;">
+                                <div class="docs-label">Multiple Sclerosis Characterization</div>
+                                <div class="docs-text">
+                                    <p>This sonification reveals differences between our healthy reference and the MS gut microbiome.  <a href="https://pubmed.ncbi.nlm.nih.gov/35059609/" target="_blank" class="docs-link">Cantoni et al. (2022)</a> identified 66 differentially abundant pathways between MS patients and controls. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12471209/" target="_blank" class="docs-link">Smusz et al. (2025)</a> synthesized metabolite data from 29 studies, which we used to infer additional pathway-level changes.</p>
+                                    <p>The gut-brain axis enables bidirectional communication between intestinal bacteria and the central nervous system through metabolites, immune signaling, and the vagus nerve. Disrupted microbial metabolism—particularly depleted short-chain fatty acids and altered tryptophan catabolism—may contribute to neuroinflammation and disease progression.</p>
+                                    <p class="docs-cta">Select a key finding to hear specific dysregulated pathways.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Key finding content (hidden by default, replaces everything) -->
+                        <div id="findingContent" style="display: none;">
+                            <div class="finding-header">
+                                <div class="finding-title-block">
+                                    <span class="finding-title" id="findingTitle">SCFA Depletion</span>
+                                    <span class="finding-expansion" id="findingExpansion"></span>
+                                </div>
+                                <span class="finding-subtitle" id="findingSubtitle">immune disruption</span>
+                                <button class="close-btn" id="closeFindingBtn" title="Close">✕</button>
+                            </div>
+                            
+                            <blockquote class="finding-quote">
                                 <p id="findingQuoteText">"Quote from the paper..."</p>
-                                <cite id="findingQuoteCite">Section 3.1, PMC12471209</cite>
+                                <cite id="findingCitation">— Source</cite>
                             </blockquote>
                             
-                            <!-- Metabolite data table -->
-                            <div class="finding-data-section">
-                                <div class="section-label">Measured Changes in MS Patients</div>
-                                <div id="findingMetaboliteTable"></div>
+                            <div class="finding-evidence">
+                                <div class="evidence-label">Metabolite Evidence</div>
+                                <div class="metabolite-chips" id="findingMetaboliteChips"></div>
                             </div>
                             
-                            <!-- Inference explanation -->
-                            <div class="finding-inference" id="findingInference">
-                                <div class="section-label">Pathway Inference</div>
-                                <p id="findingInferenceText"></p>
-                                <p class="inference-limitation" id="findingLimitation"></p>
+                            <div class="finding-pathways">
+                                <div class="evidence-label">Affected Pathways</div>
+                                <div class="pathway-chips" id="findingPathwayChips"></div>
                             </div>
                             
-                            <!-- Clinical note -->
                             <div class="finding-clinical" id="findingClinical">
-                                <div class="section-label">Clinical Relevance</div>
                                 <p id="findingClinicalText"></p>
                             </div>
-                            
-                            <!-- Citation -->
-                            <div class="finding-citation" id="findingCitation"></div>
                         </div>
                     </div>
                     
-                    <!-- Tier 3: Documentation & Methods (expandable footer) -->
-                    <div class="tier-docs" id="tierDocs">
-                        <div class="docs-header">Documentation & Methods</div>
-                        <div class="docs-content">
-                            <div class="sources" id="docsSources">
-                                <strong>Data:</strong> <a href="https://metacyc.org/" target="_blank">MetaCyc(Metabolic Pathway Library)</a> ·
-                                <a href="https://waldronlab.io/curatedMetagenomicData/articles/curatedMetagenomicData.html" target="_blank">metaCuratedgenomics(Healthy Samples)</a> · 
-                                <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12471209/" target="_blank">PMC12471209(MS Metabolomics)</a> · 
-                                <a href="https://pubmed.ncbi.nlm.nih.gov/35059609/" target="_blank">Cantoni et al. 2022</a> · 
-                                <a href="https://enteropathway.org/" target="_blank">Enteropathway</a>
-                            </div>
-                            <div class="docs-methods" id="docsMethodsText">
-                                data collected from  
-                                 <a href="#" onclick="openMethods(); return false;">4,869 healthy control samples</a>
-                                 was filtered to down to a list of ~600 pathways which were organized by category and subcategory. Some known HUMAnN3 false positives were removed 
-                            </div>
-                        </div>
+                    <!-- References footer -->
+                    <div class="tier-refs" id="tierRefs">
+                        <a href="https://metacyc.org/" target="_blank">MetaCyc</a> · 
+                        <a href="https://waldronlab.io/curatedMetagenomicData/" target="_blank">curatedMetagenomicData</a> · 
+                        <a href="https://enteropathway.org/" target="_blank">Enteropathway</a> · 
+                        <a href="https://pubmed.ncbi.nlm.nih.gov/35059609/" target="_blank">Cantoni 2022</a> · 
+                        <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12471209/" target="_blank">Smusz 2025</a> · 
+                        <a href="https://www.amazon.com/Genesis-Music-Account-Creative-Fulfillment/dp/0306801063" target="_blank">Partch, <em>Genesis of a Music</em></a> · 
+                        <a href="https://www.kylegann.com/Octave.html" target="_blank">Gann, <em>Anatomy of an Octave</em></a>
                     </div>
                 </div>
                 
                 <!-- Audio sidebar (right side) -->
                 <div class="bottom-audio">
-                    <div class="audio-section">
-                        <div class="audio-header">Audio Info</div>
-                        <div class="ratio-display">
-                            <div class="ratio-item"><div class="value" id="ratioValue">1/1</div><div class="label">Ratio</div></div>
-                            <div class="ratio-item"><div class="value" id="freqValue">660</div><div class="label">Hz</div></div>
-                            <div class="ratio-item"><div class="value" id="centsValue">+0</div><div class="label">Cents</div></div>
-                            <div class="ratio-item"><div class="value" id="intervalValue">1</div><div class="label">n×d</div></div>
-                        </div>
-                    </div>
                     <div class="scope-section">
                         <div class="oscilloscope"><canvas id="scopeCanvas"></canvas></div>
+                    </div>
+                    <div class="audio-section">
+                        <div class="audio-item ratio-main">
+                            <div class="value" id="ratioValue">1/1</div>
+                            <div class="label">Ratio</div>
+                        </div>
+                        <div class="audio-item consonance">
+                            <div class="value" id="intervalValue">1</div>
+                            <div class="label">Consonance (n×d)</div>
+                        </div>
+                        <div class="audio-item">
+                            <div class="value" id="freqValue">660</div>
+                            <div class="label">Hertz</div>
+                        </div>
+                        <div class="audio-item">
+                            <div class="value" id="centsValue">0</div>
+                            <div class="label">Cents</div>
+                        </div>
                     </div>
                     <div class="signature">Love Grows Within · 2025</div>
                 </div>
@@ -845,77 +1757,278 @@
     <div id="methodsModal" class="modal-overlay">
   <div class="modal">
     <div class="modal-header">
-      <h2>Documentation & Methods</h2>
+      <h2>Healthy Gut Reference Cohort</h2>
       <button class="modal-close" aria-label="Close">×</button>
     </div>
 
     <div class="modal-content">
-      <!-- ✅ STASH EVERYTHING HERE -->
       <pre class="methods-text">
-metaCuratedGenomics – Healthy Gut Reference Cohort
+curatedMetagenomicData – Healthy Reference
 
-Generated: 2025-12-25
-R version: 4.5.2
+Generated: 2025-12-25 15:47:20.862435
+R version: R version 4.5.2 (2025-10-31 ucrt)
 
-FILTERING CRITERIA:
-- Disease status: healthy / control
-- Body site: stool
-- Age: 18–65
-- Antibiotics: excluded current users
-- Pregnancy/lactation: excluded
-- BMI: 18.5–30
-- Excluded disease-focused studies
+FILTERING CRITERIA APPLIED:
+  - Disease status: 'healthy' or 'control'
+  - Body site: stool
+  - Age: 18-65 years
+  - Antibiotics: excluded current users
+  - Pregnancy/lactation: excluded
+  - BMI: 18.5-30 (normal to overweight, excluding obese)
+  - Excluded disease-focused studies
 
 COHORT SUMMARY:
-Total samples: 4,869
-Total studies: 40
-Total pathways: 67,175
+  Total samples: 4869
+  Total studies: 40
+  Total pathways: 67175
 
 DEMOGRAPHICS:
-Age mean = 40.0 (SD 13.3)
-Female = 2,888 | Male = 1,915
+  Age: mean = 40.0, SD = 13.3, range = 18 - 65
+  Gender: female = 2888, male = 1915
 
-[Full study list below…]
+STUDIES INCLUDED:
+  AsnicarF_2021: n=916, mean_age=44.2, %female=71.6
+  LifeLinesDeep_2016: n=911, mean_age=42.7, %female=57.2
+  ZeeviD_2015: n=654, mean_age=40.5, %female=58.9
+  SchirmerM_2016: n=432, mean_age=26.5, %female=57.4
+  BritoIL_2016: n=143, mean_age=44.1, %female=59.4
+  CosteaPI_2017: n=137, mean_age=45.1, %female=60.6
+  HansenLBS_2018: n=137, mean_age=47.8, %female=59.9
+  HMP_2012: n=135, mean_age=26.0, %female=45.2
+  ShaoY_2019: n=114, mean_age=34.1, %female=44.7
+  PehrssonE_2016: n=104, mean_age=37.8, %female=56.7
+  PasolliE_2019: n=102, mean_age=34.4, %female=47.1
+  XieH_2016: n=100, mean_age=56.9, %female=100.0
+  DeFilippisF_2019: n=90, mean_age=39.4, %female=51.1
+  MetaCardis_2020_a: n=85, mean_age=49.8, %female=60.0
+  DhakanDB_2019: n=76, mean_age=34.8, %female=52.6
+  Bengtsson-PalmeJ_2015: n=70, mean_age=25.5, %female=74.3
+  ZhuF_2020: n=70, mean_age=33.5, %female=47.1
+  LeChatelierE_2013: n=65, mean_age=54.6, %female=61.5
+  KeohaneDM_2020: n=57, mean_age=32.7, %female=52.6
+  RubelMA_2020: n=55, mean_age=42.4, %female=61.8
+  YeZ_2018: n=39, mean_age=37.7, %female=28.2
+  TettAJ_2019_a: n=38, mean_age=29.0, %female=0.0
+  LokmerA_2019: n=37, mean_age=46.8, %female=37.8
+  RaymondF_2016: n=36, mean_age=25.2, %female=58.3
+  Obregon-TitoAJ_2015: n=32, mean_age=31.5, %female=59.4
+  RampelliS_2015: n=32, mean_age=33.3, %female=43.8
+  KaurK_2020: n=28, mean_age=34.7, %female=10.7
+  GuptaA_2019: n=25, mean_age=39.1, %female=64.0
+  TettAJ_2019_c: n=23, mean_age=29.3, %female=100.0
+  TettAJ_2019_b: n=22, mean_age=33.1, %female=0.0
+  ThomasAM_2019_c: n=19, mean_age=52.6, %female=42.1
+  SmitsSA_2017: n=18, mean_age=43.2, %female=44.4
+  HanniganGD_2017: n=17, mean_age=53.6, %female=52.9
+  FerrettiP_2018: n=15, mean_age=34.2, %female=100.0
+  WampachL_2018: n=14, mean_age=34.1, %female=100.0
+  BedarfJR_2017: n=10, mean_age=58.2, %female=0.0
+  Heitz-BuschartA_2016: n=6, mean_age=59.0, %female=100.0
+  SankaranarayananK_2015: n=2, mean_age=37.5, %female=50.0
+  VincentC_2016: n=2, mean_age=63.0, %female=50.0
+  LiJ_2014: n=1, mean_age=50.0, %female=0.0
+
+TOP 50 PATHWAYS BY ABUNDANCE:
+(These represent the most consistently abundant pathways in healthy guts)
+
+    1. PWY-1042
+       median=0.000589, prevalence=99.9%, IQR=[0.000527, 0.000653]
+    2. PWY-6737
+       median=0.000561, prevalence=99.9%, IQR=[0.000468, 0.000641]
+    3. PWY-7219
+       median=0.000559, prevalence=99.9%, IQR=[0.000503, 0.000626]
+    4. PWY-5686
+       median=0.000550, prevalence=99.9%, IQR=[0.000491, 0.000612]
+    5. PWY-7111
+       median=0.000548, prevalence=99.9%, IQR=[0.000481, 0.000617]
+    6. ILEUSYN-PWY
+       median=0.000548, prevalence=99.9%, IQR=[0.000481, 0.000617]
+    7. VALSYN-PWY
+       median=0.000548, prevalence=99.9%, IQR=[0.000481, 0.000617]
+    8. PWY-6386
+       median=0.000544, prevalence=99.9%, IQR=[0.000480, 0.000606]
+    9. DTDPRHAMSYN-PWY
+       median=0.000542, prevalence=99.9%, IQR=[0.000459, 0.000646]
+   10. PWY-7221
+       median=0.000539, prevalence=99.9%, IQR=[0.000487, 0.000598]
+   11. PWY-6387
+       median=0.000537, prevalence=99.9%, IQR=[0.000475, 0.000599]
+   12. PEPTIDOGLYCANSYN-PWY
+       median=0.000529, prevalence=99.9%, IQR=[0.000468, 0.000593]
+   13. PWY-6609
+       median=0.000523, prevalence=99.9%, IQR=[0.000453, 0.000590]
+   14. TRNA-CHARGING-PWY
+       median=0.000521, prevalence=99.9%, IQR=[0.000467, 0.000587]
+   15. PWY-6385
+       median=0.000515, prevalence=99.9%, IQR=[0.000451, 0.000582]
+   16. COA-PWY-1
+       median=0.000492, prevalence=99.9%, IQR=[0.000435, 0.000541]
+   17. PWY-6163
+       median=0.000491, prevalence=99.8%, IQR=[0.000432, 0.000547]
+   18. PWY-6122
+       median=0.000472, prevalence=99.9%, IQR=[0.000417, 0.000529]
+   19. PWY-6277
+       median=0.000472, prevalence=99.9%, IQR=[0.000417, 0.000529]
+   20. ARO-PWY
+       median=0.000468, prevalence=99.8%, IQR=[0.000403, 0.000524]
+   21. PWY-6151
+       median=0.000455, prevalence=99.9%, IQR=[0.000389, 0.000527]
+   22. PWY-6700
+       median=0.000453, prevalence=99.9%, IQR=[0.000382, 0.000525]
+   23. PWY-3841
+       median=0.000452, prevalence=99.9%, IQR=[0.000402, 0.000505]
+   24. BRANCHED-CHAIN-AA-SYN-PWY
+       median=0.000446, prevalence=99.9%, IQR=[0.000384, 0.000518]
+   25. PWY-5097
+       median=0.000443, prevalence=99.9%, IQR=[0.000398, 0.000491]
+   26. COMPLETE-ARO-PWY
+       median=0.000442, prevalence=99.8%, IQR=[0.000383, 0.000497]
+   27. PWY-6121
+       median=0.000442, prevalence=99.9%, IQR=[0.000392, 0.000492]
+   28. PWY-7400
+       median=0.000430, prevalence=99.9%, IQR=[0.000348, 0.000496]
+   29. ARGSYNBSUB-PWY
+       median=0.000430, prevalence=99.9%, IQR=[0.000339, 0.000503]
+   30. ARGSYN-PWY
+       median=0.000430, prevalence=99.9%, IQR=[0.000347, 0.000497]
+   31. PWY-5103
+       median=0.000422, prevalence=99.9%, IQR=[0.000358, 0.000501]
+   32. CALVIN-PWY
+       median=0.000418, prevalence=99.9%, IQR=[0.000360, 0.000468]
+   33. PWY-4242
+       median=0.000415, prevalence=99.9%, IQR=[0.000360, 0.000468]
+   34. COA-PWY
+       median=0.000414, prevalence=99.9%, IQR=[0.000362, 0.000466]
+   35. 1CMET2-PWY
+       median=0.000408, prevalence=99.9%, IQR=[0.000363, 0.000450]
+   36. PWY-2942
+       median=0.000407, prevalence=99.9%, IQR=[0.000365, 0.000451]
+   37. PWY-5667
+       median=0.000404, prevalence=99.8%, IQR=[0.000346, 0.000455]
+   38. PWY0-1319
+       median=0.000404, prevalence=99.8%, IQR=[0.000346, 0.000455]
+   39. PWY-5695
+       median=0.000401, prevalence=99.8%, IQR=[0.000331, 0.000465]
+   40. PWY-7229
+       median=0.000369, prevalence=99.8%, IQR=[0.000328, 0.000411]
+   41. HISTSYN-PWY
+       median=0.000368, prevalence=99.9%, IQR=[0.000323, 0.000421]
+   42. GLUTORN-PWY
+       median=0.000365, prevalence=99.9%, IQR=[0.000285, 0.000434]
+   43. PWY-724
+       median=0.000364, prevalence=99.8%, IQR=[0.000321, 0.000400]
+   44. ANAGLYCOLYSIS-PWY
+       median=0.000363, prevalence=99.8%, IQR=[0.000306, 0.000414]
+   45. RIBOSYN2-PWY
+       median=0.000346, prevalence=99.8%, IQR=[0.000287, 0.000415]
+   46. PWY0-1296
+       median=0.000345, prevalence=99.8%, IQR=[0.000276, 0.000413]
+   47. PANTOSYN-PWY
+       median=0.000345, prevalence=99.8%, IQR=[0.000295, 0.000391]
+   48. PWY-3001
+       median=0.000339, prevalence=99.9%, IQR=[0.000300, 0.000380]
+   49. PWY-7199
+       median=0.000335, prevalence=99.8%, IQR=[0.000263, 0.000398]
+   50. PWY-6123
+       median=0.000334, prevalence=99.9%, IQR=[0.000287, 0.000380]
+
       </pre>
     </div>
   </div>
 </div>
-    <script src="js/pathways.js"></script>
-    <script src="js/ms-key-findings-v5.js"></script>
+
+    <div id="curatedModal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Pathway Curation Methodology</h2>
+      <button class="modal-close" aria-label="Close">×</button>
+    </div>
+
+    <div class="modal-content">
+      <pre class="methods-text">
+350 pathways curated from 597 raw HUMAnN3 (41% reduction)
+
+REMOVE:
+─────────────────────────────────────
+• Suspected HUMAnN3 gap-fill artifact
+• Taxonomic outlier (plant, fungi, mammalian)
+• Closely related entry point or superpathway
+• Industrial/xenobiotic substrate
+
+KEEP:
+─────────────────────────────────────
+• Functionally distinct (different end products)
+• Cross-verified in Enteropathway database
+• Documented in gut microbiome literature
+
+EXAMPLE:
+─────────────────────────────────────
+PWY-6606 "guanosine nucleotides degradation II"
+  → 98.4% prevalence but REMOVED
+  → MetaCyc: Embryophyta/Fungi only
+
+PWY-6608 "guanosine nucleotides degradation III"  
+  → 99.3% prevalence and KEPT
+  → MetaCyc: Bacteria (no guanosine deaminase)
+
+High prevalence ≠ gut relevance.
+Always verify taxonomic range.
+      </pre>
+    </div>
+  </div>
+</div>
+    <script src="js/pathways_v7.js"></script>
+    <script src="js/ms-key-findings-v6.js"></script>
+    <script src="js/pathway_summaries.js"></script>
     <script>
+    // Methods Modal
     const methodsModal = document.getElementById('methodsModal');
-const closeBtn = methodsModal.querySelector('.modal-close');
+    const methodsCloseBtn = methodsModal.querySelector('.modal-close');
 
-function openMethods() {
-  methodsModal.classList.add('active');
-}
+    function openMethods() {
+      methodsModal.classList.add('active');
+    }
 
-function closeMethods() {
-  methodsModal.classList.remove('active');
-}
+    function closeMethods() {
+      methodsModal.classList.remove('active');
+    }
 
-// Close button
-closeBtn.addEventListener('click', closeMethods);
+    methodsCloseBtn.addEventListener('click', closeMethods);
+    methodsModal.addEventListener('click', (e) => {
+      if (e.target === methodsModal) closeMethods();
+    });
 
-// Click outside modal closes it
-methodsModal.addEventListener('click', (e) => {
-  if (e.target === methodsModal) {
-    closeMethods();
-  }
-});
+    // Curated Modal
+    const curatedModal = document.getElementById('curatedModal');
+    const curatedCloseBtn = curatedModal.querySelector('.modal-close');
 
-// ESC key closes modal
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    closeMethods();
-  }
-});
+    function openCurated() {
+      curatedModal.classList.add('active');
+    }
+
+    function closeCurated() {
+      curatedModal.classList.remove('active');
+    }
+
+    curatedCloseBtn.addEventListener('click', closeCurated);
+    curatedModal.addEventListener('click', (e) => {
+      if (e.target === curatedModal) closeCurated();
+    });
+
+    // ESC key closes any modal
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeMethods();
+        closeCurated();
+      }
+    });
         // ===========================================
         // CONFIGURATION
         // ===========================================
         const CONFIG = {
-            fundamental: 660, volume: 0.4, currentView: 'healthy',
+            fundamental: 660, volume: 0.4, currentView: 'healthy', currentMode: 'composed',
             categoryGains: { energy: 1.0, biosynthesis: 1.0, degradation: 1.0, salvage: 1.0, other: 1.0, superpathways: 1.0 },
+            hiddenCategories: { energy: false, biosynthesis: false, degradation: false, salvage: false, other: false, superpathways: false },
             subcategoryGains: {},
             colors: { 
                 energy: '#22c55e', 
@@ -924,42 +2037,108 @@ document.addEventListener('keydown', (e) => {
                 salvage: '#eab308', 
                 other: '#6b7280',
                 superpathways: '#8b5cf6'
+            },
+            // Category color gradients (base → highlight) - for Composed mode
+            colorGradients: {
+                energy: ['#166534', '#22c55e', '#4ade80', '#86efac'],        // dark green → light green
+                biosynthesis: ['#1e3a5f', '#3b82f6', '#60a5fa', '#93c5fd'],  // dark blue → light blue
+                degradation: ['#991b1b', '#ef4444', '#f87171', '#fca5a5'],   // dark red → light red
+                salvage: ['#854d0e', '#eab308', '#facc15', '#fde047'],       // dark amber → light amber
+                other: ['#374151', '#6b7280', '#9ca3af', '#d1d5db'],         // dark gray → light gray
+                superpathways: ['#581c87', '#8b5cf6', '#a78bfa', '#c4b5fd']  // dark purple → light purple
+            },
+            // Prime-based colors (HSL) - for Consonance mode
+            // Based on HUMAnN3 harmonic relationships
+            primeColors: {
+                2:  { h: 210, s: 55, l: 48 },   // Blue - octaves
+                3:  { h: 160, s: 50, l: 42 },   // Teal/green - fifths
+                5:  { h: 45,  s: 60, l: 48 },   // Gold/amber - thirds
+                7:  { h: 20,  s: 55, l: 48 },   // Orange - septimal
+                11: { h: 335, s: 50, l: 50 },   // Pink/magenta - eleventh
+                13: { h: 270, s: 45, l: 52 },   // Purple - thirteenth
+                x:  { h: 220, s: 25, l: 50 }    // Muted blue - higher primes
             }
         };
+        
+        // Helper: Get prime factors of a number
+        function getPrimeFactors(n) {
+            const factors = {};
+            [2, 3, 5, 7, 11, 13].forEach(p => {
+                while (n % p === 0) { 
+                    factors[p] = (factors[p] || 0) + 1; 
+                    n /= p; 
+                }
+            });
+            if (n > 1) factors.x = 1;  // Higher primes
+            return factors;
+        }
+        
+        // Helper: Get prime factors of a ratio (n/d)
+        function getRatioFactors(n, d) {
+            const nf = getPrimeFactors(n);
+            const df = getPrimeFactors(d);
+            const allFactors = { ...nf };
+            for (const [p, c] of Object.entries(df)) {
+                allFactors[p] = (allFactors[p] || 0) + c;
+            }
+            return allFactors;
+        }
+        
+        // Get prime-blended HSL color for a pathway's ratio
+        function getPrimeColor(pathway) {
+            if (!pathway.n || !pathway.d) return CONFIG.colors[pathway.category] || '#666';
+            
+            const factors = getRatioFactors(pathway.n, pathway.d);
+            const total = Object.values(factors).reduce((a, b) => a + b, 0);
+            if (total === 0) return '#666';
+            
+            let h = 0, s = 0, l = 0;
+            for (const [p, count] of Object.entries(factors)) {
+                const col = CONFIG.primeColors[p] || CONFIG.primeColors.x;
+                const weight = count / total;
+                h += col.h * weight;
+                s += col.s * weight;
+                l += col.l * weight;
+            }
+            
+            return `hsl(${Math.round(h)}, ${Math.round(s)}%, ${Math.round(l)}%)`;
+        }
 
         // ===========================================
         // SUBCATEGORY DEFINITIONS
         // ===========================================
         const SUBCATEGORY_MAP = {
             energy: [
-                { id: 'Glycolysis/Gluconeogenesis', label: 'Glycolysis', count: 11 },
+                { id: 'Glycolysis/Gluconeogenesis', label: 'Glycolysis', count: 4 },
+                { id: 'TCA Cycle', label: 'TCA Cycle', count: 2 },
                 { id: 'Pentose Phosphate', label: 'Pentose Phosphate', count: 3 },
-                { id: 'TCA Cycle', label: 'TCA Cycle', count: 14 },
-                { id: 'Fermentation', label: 'Fermentation', count: 16 },
-                { id: 'Glyoxylate Cycle', label: 'Glyoxylate', count: 4 },
-                { id: 'Respiration', label: 'Respiration', count: 3 }
+                { id: 'Fermentation', label: 'Fermentation', count: 15 },
+                { id: 'Glyoxylate Cycle', label: 'Glyoxylate', count: 2 },
+                { id: 'Respiration', label: 'Respiration', count: 1 }
             ],
             biosynthesis: [
-                { id: 'Amino Acids', label: 'Amino Acids', count: 50 },
-                { id: 'Nucleotides', label: 'Nucleotides', count: 22 },
-                { id: 'Cofactors/Vitamins', label: 'Cofactors', count: 22 },
-                { id: 'Fatty Acids/Lipids', label: 'Lipids', count: 13 },
-                { id: 'Cell Wall', label: 'Cell Wall', count: 6 },
+                { id: 'Nucleotides', label: 'Nucleotides', count: 7 },
+                { id: 'Amino Acids', label: 'Amino Acids', count: 28 },
+                { id: 'Fatty Acids/Lipids', label: 'Lipids', count: 17 },
+                { id: 'Cofactors/Vitamins', label: 'Cofactors', count: 28 },
+                { id: 'Cell Envelope', label: 'Cell Envelope', count: 24 },
+                { id: 'Isoprenoids', label: 'Isoprenoids', count: 7 },
                 { id: 'Polyamines', label: 'Polyamines', count: 6 },
-                { id: 'Other', label: 'Other', count: 169 }
+                { id: 'Other', label: 'Other', count: 12 },
+                { id: 'Specialized', label: 'Specialized', count: 14 }
             ],
             degradation: [
-                { id: 'Amino Acids', label: 'Amino Acids', count: 21 },
-                { id: 'Nucleotides', label: 'Nucleotides', count: 14 },
-                { id: 'Aromatics', label: 'Aromatics', count: 13 },
-                { id: 'Carbohydrates', label: 'Carbohydrates', count: 9 },
-                { id: 'Other', label: 'Other', count: 103 }
+                { id: 'Other', label: 'Other', count: 81 },
+                { id: 'Amino Acids', label: 'Amino Acids', count: 12 },
+                { id: 'Nucleotides', label: 'Nucleotides', count: 9 },
+                { id: 'Carbohydrates', label: 'Carbohydrates', count: 7 },
+                { id: 'Aromatics', label: 'Aromatics', count: 5 }
             ],
             salvage: [
-                { id: 'Salvage/Recycling', label: 'Salvage/Recycling', count: 17 }
+                { id: 'Salvage/Recycling', label: 'Salvage/Recycling', count: 15 }
             ],
             other: [
-                { id: 'Unclassified', label: 'Unclassified', count: 74 }
+                { id: 'Unclassified', label: 'Unclassified', count: 50 }
             ],
             superpathways: [
                 { id: 'Superpathways', label: 'Superpathways', count: 10 }
@@ -970,14 +2149,18 @@ document.addEventListener('keydown', (e) => {
         // FOCUS & CYCLING STATE
         // ===========================================
         let focusedCategory = null;
-        let cyclingSubcategory = null;
-        let cyclingCategory = null;
-        let cycleInterval = null;
-        let cycleIndex = 0;
-        let activeCategory = 'energy';
+        
+        // Multi-sequence support: Map of subcategory -> sequence state
+        const activeSequences = new Map();  // key: "category:subcategory" -> { interval, index, pathways, tempo, btnElement }
+        const BASE_SEQUENCE_TEMPO = 350;  // ms per pip base
+        
+        let activeCategory = 'energy';  // For subcategory display
         
         // Visual bounce for sequence
         const sequenceBounce = new Map();  // pathwayId -> bounce amount (0-1)
+        
+        // Solo mode for sequences (ducks drone)
+        let sequenceSoloActive = false;
         
         // ===========================================
         // MS KEY FINDINGS STATE
@@ -986,13 +2169,13 @@ document.addEventListener('keydown', (e) => {
         let findingPathways = new Set();  // Pathways in the active finding
 
         // ===========================================
-        // ZOOM STATE
+        // ZOOM STATE - Range covers 1/8 to 16/1 (82.5Hz - 10560Hz at 660Hz fundamental)
         // ===========================================
         const ZOOM = {
-            minFreq: 80,      // Start more zoomed in
-            maxFreq: 8000,    // Tighter range to fill space
+            minFreq: 80,      // Just below 1/8 of 660Hz (82.5Hz)
+            maxFreq: 11000,   // Just above 16/1 of 660Hz (10560Hz)
             defaultMin: 80,
-            defaultMax: 8000,
+            defaultMax: 11000,
             minRange: 100,
             zoomSpeed: 0.15
         };
@@ -1076,9 +2259,9 @@ document.addEventListener('keydown', (e) => {
         // Pip settings
         const PIP_COOLDOWN = 80;
         const PIP_DURATION = 0.1;
-        const PIP_VOLUME = 0.25;
+        const PIP_VOLUME = 0.15;
         const SEQUENCE_PIP_DURATION = 0.1;
-        const SEQUENCE_PIP_VOLUME = 0.2;
+        const SEQUENCE_PIP_VOLUME = 0.1;
         const SEQUENCE_PIP_INTERVAL = 180;
         
         // Focus settings
@@ -1157,9 +2340,7 @@ document.addEventListener('keydown', (e) => {
         // DYNAMIC SUBCATEGORY UI
         // ===========================================
         function updateSubcategoryUI(category) {
-            // Stop any cycling when switching
-            stopCycling();
-            
+            // Don't stop sequences when switching view - allow cross-category sequences
             activeCategory = category;
             const subcats = SUBCATEGORY_MAP[category] || [];
             const color = CONFIG.colors[category] || '#666';
@@ -1176,12 +2357,14 @@ document.addEventListener('keydown', (e) => {
             
             subcatLabel.textContent = category.charAt(0).toUpperCase() + category.slice(1) + ' Subcategories';
             
+            // Compact structure: [dot+label btn] [slider] - click btn to sequence
             subcategoryFaders.innerHTML = subcats.map(sub => `
                 <div class="subcategory-fader" data-subcategory="${sub.id}" data-category="${category}">
-                    <span class="subcat-dot" style="color:${color};" title="Cycle ${sub.label}"></span>
-                    <span class="subcat-label" data-subcategory="${sub.id}" data-category="${category}">${sub.label}</span>
+                    <button class="subcat-btn" data-subcategory="${sub.id}" data-category="${category}">
+                        <span class="dot" style="background:${color};"></span>
+                        <span class="label">${sub.label}</span>
+                    </button>
                     <input type="range" data-subcategory="${sub.id}" data-category="${category}" min="0" max="100" value="${Math.round((CONFIG.subcategoryGains[sub.id] ?? 1) * 100)}">
-                    <span class="fader-value">${Math.round((CONFIG.subcategoryGains[sub.id] ?? 1) * 100)}</span>
                 </div>
             `).join('');
             
@@ -1194,46 +2377,77 @@ document.addEventListener('keydown', (e) => {
                 slider.addEventListener('input', (e) => {
                     const subcat = e.target.dataset.subcategory;
                     const value = parseInt(e.target.value);
-                    e.target.nextElementSibling.textContent = value;
                     setSubcategoryGain(subcat, value / 100);
                 });
                 
                 slider.addEventListener('dblclick', (e) => {
                     e.target.value = 100;
-                    e.target.nextElementSibling.textContent = 100;
                     setSubcategoryGain(e.target.dataset.subcategory, 1.0);
                 });
             });
             
-            // Dot AND label clicks start cycling
-            document.querySelectorAll('.subcategory-fader .subcat-dot, .subcategory-fader .subcat-label').forEach(el => {
-                el.addEventListener('click', (e) => {
+            // Subcat button click - starts/stops sequence
+            document.querySelectorAll('.subcategory-fader .subcat-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const fader = e.target.closest('.subcategory-fader');
                     const subcat = fader.dataset.subcategory;
                     const cat = fader.dataset.category;
-                    const dot = fader.querySelector('.subcat-dot');
-                    toggleSubcategoryCycle(subcat, cat, dot);
+                    const subcatBtn = fader.querySelector('.subcat-btn');
+                    toggleSubcategoryCycle(subcat, cat, subcatBtn);
                 });
             });
         }
+
+        // ===========================================
+        // SUBCATEGORY NAVIGATION (arrow buttons)
+        // ===========================================
+        const CATEGORY_ORDER = ['energy', 'biosynthesis', 'degradation', 'salvage', 'other'];
+        
+        function navigateSubcategory(direction) {
+            const currentIndex = CATEGORY_ORDER.indexOf(activeCategory);
+            let newIndex = currentIndex + direction;
+            
+            // Wrap around
+            if (newIndex < 0) newIndex = CATEGORY_ORDER.length - 1;
+            if (newIndex >= CATEGORY_ORDER.length) newIndex = 0;
+            
+            const newCategory = CATEGORY_ORDER[newIndex];
+            activeCategory = newCategory;
+            updateSubcategoryUI(newCategory);
+        }
+        
+        // Attach nav button listener (once, not in attachSubcategoryListeners)
+        document.getElementById('subcatNext').addEventListener('click', () => navigateSubcategory(1));
 
         // ===========================================
         // CATEGORY FOCUS (Audio boost + visual)
         // ===========================================
         function setFocusedCategory(category) {
             if (focusedCategory === category) {
-                clearFocus();
+                // Clicking same category - toggle off focus
+                focusedCategory = null;
+                document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('focused'));
+                restoreCategoryGains();
                 return;
             }
             
-            clearFocus();
+            // Switch focus without stopping sequences
+            const hadCategoryFocus = focusedCategory !== null;
             focusedCategory = category;
             
-            const dot = document.querySelector(`.category-fader[data-category="${category}"] .category-dot`);
-            const label = document.querySelector(`.category-fader[data-category="${category}"] .category-label`);
-            if (dot) dot.classList.add('focused');
-            if (label) label.classList.add('focused');
+            // Clear pathway focus (but keep sequences running)
+            if (focusedPathway) {
+                focusedPathway = null;
+                if (workletNode) {
+                    workletNode.port.postMessage({ type: 'setFocus', data: { id: null } });
+                }
+            }
+            
+            // Update UI
+            document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('focused'));
+            const btn = document.querySelector(`.category-fader[data-category="${category}"] .category-btn`);
+            if (btn) btn.classList.add('focused');
             
             updateSubcategoryUI(category);
             
@@ -1275,9 +2489,8 @@ document.addEventListener('keydown', (e) => {
             
             focusedCategory = null;
             focusedPathway = null;
-            stopCycling();
-            document.querySelectorAll('.category-dot').forEach(d => d.classList.remove('focused'));
-            document.querySelectorAll('.category-label').forEach(l => l.classList.remove('focused'));
+            stopAllSequences();
+            document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('focused'));
             
             // Restore audio gains
             if (hadCategoryFocus) {
@@ -1289,188 +2502,310 @@ document.addEventListener('keydown', (e) => {
         }
 
         // ===========================================
-        // SUBCATEGORY SEQUENCING (pip through with bounce)
+        // MULTI-SEQUENCE SUBCATEGORY CYCLING
         // ===========================================
-        function toggleSubcategoryCycle(subcategory, category, dotElement) {
-            if (cyclingSubcategory === subcategory) {
-                stopCycling();
+        function getSequenceKey(category, subcategory) {
+            return `${category}:${subcategory}`;
+        }
+        
+        function calculateTempo(pathwayCount) {
+            // More pathways = slightly slower tempo for musicality
+            // Creates natural polyrhythms when multiple sequences run
+            const normalized = Math.max(4, Math.min(pathwayCount, 20));
+            return BASE_SEQUENCE_TEMPO * (normalized / 8);  // 8 pathways = base tempo
+        }
+        
+        function toggleSubcategoryCycle(subcategory, category, btnElement) {
+            const key = getSequenceKey(category, subcategory);
+            
+            // If already running, stop it
+            if (activeSequences.has(key)) {
+                stopSequence(key);
                 return;
             }
             
-            stopCycling();
-            cyclingSubcategory = subcategory;
-            cyclingCategory = category;
-            cycleIndex = 0;
-            
+            // Start new sequence
             const pathways = getPathwaysInSubcategory(subcategory, category);
             if (pathways.length === 0) return;
             
-            dotElement.classList.add('cycling');
+            const tempo = calculateTempo(pathways.length);
             
-            // Start sequence - pip first one immediately
-            sequencePathway(pathways, 0);
+            // Category color mapping
+            const catColors = {
+                energy: { color: '#22c55e', light: '#dcfce7' },
+                biosynthesis: { color: '#3b82f6', light: '#dbeafe' },
+                degradation: { color: '#ef4444', light: '#fee2e2' },
+                salvage: { color: '#ca8a04', light: '#fef9c3' },
+                other: { color: '#6b7280', light: '#f3f4f6' },
+                superpathways: { color: '#8b5cf6', light: '#ede9fe' }
+            };
+            const colors = catColors[category] || catColors.other;
             
-            // Continue sequence at configured interval
-            cycleInterval = setInterval(() => {
-                cycleIndex = (cycleIndex + 1) % pathways.length;
-                sequencePathway(pathways, cycleIndex);
-            }, SEQUENCE_PIP_INTERVAL);
+            // Style the button - fill with category color
+            if (btnElement) {
+                btnElement.classList.add('cycling');
+                btnElement.style.setProperty('--pulse-duration', `${tempo}ms`);
+                btnElement.style.setProperty('--cat-color', colors.color);
+                btnElement.style.setProperty('--cat-color-light', colors.light);
+            }
+            
+            // Create sequence state
+            const seqState = {
+                interval: null,
+                index: 0,
+                pathways: pathways,
+                tempo: tempo,
+                btnElement: btnElement,
+                category: category,
+                subcategory: subcategory
+            };
+            
+            // Pip first one immediately
+            sequencePathway(seqState);
+            
+            // Continue at calculated tempo
+            seqState.interval = setInterval(() => {
+                seqState.index = (seqState.index + 1) % seqState.pathways.length;
+                sequencePathway(seqState);
+            }, tempo);
+            
+            activeSequences.set(key, seqState);
+            
+            // Update stop-all button state
+            const stopBtn = document.getElementById('stopAllBtn');
+            if (stopBtn) stopBtn.classList.add('has-active');
         }
         
-        function sequencePathway(pathways, index) {
-            const pathway = pathways[index];
+        function sequencePathway(seqState) {
+            const pathway = seqState.pathways[seqState.index];
             if (!pathway) return;
             
-            // DON'T update info display during cycling - wait for hover
-            // updatePathwayInfo(pathway);
+            // Play pip and get volume-based bounce scale
+            const bounceScale = playSequencePip(pathway) || 0.5;
             
-            // Set visual bounce (gentler)
-            sequenceBounce.set(pathway.id, 0.6);
-            
-            // Play softer, shorter sequence pip
-            playSequencePip(pathway);
+            // Visual bounce proportional to pip volume
+            sequenceBounce.set(pathway.id, 0.6 * bounceScale);
         }
         
-        function stopCycling() {
-            if (cycleInterval) {
-                clearInterval(cycleInterval);
-                cycleInterval = null;
+        function stopSequence(key) {
+            const seq = activeSequences.get(key);
+            if (seq) {
+                if (seq.interval) clearInterval(seq.interval);
+                if (seq.btnElement) {
+                    seq.btnElement.classList.remove('cycling');
+                    seq.btnElement.style.removeProperty('--pulse-duration');
+                    seq.btnElement.style.removeProperty('--cat-color');
+                    seq.btnElement.style.removeProperty('--cat-color-light');
+                }
+                activeSequences.delete(key);
             }
-            cyclingSubcategory = null;
-            cyclingCategory = null;
+            // Update stop-all button state
+            const stopBtn = document.getElementById('stopAllBtn');
+            if (stopBtn) stopBtn.classList.toggle('has-active', activeSequences.size > 0);
+        }
+        
+        function stopAllSequences() {
+            for (const key of activeSequences.keys()) {
+                stopSequence(key);
+            }
             sequenceBounce.clear();
-            document.querySelectorAll('.subcat-dot.cycling').forEach(d => d.classList.remove('cycling'));
+            
+            // Turn off solo when stopping all sequences
+            sequenceSoloActive = false;
+            const soloBtn = document.getElementById('soloAllBtn');
+            if (soloBtn) soloBtn.classList.remove('active');
+            if (workletNode) {
+                workletNode.port.postMessage({
+                    type: 'setDroneSolo',
+                    data: { solo: false }
+                });
+            }
+            
+            // Update stop-all button state
+            const stopBtn = document.getElementById('stopAllBtn');
+            if (stopBtn) stopBtn.classList.remove('has-active');
+        }
+        
+        function isSubcategoryCycling(category, subcategory) {
+            return activeSequences.has(getSequenceKey(category, subcategory));
         }
         
         function getPathwaysInSubcategory(subcategory, category) {
-            if (typeof PATHWAY_DATA === 'undefined') return [];
-            return PATHWAY_DATA.ALL_PATHWAYS.filter(p => 
+            if (typeof PATHWAY_DATA === 'undefined') {
+                console.log('PATHWAY_DATA undefined!');
+                return [];
+            }
+            const results = PATHWAY_DATA.ALL_PATHWAYS.filter(p => 
                 p.category === category && p.subcategory === subcategory && isPathwayVisible(p)
             );
+            console.log(`getPathwaysInSubcategory('${subcategory}', '${category}'): found ${results.length} pathways`);
+            if (results.length === 0) {
+                // Debug: show what subcategories exist for this category
+                const existingSubcats = [...new Set(PATHWAY_DATA.ALL_PATHWAYS.filter(p => p.category === category).map(p => p.subcategory))];
+                console.log(`  Available subcategories for ${category}:`, existingSubcats);
+            }
+            return results;
         }
 
         // ===========================================
         // PATHWAY INFO UPDATE
         // ===========================================
         function updatePathwayInfo(pathway) {
-            document.getElementById('pwdId').textContent = pathway.id;
+            // Update pathway ID with category-colored background
+            const pwdIdEl = document.getElementById('pwdId');
+            const identityBox = document.getElementById('pwdIdentityBox');
+            
+            pwdIdEl.textContent = pathway.id;
+            pwdIdEl.className = 'pathway-id ' + pathway.category;
+            
+            // Dynamic font size based on ID length
+            if (pathway.id.length > 18) {
+                pwdIdEl.classList.add('very-long-id');
+            } else if (pathway.id.length > 12) {
+                pwdIdEl.classList.add('long-id');
+            }
+            
+            // Update identity box background
+            identityBox.className = 'pathway-identity-box ' + pathway.category;
+            
             document.getElementById('pwdName').textContent = pathway.name;
             
-            const catBadge = document.getElementById('pwdCategory');
-            catBadge.textContent = pathway.category.toUpperCase();
-            catBadge.className = 'category-badge ' + pathway.category;
+            // Category label (now separate from ID)
+            document.getElementById('pwdCategory').textContent = pathway.category.toUpperCase();
+            document.getElementById('pwdSubcat').textContent = pathway.subcategory || '—';
             
-            document.getElementById('pwdSubcat').textContent = pathway.subcategory;
-               // ✅ NEW: Abundance (mean relative abundance)
-                const abd = pathway.abundance ?? null;
-                document.getElementById('pwdAbundance').textContent =
-                    abd !== null
-                        ? abd.toFixed(3)
-                        : '—';
+            // Abundance: mean relative abundance (usually 0.000x scale)
+            const abd = pathway.abundance ?? pathway.mean_abundance ?? pathway.amplitude ?? null;
+            document.getElementById('pwdAbundance').textContent =
+                abd !== null
+                    ? (abd < 0.001 ? abd.toExponential(1) : abd.toFixed(4))
+                    : '—';
 
+            // Prevalence: % of samples containing this pathway (0-100%)
             document.getElementById('pwdPrev').textContent = (pathway.prevalence * 100).toFixed(1) + '%';
             
             const ratio = pathway.ratio || [1, 1];
             const ratioValue = ratio[0] / ratio[1];
             const freq = CONFIG.fundamental * ratioValue;
-            const cents = 1200 * Math.log2(ratioValue);
+            
+            // Cents: 0-1200 range (mod 1200 to stay within one octave)
+            let cents = 1200 * Math.log2(ratioValue);
+            cents = ((cents % 1200) + 1200) % 1200;  // Ensure positive 0-1200
             
             document.getElementById('ratioValue').textContent = ratio[0] + '/' + ratio[1];
             document.getElementById('freqValue').textContent = Math.round(freq);
-            document.getElementById('centsValue').textContent = (cents >= 0 ? '+' : '') + Math.round(cents);
+            document.getElementById('centsValue').textContent = Math.round(cents);
             document.getElementById('intervalValue').textContent = ratio[0] * ratio[1];
+            
+            // Update pathway detail panel (bottom left)
+            updatePathwayDetailPanel(pathway);
         }
 
-        // ===========================================
-        // AUDIO SETUP
-        // ===========================================
-        async function initAudio() {
-            try {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                masterGain = audioContext.createGain();
-                masterGain.gain.value = CONFIG.volume;
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 2048;
-                
-                // Pip oscillator setup - connect directly to destination for testing
-                pipGain = audioContext.createGain();
-                pipGain.gain.value = PIP_VOLUME;
-                pipGain.connect(audioContext.destination);  // Direct to output!
-                
-                // Load worklet
-                await audioContext.audioWorklet.addModule('js/microbiome-sonification-v9.js');
-                workletNode = new AudioWorkletNode(audioContext, 'microbiome-sonification-processor', {
-                    numberOfInputs: 0,
-                    numberOfOutputs: 1,
-                    outputChannelCount: [2]
-                });
-                
-                workletNode.port.onmessage = (e) => {
-                    if (e.data.type === 'modulation') {
-                        const d = e.data.data;
-                        const pathwaysMap = new Map();
-                        if (d.pathways) {
-                            d.pathways.forEach(p => pathwaysMap.set(p.id, p));
-                        }
-                        modulationData = {
-                            time: d.time,
-                            pathways: pathwaysMap,
-                            peristalsisPhase: d.peristalsisPhase || 0,
-                            mmcPhase: d.mmcPhase || 'quiescent',
-                            mmcProgress: d.mmcProgress || 0,
-                            focusId: d.focusId,
-                            focusEnvelope: d.focusEnvelope || 0,
-                            engines: d.engines || {},
-                        };
-                    }
-                };
-                
-            if (typeof PATHWAY_DATA !== 'undefined') {
-                workletNode.port.postMessage({
-                    type: 'init',
-                    data: {
-                        pathways: PATHWAY_DATA.ALL_PATHWAYS.map(p => ({
-                            id: p.id,
-                            n: p.n,                    // ADD THIS
-                            d: p.d,                    // ADD THIS
-                            ratio: p.ratioValue,       // Keep for backwards compat
-                            amplitude: p.amplitude || p.prevalence,
-                            category: p.category,
-                            subcategory: p.subcategory
-                        }))
-                    }
-                });
-            }
-
-                                // Send MS comparison data to worklet
-                if (typeof PATHWAY_DATA !== 'undefined' && PATHWAY_DATA.MS_COMPARISON_DATA) {
-                    workletNode.port.postMessage({
-                        type: 'setMSComparison',
-                        data: { msData: PATHWAY_DATA.MS_COMPARISON_DATA }
-                    });
+ async function initAudio() {
+    try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Create nodes
+        masterGain = audioContext.createGain();
+        masterGain.gain.value = CONFIG.volume;
+        
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+        
+        // Compressor for consistent levels
+        const compressor = audioContext.createDynamicsCompressor();
+        compressor.threshold.setValueAtTime(-24, audioContext.currentTime);
+        compressor.knee.setValueAtTime(12, audioContext.currentTime);
+        compressor.ratio.setValueAtTime(8, audioContext.currentTime);
+        compressor.attack.setValueAtTime(0.003, audioContext.currentTime);
+        compressor.release.setValueAtTime(0.15, audioContext.currentTime);
+        
+        // Pip oscillator gain - connects to masterGain (not destination!)
+        pipGain = audioContext.createGain();
+        pipGain.gain.value = PIP_VOLUME;
+        pipGain.connect(masterGain);  // ← FIXED: goes through master
+        
+        // Load worklet
+        await audioContext.audioWorklet.addModule('js/microbiome-sonification-v13.js');
+        workletNode = new AudioWorkletNode(audioContext, 'microbiome-sonification-processor', {
+            numberOfInputs: 0,
+            numberOfOutputs: 1,
+            outputChannelCount: [2]
+        });
+        
+        workletNode.port.onmessage = (e) => {
+            if (e.data.type === 'modulation') {
+                const d = e.data.data;
+                const pathwaysMap = new Map();
+                if (d.pathways) {
+                    d.pathways.forEach(p => pathwaysMap.set(p.id, p));
                 }
-                
-                workletNode.connect(analyser);
-                
-                // Add compressor for consistent levels (especially focus tone)
-                const compressor = audioContext.createDynamicsCompressor();
-                compressor.threshold.setValueAtTime(-24, audioContext.currentTime);
-                compressor.knee.setValueAtTime(12, audioContext.currentTime);
-                compressor.ratio.setValueAtTime(8, audioContext.currentTime);
-                compressor.attack.setValueAtTime(0.003, audioContext.currentTime);
-                compressor.release.setValueAtTime(0.15, audioContext.currentTime);
-                
-                workletNode.connect(compressor);
-                compressor.connect(masterGain);
-                masterGain.connect(audioContext.destination);
-                
-                console.log('Audio initialized successfully (with compressor)');
-                return true;
-            } catch (err) {
-                console.error('Audio init error:', err);
-                return false;
+                modulationData = {
+                    time: d.time,
+                    pathways: pathwaysMap,
+                    peristalsisPhase: d.peristalsisPhase || 0,
+                    mmcPhase: d.mmcPhase || 'quiescent',
+                    mmcProgress: d.mmcProgress || 0,
+                    focusId: d.focusId,
+                    focusEnvelope: d.focusEnvelope || 0,
+                    engines: d.engines || {},
+                    // Harmonic cloud visualization
+                    harmonicCloud: d.harmonicCloud || { center: 1, density: 0 },
+                    harmonicCloudRegions: d.harmonicCloudRegions || [],
+                };
             }
+        };
+        
+        if (typeof PATHWAY_DATA !== 'undefined') {
+            workletNode.port.postMessage({
+                type: 'init',
+                data: {
+                    pathways: PATHWAY_DATA.ALL_PATHWAYS.map(p => ({
+                        id: p.id,
+                        n: p.n,
+                        d: p.d,
+                        ratio: p.ratioValue,
+                        amplitude: p.amplitude || p.prevalence,
+                        prevalence: p.prevalence || 0.5,
+                        category: p.category,
+                        subcategory: p.subcategory
+                    }))
+                }
+            });
         }
+
+        // Send MS comparison data to worklet
+        if (typeof PATHWAY_DATA !== 'undefined' && PATHWAY_DATA.MS_COMPARISON_DATA) {
+            workletNode.port.postMessage({
+                type: 'setMSComparison',
+                data: { msData: PATHWAY_DATA.MS_COMPARISON_DATA }
+            });
+        }
+        
+        // ═══════════════════════════════════════════════════════════════
+        // CLEAN AUDIO ROUTING - Everything → masterGain → analyser → out
+        // ═══════════════════════════════════════════════════════════════
+        //
+        //  workletNode → compressor ─┐
+        //                            ├→ masterGain → analyser → destination
+        //  pipGain ──────────────────┘
+        //
+        // ═══════════════════════════════════════════════════════════════
+        
+        workletNode.connect(compressor);
+        compressor.connect(masterGain);
+        // pipGain already connected to masterGain above
+        
+        masterGain.connect(analyser);
+        analyser.connect(audioContext.destination);
+        
+        console.log('Audio initialized successfully (all sources → analyser)');
+        return true;
+    } catch (err) {
+        console.error('Audio init error:', err);
+        return false;
+    }
+}
         
         // Standard hover pip
         function playPip(pathway) {
@@ -1498,8 +2833,46 @@ document.addEventListener('keydown', (e) => {
         function playSequencePip(pathway) {
             if (!audioContext || !pipGain) return;
             
-            // In MS mode, only pip on affected pathways
-            if (msMode && !MS_AFFECTED_PATHWAYS.has(pathway.id)) return;
+            // Get slider gain values
+            const categoryGain = CONFIG.categoryGains[pathway.category] ?? 1.0;
+            const subcategoryGain = CONFIG.subcategoryGains[pathway.subcategory] ?? 1.0;
+            const sliderGain = categoryGain * subcategoryGain;
+            
+            // Calculate pip volume based on context
+            let pipVolume = SEQUENCE_PIP_VOLUME * sliderGain;
+            
+            const msEnabled = CONFIG.currentView === 'ms';
+            const isAffected = msEnabled && MS_AFFECTED_PATHWAYS.has(pathway.id);
+            const inFocusedCategory = focusedCategory && pathway.category === focusedCategory;
+            
+            if (focusedCategory) {
+                // Category focus is active
+                if (inFocusedCategory) {
+                    if (msEnabled && isAffected) {
+                        pipVolume *= 1.2;
+                    } else if (msEnabled && !isAffected) {
+                        pipVolume *= 0.35;
+                    }
+                    // In focused category, no MS: full slider volume
+                } else {
+                    // NOT in focused category
+                    if (msEnabled && isAffected) {
+                        pipVolume *= 0.5;
+                    } else {
+                        pipVolume *= 0.2;
+                    }
+                }
+            } else if (msEnabled) {
+                // No category focus, but MS mode active
+                if (isAffected) {
+                    pipVolume *= 1.1;
+                } else {
+                    pipVolume *= 0.3;
+                }
+            }
+            
+            // Store for visual bounce scaling
+            const bounceScale = pipVolume / SEQUENCE_PIP_VOLUME;
             
             const freq = CONFIG.fundamental * pathway.ratioValue;
             const osc = audioContext.createOscillator();
@@ -1508,17 +2881,19 @@ document.addEventListener('keydown', (e) => {
             osc.type = 'sine';
             osc.frequency.value = freq;
             
-            // Slight attack, sustain, decay
             const now = audioContext.currentTime;
             env.gain.setValueAtTime(0, now);
-            env.gain.linearRampToValueAtTime(SEQUENCE_PIP_VOLUME, now + 0.02);
-            env.gain.setValueAtTime(SEQUENCE_PIP_VOLUME, now + 0.1);
+            env.gain.linearRampToValueAtTime(pipVolume, now + 0.02);
+            env.gain.setValueAtTime(pipVolume, now + 0.1);
             env.gain.exponentialRampToValueAtTime(0.001, now + SEQUENCE_PIP_DURATION);
             
             osc.connect(env);
             env.connect(pipGain);
             osc.start();
             osc.stop(now + SEQUENCE_PIP_DURATION + 0.1);
+            
+            // Return bounce scale for visual sync
+            return bounceScale;
         }
 
         // ===========================================
@@ -1541,7 +2916,7 @@ document.addEventListener('keydown', (e) => {
                 document.querySelectorAll('.category-dot').forEach(d => d.classList.remove('focused'));
                 restoreCategoryGains();
             }
-            stopCycling();
+            stopAllSequences();
             
             focusedPathway = pathway;
             updatePathwayInfo(pathway);
@@ -1559,6 +2934,47 @@ document.addEventListener('keydown', (e) => {
             }
         }
 // metacyc summaries
+        // Pathway summaries - will be loaded from pathway_summaries.js
+        let PATHWAY_SUMMARIES = {};
+        
+        // Try to load pathway summaries
+        function loadPathwaySummaries() {
+            // Check if loaded via external script
+            if (typeof window.PATHWAY_SUMMARIES !== 'undefined') {
+                PATHWAY_SUMMARIES = window.PATHWAY_SUMMARIES;
+                console.log(`Loaded ${Object.keys(PATHWAY_SUMMARIES).length} pathway summaries`);
+            }
+        }
+        
+        // Update the pathway summary panel
+        function updatePathwayDetailPanel(pathway) {
+            const textEl = document.getElementById('pathwaySummaryText');
+            const linkEl = document.getElementById('pathwaySummaryLink');
+            
+            if (!textEl) return;
+            
+            const summary = PATHWAY_SUMMARIES[pathway.id];
+            const summaryText = summary?.summary || null;
+            
+            if (summaryText) {
+                textEl.textContent = summaryText;
+            } else {
+                textEl.textContent = 'No description available for this pathway.';
+            }
+            
+            linkEl.href = `https://metacyc.org/META/NEW-IMAGE?object=${pathway.id}`;
+            linkEl.style.display = 'inline-block';
+        }
+        
+        // Clear pathway summary panel
+        function clearPathwayDetailPanel() {
+            const textEl = document.getElementById('pathwaySummaryText');
+            const linkEl = document.getElementById('pathwaySummaryLink');
+            
+            if (textEl) textEl.textContent = 'Hover over a pathway to see its description from MetaCyc.';
+            if (linkEl) linkEl.style.display = 'none';
+        }
+
         async function fetchMetaCycSummary(pathwayId, maxLength = 220) {
   const url = `https://websvc.biocyc.org/getxml?META:${pathwayId}`;
 
@@ -1632,7 +3048,7 @@ async function updatePathwaySummary(pathwayId) {
             if (isPlaying) {
                 // Fade out - cascade from dissonant to consonant (reverse), faster
                 if (workletNode) {
-                    workletNode.port.postMessage({ type: 'cascadeFadeOut', data: { duration: 0.8 } });
+                    workletNode.port.postMessage({ type: 'fadeOut', data: { duration: 0.8 } });
                 }
                 startVisualCascade('out', 0.8);
                 isPlaying = false;
@@ -1647,7 +3063,7 @@ async function updatePathwaySummary(pathwayId) {
                 // Fade in - cascade from consonant to dissonant, "syrup pour"
                 if (workletNode) {
                     workletNode.port.postMessage({ type: 'setMasterVolume', data: CONFIG.volume });
-                    workletNode.port.postMessage({ type: 'cascadeFadeIn', data: { duration: 2.2 } });
+                    workletNode.port.postMessage({ type: 'fadeIn', data: { duration: 2.2 } });
                 }
                 startVisualCascade('in', 4.8);  // Slower, more organic
                 isPlaying = true;
@@ -1752,56 +3168,119 @@ async function updatePathwaySummary(pathwayId) {
             CONFIG.fundamental = 660;
             if (workletNode) workletNode.port.postMessage({ type: 'setFundamental', data: 660 });
         });
+        
+        // Stop all sequences button
+        const stopAllBtn = document.getElementById('stopAllBtn');
+        stopAllBtn.addEventListener('click', () => {
+            stopAllSequences();
+            updateStopAllButton();
+        });
+        
+        // Solo button - ducks drone to hear sequences clearly
+        const soloAllBtn = document.getElementById('soloAllBtn');
+        if (soloAllBtn) {
+            soloAllBtn.addEventListener('click', () => {
+                sequenceSoloActive = !sequenceSoloActive;
+                soloAllBtn.classList.toggle('active', sequenceSoloActive);
+                
+                if (workletNode) {
+                    workletNode.port.postMessage({
+                        type: 'setDroneSolo',
+                        data: { 
+                            solo: sequenceSoloActive, 
+                            duckAmount: 0.0  // Mute drone completely
+                        }
+                    });
+                }
+            });
+        }
+        
+        function updateStopAllButton() {
+            const hasActive = activeSequences.size > 0;
+            stopAllBtn.classList.toggle('has-active', hasActive);
+        }
 
         // Category faders
         document.querySelectorAll('.category-fader input[type="range"]').forEach(slider => {
             slider.addEventListener('input', (e) => {
                 const category = e.target.dataset.category;
                 const value = parseInt(e.target.value);
-                e.target.nextElementSibling.textContent = value;
                 CONFIG.categoryGains[category] = value / 100;
                 
-                // Only send to worklet if no category focus active
-                if (!focusedCategory) {
-                    setCategoryGain(category, value / 100);
-                }
+                // Always update worklet (focus boost is additive)
+                setCategoryGain(category, value / 100);
                 
-                updateSubcategoryUI(category);
-                clearFocus();
+                // Don't call updateSubcategoryUI or clearFocus on slider drag - too disruptive
             });
             
             slider.addEventListener('dblclick', (e) => {
                 e.target.value = 100;
-                e.target.nextElementSibling.textContent = 100;
                 const category = e.target.dataset.category;
                 CONFIG.categoryGains[category] = 1.0;
-                if (!focusedCategory) {
-                    setCategoryGain(category, 1.0);
-                }
+                setCategoryGain(category, 1.0);
             });
         });
 
-        // Category dot clicks - focus category
-        document.querySelectorAll('.category-fader .category-dot').forEach(dot => {
-            dot.addEventListener('click', (e) => {
+        // Category button clicks - focus category AND unmute if muted
+        document.querySelectorAll('.category-fader .category-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
                 const category = e.target.closest('.category-fader').dataset.category;
+                unmuteCategory(category);  // Unmute when focusing
                 setFocusedCategory(category);
             });
         });
         
-        // Category label clicks - same as dot
-        document.querySelectorAll('.category-fader .category-label').forEach(label => {
-            label.addEventListener('click', (e) => {
-                const category = e.target.dataset.category;
-                setFocusedCategory(category);
+        // Helper: Unmute a category (reusable)
+        function unmuteCategory(category) {
+            const faderRow = document.querySelector(`.category-fader[data-category="${category}"]`);
+            const toggle = faderRow?.querySelector('.hide-toggle');
+            if (toggle && toggle.classList.contains('hidden')) {
+                toggle.classList.remove('hidden');
+                faderRow.classList.remove('muted');
+                CONFIG.hiddenCategories[category] = false;
+                setCategoryGain(category, CONFIG.categoryGains[category]);
+            }
+        }
+        
+        // Hide toggle clicks - grey out category
+        document.querySelectorAll('.category-fader .hide-toggle').forEach(toggle => {
+            toggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const faderRow = e.target.closest('.category-fader');
+                const category = faderRow.dataset.category;
+                
+                // If category is focused, clear focus first then mute
+                if (focusedCategory === category) {
+                    clearFocus();
+                }
+                
+                if (toggle.classList.contains('hidden')) {
+                    // Unhide
+                    toggle.classList.remove('hidden');
+                    faderRow.classList.remove('muted');
+                    CONFIG.hiddenCategories[category] = false;
+                    setCategoryGain(category, CONFIG.categoryGains[category]);
+                } else {
+                    // Hide
+                    toggle.classList.add('hidden');
+                    faderRow.classList.add('muted');
+                    CONFIG.hiddenCategories[category] = true;
+                    setCategoryGain(category, 0);
+                }
             });
         });
         
-        // Slider handle click - update subcategory display
+        // Slider interaction - update subcategory display AND unmute if muted
         document.querySelectorAll('.category-fader input[type="range"]').forEach(slider => {
             slider.addEventListener('mousedown', (e) => {
                 const category = e.target.dataset.category;
+                unmuteCategory(category);  // Unmute when interacting with slider
                 updateSubcategoryUI(category);
+            });
+            
+            slider.addEventListener('input', (e) => {
+                const category = e.target.dataset.category;
+                unmuteCategory(category);  // Also unmute on drag
             });
         });
 
@@ -1857,13 +3336,44 @@ async function updatePathwaySummary(pathwayId) {
             // Set active finding
             activeFinding = findingId;
             
-            // Build pathway set
+            // Build pathway set from v6 structure (mode-aware)
             findingPathways = new Set();
-            for (const p of (finding.pathways.primary || [])) {
-                findingPathways.add(p.id);
+            const pathwayIdArray = [];  // For audio
+            const mode = (typeof currentMode !== 'undefined') ? currentMode : 'composed';
+            
+            // Get pathways from inference.pathways (handle both flat array and mode-specific object)
+            if (finding.inference && finding.inference.pathways) {
+                const pathwayList = Array.isArray(finding.inference.pathways)
+                    ? finding.inference.pathways
+                    : (finding.inference.pathways[mode] || finding.inference.pathways.composed || []);
+                for (const p of pathwayList) {
+                    findingPathways.add(p.id);
+                    pathwayIdArray.push(p.id);
+                }
             }
-            for (const p of (finding.pathways.related || [])) {
-                findingPathways.add(p.id);
+            
+            // Also add Cantoni pathways if present (handle both flat array and mode-specific object)
+            if (finding.cantoniPathways) {
+                const cantoniList = Array.isArray(finding.cantoniPathways)
+                    ? finding.cantoniPathways
+                    : (finding.cantoniPathways[mode] || finding.cantoniPathways.composed || []);
+                for (const id of cantoniList) {
+                    if (!findingPathways.has(id)) {
+                        findingPathways.add(id);
+                        pathwayIdArray.push(id);
+                    }
+                }
+            }
+            
+            // Send to audio worklet with finding ID for character selection
+            if (workletNode && pathwayIdArray.length > 0) {
+                workletNode.port.postMessage({
+                    type: 'setKeyFinding',
+                    data: { 
+                        pathwayIds: pathwayIdArray,
+                        findingId: findingId  // 'kynurenine', 'energy', or 'fermentation'
+                    }
+                });
             }
             
             // Update button states
@@ -1872,7 +3382,10 @@ async function updatePathwaySummary(pathwayId) {
             });
             
             // Update pathway ID display with primary pathway
-            const primaryId = finding.primaryPathway || finding.pathways?.primary?.[0]?.id;
+            const pathwayList = Array.isArray(finding.inference?.pathways)
+                ? finding.inference.pathways
+                : (finding.inference?.pathways?.[mode] || finding.inference?.pathways?.composed || []);
+            const primaryId = pathwayList[0]?.id;
             if (primaryId) {
                 const pathwayIdEl = document.getElementById('pathwayIdValue');
                 if (pathwayIdEl) {
@@ -1888,109 +3401,107 @@ async function updatePathwaySummary(pathwayId) {
         
         // Update the summary panel with finding details
         function updateStudyInfoPanel(finding) {
-            // Hide other content, show finding content
-            document.getElementById('healthyContent').style.display = 'none';
-            document.getElementById('msContent').style.display = 'none';
-            document.getElementById('findingContent').style.display = 'block';
+            // Hide pathway summary and docs, show finding content
+            document.getElementById('pathwaySummarySection').style.display = 'none';
+            document.getElementById('docsSection').style.display = 'none';
+            document.getElementById('findingContent').style.display = 'flex';
+            document.getElementById('tierRefs').style.display = 'none';
             
-            const closeBtn = document.getElementById('closeSummaryBtn');
-            const headerText = document.getElementById('summaryHeaderText');
-            
-            closeBtn.style.display = 'inline';
-            headerText.textContent = 'Key Research Finding';
-            
-            // Set color variable for styling
-            document.getElementById('findingContent').style.setProperty('--finding-color', finding.color);
-            document.getElementById('findingColorBar').style.background = finding.color;
-            
-            // Header
+            // Update finding header
             document.getElementById('findingTitle').textContent = finding.title;
-            document.getElementById('findingTitle').style.color = finding.color;
+            document.getElementById('findingExpansion').textContent = finding.expansion || '';
             document.getElementById('findingSubtitle').textContent = finding.subtitle;
             
-            // Quote from paper - wrapped in quotes, section reference
+            const closeBtn = document.getElementById('closeFindingBtn');
+            if (closeBtn) closeBtn.style.display = 'inline';
+            
+            // Set color variable
+            document.getElementById('findingContent').style.setProperty('--finding-color', finding.color);
+            
+            // Quote
             if (finding.quote) {
                 document.getElementById('findingQuoteText').textContent = `"${finding.quote.text}"`;
-                document.getElementById('findingQuoteCite').textContent = `Section ${finding.quote.section}, PMC12471209`;
+                document.getElementById('findingCitation').innerHTML = 
+                    `— <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12471209/" target="_blank">${finding.quote.source}</a>`;
                 document.querySelector('.finding-quote').style.display = 'block';
             } else {
                 document.querySelector('.finding-quote').style.display = 'none';
             }
             
-            // Metabolite data table - use +/- instead of arrows
-            const tableContainer = document.getElementById('findingMetaboliteTable');
-            if (finding.metaboliteData && finding.metaboliteData.length > 0) {
-                let html = '<table class="metabolite-table"><thead><tr>';
-                html += '<th>Metabolite</th><th></th><th>Fold</th><th>p-value</th><th></th>';
-                html += '</tr></thead><tbody>';
-                
-                for (const m of finding.metaboliteData) {
-                    const isUp = m.direction === 'up';
-                    const dirClass = isUp ? 'elevated' : 'depleted';
-                    const dirSymbol = isUp ? '+' : '-';
-                    html += `<tr>`;
-                    html += `<td>${m.name}</td>`;
-                    html += `<td class="${dirClass}">${dirSymbol}</td>`;
-                    html += `<td>${m.fold}</td>`;
-                    html += `<td>${m.pValue}</td>`;
-                    html += `<td class="note">${m.note || ''}</td>`;
-                    html += `</tr>`;
+            // Metabolite chips
+            const chipsContainer = document.getElementById('findingMetaboliteChips');
+            if (finding.metabolites && finding.metabolites.length > 0) {
+                let html = '';
+                for (const m of finding.metabolites) {
+                    const dirClass = m.dir === '↓' ? 'depleted' : 'elevated';
+                    html += `<div class="metabolite-chip">
+                        <span class="name">${m.name}</span>
+                        <span class="dir ${dirClass}">${m.dir}</span>
+                        <span class="p-val">p=${m.p}</span>
+                    </div>`;
                 }
-                
-                html += '</tbody></table>';
-                tableContainer.innerHTML = html;
-                document.querySelector('.finding-data-section').style.display = 'block';
-            } else {
-                document.querySelector('.finding-data-section').style.display = 'none';
+                chipsContainer.innerHTML = html;
             }
             
-            // Inference section - no emoji prefix
-            if (finding.inference) {
-                document.getElementById('findingInferenceText').textContent = finding.inference.logic;
-                document.getElementById('findingLimitation').textContent = `Limitation: ${finding.inference.limitation}`;
-                document.querySelector('.finding-inference').style.display = 'block';
-            } else {
-                document.querySelector('.finding-inference').style.display = 'none';
+            // Pathway chips (handle both flat array and mode-specific object)
+            const pathwayContainer = document.getElementById('findingPathwayChips');
+            if (pathwayContainer && finding.inference && finding.inference.pathways) {
+                const mode = (typeof currentMode !== 'undefined') ? currentMode : 'composed';
+                const pathwayList = Array.isArray(finding.inference.pathways)
+                    ? finding.inference.pathways
+                    : (finding.inference.pathways[mode] || finding.inference.pathways.composed || []);
+                let html = '';
+                for (const p of pathwayList) {
+                    const dirClass = p.dir === '↓' ? 'depleted' : 'elevated';
+                    html += `<div class="pathway-chip">
+                        <span>${p.id}</span>
+                        <span class="pathway-dir ${dirClass}">${p.dir}</span>
+                    </div>`;
+                }
+                pathwayContainer.innerHTML = html;
             }
             
             // Clinical note
-            if (finding.clinicalNote) {
-                document.getElementById('findingClinicalText').textContent = finding.clinicalNote;
+            if (finding.clinical) {
+                document.getElementById('findingClinicalText').textContent = finding.clinical;
                 document.querySelector('.finding-clinical').style.display = 'block';
             } else {
                 document.querySelector('.finding-clinical').style.display = 'none';
             }
-            
-            // Citation - simple format
-            if (finding.citation) {
-                const cite = finding.citation;
-                document.getElementById('findingCitation').innerHTML = 
-                    `Source: ${cite.authors}, ${cite.table}`;
-            }
         }
         
-        // Show MS comparison content
+        // Show MS comparison content (swaps docs section only)
         function showMSContent() {
-            document.getElementById('healthyContent').style.display = 'none';
+            document.getElementById('healthyDocs').style.display = 'none';
+            document.getElementById('msDocs').style.display = 'block';
             document.getElementById('findingContent').style.display = 'none';
-            document.getElementById('msContent').style.display = 'block';
-            document.getElementById('summaryHeaderText').textContent = 'MS Metabolic Inference';
-            document.getElementById('closeSummaryBtn').style.display = 'none';
+            document.getElementById('pathwaySummarySection').style.display = 'block';
+            document.getElementById('docsSection').style.display = 'block';
+            document.getElementById('tierRefs').style.display = 'block';
         }
         
         // Show healthy gut content
         function showHealthyContent() {
-            document.getElementById('msContent').style.display = 'none';
+            document.getElementById('healthyDocs').style.display = 'block';
+            document.getElementById('msDocs').style.display = 'none';
             document.getElementById('findingContent').style.display = 'none';
-            document.getElementById('healthyContent').style.display = 'block';
-            document.getElementById('summaryHeaderText').textContent = 'About This Visualization';
-            document.getElementById('closeSummaryBtn').style.display = 'none';
+            document.getElementById('pathwaySummarySection').style.display = 'block';
+            document.getElementById('docsSection').style.display = 'block';
+            document.getElementById('tierRefs').style.display = 'block';
         }
         
         // Clear finding focus
         function clearFindingFocus() {
             activeFinding = null;
             findingPathways.clear();
+            
+            // Clear audio key finding
+            if (workletNode) {
+                workletNode.port.postMessage({
+                    type: 'setKeyFinding',
+                    data: { pathwayIds: [] }
+                });
+            }
             
             // Clear button states
             document.querySelectorAll('.key-finding-btn').forEach(btn => {
@@ -2096,16 +3607,21 @@ async function updatePathwaySummary(pathwayId) {
                 // Clear per-pathway states (will rebuild with smoothing)
                 msPathwayState.clear();
                 
-                // Build pathway classifications
+                // Build pathway classifications (with mode filtering)
                 MS_AFFECTED_PATHWAYS.clear();
                 MS_DEPLETED_PATHWAYS.clear();
                 MS_ELEVATED_PATHWAYS.clear();
                 
                 if (typeof PATHWAY_DATA !== 'undefined' && PATHWAY_DATA.MS_COMPARISON_DATA) {
                     const msData = PATHWAY_DATA.MS_COMPARISON_DATA;
+                    const mode = (typeof currentMode !== 'undefined') ? currentMode : 'composed';
                     for (const id of Object.keys(msData)) {
-                        MS_AFFECTED_PATHWAYS.add(id);
                         const info = msData[id];
+                        // Skip if pathway has mode restriction and current mode doesn't match
+                        if (info.modes && !info.modes.includes(mode)) {
+                            continue;
+                        }
+                        MS_AFFECTED_PATHWAYS.add(id);
                         if (info.enrichedIn === 'healthy') {
                             MS_DEPLETED_PATHWAYS.add(id);
                         } else {
@@ -2169,7 +3685,17 @@ async function updatePathwaySummary(pathwayId) {
                 mixing: '#f9fcf9',    // Very subtle green tint
                 propulsive: '#fcfbf8', // Very subtle warm tint
             };
-            spectrumCtx.fillStyle = bgTint[mmcPhase] || '#fafafa';
+            
+            // Dark mode backgrounds
+            const darkBgTint = {
+                quiescent: '#141414',
+                mixing: '#141716',
+                propulsive: '#161514',
+            };
+            
+            const isDarkMode = CONFIG.currentMode === 'consonance';
+            const bg = isDarkMode ? (darkBgTint[mmcPhase] || '#111') : (bgTint[mmcPhase] || '#fafafa');
+            spectrumCtx.fillStyle = bg;
             spectrumCtx.fillRect(0, 0, width, height);
             
             // Update breath animation
@@ -2187,7 +3713,7 @@ async function updatePathwaySummary(pathwayId) {
             }
             
             // Grid
-            spectrumCtx.strokeStyle = '#f0f0f0';
+            spectrumCtx.strokeStyle = isDarkMode ? '#333' : '#f0f0f0';
             spectrumCtx.lineWidth = 1;
             const gridFreqs = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 16000].filter(f => f >= ZOOM.minFreq && f <= ZOOM.maxFreq);
             gridFreqs.forEach(freq => {
@@ -2197,7 +3723,7 @@ async function updatePathwaySummary(pathwayId) {
                     spectrumCtx.moveTo(x, 20);
                     spectrumCtx.lineTo(x, height - 30);
                     spectrumCtx.stroke();
-                    spectrumCtx.fillStyle = '#bbb';
+                    spectrumCtx.fillStyle = isDarkMode ? '#666' : '#bbb';
                     spectrumCtx.font = '10px system-ui';
                     spectrumCtx.textAlign = 'center';
                     spectrumCtx.fillText(freq >= 1000 ? (freq/1000) + 'k' : freq.toString(), x, height - 12);
@@ -2208,14 +3734,14 @@ async function updatePathwaySummary(pathwayId) {
             const fundFreq = CONFIG.fundamental;
             if (fundFreq >= ZOOM.minFreq && fundFreq <= ZOOM.maxFreq) {
                 const fundX = freqToX(fundFreq, width);
-                spectrumCtx.strokeStyle = '#ddd';
+                spectrumCtx.strokeStyle = isDarkMode ? '#444' : '#ddd';
                 spectrumCtx.setLineDash([4, 4]);
                 spectrumCtx.beginPath();
                 spectrumCtx.moveTo(fundX, 20);
                 spectrumCtx.lineTo(fundX, height - 30);
                 spectrumCtx.stroke();
                 spectrumCtx.setLineDash([]);
-                spectrumCtx.fillStyle = '#999';
+                spectrumCtx.fillStyle = isDarkMode ? '#666' : '#999';
                 spectrumCtx.font = '10px system-ui';
                 spectrumCtx.textAlign = 'left';
                 spectrumCtx.fillText('f₀=' + CONFIG.fundamental, fundX + 4, 32);
@@ -2285,8 +3811,48 @@ async function updatePathwaySummary(pathwayId) {
                     }
                 }
                 
+                // ═══════════════════════════════════════════════════════════════════════
+                // SYNC MS PHASES TO AUDIO ENGINE (v10)
+                // ═══════════════════════════════════════════════════════════════════════
+                if (workletNode && (msPhaseIndex >= 0 || msPhase.affected > 0.01)) {
+                    workletNode.port.postMessage({
+                        type: 'setMSPhases',
+                        data: {
+                            phases: {
+                                affected: msPhase.affected,
+                                depleted: msPhase.depleted,
+                                elevated: msPhase.elevated,
+                                settled: msPhase.settled,
+                            }
+                        }
+                    });
+                }
                 
-                PATHWAY_DATA.ALL_PATHWAYS.forEach((pathway) => {
+                // Sort pathways: 
+                // 1. Category priority (energy on top of biosynthesis, etc)
+                // 2. Within category, low amplitude first so high amplitude draws ON TOP
+                const CATEGORY_DRAW_ORDER = {
+                    'superpathways': 0,  // Draw first (background)
+                    'other': 1,
+                    'salvage': 2,
+                    'degradation': 3,
+                    'biosynthesis': 4,
+                    'energy': 5           // Draw last (foreground)
+                };
+                
+                const sortedPathways = [...PATHWAY_DATA.ALL_PATHWAYS].sort((a, b) => {
+                    // First by category (lower order = draw first)
+                    const catA = CATEGORY_DRAW_ORDER[a.category] ?? 0;
+                    const catB = CATEGORY_DRAW_ORDER[b.category] ?? 0;
+                    if (catA !== catB) return catA - catB;
+                    
+                    // Within same category, lower amplitude first
+                    const aAmp = (a.amplitude || a.prevalence || 0.5);
+                    const bAmp = (b.amplitude || b.prevalence || 0.5);
+                    return aAmp - bAmp;
+                });
+                
+                sortedPathways.forEach((pathway) => {
                     const freq = CONFIG.fundamental * pathway.ratioValue;
                     if (freq < ZOOM.minFreq * 0.9 || freq > ZOOM.maxFreq * 1.1) return;
                     
@@ -2311,9 +3877,7 @@ async function updatePathwaySummary(pathwayId) {
                     const hasFocus = focusedPathway !== null;
                     const isCategoryHighlighted = focusedCategory === pathway.category;
                     const hasCategoryFocus = focusedCategory !== null;
-                    const isInCyclingSubcat = cyclingSubcategory && 
-                        pathway.subcategory === cyclingSubcategory && 
-                        pathway.category === cyclingCategory;
+                    const isInCyclingSubcat = isSubcategoryCycling(pathway.category, pathway.subcategory);
                     const bounce = sequenceBounce.get(pathway.id) || 0;
                     
                     // Key Finding highlight state
@@ -2337,33 +3901,118 @@ async function updatePathwaySummary(pathwayId) {
                     const cascadeFade = getVisualCascadeFade(pathway.id);
                     baseAmplitude *= cascadeFade;
                     
+                    // Check if category is hidden (grey out mode)
+                    const isHidden = CONFIG.hiddenCategories?.[pathway.category] || false;
+                    
                     let visualScale = 1.0;
-                    let alpha = 0.6 * cascadeFade;  // Alpha also fades with cascade
-                    let lineWidth = 2;
+                    // Base alpha - lower so active pathways stand out more
+                    const prevalenceAlpha = 0.25 + (pathway.prevalence || 0.5) * 0.4;  // 0.25 to 0.65
+                    let alpha = prevalenceAlpha * cascadeFade;
+                    // Line width proportional to amplitude (high amplitude = thicker, more visible)
+                    const ampNorm = Math.pow(pathway.amplitude || pathway.prevalence || 0.5, 0.5);  // sqrt for gentle scaling
+                    let lineWidth = 1.5 + ampNorm * 2.5;  // 1.5 to 4px range
                     let glowAmount = 0;
-                    let useColor = CONFIG.colors[pathway.category] || '#666';
+                    
+                    // ═══════════════════════════════════════════════════════
+                    // COLOR SELECTION - CONSONANCE-based intensity
+                    // On light background: dark colors POP, light colors FADE
+                    // LOW n×d = consonant = dark/bold (landmarks, grounded)
+                    // HIGH n×d = dissonant = light/faded (easy to overlook)
+                    // Gradient: [0]=dark, [1]=bold, [2]=bright, [3]=light
+                    // ═══════════════════════════════════════════════════════
+                    let useColor;
+                    const gradients = CONFIG.colorGradients[pathway.category];
+                    
+                    if (gradients) {
+                        // n×d is our consonance measure (lower = more consonant)
+                        const nxd = pathway.ratio ? pathway.ratio[0] * pathway.ratio[1] : 100;
+                        
+                        // Map consonance to gradient index:
+                        // Very consonant (n×d < 20) → dark (index 0) = stands out, grounded
+                        // Consonant (n×d 20-100) → bold (index 1)
+                        // Dissonant (n×d 100-500) → bright (index 2)
+                        // Very dissonant (n×d > 500) → light (index 3) = fades away
+                        let gradientIndex;
+                        if (nxd < 20) {
+                            gradientIndex = 0;  // dark = landmark, consonant
+                        } else if (nxd < 100) {
+                            gradientIndex = 1;  // bold/saturated  
+                        } else if (nxd < 500) {
+                            gradientIndex = 2;  // bright
+                        } else {
+                            gradientIndex = 3;  // light = dissonant, fades
+                        }
+                        useColor = gradients[gradientIndex];
+                        
+                        // Also reduce alpha for very dissonant (compound fading)
+                        if (nxd > 200) {
+                            const fadeFactor = Math.min(1, 200 / nxd);  // fades from 1.0 at 200 to 0.4 at 500
+                            alpha *= 0.4 + fadeFactor * 0.6;
+                        }
+                    } else {
+                        useColor = CONFIG.colors[pathway.category] || '#666';
+                    }
+                    
+                    // Hidden category: grey out
+                    if (isHidden) {
+                        useColor = CONFIG.currentMode === 'consonance' ? '#444' : '#ccc';
+                        alpha *= 0.4;
+                    }
                     
                     // Subtle organism breathing (barely perceptible)
-                    if (isPlaying) {
+                    if (isPlaying && !isHidden) {
                         const pathwayOffset = (pathway.ratioValue * 1.5) % (Math.PI * 2);
-                        const breathAmount = Math.sin(breathTime * 0.4 + pathwayOffset) * 0.008;
+                        const breathAmount = Math.sin(breathTime * 0.4 + pathwayOffset) * 0.015;
                         visualScale += breathAmount;
                     }
                     
-                    // Layer-based visual feedback (subtle!)
-                    if (isPlaying && !hasFindingFocus) {
+                    // ═══════════════════════════════════════════════════════
+                    // AUDIO-VISUAL SYNC - More dramatic for clarity
+                    // When a pathway is sounding, it should CLEARLY pulse
+                    // ═══════════════════════════════════════════════════════
+                    if (isPlaying && !hasFindingFocus && !isHidden) {
                         if (isInDrone) {
-                            alpha += 0.08;
-                            glowAmount = 0.08;
+                            // Drone layer: steady glow, moderate thickening
+                            alpha += 0.2;
+                            lineWidth += 1;
+                            visualScale += 0.05;
+                            glowAmount = 0.2;
                         }
                         if (isInCategory) {
-                            alpha += mod.envelope * 0.15;
-                            glowAmount = mod.envelope * 0.2;
+                            // Category sweep: strong pulse with envelope
+                            const envPow = Math.pow(mod.envelope, 0.7);  // Soften curve
+                            alpha += envPow * 0.4;
+                            lineWidth += envPow * 2.5;
+                            visualScale += envPow * 0.15;
+                            glowAmount = envPow * 0.5;
                         }
                         if (hasShimmer) {
-                            // Shimmer: brief sparkle
-                            alpha += mod.shimmer * 0.3;
-                            glowAmount = Math.max(glowAmount, mod.shimmer * 0.5);
+                            // Shimmer: bright flash
+                            alpha += mod.shimmer * 0.5;
+                            visualScale += mod.shimmer * 0.1;
+                            glowAmount = Math.max(glowAmount, mod.shimmer * 0.7);
+                        }
+                    }
+                    
+                    // ═══════════════════════════════════════════════════════════════════════
+                    // HARMONIC CLOUD - Subtle glow based on cloud activity in this region
+                    // The cloud is imperceptible individually but creates regional warmth
+                    // ═══════════════════════════════════════════════════════════════════════
+                    if (isPlaying && modulationData.harmonicCloudRegions) {
+                        const regions = modulationData.harmonicCloudRegions;
+                        const pathwayRegion = Math.round(Math.log2(pathway.ratioValue || 1) * 4);
+                        
+                        for (const region of regions) {
+                            // Check if pathway is in or near this active region
+                            if (Math.abs(region.region - pathwayRegion) <= 1) {
+                                const intensity = Math.min(region.activity * 0.3, 0.15);
+                                
+                                // Very subtle alpha warmth
+                                alpha += intensity;
+                                
+                                // Tiny glow for active regions
+                                glowAmount = Math.max(glowAmount, intensity * 0.5);
+                            }
                         }
                     }
                     
@@ -2518,11 +4167,41 @@ async function updatePathwaySummary(pathwayId) {
                         alpha *= 0.35; lineWidth = 1.5; 
                     }
                     
+                    // ═══════════════════════════════════════════════════════════════════════
+                    // MS + CATEGORY FOCUS INTERSECTION
+                    // When both MS comparison and category focus are active,
+                    // show focused category but emphasize MS-affected pathways
+                    // ═══════════════════════════════════════════════════════════════════════
+                    const msEnabled = CONFIG.currentView === 'ms';
+                    
                     if (hasCategoryFocus && !hasFocus) {
                         if (isCategoryHighlighted) {
-                            alpha = 0.95; lineWidth = 3; visualScale = 1.1;
+                            // This pathway is in the focused category
+                            if (msEnabled && isAffected) {
+                                // MS-affected pathway in focused category - FULL EMPHASIS
+                                alpha = 1.0; 
+                                lineWidth = 3.5; 
+                                visualScale = 1.1;
+                                if (isDepleted) {
+                                    alpha = 0.95;
+                                } else if (isElevated) {
+                                    alpha = 1.0;
+                                    lineWidth = 4;
+                                }
+                            } else if (msEnabled && !isAffected) {
+                                // Non-MS pathway in focused category - reduced but visible
+                                alpha = 0.5; 
+                                lineWidth = 2;
+                            } else {
+                                // No MS comparison - normal category focus
+                                alpha = 0.9; 
+                                lineWidth = 2.5; 
+                                visualScale = 1.05;
+                            }
                         } else {
-                            alpha = 0.12; lineWidth = 1;
+                            // Not in focused category - dimmed but still visible
+                            alpha = 0.35; 
+                            lineWidth = 1.5;
                         }
                     }
                     
@@ -2565,37 +4244,41 @@ async function updatePathwaySummary(pathwayId) {
                     spectrumCtx.lineTo(x, baselineY - barHeight);
                     spectrumCtx.stroke();
                     
-                    // Glow DISABLED - was causing flickering
-                    // Keep code for future reference but skip rendering
-                    /*
-                    if (glowAmount > 0.15 && (isPlaying || isInFinding) && !hasFocus) {
+                    // Subtle glow for active pathways (audio-visual sync)
+                    if (glowAmount > 0.1 && isPlaying && !isHidden) {
                         spectrumCtx.save();
                         spectrumCtx.strokeStyle = color;
-                        spectrumCtx.lineWidth = lineWidth + glowAmount * 1.5;
-                        spectrumCtx.globalAlpha = glowAmount * 0.25;
-                        spectrumCtx.shadowColor = color;
-                        spectrumCtx.shadowBlur = 3 + glowAmount * 4;
+                        spectrumCtx.lineWidth = lineWidth + glowAmount * 2;
+                        spectrumCtx.globalAlpha = glowAmount * 0.2;
                         spectrumCtx.beginPath();
                         spectrumCtx.moveTo(x, baselineY);
                         spectrumCtx.lineTo(x, baselineY - barHeight);
                         spectrumCtx.stroke();
                         spectrumCtx.restore();
                     }
-                    */
                     
                     // MS indicator dot - visible, clear colors
+                    // Dot opacity should match bar alpha to maintain visual cohesion
                     if (isAffected && dotOpacity > 0.02) {
                         spectrumCtx.save();
                         
-                        // Base opacity
-                        let dotAlpha = dotOpacity * 0.85;
+                        // Start with bar's alpha - dots should match bar visibility
+                        let dotAlpha = Math.min(alpha, dotOpacity * 0.85);
                         
-                        // Respect focus states
+                        // If bar is very dim, dot should also be dim
+                        if (alpha < 0.4) {
+                            dotAlpha = alpha * 0.8;
+                        }
+                        
+                        // Respect focus states (apply same reductions as bar)
                         if (hasFocus && !isFocused) {
                             dotAlpha *= 0.4;
                         }
                         if (hasFindingFocus && !isInFinding) {
                             dotAlpha *= 0.4;
+                        }
+                        if (hasCategoryFocus && !isCategoryHighlighted) {
+                            dotAlpha *= 0.25;  // Match bar dimming
                         }
                         
                         spectrumCtx.globalAlpha = dotAlpha;
@@ -2678,44 +4361,196 @@ async function updatePathwaySummary(pathwayId) {
             return closest;
         }
 
-        // ===========================================
-        // OSCILLOSCOPE
-        // ===========================================
-        function drawOscilloscope() {
-            const width = scopeCanvas.width / (window.devicePixelRatio || 1);
-            const height = scopeCanvas.height / (window.devicePixelRatio || 1);
-            
-            scopeCtx.fillStyle = '#000';
-            scopeCtx.fillRect(0, 0, width, height);
-            
-            if (isPlaying && analyser) {
-                const bufferLength = analyser.frequencyBinCount;
-                const dataArray = new Float32Array(bufferLength);
-                analyser.getFloatTimeDomainData(dataArray);
-                
-                scopeCtx.strokeStyle = '#22c55e';
-                scopeCtx.lineWidth = 1.5;
-                scopeCtx.beginPath();
-                
-                const sliceWidth = width / bufferLength;
-                let x = 0;
-                for (let i = 0; i < bufferLength; i++) {
-                    const v = dataArray[i];
-                    const y = (v + 1) / 2 * height;
-                    if (i === 0) scopeCtx.moveTo(x, y); else scopeCtx.lineTo(x, y);
-                    x += sliceWidth;
-                }
-                scopeCtx.stroke();
-            } else {
-                scopeCtx.strokeStyle = '#333';
-                scopeCtx.beginPath();
-                scopeCtx.moveTo(0, height / 2);
-                scopeCtx.lineTo(width, height / 2);
-                scopeCtx.stroke();
-            }
-            
-            requestAnimationFrame(drawOscilloscope);
+// ===========================================
+// SPECTROGRAPH + WAVEFORM OVERLAY
+// ===========================================
+
+function drawOscilloscope() {
+    const width = scopeCanvas.width / (window.devicePixelRatio || 1);
+    const height = scopeCanvas.height / (window.devicePixelRatio || 1);
+    
+    if (!isPlaying || !analyser) {
+        // Idle state
+        scopeCtx.fillStyle = '#fff';
+        scopeCtx.fillRect(0, 0, width, height);
+        scopeCtx.strokeStyle = '#ddd';
+        scopeCtx.lineWidth = 1;
+        scopeCtx.beginPath();
+        scopeCtx.moveTo(0, height / 2);
+        scopeCtx.lineTo(width, height / 2);
+        scopeCtx.stroke();
+        requestAnimationFrame(drawOscilloscope);
+        return;
+    }
+    
+    // Always draw spectrograph as base layer
+    drawSpectrograph(width, height);
+    
+    // Overlay waveform when focused
+    if (focusedPathway) {
+        drawWaveformOverlay(width, height);
+    }
+    
+    requestAnimationFrame(drawOscilloscope);
+}
+
+// ===========================================
+// SPECTROGRAPH (base layer)
+// ===========================================
+function drawSpectrograph(width, height) {
+    if (!analyser) return;
+    
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    analyser.getByteFrequencyData(dataArray);
+    
+    const sampleRate = audioContext.sampleRate;
+    const fundamental = CONFIG.fundamental || 660;
+    const binSize = sampleRate / (bufferLength * 2);
+    
+    const minRatio = 1 / 8;
+    const maxRatio = 16;
+    const minFreq = fundamental * minRatio;
+    const maxFreq = fundamental * maxRatio;
+    
+    // Shift existing image left
+    const imageData = scopeCtx.getImageData(1, 0, width - 1, height);
+    scopeCtx.putImageData(imageData, 0, 0);
+    
+    // Draw new column
+    for (let y = 0; y < height; y++) {
+        const normalizedY = 1 - (y / height);
+        
+        const logMin = Math.log2(minFreq);
+        const logMax = Math.log2(maxFreq);
+        const freq = Math.pow(2, logMin + normalizedY * (logMax - logMin));
+        
+        const binIndex = Math.round(freq / binSize);
+        
+        let value = 0;
+        let count = 0;
+        for (let b = Math.max(0, binIndex - 1); b <= Math.min(bufferLength - 1, binIndex + 1); b++) {
+            value += dataArray[b];
+            count++;
         }
+        value = count > 0 ? value / count : 0;
+        
+        const freqBoost = 1 + (1 - normalizedY) * 0.5;
+        value = Math.min(255, value * freqBoost);
+        
+        // Inverted colors
+        const brightness = 255 - value;
+        
+        scopeCtx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
+        scopeCtx.fillRect(width - 1, y, 1, 1);
+    }
+}
+
+// ===========================================
+// WAVEFORM OVERLAY (on top of spectrograph)
+// ===========================================
+function drawWaveformOverlay(width, height) {
+    if (!focusedPathway) return;
+    if (!audioContext) return;
+    
+    const sampleRate = audioContext.sampleRate;
+    const fundamental = CONFIG.fundamental || 660;
+    
+    const ratio = focusedPathway.ratioValue || 1;
+    const focusedFreq = fundamental * ratio;
+    
+    const num = focusedPathway.n || (Array.isArray(focusedPathway.ratio) ? focusedPathway.ratio[0] : 1);
+    const denom = focusedPathway.d || (Array.isArray(focusedPathway.ratio) ? focusedPathway.ratio[1] : 1);
+    
+    const gcd = (a, b) => b ? gcd(b, a % b) : a;
+    const lcm = (a, b) => (a * b) / gcd(a, b);
+    const cycleRatio = Math.min(lcm(num, denom), 4);
+    const basePeriod = sampleRate / fundamental;
+    const samplesToShow = Math.max(64, Math.min(Math.floor(basePeriod * cycleRatio), 1024));
+    
+    // Calculate cycle length in pixels
+    const samplesPerCycle = sampleRate / fundamental;
+    const pixelsPerCycle = (samplesPerCycle / samplesToShow) * width;
+    const numCycles = Math.floor(width / pixelsPerCycle);
+    
+    // Semi-transparent background for waveform area
+    scopeCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    scopeCtx.fillRect(0, 0, width, height);
+    
+    // Draw cycle markers (subtle vertical lines)
+    scopeCtx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
+    scopeCtx.lineWidth = 1;
+    for (let i = 1; i <= numCycles; i++) {
+        const x = i * pixelsPerCycle;
+        if (x < width) {
+            scopeCtx.beginPath();
+            scopeCtx.moveTo(x, 0);
+            scopeCtx.lineTo(x, height);
+            scopeCtx.stroke();
+        }
+    }
+    
+    // Center line
+    scopeCtx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+    scopeCtx.lineWidth = 1;
+    scopeCtx.beginPath();
+    scopeCtx.moveTo(0, height / 2);
+    scopeCtx.lineTo(width, height / 2);
+    scopeCtx.stroke();
+    
+    // Generate waveform points
+    const points = [];
+    for (let i = 0; i < samplesToShow; i++) {
+        const t = i / sampleRate;
+        const wave1 = Math.sin(2 * Math.PI * fundamental * t);
+        const wave2 = Math.sin(2 * Math.PI * focusedFreq * t) * 0.7;
+        const combined = (wave1 + wave2) / 1.7;
+        points.push(combined);
+    }
+    
+    // Draw waveform shadow (subtle depth)
+    const sliceWidth = width / points.length;
+    const gain = 0.75;
+    
+    scopeCtx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+    scopeCtx.lineWidth = 3;
+    scopeCtx.beginPath();
+    for (let i = 0; i < points.length; i++) {
+        const v = points[i] * gain;
+        const y = height / 2 - (v * height / 2.4) + 1;
+        const x = i * sliceWidth;
+        if (i === 0) scopeCtx.moveTo(x, y);
+        else scopeCtx.lineTo(x, y);
+    }
+    scopeCtx.stroke();
+    
+    // Draw main waveform
+    scopeCtx.strokeStyle = '#000';
+    scopeCtx.lineWidth = 1.5;
+    scopeCtx.beginPath();
+    for (let i = 0; i < points.length; i++) {
+        const v = points[i] * gain;
+        const y = height / 2 - (v * height / 2.4);
+        const x = i * sliceWidth;
+        if (i === 0) scopeCtx.moveTo(x, y);
+        else scopeCtx.lineTo(x, y);
+    }
+    scopeCtx.stroke();
+    
+    // Cycle count label (bottom left)
+    scopeCtx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    scopeCtx.font = '7px system-ui';
+    scopeCtx.textAlign = 'left';
+    const cycleText = cycleRatio === 1 ? '1 cycle' : `${cycleRatio} cycles`;
+    scopeCtx.fillText(cycleText, 3, height - 3);
+    
+    // Ratio label (top right)
+    scopeCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    scopeCtx.font = '8px system-ui';
+    scopeCtx.textAlign = 'right';
+    scopeCtx.fillText(`1/1 + ${num}/${denom}`, width - 3, 9);
+}
+
 
         // ===========================================
         // CANVAS INTERACTIONS
@@ -2880,6 +4715,148 @@ async function updatePathwaySummary(pathwayId) {
         });
 
         // ===========================================
+        // MODE TOGGLE HANDLERS
+        // ===========================================
+        let currentMode = 'composed';
+        
+        document.querySelectorAll('#modeToggle .mode-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const newMode = btn.dataset.mode;
+                if (newMode === currentMode) return;
+                
+                // Update toggle UI immediately
+                document.querySelectorAll('#modeToggle .mode-btn').forEach(b => {
+                    b.classList.toggle('active', b.dataset.mode === newMode);
+                });
+                
+                // Remember current state to restore after transition
+                const hadFocus = focusedPathway;
+                const hadFinding = activeFinding;
+                const hadFindingPathways = hadFinding ? [...findingPathways] : null;
+                
+                // Clear pathway focus but NOT key findings (they persist)
+                if (focusedPathway) {
+                    focusedPathway = null;
+                    if (workletNode) {
+                        workletNode.port.postMessage({ type: 'setFocus', data: { id: null } });
+                    }
+                }
+                
+                // Quick fade out (reverb tail carries through)
+                if (workletNode && isPlaying) {
+                    workletNode.port.postMessage({
+                        type: 'fadeOut',
+                        data: { duration: 0.2 }
+                    });
+                    await new Promise(resolve => setTimeout(resolve, 220));
+                }
+                
+                // Switch mode
+                currentMode = newMode;
+                CONFIG.currentMode = newMode;
+                
+                // Tell worklet about mode change (affects granular rain movement)
+                if (workletNode) {
+                    workletNode.port.postMessage({
+                        type: 'setComposedMode',
+                        data: { enabled: newMode === 'composed' }
+                    });
+                }
+                
+                // Update visualization background
+                const vizContainer = document.getElementById('vizContainer');
+                vizContainer.classList.toggle('dark-mode', newMode === 'consonance');
+                
+                // Brief visual flash to indicate transition
+                vizContainer.classList.add('mode-transition');
+                setTimeout(() => vizContainer.classList.remove('mode-transition'), 300);
+                
+                // Switch pathway data
+                if (typeof PATHWAY_DATA !== 'undefined' && typeof PATHWAY_DATA.switchMode === 'function') {
+                    const pathways = PATHWAY_DATA.switchMode(newMode);
+                    
+                    // Update nav button subtitle
+                    const navSub = document.getElementById('healthyNavSub');
+                    if (navSub) navSub.textContent = 'Curated Pathways';
+                    
+                    // Rebuild MS_AFFECTED_PATHWAYS with mode filter
+                    if (msMode && typeof PATHWAY_DATA.MS_COMPARISON_DATA !== 'undefined') {
+                        MS_AFFECTED_PATHWAYS.clear();
+                        MS_DEPLETED_PATHWAYS.clear();
+                        MS_ELEVATED_PATHWAYS.clear();
+                        
+                        const msData = PATHWAY_DATA.MS_COMPARISON_DATA;
+                        for (const id of Object.keys(msData)) {
+                            const info = msData[id];
+                            // Skip if pathway has mode restriction and current mode doesn't match
+                            if (info.modes && !info.modes.includes(newMode)) {
+                                continue;
+                            }
+                            MS_AFFECTED_PATHWAYS.add(id);
+                            if (info.enrichedIn === 'healthy') {
+                                MS_DEPLETED_PATHWAYS.add(id);
+                            } else {
+                                MS_ELEVATED_PATHWAYS.add(id);
+                            }
+                        }
+                        console.log(`MS mode switch: ${MS_AFFECTED_PATHWAYS.size} affected pathways for ${newMode}`);
+                    }
+                    
+                    // Reinitialize audio with new mappings
+                    if (workletNode && isPlaying) {
+                        workletNode.port.postMessage({
+                            type: 'init',
+                            data: {
+                                pathways: pathways.map(p => ({
+                                    id: p.id,
+                                    n: p.n,
+                                    d: p.d,
+                                    ratio: p.ratioValue,
+                                    amplitude: p.amplitude || p.prevalence,
+                                    category: p.category,
+                                    subcategory: p.subcategory
+                                }))
+                            }
+                        });
+                        
+                        // Re-send MS data if in MS mode
+                        if (msMode && typeof PATHWAY_DATA.MS_COMPARISON_DATA !== 'undefined') {
+                            workletNode.port.postMessage({
+                                type: 'setMSMode',
+                                data: { enabled: true, msData: PATHWAY_DATA.MS_COMPARISON_DATA }
+                            });
+                        }
+                        
+                        // Re-trigger key finding with NEW mode's pathways
+                        if (hadFinding) {
+                            // Re-call focusKeyFinding to get correct pathways for new mode
+                            focusKeyFinding(hadFinding);
+                        }
+                        
+                        // Quick fade in
+                        workletNode.port.postMessage({
+                            type: 'fadeIn',
+                            data: { duration: 0.3 }
+                        });
+                    }
+                    
+                    // Restore pathway focus if it exists in new mode
+                    if (hadFocus) {
+                        const newPathway = pathways.find(p => p.id === hadFocus.id);
+                        if (newPathway) {
+                            setTimeout(() => setFocusedPathway(newPathway), 100);
+                        }
+                    }
+                    
+                    // Update subcategory UI
+                    updateSubcategoryUI(activeCategory);
+                    
+                    console.log(`Mode switched to: ${newMode} (${pathways.length} pathways)`);
+                }
+            });
+        });
+
+        // ===========================================
         // INITIALIZATION
         // ===========================================
         window.addEventListener('resize', resizeCanvases);
@@ -2891,7 +4868,7 @@ async function updatePathwaySummary(pathwayId) {
             updatePathwayInfo(PATHWAY_DATA.ALL_PATHWAYS[0]);
             
             const maxRatio = Math.max(...PATHWAY_DATA.ALL_PATHWAYS.map(p => p.ratioValue));
-            const maxPossibleFreq = 1200 * maxRatio * 1.01;
+            const maxPossibleFreq = 600 * maxRatio * 1.01;
             ZOOM.defaultMax = Math.ceil(maxPossibleFreq / 1000) * 1000;
             ZOOM.maxFreq = ZOOM.defaultMax;
             
@@ -2900,9 +4877,11 @@ async function updatePathwaySummary(pathwayId) {
         
         drawSpectrum();
         drawOscilloscope();
+        loadPathwaySummaries();
         
-        console.log('Metabolic Harmony v3.4 - Fixed Focus & Sequencing');
+        console.log('Metabolic Harmony v5.3 - Ship-Ready Key Findings');
         if (typeof PATHWAY_DATA !== 'undefined') console.log('Loaded ' + PATHWAY_DATA.ALL_PATHWAYS.length + ' pathways');
+        if (Object.keys(PATHWAY_SUMMARIES).length > 0) console.log('Loaded ' + Object.keys(PATHWAY_SUMMARIES).length + ' pathway summaries');
     </script>
 </body>
 </html>

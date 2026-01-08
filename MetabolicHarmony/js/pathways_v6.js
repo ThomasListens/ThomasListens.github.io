@@ -1,200 +1,683 @@
 // ============================================================
-// RATIO MAPPING SYSTEM v6
+// METABOLIC HARMONY - PATHWAY DATA
+// Version: 6.0 (January 2026)
 // ============================================================
-// Three mapping modes:
-//   'abundance'   - Pure consonance by abundance rank (simplest)
-//   'category'    - Category-level mapping (Energy, Biosynthesis, etc.)
-//   'subcategory' - Detailed subcategory mapping (original approach)
+//
+// UNIFIED DATA FILE containing:
+//   1. Raw HUMAnN3 pathway data (597 pathways)
+//   2. MS comparison characterization (Cantoni + metabolomics-inferred)
+//   3. Composed harmonic ratios (from notebook)
+//   4. Mode switching logic
+//
+// MODES:
+//   'composed' - Curated pathways with hand-composed ratios
+//   'raw'      - All 597 pathways with abundance-based ratios
+//
+// WORKFLOW FOR UPDATES:
+//   1. Update harmonic_map.json in notebook
+//   2. Regenerate COMPOSED_RATIOS section (marked below)
+//   3. CURATED_IDS auto-generates from COMPOSED_RATIOS keys
+//
 // ============================================================
 
 // ╔═══════════════════════════════════════════════════════════════╗
-// ║  CHANGE THIS TO SWITCH MAPPING MODES                          ║
+// ║  CONFIGURATION                                                 ║
 // ╚═══════════════════════════════════════════════════════════════╝
-const MAPPING_MODE = 'category';  // 'abundance' | 'category' | 'subcategory'
+
+const MAPPING_MODE = 'composed';  // 'composed' | 'raw'
 
 
 // ============================================================
-// RATIO UTILITIES
+// SECTION 1: UTILITIES
 // ============================================================
 
 function gcd(a, b) {
-    return b === 0 ? a : gcd(b, a % b);
+  return b === 0 ? a : gcd(b, a % b);
 }
 
 function ratioInfo(n, d) {
-    const g = gcd(n, d);
-    n = n / g;
-    d = d / g;
-    const value = n / d;
-    const cents = 1200 * Math.log2(value);
-    const consonance = n * d;
-    
-    // Prime limit
-    let primeLimit = 1;
-    for (const num of [n, d]) {
-        let temp = num;
-        for (let p = 2; p * p <= temp; p++) {
-            while (temp % p === 0) {
-                primeLimit = Math.max(primeLimit, p);
-                temp /= p;
-            }
-        }
-        if (temp > 1) primeLimit = Math.max(primeLimit, temp);
+  const g = gcd(n, d);
+  n = n / g;
+  d = d / g;
+  const value = n / d;
+  const cents = 1200 * Math.log2(value);
+  const consonance = n * d;
+  
+  let primeLimit = 1;
+  for (const num of [n, d]) {
+    let temp = num;
+    for (let p = 2; p * p <= temp; p++) {
+      while (temp % p === 0) {
+        primeLimit = Math.max(primeLimit, p);
+        temp /= p;
+      }
     }
-    
-    return { n, d, value, cents, consonance, primeLimit };
+    if (temp > 1) primeLimit = Math.max(primeLimit, temp);
+  }
+  
+  return { n, d, value, cents, consonance, primeLimit };
 }
 
 function formatAbundance(value, max) {
-    if (value === 0) return '0';
-    const pct = (value / max) * 100;
-    if (pct >= 1) return pct.toFixed(1) + '%';
-    if (pct >= 0.01) return pct.toFixed(2) + '%';
-    return pct.toExponential(1);
+  if (value === 0) return '0';
+  const pct = (value / max) * 100;
+  if (pct >= 1) return pct.toFixed(1) + '%';
+  if (pct >= 0.01) return pct.toFixed(2) + '%';
+  return pct.toExponential(1);
 }
 
-
-// ============================================================
-// MODE 1: ABUNDANCE-ONLY RATIOS
-// ============================================================
-// Generate 650 ratios in range 1/8 to 16, sorted by consonance
-// Pathway rank 1 (most abundant) gets ratio 1 (most consonant)
-
+// Generate abundance-based ratios for 'raw' mode
 function generateAbundanceRatios(count = 650, minValue = 0.125, maxValue = 16) {
-    const ratios = [];
-    const seen = new Set();
-    
-    for (let consonance = 1; ratios.length < count && consonance < 50000; consonance++) {
-        for (let n = 1; n <= consonance; n++) {
-            if (consonance % n === 0) {
-                const d = consonance / n;
-                if (gcd(n, d) === 1) {
-                    const value = n / d;
-                    if (value >= minValue && value <= maxValue) {
-                        const key = `${n}/${d}`;
-                        if (!seen.has(key)) {
-                            seen.add(key);
-                            ratios.push([n, d]);
-                            if (ratios.length >= count) break;
-                        }
-                    }
-                }
+  const ratios = [];
+  const seen = new Set();
+  
+  for (let consonance = 1; ratios.length < count && consonance < 50000; consonance++) {
+    for (let n = 1; n <= consonance; n++) {
+      if (consonance % n === 0) {
+        const d = consonance / n;
+        if (gcd(n, d) === 1) {
+          const value = n / d;
+          if (value >= minValue && value <= maxValue) {
+            const key = `${n}/${d}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              ratios.push([n, d]);
+              if (ratios.length >= count) break;
             }
+          }
         }
+      }
     }
-    
-    return ratios;
+  }
+  return ratios;
 }
 
 const ABUNDANCE_RATIOS = generateAbundanceRatios(650);
 
 
 // ============================================================
-// MODE 2: CATEGORY-LEVEL RATIOS (v6)
+// SECTION 2: COMPOSED RATIOS (from harmonic_map.json)
 // ============================================================
-// Energy: 3-limit + 5-limit harmonics (pure, foundational)
-// Biosynthesis: 7+ limit harmonics (rich, building)
-// Degradation: 5+ limit subharmonics (breaking down)
-// Salvage: 3-limit subharmonics (recycling)
-// Superpathways: Superparticular (smooth steps)
-// Other: Remaining consonant ratios
+// 
+// ┌─────────────────────────────────────────────────────────────┐
+// │  TO UPDATE: Regenerate this section from notebook output    │
+// │  Current: 350 pathways (All categories complete)         │
+// └─────────────────────────────────────────────────────────────┘
 
-const CATEGORY_RATIOS = {
-    'energy': [
-        [1,1], [2,1], [3,1], [4,1], [5,1], [3,2], [6,1], [8,1], [9,1], [5,2],
-        [10,1], [4,3], [12,1], [5,3], [15,1], [16,1], [9,2], [5,4], [8,3], [6,5],
-        [10,3], [15,2], [9,4], [8,5], [9,5], [16,3], [25,2], [27,2], [12,5], [15,4],
-        [20,3], [9,8], [25,3], [16,5], [10,9], [18,5], [32,3], [25,4], [27,4], [16,9],
-        [27,8], [32,9], [27,16], [64,9], [81,8], [32,27], [128,9], [81,16], [64,27], [81,32],
-        [128,27], [243,16], [81,64], [256,27], [243,32],
-    ],
-    
-    'salvage': [
-        [1,2], [1,3], [1,4], [1,6], [2,3], [1,8], [3,4], [2,9], [3,8], [4,9],
-        [3,16], [8,9], [4,27], [9,16], [8,27], [9,32], [16,27],
-    ],
-    
-    'biosynthesis': [
-        [7,1], [11,1], [13,1], [7,2], [14,1], [7,3], [11,2], [13,2], [7,4], [11,3],
-        [17,2], [7,5], [19,2], [13,3], [7,6], [14,3], [21,2], [11,4], [23,2], [17,3],
-        [13,4], [11,5], [8,7], [19,3], [29,2], [31,2], [9,7], [13,5], [11,6], [22,3],
-        [17,4], [23,3], [10,7], [14,5], [19,4], [11,7], [13,6], [26,3], [12,7], [21,4],
-        [28,3], [17,5], [29,3], [11,8], [13,7], [23,4], [31,3], [19,5], [11,9], [17,6],
-        [34,3], [13,8], [15,7], [21,5], [35,3], [11,10], [22,5], [37,3], [16,7], [19,6],
-        [38,3], [23,5], [29,4], [13,9], [17,7], [15,8], [24,5], [40,3], [41,3], [31,4],
-        [14,9], [18,7], [43,3], [13,10], [26,5], [12,11], [33,4], [44,3], [19,7], [27,5],
-        [17,8], [23,6], [46,3], [20,7], [28,5], [35,4], [47,3], [13,11], [29,5], [37,4],
-        [25,6], [19,8], [17,9], [14,11], [22,7], [31,5], [13,12], [39,4], [32,5], [23,7],
-        [41,4], [15,11], [33,5], [21,8], [24,7], [17,10], [34,5], [19,9], [43,4], [29,6],
-        [25,7], [16,11], [20,9], [36,5], [45,4], [14,13], [26,7], [23,8], [37,5], [31,6],
-        [17,11], [47,4], [27,7], [19,10], [38,5], [15,13], [39,5], [49,4], [18,11], [22,9],
-        [25,8], [29,7], [17,12], [51,4], [41,5], [23,9], [16,13], [19,11], [15,14], [21,10],
-        [30,7], [35,6], [42,5], [53,4], [43,5], [31,7], [20,11], [44,5], [55,4], [17,13],
-        [37,6], [32,7], [25,9], [19,12], [57,4], [23,10], [46,5], [21,11], [33,7], [29,8],
-        [18,13], [26,9], [47,5], [59,4], [17,14], [34,7], [16,15], [48,5], [61,4], [49,5],
-        [41,6], [19,13], [31,8], [28,9], [36,7], [63,4], [23,11], [17,15], [51,5], [43,6],
-        [37,7], [20,13], [52,5], [29,9], [24,11], [33,8], [53,5], [19,14], [38,7], [27,10],
-        [54,5], [17,16], [21,13], [39,7], [25,11], [23,12], [31,9], [35,8], [40,7], [56,5],
-        [47,6], [19,15], [57,5], [22,13], [26,11], [41,7], [29,10], [58,5], [49,6], [59,5],
-        [37,8], [27,11], [23,13], [25,12], [43,7], [19,16], [61,5], [18,17], [34,9], [28,11],
-        [44,7], [31,10], [62,5], [24,13], [39,8], [35,9], [45,7], [63,5], [53,6], [29,11],
-        [64,5], [23,14], [46,7], [19,17], [25,13], [41,8], [47,7], [22,15], [30,11], [33,10],
-        [55,6], [66,5], [37,9], [67,5], [21,16], [48,7], [20,17], [68,5], [31,11], [19,18],
-        [38,9], [43,8], [23,15], [69,5], [29,12], [25,14], [50,7], [27,13], [32,11], [59,6],
-        [71,5], [21,17], [51,7], [40,9], [45,8], [72,5], [28,13], [52,7], [73,5], [61,6],
-        [23,16], [41,9], [37,10], [74,5], [53,7], [31,12], [22,17], [34,11], [47,8], [29,13],
-        [27,14], [54,7], [20,19], [76,5], [35,11], [55,7], [77,5], [43,9],
-    ],
-    
-    'degradation': [
-        [1,5], [1,7], [2,5], [2,7], [3,5], [4,5], [3,7], [2,11], [2,13], [4,7],
-        [2,15], [3,10], [5,6], [3,11], [5,7], [3,13], [5,8], [3,14], [6,7], [4,11],
-        [5,9], [3,17], [4,13], [5,11], [7,8], [3,19], [3,20], [4,15], [5,12], [7,9],
-        [5,13], [3,22], [6,11], [4,17], [3,23], [5,14], [7,10], [4,19], [7,11], [6,13],
-        [5,16], [4,21], [7,12], [5,17], [8,11], [5,18], [9,10], [7,13], [4,23], [5,19],
-        [9,11], [4,25], [6,17], [8,13], [5,21], [7,15], [5,22], [10,11], [7,16], [6,19],
-        [5,23], [4,29], [9,13], [7,17], [5,24], [8,15], [4,31], [7,18], [9,14], [5,26],
-        [10,13], [11,12], [7,19], [5,27], [8,17], [6,23], [5,28], [7,20], [11,13], [5,29],
-        [6,25], [8,19], [9,17], [7,22], [11,14], [5,31], [12,13], [5,32], [7,23], [5,33],
-        [11,15], [7,24], [8,21], [5,34], [10,17], [9,19], [6,29], [7,25], [11,16], [5,36],
-        [9,20], [7,26], [13,14], [8,23], [5,37], [6,31], [11,17], [7,27], [5,38], [10,19],
-        [5,39], [13,15], [9,22], [11,18], [8,25], [7,29], [12,17], [9,23], [13,16], [11,19],
-        [6,35], [7,30], [10,21], [14,15], [7,31], [11,20], [13,17], [6,37], [7,32], [9,25],
-        [12,19], [10,23], [7,33], [11,21], [8,29], [9,26], [13,18], [7,34], [14,17], [15,16],
-        [6,41], [13,19], [8,31], [7,36], [9,28], [11,23], [15,17], [6,43], [7,37], [13,20],
-        [9,29], [8,33], [11,24], [7,38], [14,19], [10,27], [16,17], [7,39], [13,21], [11,25],
-    ],
-    
-    'superpathways': [
-        [17,18], [18,19], [19,20], [20,21], [21,20], [21,22], [22,21], [22,23], [23,22], [23,24],
-    ],
-    
-    'other': [
-        [12,23], [9,31], [7,40], [8,35], [6,47], [15,19], [11,26], [13,22], [7,41], [10,29],
-        [8,37], [11,27], [13,23], [12,25], [7,43], [16,19], [9,34], [7,44], [11,28], [10,31],
-        [8,39], [13,24], [7,45], [9,35], [11,29], [7,46], [14,23], [17,19], [13,25], [8,41],
-        [7,47], [10,33], [11,30], [15,22], [9,37], [7,48], [16,21], [17,20], [11,31], [9,38],
-        [8,43], [15,23], [12,29], [7,50], [14,25], [13,27], [11,32], [7,51], [17,21], [8,45],
-        [9,40], [7,52], [13,28], [16,23], [9,41], [10,37], [7,53], [12,31], [11,34], [17,22],
-        [8,47], [13,29], [7,54], [14,27], [7,55], [11,35], [9,43], [10,39], [13,30], [15,26],
-        [26,15], [30,13], [39,10], [65,6],
-    ],
+const COMPOSED_RATIOS = {
+  // ═══════════════════════════════════════════════════════════════
+  // ENERGY (27 pathways)
+  // ═══════════════════════════════════════════════════════════════
+
+  // Fermentation (15)
+  'PWY-5100': { n: 4, d: 3, derivation: '/3 family - acetate+lactate feeds cross-feeders' },
+  'ANAEROFRUCAT-PWY': { n: 8, d: 3, derivation: '/3 family - pure lactate production' },
+  'PWY-5676': { n: 16, d: 3, derivation: '/3 family - cross-feeding route to butyrate' },
+  'P461-PWY': { n: 32, d: 3, derivation: '/3 family - hexitol substrate' },
+  'FERMENTATION-PWY': { n: 27, d: 2, derivation: '27/ family - mixed acid (high consonance for importance)' },
+  'CENTFERM-PWY': { n: 3, d: 2, derivation: 'butyrate canonical - THE healthy gut interval (3/2)' },
+  'PWY-6590': { n: 9, d: 8, derivation: '/9 family - Clostridium complex fermentation' },
+  'P108-PWY': { n: 27, d: 4, derivation: '27/ family - propionate canonical' },
+  'PWY-6588': { n: 16, d: 9, derivation: '/9 family - acetone (solvent)' },
+  'P122-PWY': { n: 32, d: 9, derivation: '/9 family - heterolactic' },
+  'PROPFERM-PWY': { n: 27, d: 16, derivation: '27/ family - alanine to propionate' },
+  'PWY-5677': { n: 27, d: 8, derivation: '27/ family - succinate to butyrate' },
+  'P163-PWY': { n: 64, d: 9, derivation: '/9 family - lysine to butyrate' },
+  'PWY-6863': { n: 128, d: 9, derivation: '/9 family - rare hexanol (has MS data)' },
+  'PWY-6883': { n: 32, d: 27, derivation: 'Pythagorean comma zone - rare butanol' },
+
+  // Glycolysis/Gluconeogenesis (4)
+  'PWY-1042': { n: 1, d: 1, derivation: 'exponential 2-limit growth (1→2→4→16)', composedName: 'Glycolysis IV (canonical)' },
+  'GLUCONEO-PWY': { n: 2, d: 1, derivation: 'exponential 2-limit growth (1→2→4→16)' },
+  'GLYCOLYSIS-E-D': { n: 4, d: 1, derivation: 'exponential 2-limit growth (1→2→4→16)' },
+  'PWY-7446': { n: 16, d: 1, derivation: 'exponential 2-limit growth (1→2→4→16)' },
+
+  // Glyoxylate Cycle (2)
+  'GLYOXYLATE-BYPASS': { n: 8, d: 1, derivation: 'glycolysis-derived stress harmonic (8/1 → 81/8)' },
+  'PWY-5705': { n: 81, d: 8, derivation: 'glycolysis-derived stress harmonic (8/1 → 81/8)' },
+
+  // Pentose Phosphate (3)
+  'NONOXIPENT-PWY': { n: 9, d: 1, derivation: 'prime-5 biosynthetic primer (5/1 → 5/2 → 5/3)' },
+  'PENTOSE-P-PWY': { n: 9, d: 2, derivation: 'prime-5 biosynthetic primer (5/1 → 5/2 → 5/3)' },
+  'PWY-2221': { n: 9, d: 4, derivation: 'prime-5 biosynthetic primer (5/1 → 5/2 → 5/3)' },
+
+  // Respiration (1)
+  'PWY-3781': { n: 12, d: 1, derivation: '3-limit amplification (12/1)' },
+
+  // TCA Cycle (2)
+  'TCA': { n: 3, d: 1, derivation: 'prime-3 introduction (3/1 → 3/2)' },
+  'TCA-GLYOX-BYPASS': { n: 6, d: 1, derivation: 'prime-3 introduction (3/1 → 3/2)' },
+
+  // ═══════════════════════════════════════════════════════════════
+  // BIOSYNTHESIS (143 pathways)
+  // ═══════════════════════════════════════════════════════════════
+
+  // Amino Acids (28)
+  'VALSYN-PWY': { n: 7, d: 2, derivation: 'simplest structural BCAA' },
+  'HISTSYN-PWY': { n: 5, d: 3, derivation: 'histidine — catalytic hinge embedded in metabolic flow' },
+  'BRANCHED-CHAIN-AA-SYN-PWY': { n: 7, d: 1, derivation: 'prime-7 introduction — protein identity / hydrophobic core' },
+  'ILEUSYN-PWY': { n: 7, d: 4, derivation: 'differentiated BCAA structure' },
+  'PWY-5103': { n: 21, d: 8, derivation: 'leucine variant — structure engaged with circulation' },
+  'PWY-5097': { n: 7, d: 3, derivation: 'lysine — identity engaged in interaction' },
+  'ARGSYNBSUB-PWY': { n: 21, d: 4, derivation: 'arginine — moderated nitrogen routing' },
+  'PWY-2942': { n: 7, d: 6, derivation: 'lysine — buffered / moderated binding' },
+  'ARGSYN-PWY': { n: 21, d: 2, derivation: 'arginine — primary directional signaling' },
+  'PWY-5154': { n: 21, d: 16, derivation: 'arginine — contextual / conditional signaling' },
+  'PWY-5104': { n: 63, d: 16, derivation: 'leucine variant — high metabolic turnover' },
+  'PWY-2941': { n: 28, d: 3, derivation: 'lysine — high-affinity interaction' },
+  'DAPLYSINESYN-PWY': { n: 14, d: 3, derivation: 'lysine — amplified structural anchoring' },
+  'PWY-5101': { n: 189, d: 32, derivation: 'leucine variant — specialized / condition-dependent' },
+  'HOMOSER-METSYN-PWY': { n: 35, d: 3, derivation: 'methionine I — sulfhydrylation (35 = 7×5)' },
+  'HSERMETANA-PWY': { n: 35, d: 6, derivation: 'methionine III — transsulfuration (35 = 7×5)' },
+  'MET-SAM-PWY': { n: 35, d: 9, derivation: 'SAM — methylation currency (35 = 7×5)' },
+  'THRESYN-PWY': { n: 10, d: 3, derivation: 'threonine — branch point' },
+  'SER-GLYSYN-PWY': { n: 25, d: 3, derivation: 'serine/glycine — one-carbon supply' },
+  'PWY-6628': { n: 7, d: 5, derivation: 'phenylalanine — base aromatic identity' },
+  'PWY-6630': { n: 21, d: 10, derivation: 'tyrosine — functionalized aromatic identity' },
+  'TRPSYN-PWY': { n: 21, d: 20, derivation: 'tryptophan — deep, high-cost aromatic identity' },
+  'PWY-5505': { n: 9, d: 7, derivation: 'glutamate/glutamine — nitrogen currency' },
+  'ASPASN-PWY': { n: 18, d: 7, derivation: 'aspartate/asparagine — TCA currency' },
+  'PWY-4981': { n: 15, d: 7, derivation: 'proline — structural curvature' },
+  'SULFATE-CYS-PWY': { n: 45, d: 7, derivation: 'cysteine — embodied redox identity (disulfides, glutathione, Fe–S)' },
+  'PWY-6936': { n: 135, d: 14, derivation: 'seleno-amino acids — rare, constrained high-kinetic redox identity' },
+  'PWY0-1061': { n: 14, d: 1, derivation: 'alanine — nitrogen shuttle' },
+
+  // Carbon Storage (1)
+  'GLYCOGENSYNTH-PWY': { n: 1, d: 8, derivation: 'glycogen biosynthesis — inert polymeric carbon reserve' },
+
+  // Cell Envelope (24)
+  'DTDPRHAMSYN-PWY': { n: 1, d: 7, derivation: 'L-rhamnose — external identity marker (1/7)' },
+  'PEPTIDOGLYCANSYN-PWY': { n: 8, d: 35, derivation: 'canonical peptidoglycan' },
+  'PWY-5265': { n: 16, d: 35, derivation: 'thickened peptidoglycan' },
+  'PWY-6470': { n: 16, d: 49, derivation: 'reinforced peptidoglycan' },
+  'PWY-6385': { n: 32, d: 49, derivation: 'extreme peptidoglycan envelope' },
+  'PWY-6471': { n: 32, d: 63, derivation: 'adaptive peptidoglycan remodeling' },
+  'UDPNAGSYN-PWY': { n: 105, d: 32, derivation: 'UDP-GlcNAc — highest availability' },
+  'PWY-6386': { n: 105, d: 64, derivation: 'UDP-MurNAc — PG precursor' },
+  'PWY-6387': { n: 105, d: 128, derivation: 'UDP-MurNAc variant' },
+  'PWY-5659': { n: 256, d: 105, derivation: 'GDP-mannose — prevalent outer-envelope precursor' },
+  'PWY-6478': { n: 512, d: 105, derivation: 'GDP-heptose — specialized outer-core precursor' },
+  'COLANSYN-PWY': { n: 32, d: 147, derivation: 'colanic acid capsule — adaptive septimal boundary (7²×3)' },
+  'ECASYN-PWY': { n: 147, d: 25, derivation: 'enterobacterial common antigen — group-level surface identity' },
+  'TEICHOICACID-PWY': { n: 4, d: 21, derivation: 'teichoic acid — PG-anchored boundary modulation (3×7)' },
+  'LPSSYN-PWY': { n: 147, d: 64, derivation: 'lipopolysaccharide — dominant septimal outer membrane (7²×3)' },
+  'PWY0-1241': { n: 147, d: 128, derivation: 'ADP-heptose — LPS inner-core precursor (7²×3)' },
+  'PWY-1269': { n: 245, d: 64, derivation: 'CMP-KDO — prevalent LPS core anchor' },
+  'PWY-6749': { n: 245, d: 32, derivation: 'CMP-legionaminate — specialized terminal sugar' },
+  'PWY-6143': { n: 245, d: 16, derivation: 'CMP-pseudaminate — rare terminal decoration' },
+  'PWY-7315': { n: 16, d: 245, derivation: 'dTDP-N-acetylthomosamine — common rare identity (7²×5)' },
+  'PWY-7312': { n: 32, d: 245, derivation: 'dTDP-β-D-fucofuranose — moderate identity marker (7²×5)' },
+  'PWY-7316': { n: 64, d: 245, derivation: 'dTDP-N-acetylviosamine — rare surface identity (7²×5)' },
+  'PWY-6953': { n: 128, d: 245, derivation: 'dTDP-3-acetamido-3,6-dideoxy-galactose — very rare identity (7²×5)' },
+  'PWY-7413': { n: 256, d: 245, derivation: 'dTDP-6-deoxy-α-D-allose — extreme / exotic identity (7²×5)' },
+
+  // Cofactors/Vitamins (28)
+  'PYRIDNUCSYN-PWY': { n: 11, d: 1, derivation: 'NAD biosynthesis I — 11-limit foundation' },
+  'NADSYN-PWY': { n: 121, d: 8, derivation: 'NAD biosynthesis II — 11-limit variant' },
+  'COA-PWY': { n: 11, d: 2, derivation: 'CoA biosynthesis I — 11-limit octave 1' },
+  'PWY-4242': { n: 11, d: 4, derivation: 'CoA biosynthesis III — 11-limit octave 2' },
+  'PANTOSYN-PWY': { n: 11, d: 8, derivation: 'CoA biosynthesis I — 11-limit octave 3' },
+  'THISYN-PWY': { n: 11, d: 3, derivation: 'Thiamine main superpathway — 11/3 anchor' },
+  'PWY-6895': { n: 11, d: 6, derivation: 'Thiamine variant superpathway — octave echo' },
+  'PWY-6892': { n: 33, d: 4, derivation: 'Thiazole precursor I — building block' },
+  'PWY-6891': { n: 33, d: 8, derivation: 'Thiazole precursor II — building block echo' },
+  '1CMET2-PWY': { n: 11, d: 5, derivation: 'Active folate form — 11/5 anchor' },
+  'PWY-6147': { n: 11, d: 10, derivation: 'Folate precursor — octave echo' },
+  'RIBOSYN2-PWY': { n: 11, d: 9, derivation: 'Flavin biosynthesis — structural redox cofactor adjacent to NAD (11/9 = 3×3)' },
+  'PWY-5188': { n: 33, d: 5, derivation: 'Tetrapyrrole scaffold (from glutamate) — structural macrocycle' },
+  'PWY-5189': { n: 99, d: 10, derivation: 'Tetrapyrrole scaffold (from glycine) — recursive structural macrocycle' },
+  'HEMESYN2-PWY': { n: 33, d: 10, derivation: 'Heme biosynthesis (anaerobic) — functionalized cofactor' },
+  'HEME-BIOSYNTHESIS-II': { n: 99, d: 20, derivation: 'Heme biosynthesis (aerobic) — functionalized cofactor' },
+  'PWY-5918': { n: 33, d: 20, derivation: 'Heme superpathway (from glutamate) — packaged / aggregate' },
+  'PWY-5920': { n: 99, d: 40, derivation: 'Heme superpathway (from glycine) — packaged / aggregate' },
+  'PYRIDOXSYN-PWY': { n: 11, d: 7, derivation: 'Vitamin B6 (PLP) biosynthesis — aminotransferase cofactor (11/7)' },
+  'BIOTIN-BIOSYNTHESIS-PWY': { n: 21, d: 11, derivation: 'Biotin biosynthesis — permissive lipid‑adjacent cofactor' },
+  'PWY-5005': { n: 35, d: 11, derivation: 'Biotin biosynthesis (alternate) — increased material capacity' },
+  'PWY-6519': { n: 49, d: 11, derivation: 'Biotin precursor biosynthesis — dense septimal scaffold' },
+  'PWY-5509': { n: 77, d: 8, derivation: 'Cobalamin (B12) biosynthesis — salvage / community route' },
+  'PWY-5508': { n: 77, d: 16, derivation: 'Cobalamin (B12) biosynthesis — de novo (late cobalt insertion)' },
+  'PWY-5507': { n: 77, d: 32, derivation: 'Cobalamin (B12) biosynthesis — de novo (early cobalt insertion)' },
+  'PWY-6823': { n: 121, d: 35, derivation: 'Molybdenum cofactor biosynthesis — boundary redox gate' },
+  'P261-PWY': { n: 55, d: 7, derivation: 'Coenzyme M biosynthesis — terminal methyl carrier' },
+  'P241-PWY': { n: 55, d: 49, derivation: 'Coenzyme B biosynthesis — terminal reductant partner' },
+
+  // Fatty Acid Synthesis (4)
+  'FASYN-INITIAL-PWY': { n: 35, d: 4, derivation: 'FAS initiation — commitment threshold' },
+  'PWY-6285': { n: 105, d: 16, derivation: 'FAS elongation — full 105-realm engine' },
+  'PWY-6284': { n: 175, d: 32, derivation: 'FAS unsaturation — constrained adaptation' },
+  'PWY0-881': { n: 35, d: 8, derivation: 'FAS superpathway — taxon-specific aggregation' },
+
+  // Fatty Acids / Lipids (10)
+  'PWY-7664': { n: 49, d: 8, derivation: 'oleate IV — light monounsaturated membrane' },
+  'PWY-6282': { n: 49, d: 9, derivation: 'palmitoleate — viscous monounsaturated variant' },
+  'PWY-5973': { n: 49, d: 5, derivation: 'cis-vaccenate — flexible membrane curvature' },
+  'PWY0-862': { n: 49, d: 25, derivation: 'dodecenoate — short-chain flexible lipid' },
+  'PWY-7663': { n: 63, d: 5, derivation: 'gondoate — dense long-chain lipid' },
+  'PWY-5367': { n: 63, d: 25, derivation: 'petroselinate — heavy monounsaturated lipid' },
+  'PWY-5989': { n: 147, d: 40, derivation: 'stearate — saturated rigidity anchor' },
+  'PWY-5971': { n: 147, d: 50, derivation: 'palmitate — saturated membrane anchor' },
+  'NAGLIPASYN-PWY': { n: 35, d: 16, derivation: 'lipid IVA — outer membrane scaffold' },
+  'KDO-NAGLIPASYN-PWY': { n: 35, d: 32, derivation: 'Kdo2-lipid A — immune boundary stress' },
+
+  // Isoprenoids (7)
+  'POLYISOPRENSYN-PWY': { n: 55, d: 8, derivation: 'polyisoprenoid biosynthesis — active scaffold hub' },
+  'PWY-6270': { n: 55, d: 9, derivation: 'isoprene biosynthesis — dynamic short-chain pool' },
+  'PWY-6859': { n: 77, d: 5, derivation: 'all-trans-farnesol biosynthesis — flexible backbone supply' },
+  'PWY-5837': { n: 77, d: 9, derivation: 'dihydroxynaphthoate biosynthesis — stable backbone supply' },
+  'PWY-5838': { n: 77, d: 10, derivation: 'menaquinol-8 superpathway — adaptive extended scaffold' },
+  'PWY-6708': { n: 77, d: 15, derivation: 'ubiquinol-8 biosynthesis — heavy extended scaffold' },
+  'PWY-5910': { n: 33, d: 7, derivation: 'GGPP superpathway — boundary-constrained scaffold reserve' },
+
+  // Lipids & Membranes (3)
+  'PWY-5667': { n: 45, d: 49, derivation: 'CDP-diacylglycerol — boundary capture of fatty material' },
+  'PHOSLIPSYN-PWY': { n: 90, d: 49, derivation: 'phospholipid superpathway — bulk membrane synthesis' },
+  'PWY4FS-8': { n: 135, d: 49, derivation: 'phosphatidylglycerol — active membrane expression' },
+
+  // Nucleotides (7)
+  'PWY-7219': { n: 5, d: 1, derivation: 'RNA + ATP root — material permission, metabolic time' },
+  'PWY-6122': { n: 10, d: 1, derivation: 'Purine precursor — nucleotide pool amplification' },
+  'PWY-7221': { n: 5, d: 2, derivation: 'RNA guanosine — execution within continuous time' },
+  'PWY-7220': { n: 15, d: 1, derivation: 'DNA adenosine — commitment to replication' },
+  'PWY-7222': { n: 15, d: 2, derivation: 'DNA guanosine — replication execution' },
+  'PWY-7187': { n: 15, d: 4, derivation: 'DNA pyrimidines — replication completion/fidelity' },
+  'PWY0-162': { n: 5, d: 4, derivation: 'RNA pyrimidines — transcriptional expression/color' },
+
+  // Other (8)
+  'PWY-5198': { n: 55, d: 4, derivation: 'factor F420 — methanogen deazaflavin cofactor (5×11/2²)' },
+  'PWY-6349': { n: 143, d: 16, derivation: 'CDP-archaeol — archaeal membrane precursor (11×13/2⁴)' },
+  'PWY-7374': { n: 77, d: 6, derivation: 'naphthoate — menaquinone precursor (7×11/2×3)' },
+  'PWY-6148': { n: 143, d: 32, derivation: 'tetrahydromethanopterin — methanogen C1 carrier (11×13/2⁵)' },
+  'PWY-6351': { n: 15, d: 8, derivation: 'inositol-1,4,5-P3 — signaling molecule (3×5/2³)' },
+  'PWY-7377': { n: 231, d: 16, derivation: 'cob(II)yrinate — B12 precursor (3×7×11/2⁴)' },
+  'PWY-6163': { n: 13, d: 1, derivation: 'chorismate — dominant irreversible decision point into aromatic biosynthetic ...' },
+  'ARO-PWY': { n: 13, d: 2, derivation: 'chorismate — alternative implementation of the aromatic decision point (Prime...' },
+
+  // Polyamines (6)
+  'PWY-6305': { n: 25, d: 2, derivation: 'putrescine biosynthesis — baseline polyamine pool' },
+  'POLYAMSYN-PWY': { n: 25, d: 4, derivation: 'polyamine superpathway I — expanded buffering' },
+  'POLYAMINSYN3-PWY': { n: 25, d: 8, derivation: 'polyamine superpathway II — extended buffering' },
+  'PWY-6562': { n: 25, d: 12, derivation: 'norspermidine biosynthesis — geometric modulation' },
+  'PWY-6565': { n: 25, d: 16, derivation: 'polyamine superpathway III — low-abundance extension' },
+  'PWY-6834': { n: 25, d: 21, derivation: 'spermidine biosynthesis III — rare / specialized pool' },
+
+  // Specialized (13)
+  'GLUTORN-PWY': { n: 27, d: 5, derivation: 'ornithine — nitrogen pool for arginine/polyamines (3³/5)' },
+  'PWY-5695': { n: 25, d: 9, derivation: 'urate — purine endpoint, nitrogen excretion (5²/3²)' },
+  'CITRULBIO-PWY': { n: 27, d: 10, derivation: 'citrulline — urea cycle shuttle (3³/2×5)' },
+  'PWY-5173': { n: 33, d: 16, derivation: 'acetyl-CoA — universal 2C donor (3×11/2⁴)' },
+  'P125-PWY': { n: 27, d: 20, derivation: 'butanediol — fermentation product (3³/4×5)' },
+  'PWY-5656': { n: 9, d: 5, derivation: 'mannosylglycerate — osmolyte, stress protection (3²/5)' },
+  'ENTBACSYN-PWY': { n: 91, d: 8, derivation: 'enterobactin — primary siderophore, iron scavenger (7×13/2³)' },
+  'PWY1G-0': { n: 55, d: 16, derivation: 'mycothiol — antioxidant, mycobacterial glutathione (5×11/2⁴)' },
+  'AEROBACTINSYN-PWY': { n: 91, d: 16, derivation: 'aerobactin — hydroxamate siderophore variant (7×13/2⁴)' },
+  'URSIN-PWY': { n: 45, d: 8, derivation: 'ureide — nitrogen transport compound (9×5/2³)' },
+  'PWY-5514': { n: 245, d: 128, derivation: 'UDP-GalNAc — surface sugar (7²×5/2⁷)' },
+  'PWY-7090': { n: 245, d: 256, derivation: 'UDP-ManNAc — rare surface identity (7²×5/2⁸)' },
+  'PWY-7255': { n: 55, d: 32, derivation: 'ergothioneine — histidine-derived antioxidant (5×11/2⁵)' },
+
+  // Stress / Decision (1)
+  'PPGPPMET-PWY': { n: 13, d: 5, derivation: 'ppGpp biosynthesis — guanosine-based global decision signal' },
+
+  // tRNA Modifications (3)
+  'PWY-6700': { n: 75, d: 16, derivation: 'queuosine — tRNA wobble-base modification' },
+  'PWY-6703': { n: 75, d: 32, derivation: 'preQ0 — metabolic precursor to queuosine' },
+  'PWY-7286': { n: 75, d: 49, derivation: 'wyosine derivative — identity-anchored tRNA modification' },
+
+  // ═══════════════════════════════════════════════════════════════
+  // DEGRADATION (115 pathways)
+  // ═══════════════════════════════════════════════════════════════
+
+  // Amino Acids (13)
+  'PWY-5177': { n: 8, d: 7, derivation: '' },
+  'HISDEG-PWY': { n: 3, d: 5, derivation: 'histidine deg ← inverse of HISTSYN (3/5)' },
+  'P162-PWY': { n: 12, d: 5, derivation: '' },
+  'AST-PWY': { n: 16, d: 21, derivation: '' },
+  'ARGDEG-PWY': { n: 8, d: 9, derivation: '' },
+  'ORNARGDEG-PWY': { n: 14, d: 9, derivation: '' },
+  'PWY-5088': { n: 4, d: 7, derivation: '' },
+  'PWY-5028': { n: 6, d: 5, derivation: '' },
+  'VALDEG-PWY': { n: 2, d: 7, derivation: 'valine deg ← inverse of VALSYN (2/7)' },
+  'TYRFUMCAT-PWY': { n: 10, d: 21, derivation: '' },
+  'LEU-DEG2-PWY': { n: 4, d: 9, derivation: 'leucine degradation — BCAA breakdown (4/9)' },
+  'TRPKYNCAT-PWY': { n: 20, d: 21, derivation: 'tryptophan XI ← inverse of TRPSYN (20/21)', composedName: 'Tryptophan → Indolelactate (bacterial)' },
+  'GLUDEG-II-PWY': { n: 5, d: 7, derivation: '' },
+
+  // Aromatics (5)
+  'PWY-5415': { n: 2, d: 11, derivation: '' },
+  'PWY-5431': { n: 1, d: 11, derivation: '' },
+  'PWY-6215': { n: 3, d: 11, derivation: '' },
+  'PWY-5178': { n: 8, d: 11, derivation: '' },
+  'PWY-7431': { n: 4, d: 11, derivation: '' },
+
+  // Carbohydrates (7)
+  'PWY-6737': { n: 1, d: 2, derivation: 'starch V — THE canonical breakdown (1/2)' },
+  'PWY-6317': { n: 2, d: 3, derivation: '' },
+  'PWY-6901': { n: 1, d: 3, derivation: '' },
+  'LACTOSECAT-PWY': { n: 5, d: 6, derivation: '' },
+  'GLUCOSE1PMETAB-PWY': { n: 5, d: 8, derivation: '' },
+  'PWY-6731': { n: 1, d: 4, derivation: '' },
+  'DHGLUCONATE-PYR-CAT-PWY': { n: 2, d: 9, derivation: '' },
+
+  // Nucleotides (9)
+  'PWY0-1296': { n: 1, d: 5, derivation: 'purine ribonucleosides — 5-series (1/5)' },
+  'PWY-6608': { n: 2, d: 5, derivation: '' },
+  'SALVADEHYPOX-PWY': { n: 3, d: 10, derivation: '' },
+  'PWY-6353': { n: 6, d: 25, derivation: '' },
+  'PWY0-1297': { n: 2, d: 15, derivation: '' },
+  'PWY0-1298': { n: 4, d: 15, derivation: '' },
+  'P164-PWY': { n: 8, d: 5, derivation: '' },
+  'PWY-7209': { n: 4, d: 5, derivation: '' },
+  'PWY-5532': { n: 16, d: 5, derivation: '' },
+
+  // Other (81)
+  'PWY-6527': { n: 1, d: 6, derivation: '' },
+  'RHAMCAT-PWY': { n: 1, d: 9, derivation: '' },
+  'PWY-7242': { n: 5, d: 9, derivation: '' },
+  'GLCMANNANAUT-PWY': { n: 10, d: 9, derivation: '' },
+  'GLUCUROCAT-PWY': { n: 10, d: 7, derivation: '' },
+  'PWY-6507': { n: 6, d: 7, derivation: '' },
+  'GALACTUROCAT-PWY': { n: 1, d: 14, derivation: '' },
+  'PWY-621': { n: 17, d: 2, derivation: '' },
+  'GALACT-GLUCUROCAT-PWY': { n: 3, d: 14, derivation: '' },
+  'PWY-7456': { n: 7, d: 8, derivation: '' },
+  'HEXITOLDEGSUPER-PWY': { n: 3, d: 16, derivation: '' },
+  'PWY-5384': { n: 9, d: 16, derivation: '' },
+  'FUCCAT-PWY': { n: 12, d: 7, derivation: '' },
+  'P441-PWY': { n: 3, d: 7, derivation: '' },
+  'GOLPDLCAT-PWY': { n: 19, d: 2, derivation: '' },
+  'PWY-7237': { n: 1, d: 18, derivation: '' },
+  'FUC-RHAMCAT-PWY': { n: 29, d: 2, derivation: '' },
+  'PWY-7013': { n: 23, d: 2, derivation: '' },
+  'PWY-5022': { n: 1, d: 22, derivation: '' },
+  'GLYCOCAT-PWY': { n: 3, d: 4, derivation: 'glycogen I bacterial (3/4)' },
+  'PWY-2723': { n: 3, d: 32, derivation: '' },
+  'PWY-5941': { n: 3, d: 8, derivation: '' },
+  'PWY-7003': { n: 17, d: 3, derivation: '' },
+  'PWY-7046': { n: 9, d: 11, derivation: '' },
+  'METHGLYUT-PWY': { n: 7, d: 9, derivation: '' },
+  'GALACTARDEG-PWY': { n: 19, d: 3, derivation: '' },
+  'GLUCARGALACTSUPER-PWY': { n: 22, d: 9, derivation: '' },
+  'GLUCARDEG-PWY': { n: 23, d: 3, derivation: '' },
+  'PWY66-389': { n: 22, d: 7, derivation: '' },
+  'PWY-6572': { n: 7, d: 10, derivation: '' },
+  'ALLANTOINDEG-PWY': { n: 1, d: 13, derivation: '' },
+  'GLYCOL-GLYOXDEG-PWY': { n: 13, d: 3, derivation: '' },
+  'ORNDEG-PWY': { n: 21, d: 5, derivation: '' },
+  'HCAMHPDEG-PWY': { n: 3, d: 22, derivation: '' },
+  'PWY-6690': { n: 6, d: 11, derivation: '' },
+  'PWY0-1277': { n: 5, d: 11, derivation: '' },
+  'PROTOCATECHUATE-ORTHO-CLEAVAGE-PWY': { n: 13, d: 7, derivation: '' },
+  'PWY0-41': { n: 2, d: 13, derivation: '' },
+  'PWY0-1533': { n: 1, d: 26, derivation: '' },
+  'CRNFORCAT-PWY': { n: 1, d: 21, derivation: '' },
+  '3-HYDROXYPHENYLACETATE-DEGRADATION-PWY': { n: 14, d: 11, derivation: '' },
+  'PWY-4722': { n: 2, d: 21, derivation: '' },
+  'P562-PWY': { n: 1, d: 36, derivation: '' },
+  'PWY0-321': { n: 7, d: 11, derivation: '' },
+  'PWY-6071': { n: 9, d: 13, derivation: '' },
+  'PWY-7294': { n: 5, d: 18, derivation: '' },
+  'PWY-5180': { n: 16, d: 11, derivation: '' },
+  'PWY-3801': { n: 9, d: 64, derivation: '' },
+  'PWY-7345': { n: 31, d: 2, derivation: '' },
+  'PWY-5181': { n: 32, d: 11, derivation: '' },
+  'PWY-6992': { n: 31, d: 3, derivation: '' },
+  'PWY-5654': { n: 20, d: 11, derivation: '' },
+  'PWY-6182': { n: 7, d: 22, derivation: '' },
+  'PWY-6906': { n: 7, d: 13, derivation: '' },
+  'PWY-7399': { n: 1, d: 52, derivation: '' },
+  'PWY-1541': { n: 1, d: 42, derivation: '' },
+  'PWY-7118': { n: 11, d: 13, derivation: '' },
+  'PWY-1361': { n: 13, d: 8, derivation: '' },
+  'PWY-1501': { n: 13, d: 6, derivation: '' },
+  'PWY-6107': { n: 13, d: 33, derivation: '' },
+  'PWY-5055': { n: 5, d: 42, derivation: '' },
+  'PWY-4361': { n: 35, d: 12, derivation: '' },
+  'PWY-6641': { n: 45, d: 14, derivation: '' },
+  'PWY-5183': { n: 64, d: 11, derivation: '' },
+  'METHYLGALLATE-DEGRADATION-PWY': { n: 22, d: 5, derivation: '' },
+  'GALLATE-DEGRADATION-I-PWY': { n: 15, d: 11, derivation: '' },
+  'PWY-6760': { n: 5, d: 36, derivation: '' },
+  'GALLATE-DEGRADATION-II-PWY': { n: 11, d: 15, derivation: '' },
+  'PWY-5499': { n: 5, d: 14, derivation: '' },
+  'PWY-6948': { n: 11, d: 14, derivation: '' },
+  'PWY-6060': { n: 4, d: 13, derivation: '' },
+  'PWY-6339': { n: 5, d: 13, derivation: '' },
+  'PWY-6344': { n: 8, d: 21, derivation: '' },
+  'PWY-722': { n: 7, d: 15, derivation: '' },
+  'PWY-7295': { n: 5, d: 72, derivation: '' },
+  'PWY-6957': { n: 26, d: 11, derivation: '' },
+  'PWY-5328': { n: 11, d: 21, derivation: '' },
+  'PWY-6486': { n: 7, d: 16, derivation: '' },
+  'P184-PWY': { n: 13, d: 4, derivation: '' },
+  'PWY66-373': { n: 9, d: 32, derivation: '' },
+  'PWY-3661': { n: 25, d: 7, derivation: '' },
+
+  // ═══════════════════════════════════════════════════════════════
+  // SALVAGE (15 pathways)
+  // ═══════════════════════════════════════════════════════════════
+
+  // Salvage/Recycling (15)
+  'PWY-6609': { n: 10, d: 11, derivation: '' },
+  'PWY-6897': { n: 22, d: 21, derivation: '' },
+  'PWY-7199': { n: 9, d: 10, derivation: '' },
+  'PWY-7208': { n: 16, d: 15, derivation: '' },
+  'COBALSYN-PWY': { n: 13, d: 12, derivation: '' },
+  'PWY66-409': { n: 15, d: 16, derivation: '' },
+  'PWY-7196': { n: 13, d: 14, derivation: '' },
+  'NAD-BIOSYNTHESIS-II': { n: 12, d: 11, derivation: '' },
+  'PYRIDNUCSAL-PWY': { n: 11, d: 12, derivation: '' },
+  'PWY-7094': { n: 14, d: 13, derivation: '' },
+  'PWY-7200': { n: 17, d: 18, derivation: '' },
+  'PWY-7527': { n: 36, d: 35, derivation: '' },
+  'PWY-7528': { n: 35, d: 36, derivation: '' },
+  'PWY-7224': { n: 25, d: 24, derivation: '' },
+  'PWY-6269': { n: 12, d: 13, derivation: '' },
+
+  // ═══════════════════════════════════════════════════════════════
+  // OTHER (50 pathways)
+  // ═══════════════════════════════════════════════════════════════
+
+  // Unclassified (50)
+  'PWY-6151': { n: 4, d: 35, derivation: '' },
+  'PWY0-1586': { n: 35, d: 64, derivation: '' },
+  'PWY-3841': { n: 11, d: 18, derivation: '' },
+  'TRNA-CHARGING-PWY': { n: 6, d: 35, derivation: '' },
+  'PWY-7197': { n: 5, d: 12, derivation: '' },
+  'PWY-4041': { n: 9, d: 35, derivation: '' },
+  'PWY0-1479': { n: 70, d: 9, derivation: '' },
+  'PWY0-1261': { n: 7, d: 32, derivation: '' },
+  'FASYN-ELONG-PWY': { n: 49, d: 6, derivation: '' },
+  'PWY-4984': { n: 9, d: 14, derivation: '' },
+  'METH-ACETATE-PWY': { n: 81, d: 4, derivation: '' },
+  'FAO-PWY': { n: 6, d: 49, derivation: '' },
+  'PWY-1861': { n: 2, d: 27, derivation: '' },
+  'P185-PWY': { n: 16, d: 27, derivation: '' },
+  'GLUDEG-I-PWY': { n: 11, d: 16, derivation: '' },
+  'ARGORNPROST-PWY': { n: 21, d: 19, derivation: '' },
+  'NONMEVIPP-PWY': { n: 8, d: 15, derivation: '' },
+  'PWY-7560': { n: 20, d: 7, derivation: '' },
+  'SO4ASSIM-PWY': { n: 45, d: 16, derivation: '' },
+  'P124-PWY': { n: 18, d: 5, derivation: '' },
+  'PWY-5083': { n: 22, d: 3, derivation: '' },
+  'PWY-6531': { n: 7, d: 12, derivation: '' },
+  'RUMP-PWY': { n: 4, d: 27, derivation: '' },
+  'PWY-5138': { n: 3, d: 49, derivation: '' },
+  'PWY-6803': { n: 7, d: 48, derivation: '' },
+  'PWY-5675': { n: 5, d: 27, derivation: '' },
+  'PWY-5723': { n: 24, d: 5, derivation: '' },
+  'PWY490-3': { n: 3, d: 20, derivation: '' },
+  'KETOGLUCONMET-PWY': { n: 27, d: 7, derivation: '' },
+  'P221-PWY': { n: 7, d: 27, derivation: '' },
+  'PWY-6837': { n: 4, d: 49, derivation: '' },
+  'PWY-7616': { n: 8, d: 27, derivation: '' },
+  'METHANOGENESIS-PWY': { n: 81, d: 16, derivation: '' },
+  'PWY0-1338': { n: 28, d: 13, derivation: '' },
+  'PWY-922': { n: 15, d: 14, derivation: '' },
+  'PWY66-367': { n: 7, d: 18, derivation: '' },
+  'PWY66-388': { n: 8, d: 49, derivation: '' },
+  'PWY-6785': { n: 1, d: 16, derivation: '' },
+  'PWY-7031': { n: 7, d: 24, derivation: '' },
+  'DENITRIFICATION-PWY': { n: 3, d: 40, derivation: '' },
+  'PWY-6174': { n: 81, d: 32, derivation: '' },
+  'PWY-7039': { n: 7, d: 64, derivation: '' },
+  'LIPASYN-PWY': { n: 7, d: 81, derivation: '' },
+  'CODH-PWY': { n: 1, d: 81, derivation: '' },
+  'PWY-1622': { n: 1, d: 27, derivation: '' },
+  'PWY-6748': { n: 3, d: 80, derivation: '' },
+  'PWY-2201': { n: 18, d: 11, derivation: '' },
+  'PWY-6728': { n: 13, d: 9, derivation: '' },
+  'PWY-5430': { n: 13, d: 11, derivation: '' },
+  'PWY-4202': { n: 3, d: 13, derivation: '' },
+};
+
+// Auto-generate curated IDs from composed ratios
+const CURATED_IDS = new Set(Object.keys(COMPOSED_RATIOS));
+
+
+// ============================================================
+// SECTION 3: MS COMPARISON DATA
+// ============================================================
+
+const MS_COMPARISON_DATA = {
+  // ═══════════════════════════════════════════════════════════════
+  // CANTONI 2022 - DIRECT METAGENOMIC DATA (64 pathways)
+  // ═══════════════════════════════════════════════════════════════
+  
+  // MS-ELEVATED (2 from Cantoni)
+  'PWY-6269': { enrichedIn: 'ms', ldaScore: 1.4655, pValue: 0.023652, confidence: 'cantoni' },
+  'PWY-5306': { enrichedIn: 'ms', ldaScore: 0.7060, pValue: 0.026635, confidence: 'cantoni' },
+  
+  // HEALTHY-ENRICHED / DEPLETED IN MS (62 from Cantoni)
+  'PWY-6895': { enrichedIn: 'healthy', ldaScore: 1.5538, pValue: 0.042658, confidence: 'cantoni' },
+  'P42-PWY': { enrichedIn: 'healthy', ldaScore: 1.5455, pValue: 0.031962, confidence: 'cantoni' },
+  'TCA': { enrichedIn: 'healthy', ldaScore: 1.5033, pValue: 0.035927, confidence: 'cantoni' },
+  'PWY-5690': { enrichedIn: 'healthy', ldaScore: 1.4957, pValue: 0.026719, confidence: 'cantoni' },
+  'PWY-7357': { enrichedIn: 'healthy', ldaScore: 1.4681, pValue: 0.040305, confidence: 'cantoni' },
+  'PWY0-1061': { enrichedIn: 'healthy', ldaScore: 1.4492, pValue: 0.019624, confidence: 'cantoni' },
+  'ARGSYNBSUB-PWY': { enrichedIn: 'healthy', ldaScore: 1.4433, pValue: 0.020895, confidence: 'cantoni' },
+  'P4-PWY': { enrichedIn: 'healthy', ldaScore: 1.4367, pValue: 0.007735, confidence: 'cantoni' },
+  'PWY0-781': { enrichedIn: 'healthy', ldaScore: 1.4300, pValue: 0.006717, confidence: 'cantoni' },
+  'PWY-6305': { enrichedIn: 'healthy', ldaScore: 1.4272, pValue: 0.001586, confidence: 'cantoni' },
+  'DAPLYSINESYN-PWY': { enrichedIn: 'healthy', ldaScore: 1.3717, pValue: 0.028377, confidence: 'cantoni' },
+  'FAO-PWY': { enrichedIn: 'healthy', ldaScore: 1.3702, pValue: 0.026719, confidence: 'cantoni' },
+  'PWY-5136': { enrichedIn: 'healthy', ldaScore: 1.3674, pValue: 0.020895, confidence: 'cantoni' },
+  'PWY-6897': { enrichedIn: 'healthy', ldaScore: 1.3617, pValue: 0.013328, confidence: 'cantoni' },
+  'PWY-6590': { enrichedIn: 'healthy', ldaScore: 1.3459, pValue: 0.008889, confidence: 'cantoni' },
+  'P105-PWY': { enrichedIn: 'healthy', ldaScore: 1.3287, pValue: 0.010093, confidence: 'cantoni' },
+  'CENTFERM-PWY': { enrichedIn: 'healthy', ldaScore: 1.3123, pValue: 0.013328, confidence: 'cantoni' },
+  'ARG+POLYAMINE-SYN': { enrichedIn: 'healthy', ldaScore: 1.3024, pValue: 0.015194, confidence: 'cantoni' },
+  'PWY0-1296': { enrichedIn: 'healthy', ldaScore: 1.2929, pValue: 0.008889, confidence: 'cantoni' },
+  'PWY-5177': { enrichedIn: 'healthy', ldaScore: 1.2812, pValue: 0.035927, confidence: 'cantoni' },
+  'PWY0-1297': { enrichedIn: 'healthy', ldaScore: 1.2686, pValue: 0.008294, confidence: 'cantoni' },
+  'LACTOSECAT-PWY': { enrichedIn: 'healthy', ldaScore: 1.2677, pValue: 0.005034, confidence: 'cantoni' },
+  'PWY-5083': { enrichedIn: 'healthy', ldaScore: 1.2464, pValue: 0.028377, confidence: 'cantoni' },
+  'GOLPDLCAT-PWY': { enrichedIn: 'healthy', ldaScore: 1.2268, pValue: 0.040305, confidence: 'cantoni' },
+  'PWY0-1298': { enrichedIn: 'healthy', ldaScore: 1.1995, pValue: 0.011669, confidence: 'cantoni' },
+  'PWY-6435': { enrichedIn: 'healthy', ldaScore: 1.1891, pValue: 0.022236, confidence: 'cantoni' },
+  'PWY-5464': { enrichedIn: 'healthy', ldaScore: 1.1839, pValue: 0.030124, confidence: 'cantoni' },
+  'GLYCOLYSIS': { enrichedIn: 'healthy', ldaScore: 1.1714, pValue: 0.029040, confidence: 'cantoni', modes: ['consonance'] },
+  'PWY-1042': { enrichedIn: 'healthy', ldaScore: 1.1714, pValue: 0.029040, confidence: 'cantoni', modes: ['composed'], note: 'Glycolysis IV (canonical) - bacterial' },
+  'KETOGLUCONMET-PWY': { enrichedIn: 'healthy', ldaScore: 1.1446, pValue: 0.003742, confidence: 'cantoni' },
+  'POLYAMSYN-PWY': { enrichedIn: 'healthy', ldaScore: 1.1226, pValue: 0.017285, confidence: 'cantoni' },
+  'PWY-7279': { enrichedIn: 'healthy', ldaScore: 1.1031, pValue: 0.014115, confidence: 'cantoni' },
+  'GLYOXYLATE-BYPASS': { enrichedIn: 'healthy', ldaScore: 1.0762, pValue: 0.020097, confidence: 'cantoni' },
+  'PWY-4702': { enrichedIn: 'healthy', ldaScore: 1.0750, pValue: 0.042658, confidence: 'cantoni' },
+  'ENTBACSYN-PWY': { enrichedIn: 'healthy', ldaScore: 1.0706, pValue: 0.024939, confidence: 'cantoni' },
+  'PWY-561': { enrichedIn: 'healthy', ldaScore: 1.0629, pValue: 0.010067, confidence: 'cantoni' },
+  'TCA-GLYOX-BYPASS': { enrichedIn: 'healthy', ldaScore: 1.0525, pValue: 0.029040, confidence: 'cantoni' },
+  'GALACTARDEG-PWY': { enrichedIn: 'healthy', ldaScore: 1.0340, pValue: 0.040305, confidence: 'cantoni' },
+  'GLUCARGALACTSUPER-PWY': { enrichedIn: 'healthy', ldaScore: 1.0340, pValue: 0.040305, confidence: 'cantoni' },
+  'PWY-5173': { enrichedIn: 'healthy', ldaScore: 1.0158, pValue: 0.035927, confidence: 'cantoni' },
+  'P23-PWY': { enrichedIn: 'healthy', ldaScore: 1.0129, pValue: 0.031956, confidence: 'cantoni' },
+  'PWY-4041': { enrichedIn: 'healthy', ldaScore: 0.9763, pValue: 0.042658, confidence: 'cantoni' },
+  'PWY-4321': { enrichedIn: 'healthy', ldaScore: 0.9588, pValue: 0.036816, confidence: 'cantoni' },
+  'P125-PWY': { enrichedIn: 'healthy', ldaScore: 0.8644, pValue: 0.001052, confidence: 'cantoni' },
+  'PWY-7389': { enrichedIn: 'healthy', ldaScore: 0.8640, pValue: 0.042658, confidence: 'cantoni' },
+  'NAGLIPASYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.8583, pValue: 0.036749, confidence: 'cantoni' },
+  'TYRFUMCAT-PWY': { enrichedIn: 'healthy', ldaScore: 0.8066, pValue: 0.034618, confidence: 'cantoni' },
+  'PWY-6837': { enrichedIn: 'healthy', ldaScore: 0.7750, pValue: 0.033571, confidence: 'cantoni' },
+  'TRPSYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.7746, pValue: 0.047715, confidence: 'cantoni' },
+  'PWY-7165': { enrichedIn: 'healthy', ldaScore: 0.7667, pValue: 0.030568, confidence: 'cantoni' },
+  'PWY-6467': { enrichedIn: 'healthy', ldaScore: 0.7590, pValue: 0.032485, confidence: 'cantoni' },
+  'PWY-5392': { enrichedIn: 'healthy', ldaScore: 0.7233, pValue: 0.026713, confidence: 'cantoni' },
+  'PWY-7616': { enrichedIn: 'healthy', ldaScore: 0.6915, pValue: 0.025093, confidence: 'cantoni' },
+  'PWY-6470': { enrichedIn: 'healthy', ldaScore: 0.6834, pValue: 0.040933, confidence: 'cantoni' },
+  'VALDEG-PWY': { enrichedIn: 'healthy', ldaScore: 0.6795, pValue: 0.002923, confidence: 'cantoni' },
+  'PWY0-1277': { enrichedIn: 'healthy', ldaScore: 0.6396, pValue: 0.047293, confidence: 'cantoni' },
+  'DENITRIFICATION-PWY': { enrichedIn: 'healthy', ldaScore: 0.5962, pValue: 0.038615, confidence: 'cantoni' },
+  'PWY-6863': { enrichedIn: 'healthy', ldaScore: 0.5819, pValue: 0.011669, confidence: 'cantoni' },
+  'PWY-922': { enrichedIn: 'healthy', ldaScore: 0.5716, pValue: 0.046548, confidence: 'cantoni' },
+  'PWY-5415': { enrichedIn: 'healthy', ldaScore: 0.5555, pValue: 0.048594, confidence: 'cantoni' },
+  'PWY-5910': { enrichedIn: 'healthy', ldaScore: 0.5193, pValue: 0.043843, confidence: 'cantoni' },
+  'PWY-6690': { enrichedIn: 'healthy', ldaScore: 0.4677, pValue: 0.047293, confidence: 'cantoni' },
+  'HCAMHPDEG-PWY': { enrichedIn: 'healthy', ldaScore: 0.4647, pValue: 0.047293, confidence: 'cantoni' },
+  
+  // ═══════════════════════════════════════════════════════════════
+  // METABOLOMICS-INFERRED (23 pathways from Smusz 2024 review)
+  // ═══════════════════════════════════════════════════════════════
+  
+  // SCFA PRODUCTION (depleted in MS - strong evidence)
+  'P108-PWY': { enrichedIn: 'healthy', ldaScore: 0.90, confidence: 'metabolite-high', source: 'Duscha 2020', metabolite: 'propionate ↓' },
+  'PWY-5100': { enrichedIn: 'healthy', ldaScore: 0.75, confidence: 'metabolite-medium', source: 'Olsson 2021', metabolite: 'acetate ↓' },
+  'PWY-5676': { enrichedIn: 'healthy', ldaScore: 0.70, confidence: 'metabolite-medium', source: 'inferred', metabolite: 'butanoate via acetyl-CoA' },
+  
+  // AMINO ACID BIOSYNTHESIS (depleted amino acids)
+  'LYSINE-AMINOAD-PWY': { enrichedIn: 'healthy', ldaScore: 0.80, confidence: 'metabolite-high', source: 'Alwahsh 2024', metabolite: 'lysine ↓ 0.48-fold' },
+  'HISTSYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.70, confidence: 'metabolite-medium', source: 'Zido 2023', metabolite: 'histidine ↓' },
+  'VALSYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.65, confidence: 'metabolite-medium', source: 'Olsson 2021', metabolite: 'valine ↓' },
+  'ILEUSYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.65, confidence: 'metabolite-medium', source: 'Yang 2021', metabolite: 'isoleucine ↓' },
+  'BRANCHED-CHAIN-AA-SYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.70, confidence: 'metabolite-medium', source: 'multiple', metabolite: 'BCAAs ↓' },
+  'HOMOSER-METSYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.65, confidence: 'metabolite-medium', source: 'Zido 2023', metabolite: 'methionine dysregulated' },
+  'PWY-6628': { enrichedIn: 'healthy', ldaScore: 0.70, confidence: 'metabolite-medium', source: 'Yang 2021', metabolite: 'Phe ↓' },
+  'COMPLETE-ARO-PWY': { enrichedIn: 'healthy', ldaScore: 0.75, confidence: 'metabolite-medium', source: 'multiple', metabolite: 'aromatic AAs ↓' },
+  'PWY-5505': { enrichedIn: 'healthy', ldaScore: 0.75, confidence: 'metabolite-high', source: 'Alwahsh 2024', metabolite: 'glutamate ↓ 0.57-fold' },
+  
+  // NAD METABOLISM (niacinamide depleted)
+  'NADSYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.70, confidence: 'metabolite-medium', source: 'Yang 2021', metabolite: 'niacinamide ↓' },
+  'NAD-BIOSYNTHESIS-II': { enrichedIn: 'healthy', ldaScore: 0.70, confidence: 'metabolite-medium', source: 'Yang 2021', metabolite: 'NAD from tryptophan' },
+  'PYRIDNUCSYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.65, confidence: 'metabolite-medium', source: 'inferred', metabolite: 'NAD biosynthesis' },
+  
+  // PANTOTHENATE (elevated in MS - metabolic compensation?)
+  'PANTOSYN-PWY': { enrichedIn: 'ms', ldaScore: 0.60, confidence: 'metabolite-high', source: 'Alwahsh 2024', metabolite: 'pantothenate ↑ 1.37-fold' },
+  'COA-PWY': { enrichedIn: 'ms', ldaScore: 0.50, confidence: 'metabolite-medium', source: 'Alwahsh 2024', metabolite: 'CoA from pantothenate' },
+  
+  'TRPKYNCAT-PWY': { 
+    enrichedIn: 'healthy', 
+    ldaScore: 0.80, 
+    confidence: 'metabolite-high', 
+    source: 'Levi 2021 + Fitzgerald 2021', 
+    metabolite: 'indolelactate ↓, indolepropionate ↓',
+    note: 'Bacterial Stickland fermentation - produces protective indoles ILA→IPA',
+    modes: ['composed']  // Only show in composed mode
+  },
+  
+  // Mammalian kynurenine pathway - shows in consonance mode (raw HUMAnN3 data)
+  'PWY-6309': { 
+    enrichedIn: 'dysregulated', 
+    ldaScore: 0.80, 
+    confidence: 'metabolite-high', 
+    source: 'Staats Pires 2025', 
+    metabolite: 'KYNA ↓, QUIN/KYNA ↑',
+    note: 'Mammalian kynurenine pathway - HUMAnN3 gap-fill from host tissue',
+    modes: ['consonance']  // Only show in consonance mode
+  },
+  
+  // SPHINGOLIPID (S1P depleted)
+  'PWY-5129': { enrichedIn: 'healthy', ldaScore: 0.70, confidence: 'metabolite-high', source: 'Yang 2021', metabolite: 'S1P ↓' },
+  
+  // PHOSPHOLIPID (choline/phosphocholine depleted)
+  'PWY-5667': { enrichedIn: 'healthy', ldaScore: 0.65, confidence: 'metabolite-medium', source: 'Alwahsh 2024', metabolite: 'phosphocholine ↓' },
+  'PWY4FS-5': { enrichedIn: 'healthy', ldaScore: 0.60, confidence: 'metabolite-medium', source: 'Alwahsh 2024', metabolite: 'choline ↓ 0.50-fold' },
 };
 
 
 // ============================================================
-// MODE 3: SUBCATEGORY-LEVEL RATIOS (placeholder)
+// SECTION 4: RAW PATHWAY DATA (597 pathways from HUMAnN3)
 // ============================================================
-// This is where your original detailed RATIO_MAPS would go
-// Keep your existing RATIO_MAPS object here if you want subcategory mode
-
-// ╔════════════════════════════════════════════════════════════════════════════╗
-// ║  PATHWAY DATA - Sorted by abundance within each subcategory                ║
-// ╚════════════════════════════════════════════════════════════════════════════╝
 
 const ALL_PATHWAYS_RAW = [
     { id: 'VALSYN-PWY', name: "L-valine biosynthesis", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.999177801, tier: 'UNIVERSAL', medianAbundance: 0.000548051, meanAbundance: 0.000558411 },
-    { id: 'PWY-6386', name: "UDP-N-acetylmuramoyl-pentapeptide biosynthesis II (lysine-containing)", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.999177801, tier: 'UNIVERSAL', medianAbundance: 0.000544442, meanAbundance: 0.000547687 },
+    { id: 'PWY-6386', name: "UDP-N-acetylmuramoyl-pentapeptide biosynthesis II (lysine-containing)", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.999177801, tier: 'UNIVERSAL', medianAbundance: 0.000544442, meanAbundance: 0.000547687 },
     { id: 'ILEUSYN-PWY', name: "L-isoleucine biosynthesis I (from threonine)", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.998972251, tier: 'UNIVERSAL', medianAbundance: 0.000548051, meanAbundance: 0.000558378 },
     { id: 'BRANCHED-CHAIN-AA-SYN-PWY', name: "superpathway of branched amino acid biosynthesis", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.998972251, tier: 'UNIVERSAL', medianAbundance: 0.000445759, meanAbundance: 0.000461325 },
     { id: 'PWY-5097', name: "L-lysine biosynthesis VI", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.998972251, tier: 'UNIVERSAL', medianAbundance: 0.000443246, meanAbundance: 0.000448348 },
@@ -206,7 +689,7 @@ const ALL_PATHWAYS_RAW = [
     { id: 'PWY-2942', name: "L-lysine biosynthesis III", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.998766701, tier: 'UNIVERSAL', medianAbundance: 0.000407016, meanAbundance: 0.000416004 },
     { id: 'PWY-3001', name: "superpathway of L-isoleucine biosynthesis I", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.998766701, tier: 'UNIVERSAL', medianAbundance: 0.000339195, meanAbundance: 0.000342277 },
     { id: 'THRESYN-PWY', name: "superpathway of L-threonine biosynthesis", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.998766701, tier: 'UNIVERSAL', medianAbundance: 0.000290123, meanAbundance: 0.00029476 },
-    { id: 'PYRIDNUCSYN-PWY', name: "NAD biosynthesis I (from aspartate)", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.998561151, tier: 'UNIVERSAL', medianAbundance: 0.000288774, meanAbundance: 0.000293396 },
+    { id: 'PYRIDNUCSYN-PWY', name: "NAD biosynthesis I (from aspartate)", category: 'biosynthesis', subcategory: 'Cofactors/Vitamins', prevalence: 0.998561151, tier: 'UNIVERSAL', medianAbundance: 0.000288774, meanAbundance: 0.000293396 },
     { id: 'HSERMETANA-PWY', name: "L-methionine biosynthesis III", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.998561151, tier: 'UNIVERSAL', medianAbundance: 0.000271169, meanAbundance: 0.000272231 },
     { id: 'SER-GLYSYN-PWY', name: "superpathway of L-serine and glycine biosynthesis I", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.998561151, tier: 'UNIVERSAL', medianAbundance: 0.000259368, meanAbundance: 0.000260385 },
     { id: 'COMPLETE-ARO-PWY', name: "superpathway of aromatic amino acid biosynthesis", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.998355601, tier: 'UNIVERSAL', medianAbundance: 0.000442414, meanAbundance: 0.000438332 },
@@ -216,7 +699,7 @@ const ALL_PATHWAYS_RAW = [
     { id: 'TRPSYN-PWY', name: "L-tryptophan biosynthesis", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.998150051, tier: 'UNIVERSAL', medianAbundance: 0.00025553, meanAbundance: 0.000253914 },
     { id: 'PWY-5154', name: "L-arginine biosynthesis III (via N-acetyl-L-citrulline)", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.996711202, tier: 'UNIVERSAL', medianAbundance: 0.000171412, meanAbundance: 0.000180577 },
     { id: 'PWY-4981', name: "L-proline biosynthesis II (from arginine)", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.995272354, tier: 'UNIVERSAL', medianAbundance: 9.92E-05, meanAbundance: 0.000111509 },
-    { id: 'PWY-5188', name: "tetrapyrrole biosynthesis I (from glutamate)", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.994655704, tier: 'UNIVERSAL', medianAbundance: 0.000128702, meanAbundance: 0.000131938 },
+    { id: 'PWY-5188', name: "tetrapyrrole biosynthesis I (from glutamate)", category: 'biosynthesis', subcategory: 'Cofactors/Vitamins', prevalence: 0.994655704, tier: 'UNIVERSAL', medianAbundance: 0.000128702, meanAbundance: 0.000131938 },
     { id: 'PWY-5104', name: "L-isoleucine biosynthesis IV", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.992189106, tier: 'UNIVERSAL', medianAbundance: 0.000112167, meanAbundance: 0.000124661 },
     { id: 'PWY-2941', name: "L-lysine biosynthesis II", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.988900308, tier: 'VERY_COMMON', medianAbundance: 8.82E-05, meanAbundance: 0.000100507 },
     { id: 'MET-SAM-PWY', name: "superpathway of S-adenosyl-L-methionine biosynthesis", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.988078109, tier: 'VERY_COMMON', medianAbundance: 9.30E-05, meanAbundance: 0.000101413 },
@@ -232,23 +715,23 @@ const ALL_PATHWAYS_RAW = [
     { id: 'P4-PWY', name: "superpathway of L-lysine, L-threonine and L-methionine biosynthesis I", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.954779034, tier: 'VERY_COMMON', medianAbundance: 5.49E-05, meanAbundance: 6.85E-05 },
     { id: 'SULFATE-CYS-PWY', name: "superpathway of sulfate assimilation and cysteine biosynthesis", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.890853032, tier: 'MODERATE', medianAbundance: 2.51E-05, meanAbundance: 4.01E-05 },
     { id: 'PWY-5345', name: "superpathway of L-methionine biosynthesis (by sulfhydrylation)", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.890441932, tier: 'MODERATE', medianAbundance: 3.04E-05, meanAbundance: 4.67E-05 },
-    { id: 'PWY-5189', name: "tetrapyrrole biosynthesis II (from glycine)", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.828776978, tier: 'MODERATE', medianAbundance: 5.13E-06, meanAbundance: 1.12E-05 },
-    { id: 'PWY-5918', name: "superpathay of heme biosynthesis from glutamate", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.730318602, tier: 'MODERATE', medianAbundance: 4.81E-06, meanAbundance: 1.09E-05 },
+    { id: 'PWY-5189', name: "tetrapyrrole biosynthesis II (from glycine)", category: 'biosynthesis', subcategory: 'Cofactors/Vitamins', prevalence: 0.828776978, tier: 'MODERATE', medianAbundance: 5.13E-06, meanAbundance: 1.12E-05 },
+    { id: 'PWY-5918', name: "superpathay of heme biosynthesis from glutamate", category: 'biosynthesis', subcategory: 'Cofactors/Vitamins', prevalence: 0.730318602, tier: 'MODERATE', medianAbundance: 4.81E-06, meanAbundance: 1.09E-05 },
     { id: 'PWY-821', name: "superpathway of sulfur amino acid biosynthesis (Saccharomyces cerevisiae)", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.697019527, tier: 'MODERATE', medianAbundance: 5.31E-06, meanAbundance: 1.36E-05 },
     { id: 'PWY-6628', name: "superpathway of L-phenylalanine biosynthesis", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.69352518, tier: 'MODERATE', medianAbundance: 8.89E-06, meanAbundance: 2.90E-05 },
     { id: 'PWY-6630', name: "superpathway of L-tyrosine biosynthesis", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.540184995, tier: 'MODERATE', medianAbundance: 2.65E-06, meanAbundance: 1.38E-05 },
     { id: 'PWY-6629', name: "superpathway of L-tryptophan biosynthesis", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.502363823, tier: 'MODERATE', medianAbundance: 1.06E-06, meanAbundance: 2.06E-05 },
     { id: 'PWY-5101', name: "L-isoleucine biosynthesis II", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.444193217, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 9.07E-06 },
-    { id: 'PWY-5920', name: "superpathway of heme biosynthesis from glycine", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.388900308, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 4.14E-06 },
+    { id: 'PWY-5920', name: "superpathway of heme biosynthesis from glycine", category: 'biosynthesis', subcategory: 'Cofactors/Vitamins', prevalence: 0.388900308, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 4.14E-06 },
     { id: 'PWY-6281', name: "L-selenocysteine biosynthesis II (archaea and eukaryotes)", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.032682425, tier: 'RARE', medianAbundance: 0, meanAbundance: 5.75E-08 },
-    { id: 'NADSYN-PWY', name: "NAD biosynthesis II (from tryptophan)", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.001027749, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.89E-09 },
+    { id: 'NADSYN-PWY', name: "NAD biosynthesis II (from tryptophan)", category: 'biosynthesis', subcategory: 'Cofactors/Vitamins', prevalence: 0.001027749, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.89E-09 },
     { id: 'LYSINE-AMINOAD-PWY', name: "L-lysine biosynthesis IV", category: 'biosynthesis', subcategory: 'Amino Acids', prevalence: 0.00020555, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.16E-10 },
-    { id: 'PEPTIDOGLYCANSYN-PWY', name: "peptidoglycan biosynthesis I (meso-diaminopimelate containing)", category: 'biosynthesis', subcategory: 'Cell Wall', prevalence: 0.998972251, tier: 'UNIVERSAL', medianAbundance: 0.000529434, meanAbundance: 0.000537655 },
-    { id: 'PWY-6385', name: "peptidoglycan biosynthesis III (mycobacteria)", category: 'biosynthesis', subcategory: 'Cell Wall', prevalence: 0.998972251, tier: 'UNIVERSAL', medianAbundance: 0.00051488, meanAbundance: 0.000523088 },
-    { id: 'PWY-6471', name: "peptidoglycan biosynthesis IV (Enterococcus faecium)", category: 'biosynthesis', subcategory: 'Cell Wall', prevalence: 0.962589928, tier: 'VERY_COMMON', medianAbundance: 0.000129528, meanAbundance: 0.000130519 },
-    { id: 'PWY-6470', name: "peptidoglycan biosynthesis V (&beta;-lactam resistance)", category: 'biosynthesis', subcategory: 'Cell Wall', prevalence: 0.951490236, tier: 'VERY_COMMON', medianAbundance: 6.76E-05, meanAbundance: 7.13E-05 },
-    { id: 'PWY-5265', name: "peptidoglycan biosynthesis II (staphylococci)", category: 'biosynthesis', subcategory: 'Cell Wall', prevalence: 0.34717369, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 9.46E-06 },
-    { id: 'LPSSYN-PWY', name: "superpathway of lipopolysaccharide biosynthesis", category: 'biosynthesis', subcategory: 'Cell Wall', prevalence: 0.228160329, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 1.91E-06 },
+    { id: 'PEPTIDOGLYCANSYN-PWY', name: "peptidoglycan biosynthesis I (meso-diaminopimelate containing)", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.998972251, tier: 'UNIVERSAL', medianAbundance: 0.000529434, meanAbundance: 0.000537655 },
+    { id: 'PWY-6385', name: "peptidoglycan biosynthesis III (mycobacteria)", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.998972251, tier: 'UNIVERSAL', medianAbundance: 0.00051488, meanAbundance: 0.000523088 },
+    { id: 'PWY-6471', name: "peptidoglycan biosynthesis IV (Enterococcus faecium)", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.962589928, tier: 'VERY_COMMON', medianAbundance: 0.000129528, meanAbundance: 0.000130519 },
+    { id: 'PWY-6470', name: "peptidoglycan biosynthesis V (&beta;-lactam resistance)", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.951490236, tier: 'VERY_COMMON', medianAbundance: 6.76E-05, meanAbundance: 7.13E-05 },
+    { id: 'PWY-5265', name: "peptidoglycan biosynthesis II (staphylococci)", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.34717369, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 9.46E-06 },
+    { id: 'LPSSYN-PWY', name: "superpathway of lipopolysaccharide biosynthesis", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.228160329, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 1.91E-06 },
     { id: 'COA-PWY', name: "coenzyme A biosynthesis I", category: 'biosynthesis', subcategory: 'Cofactors/Vitamins', prevalence: 0.999177801, tier: 'UNIVERSAL', medianAbundance: 0.000414035, meanAbundance: 0.000414154 },
     { id: 'COA-PWY-1', name: "coenzyme A biosynthesis II (mammalian)", category: 'biosynthesis', subcategory: 'Cofactors/Vitamins', prevalence: 0.998972251, tier: 'UNIVERSAL', medianAbundance: 0.000491978, meanAbundance: 0.000488684 },
     { id: 'PWY-4242', name: "pantothenate and coenzyme A biosynthesis III", category: 'biosynthesis', subcategory: 'Cofactors/Vitamins', prevalence: 0.998972251, tier: 'UNIVERSAL', medianAbundance: 0.000414723, meanAbundance: 0.000411736 },
@@ -306,70 +789,70 @@ const ALL_PATHWAYS_RAW = [
     { id: 'PWY-7211', name: "superpathway of pyrimidine deoxyribonucleotides de novo biosynthesis", category: 'biosynthesis', subcategory: 'Nucleotides', prevalence: 0.971223022, tier: 'VERY_COMMON', medianAbundance: 8.30E-05, meanAbundance: 8.05E-05 },
     { id: 'PWY-7282', name: "4-amino-2-methyl-5-phosphomethylpyrimidine biosynthesis (yeast)", category: 'biosynthesis', subcategory: 'Nucleotides', prevalence: 0.956217883, tier: 'VERY_COMMON', medianAbundance: 0.000113586, meanAbundance: 0.000116336 },
     { id: 'PWY-7210', name: "pyrimidine deoxyribonucleotides biosynthesis from CTP", category: 'biosynthesis', subcategory: 'Nucleotides', prevalence: 0.744295992, tier: 'MODERATE', medianAbundance: 1.06E-05, meanAbundance: 1.80E-05 },
-    { id: 'DTDPRHAMSYN-PWY', name: "dTDP-L-rhamnose biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.99938335, tier: 'UNIVERSAL', medianAbundance: 0.000541803, meanAbundance: 0.000579591 },
+    { id: 'DTDPRHAMSYN-PWY', name: "dTDP-L-rhamnose biosynthesis I", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.99938335, tier: 'UNIVERSAL', medianAbundance: 0.000541803, meanAbundance: 0.000579591 },
     { id: 'PWY-5686', name: "UMP biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.999177801, tier: 'UNIVERSAL', medianAbundance: 0.000549603, meanAbundance: 0.000559694 },
-    { id: 'PWY-6700', name: "queuosine biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.999177801, tier: 'UNIVERSAL', medianAbundance: 0.000452934, meanAbundance: 0.000461838 },
-    { id: 'PWY-6387', name: "UDP-N-acetylmuramoyl-pentapeptide biosynthesis I (meso-diaminopimelate containing)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.998972251, tier: 'UNIVERSAL', medianAbundance: 0.000536877, meanAbundance: 0.000543909 },
-    { id: 'GLUTORN-PWY', name: "L-ornithine biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.998972251, tier: 'UNIVERSAL', medianAbundance: 0.000364956, meanAbundance: 0.000358672 },
+    { id: 'PWY-6700', name: "queuosine biosynthesis", category: 'biosynthesis', subcategory: 'Specialized', prevalence: 0.999177801, tier: 'UNIVERSAL', medianAbundance: 0.000452934, meanAbundance: 0.000461838 },
+    { id: 'PWY-6387', name: "UDP-N-acetylmuramoyl-pentapeptide biosynthesis I (meso-diaminopimelate containing)", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.998972251, tier: 'UNIVERSAL', medianAbundance: 0.000536877, meanAbundance: 0.000543909 },
+    { id: 'GLUTORN-PWY', name: "L-ornithine biosynthesis", category: 'biosynthesis', subcategory: 'Specialized', prevalence: 0.998972251, tier: 'UNIVERSAL', medianAbundance: 0.000364956, meanAbundance: 0.000358672 },
     { id: 'PWY-6123', name: "inosine-5\'-phosphate biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.998561151, tier: 'UNIVERSAL', medianAbundance: 0.000333908, meanAbundance: 0.000336236 },
     { id: 'PWY-6124', name: "inosine-5\'-phosphate biosynthesis II", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.998561151, tier: 'UNIVERSAL', medianAbundance: 0.000314442, meanAbundance: 0.00031704 },
     { id: 'PWY-6163', name: "chorismate biosynthesis from 3-dehydroquinate", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.998355601, tier: 'UNIVERSAL', medianAbundance: 0.000490648, meanAbundance: 0.000486687 },
     { id: 'ARO-PWY', name: "chorismate biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.998355601, tier: 'UNIVERSAL', medianAbundance: 0.000467789, meanAbundance: 0.000460302 },
     { id: 'PANTO-PWY', name: "phosphopantothenate biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.998355601, tier: 'UNIVERSAL', medianAbundance: 0.000320705, meanAbundance: 0.000323503 },
     { id: 'GLYCOGENSYNTH-PWY', name: "glycogen biosynthesis I (from ADP-D-Glucose)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.998355601, tier: 'UNIVERSAL', medianAbundance: 0.000290847, meanAbundance: 0.000303944 },
-    { id: 'PWY-5667', name: "CDP-diacylglycerol biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.998150051, tier: 'UNIVERSAL', medianAbundance: 0.000404056, meanAbundance: 0.000397125 },
+    { id: 'PWY-5667', name: "CDP-diacylglycerol biosynthesis I", category: 'biosynthesis', subcategory: 'Fatty Acids/Lipids', prevalence: 0.998150051, tier: 'UNIVERSAL', medianAbundance: 0.000404056, meanAbundance: 0.000397125 },
     { id: 'PWY0-1319', name: "CDP-diacylglycerol biosynthesis II", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.998150051, tier: 'UNIVERSAL', medianAbundance: 0.000404056, meanAbundance: 0.000397129 },
-    { id: 'PWY-5695', name: "urate biosynthesis/inosine 5\'-phosphate degradation", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.998150051, tier: 'UNIVERSAL', medianAbundance: 0.000401105, meanAbundance: 0.000407512 },
-    { id: 'PWY-5973', name: "cis-vaccenate biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.998150051, tier: 'UNIVERSAL', medianAbundance: 0.000243589, meanAbundance: 0.000242642 },
-    { id: 'PWY-7663', name: "gondoate biosynthesis (anaerobic)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.998150051, tier: 'UNIVERSAL', medianAbundance: 0.000217685, meanAbundance: 0.000220962 },
-    { id: 'RIBOSYN2-PWY', name: "flavin biosynthesis I (bacteria and plants)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.997738952, tier: 'UNIVERSAL', medianAbundance: 0.000345745, meanAbundance: 0.000364579 },
+    { id: 'PWY-5695', name: "urate biosynthesis/inosine 5\'-phosphate degradation", category: 'biosynthesis', subcategory: 'Specialized', prevalence: 0.998150051, tier: 'UNIVERSAL', medianAbundance: 0.000401105, meanAbundance: 0.000407512 },
+    { id: 'PWY-5973', name: "cis-vaccenate biosynthesis", category: 'biosynthesis', subcategory: 'Fatty Acids/Lipids', prevalence: 0.998150051, tier: 'UNIVERSAL', medianAbundance: 0.000243589, meanAbundance: 0.000242642 },
+    { id: 'PWY-7663', name: "gondoate biosynthesis (anaerobic)", category: 'biosynthesis', subcategory: 'Fatty Acids/Lipids', prevalence: 0.998150051, tier: 'UNIVERSAL', medianAbundance: 0.000217685, meanAbundance: 0.000220962 },
+    { id: 'RIBOSYN2-PWY', name: "flavin biosynthesis I (bacteria and plants)", category: 'biosynthesis', subcategory: 'Cofactors/Vitamins', prevalence: 0.997738952, tier: 'UNIVERSAL', medianAbundance: 0.000345745, meanAbundance: 0.000364579 },
     { id: 'OANTIGEN-PWY', name: "O-antigen building blocks biosynthesis (E. coli)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.997327852, tier: 'UNIVERSAL', medianAbundance: 0.00025001, meanAbundance: 0.000253516 },
-    { id: 'UDPNAGSYN-PWY', name: "UDP-N-acetyl-D-glucosamine biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.997327852, tier: 'UNIVERSAL', medianAbundance: 0.00018532, meanAbundance: 0.000198886 },
+    { id: 'UDPNAGSYN-PWY', name: "UDP-N-acetyl-D-glucosamine biosynthesis I", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.997327852, tier: 'UNIVERSAL', medianAbundance: 0.00018532, meanAbundance: 0.000198886 },
     { id: 'PWY-6168', name: "flavin biosynthesis III (fungi)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.996300103, tier: 'UNIVERSAL', medianAbundance: 0.00027735, meanAbundance: 0.000273278 },
-    { id: 'PWY-6703', name: "preQ0 biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.995889003, tier: 'UNIVERSAL', medianAbundance: 0.000213342, meanAbundance: 0.000227655 },
+    { id: 'PWY-6703', name: "preQ0 biosynthesis", category: 'biosynthesis', subcategory: 'Specialized', prevalence: 0.995889003, tier: 'UNIVERSAL', medianAbundance: 0.000213342, meanAbundance: 0.000227655 },
     { id: 'PWY4FS-7', name: "phosphatidylglycerol biosynthesis I (plastidic)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.995889003, tier: 'UNIVERSAL', medianAbundance: 0.00011225, meanAbundance: 0.000124796 },
-    { id: 'PWY4FS-8', name: "phosphatidylglycerol biosynthesis II (non-plastidic)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.995889003, tier: 'UNIVERSAL', medianAbundance: 0.00011225, meanAbundance: 0.000124796 },
-    { id: 'PWY-5659', name: "GDP-mannose biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.995272354, tier: 'UNIVERSAL', medianAbundance: 0.000104956, meanAbundance: 0.000109723 },
-    { id: 'PWY-6892', name: "thiazole biosynthesis I (E. coli)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.995066804, tier: 'UNIVERSAL', medianAbundance: 0.000174276, meanAbundance: 0.000179555 },
-    { id: 'PWY-6147', name: "6-hydroxymethyl-dihydropterin diphosphate biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.994861254, tier: 'UNIVERSAL', medianAbundance: 0.000139838, meanAbundance: 0.000171028 },
+    { id: 'PWY4FS-8', name: "phosphatidylglycerol biosynthesis II (non-plastidic)", category: 'biosynthesis', subcategory: 'Fatty Acids/Lipids', prevalence: 0.995889003, tier: 'UNIVERSAL', medianAbundance: 0.00011225, meanAbundance: 0.000124796 },
+    { id: 'PWY-5659', name: "GDP-mannose biosynthesis", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.995272354, tier: 'UNIVERSAL', medianAbundance: 0.000104956, meanAbundance: 0.000109723 },
+    { id: 'PWY-6892', name: "thiazole biosynthesis I (E. coli)", category: 'biosynthesis', subcategory: 'Cofactors/Vitamins', prevalence: 0.995066804, tier: 'UNIVERSAL', medianAbundance: 0.000174276, meanAbundance: 0.000179555 },
+    { id: 'PWY-6147', name: "6-hydroxymethyl-dihydropterin diphosphate biosynthesis I", category: 'biosynthesis', subcategory: 'Cofactors/Vitamins', prevalence: 0.994861254, tier: 'UNIVERSAL', medianAbundance: 0.000139838, meanAbundance: 0.000171028 },
     { id: 'PWY-7539', name: "6-hydroxymethyl-dihydropterin diphosphate biosynthesis III (Chlamydia)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.994655704, tier: 'UNIVERSAL', medianAbundance: 0.000138423, meanAbundance: 0.000168401 },
-    { id: 'PWY-1269', name: "CMP-3-deoxy-D-manno-octulosonate biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.994244604, tier: 'UNIVERSAL', medianAbundance: 7.69E-05, meanAbundance: 0.000114393 },
-    { id: 'COLANSYN-PWY', name: "colanic acid building blocks biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.992189106, tier: 'UNIVERSAL', medianAbundance: 8.78E-05, meanAbundance: 8.90E-05 },
+    { id: 'PWY-1269', name: "CMP-3-deoxy-D-manno-octulosonate biosynthesis I", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.994244604, tier: 'UNIVERSAL', medianAbundance: 7.69E-05, meanAbundance: 0.000114393 },
+    { id: 'COLANSYN-PWY', name: "colanic acid building blocks biosynthesis", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.992189106, tier: 'UNIVERSAL', medianAbundance: 8.78E-05, meanAbundance: 8.90E-05 },
     { id: 'PWY-7323', name: "superpathway of GDP-mannose-derived O-antigen building blocks biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.991366906, tier: 'UNIVERSAL', medianAbundance: 7.42E-05, meanAbundance: 7.86E-05 },
     { id: 'PWY-7234', name: "inosine-5\'-phosphate biosynthesis III", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.990133607, tier: 'UNIVERSAL', medianAbundance: 9.84E-05, meanAbundance: 0.000109071 },
-    { id: 'PWY-5989', name: "stearate biosynthesis II (bacteria and plants)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.982322713, tier: 'VERY_COMMON', medianAbundance: 5.27E-05, meanAbundance: 6.76E-05 },
-    { id: 'CITRULBIO-PWY', name: "L-citrulline biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.980883864, tier: 'VERY_COMMON', medianAbundance: 8.51E-05, meanAbundance: 0.000100445 },
-    { id: 'PWY0-862', name: "(5Z)-dodec-5-enoate biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.977183967, tier: 'VERY_COMMON', medianAbundance: 5.22E-05, meanAbundance: 6.87E-05 },
-    { id: 'PWY-7664', name: "oleate biosynthesis IV (anaerobic)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.976567318, tier: 'VERY_COMMON', medianAbundance: 5.81E-05, meanAbundance: 7.47E-05 },
-    { id: 'PWY-6282', name: "palmitoleate biosynthesis I (from (5Z)-dodec-5-enoate)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.976567318, tier: 'VERY_COMMON', medianAbundance: 5.17E-05, meanAbundance: 6.82E-05 },
+    { id: 'PWY-5989', name: "stearate biosynthesis II (bacteria and plants)", category: 'biosynthesis', subcategory: 'Fatty Acids/Lipids', prevalence: 0.982322713, tier: 'VERY_COMMON', medianAbundance: 5.27E-05, meanAbundance: 6.76E-05 },
+    { id: 'CITRULBIO-PWY', name: "L-citrulline biosynthesis", category: 'biosynthesis', subcategory: 'Specialized', prevalence: 0.980883864, tier: 'VERY_COMMON', medianAbundance: 8.51E-05, meanAbundance: 0.000100445 },
+    { id: 'PWY0-862', name: "(5Z)-dodec-5-enoate biosynthesis", category: 'biosynthesis', subcategory: 'Fatty Acids/Lipids', prevalence: 0.977183967, tier: 'VERY_COMMON', medianAbundance: 5.22E-05, meanAbundance: 6.87E-05 },
+    { id: 'PWY-7664', name: "oleate biosynthesis IV (anaerobic)", category: 'biosynthesis', subcategory: 'Fatty Acids/Lipids', prevalence: 0.976567318, tier: 'VERY_COMMON', medianAbundance: 5.81E-05, meanAbundance: 7.47E-05 },
+    { id: 'PWY-6282', name: "palmitoleate biosynthesis I (from (5Z)-dodec-5-enoate)", category: 'biosynthesis', subcategory: 'Fatty Acids/Lipids', prevalence: 0.976567318, tier: 'VERY_COMMON', medianAbundance: 5.17E-05, meanAbundance: 6.82E-05 },
     { id: 'PWY-7388', name: "octanoyl-[acyl-carrier protein] biosynthesis (mitochondria, yeast)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.976567318, tier: 'VERY_COMMON', medianAbundance: 4.91E-05, meanAbundance: 6.64E-05 },
-    { id: 'TEICHOICACID-PWY', name: "teichoic acid (poly-glycerol) biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.975539568, tier: 'VERY_COMMON', medianAbundance: 5.52E-05, meanAbundance: 5.68E-05 },
+    { id: 'TEICHOICACID-PWY', name: "teichoic acid (poly-glycerol) biosynthesis", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.975539568, tier: 'VERY_COMMON', medianAbundance: 5.52E-05, meanAbundance: 5.68E-05 },
     { id: 'PWYG-321', name: "mycolate biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.972250771, tier: 'VERY_COMMON', medianAbundance: 6.06E-05, meanAbundance: 7.75E-05 },
     { id: 'ARGININE-SYN4-PWY', name: "L-ornithine de novo  biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.971839671, tier: 'VERY_COMMON', medianAbundance: 6.58E-05, meanAbundance: 9.34E-05 },
-    { id: 'PPGPPMET-PWY', name: "ppGpp biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.968139774, tier: 'VERY_COMMON', medianAbundance: 2.55E-05, meanAbundance: 3.06E-05 },
-    { id: 'PWY-6519', name: "8-amino-7-oxononanoate biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.967523124, tier: 'VERY_COMMON', medianAbundance: 5.08E-05, meanAbundance: 6.40E-05 },
-    { id: 'PWY0-1241', name: "ADP-L-glycero-&beta;-D-manno-heptose biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.963412127, tier: 'VERY_COMMON', medianAbundance: 2.10E-05, meanAbundance: 3.00E-05 },
-    { id: 'PWY-6891', name: "thiazole biosynthesis II (Bacillus)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.963001028, tier: 'VERY_COMMON', medianAbundance: 3.15E-05, meanAbundance: 4.05E-05 },
-    { id: 'PYRIDOXSYN-PWY', name: "pyridoxal 5\'-phosphate biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.95971223, tier: 'VERY_COMMON', medianAbundance: 5.49E-05, meanAbundance: 7.74E-05 },
-    { id: 'POLYISOPRENSYN-PWY', name: "polyisoprenoid biosynthesis (E. coli)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.958890031, tier: 'VERY_COMMON', medianAbundance: 3.52E-05, meanAbundance: 4.33E-05 },
+    { id: 'PPGPPMET-PWY', name: "ppGpp biosynthesis", category: 'biosynthesis', subcategory: 'Specialized', prevalence: 0.968139774, tier: 'VERY_COMMON', medianAbundance: 2.55E-05, meanAbundance: 3.06E-05 },
+    { id: 'PWY-6519', name: "8-amino-7-oxononanoate biosynthesis I", category: 'biosynthesis', subcategory: 'Cofactors/Vitamins', prevalence: 0.967523124, tier: 'VERY_COMMON', medianAbundance: 5.08E-05, meanAbundance: 6.40E-05 },
+    { id: 'PWY0-1241', name: "ADP-L-glycero-&beta;-D-manno-heptose biosynthesis", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.963412127, tier: 'VERY_COMMON', medianAbundance: 2.10E-05, meanAbundance: 3.00E-05 },
+    { id: 'PWY-6891', name: "thiazole biosynthesis II (Bacillus)", category: 'biosynthesis', subcategory: 'Cofactors/Vitamins', prevalence: 0.963001028, tier: 'VERY_COMMON', medianAbundance: 3.15E-05, meanAbundance: 4.05E-05 },
+    { id: 'PYRIDOXSYN-PWY', name: "pyridoxal 5\'-phosphate biosynthesis I", category: 'biosynthesis', subcategory: 'Cofactors/Vitamins', prevalence: 0.95971223, tier: 'VERY_COMMON', medianAbundance: 5.49E-05, meanAbundance: 7.74E-05 },
+    { id: 'POLYISOPRENSYN-PWY', name: "polyisoprenoid biosynthesis (E. coli)", category: 'biosynthesis', subcategory: 'Isoprenoids', prevalence: 0.958890031, tier: 'VERY_COMMON', medianAbundance: 3.52E-05, meanAbundance: 4.33E-05 },
     { id: 'PWY0-845', name: "superpathway of pyridoxal 5\'-phosphate biosynthesis and salvage", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.953340185, tier: 'VERY_COMMON', medianAbundance: 6.59E-05, meanAbundance: 8.44E-05 },
-    { id: 'PWY-6859', name: "all-trans-farnesol biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.927235355, tier: 'COMMON', medianAbundance: 2.32E-05, meanAbundance: 3.03E-05 },
+    { id: 'PWY-6859', name: "all-trans-farnesol biosynthesis", category: 'biosynthesis', subcategory: 'Isoprenoids', prevalence: 0.927235355, tier: 'COMMON', medianAbundance: 2.32E-05, meanAbundance: 3.03E-05 },
     { id: 'PWY-7328', name: "superpathway of UDP-glucose-derived O-antigen building blocks biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.922096608, tier: 'COMMON', medianAbundance: 1.84E-05, meanAbundance: 2.92E-05 },
-    { id: 'PWY-7315', name: "dTDP-N-acetylthomosamine biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.914902364, tier: 'COMMON', medianAbundance: 1.07E-05, meanAbundance: 2.02E-05 },
-    { id: 'PWY-6270', name: "isoprene biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.896402878, tier: 'MODERATE', medianAbundance: 3.54E-05, meanAbundance: 6.38E-05 },
+    { id: 'PWY-7315', name: "dTDP-N-acetylthomosamine biosynthesis", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.914902364, tier: 'COMMON', medianAbundance: 1.07E-05, meanAbundance: 2.02E-05 },
+    { id: 'PWY-6270', name: "isoprene biosynthesis I", category: 'biosynthesis', subcategory: 'Isoprenoids', prevalence: 0.896402878, tier: 'MODERATE', medianAbundance: 3.54E-05, meanAbundance: 6.38E-05 },
     { id: 'PWY-5121', name: "superpathway of geranylgeranyl diphosphate biosynthesis II (via MEP)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.889208633, tier: 'MODERATE', medianAbundance: 3.11E-05, meanAbundance: 3.69E-05 },
-    { id: 'PWY-5367', name: "petroselinate biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.825693731, tier: 'MODERATE', medianAbundance: 6.20E-06, meanAbundance: 1.15E-05 },
-    { id: 'PWY-5971', name: "palmitate biosynthesis II (bacteria and plants)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.819116136, tier: 'MODERATE', medianAbundance: 5.06E-05, meanAbundance: 6.18E-05 },
+    { id: 'PWY-5367', name: "petroselinate biosynthesis", category: 'biosynthesis', subcategory: 'Fatty Acids/Lipids', prevalence: 0.825693731, tier: 'MODERATE', medianAbundance: 6.20E-06, meanAbundance: 1.15E-05 },
+    { id: 'PWY-5971', name: "palmitate biosynthesis II (bacteria and plants)", category: 'biosynthesis', subcategory: 'Fatty Acids/Lipids', prevalence: 0.819116136, tier: 'MODERATE', medianAbundance: 5.06E-05, meanAbundance: 6.18E-05 },
     { id: 'PWY-6113', name: "superpathway of mycolate biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.816855087, tier: 'MODERATE', medianAbundance: 3.41E-05, meanAbundance: 4.19E-05 },
     { id: 'PWY-622', name: "starch biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.728057554, tier: 'MODERATE', medianAbundance: 1.53E-05, meanAbundance: 3.32E-05 },
-    { id: 'PWY-5173', name: "superpathway of acetyl-CoA biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.713874615, tier: 'MODERATE', medianAbundance: 2.25E-06, meanAbundance: 8.74E-06 },
+    { id: 'PWY-5173', name: "superpathway of acetyl-CoA biosynthesis", category: 'biosynthesis', subcategory: 'Specialized', prevalence: 0.713874615, tier: 'MODERATE', medianAbundance: 2.25E-06, meanAbundance: 8.74E-06 },
     { id: 'PWY-5791', name: "1,4-dihydroxy-2-naphthoate biosynthesis II (plants)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.682836588, tier: 'MODERATE', medianAbundance: 3.46E-06, meanAbundance: 8.66E-06 },
-    { id: 'PWY-5837', name: "1,4-dihydroxy-2-naphthoate biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.682836588, tier: 'MODERATE', medianAbundance: 3.46E-06, meanAbundance: 8.66E-06 },
+    { id: 'PWY-5837', name: "1,4-dihydroxy-2-naphthoate biosynthesis I", category: 'biosynthesis', subcategory: 'Isoprenoids', prevalence: 0.682836588, tier: 'MODERATE', medianAbundance: 3.46E-06, meanAbundance: 8.66E-06 },
     { id: 'PWY-5897', name: "superpathway of menaquinol-11 biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.682631038, tier: 'MODERATE', medianAbundance: 9.89E-06, meanAbundance: 1.99E-05 },
     { id: 'PWY-5898', name: "superpathway of menaquinol-12 biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.682631038, tier: 'MODERATE', medianAbundance: 9.89E-06, meanAbundance: 1.99E-05 },
     { id: 'PWY-5899', name: "superpathway of menaquinol-13 biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.682631038, tier: 'MODERATE', medianAbundance: 9.89E-06, meanAbundance: 1.99E-05 },
     { id: 'PWY-5863', name: "superpathway of phylloquinol biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.680986639, tier: 'MODERATE', medianAbundance: 3.79E-06, meanAbundance: 8.12E-06 },
-    { id: 'PWY-5838', name: "superpathway of menaquinol-8 biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.674203494, tier: 'MODERATE', medianAbundance: 1.06E-05, meanAbundance: 2.07E-05 },
+    { id: 'PWY-5838', name: "superpathway of menaquinol-8 biosynthesis I", category: 'biosynthesis', subcategory: 'Isoprenoids', prevalence: 0.674203494, tier: 'MODERATE', medianAbundance: 1.06E-05, meanAbundance: 2.07E-05 },
     { id: 'PWY-5861', name: "superpathway of demethylmenaquinol-8 biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.674203494, tier: 'MODERATE', medianAbundance: 7.21E-06, meanAbundance: 1.52E-05 },
     { id: 'PWY-6263', name: "superpathway of menaquinol-8 biosynthesis II", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.665981501, tier: 'MODERATE', medianAbundance: 4.05E-06, meanAbundance: 7.25E-06 },
     { id: 'PWY-5840', name: "superpathway of menaquinol-7 biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.650976362, tier: 'MODERATE', medianAbundance: 8.34E-06, meanAbundance: 1.58E-05 },
@@ -378,45 +861,45 @@ const ALL_PATHWAYS_RAW = [
     { id: 'PWY-7371', name: "1,4-dihydroxy-6-naphthoate biosynthesis II", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.560739979, tier: 'MODERATE', medianAbundance: 1.36E-06, meanAbundance: 4.67E-06 },
     { id: 'PWY-7332', name: "superpathway of UDP-N-acetylglucosamine-derived O-antigen building blocks biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.539773895, tier: 'MODERATE', medianAbundance: 4.40E-06, meanAbundance: 1.90E-05 },
     { id: 'PWY-5994', name: "palmitate biosynthesis I (animals and fungi)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.486742035, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 1.26E-05 },
-    { id: 'P125-PWY', name: "superpathway of (R,R)-butanediol biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.4668037, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 2.86E-06 },
-    { id: 'PWY-6749', name: "CMP-legionaminate biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.395272354, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 3.08E-06 },
-    { id: 'PWY-6143', name: "CMP-pseudaminate biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.394244604, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 3.32E-06 },
-    { id: 'PWY-7312', name: "dTDP-D-&beta;-fucofuranose biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.393011305, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 7.49E-06 },
+    { id: 'P125-PWY', name: "superpathway of (R,R)-butanediol biosynthesis", category: 'biosynthesis', subcategory: 'Specialized', prevalence: 0.4668037, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 2.86E-06 },
+    { id: 'PWY-6749', name: "CMP-legionaminate biosynthesis I", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.395272354, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 3.08E-06 },
+    { id: 'PWY-6143', name: "CMP-pseudaminate biosynthesis", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.394244604, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 3.32E-06 },
+    { id: 'PWY-7312', name: "dTDP-D-&beta;-fucofuranose biosynthesis", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.393011305, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 7.49E-06 },
     { id: 'PWY-5850', name: "superpathway of menaquinol-6 biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.387461459, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 9.59E-06 },
     { id: 'PWY-5860', name: "superpathway of demethylmenaquinol-6 biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.387461459, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 7.08E-06 },
     { id: 'PWY-5896', name: "superpathway of menaquinol-10 biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.38643371, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 9.57E-06 },
     { id: 'PWY3O-355', name: "stearate biosynthesis III (fungi)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.378417266, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 2.84E-06 },
     { id: 'PWY-6876', name: "isopropanol biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.372250771, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 1.22E-06 },
-    { id: 'PWY-5656', name: "mannosylglycerate biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.363617677, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 3.58E-06 },
-    { id: 'PWY-7316', name: "dTDP-N-acetylviosamine biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.349434738, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 3.59E-06 },
+    { id: 'PWY-5656', name: "mannosylglycerate biosynthesis I", category: 'biosynthesis', subcategory: 'Specialized', prevalence: 0.363617677, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 3.58E-06 },
+    { id: 'PWY-7316', name: "dTDP-N-acetylviosamine biosynthesis", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.349434738, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 3.59E-06 },
     { id: 'PWY-6435', name: "4-hydroxybenzoate biosynthesis V", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.311202467, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 1.85E-06 },
     { id: 'PWY-5855', name: "ubiquinol-7 biosynthesis (prokaryotic)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.308530319, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 1.63E-06 },
     { id: 'PWY-5856', name: "ubiquinol-9 biosynthesis (prokaryotic)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.308530319, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 1.63E-06 },
     { id: 'PWY-5857', name: "ubiquinol-10 biosynthesis (prokaryotic)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.308530319, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 1.63E-06 },
-    { id: 'PWY-6708', name: "ubiquinol-8 biosynthesis (prokaryotic)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.308530319, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 1.63E-06 },
-    { id: 'PWY-6478', name: "GDP-D-glycero-&alpha;-D-manno-heptose biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.30709147, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 1.44E-06 },
-    { id: 'ENTBACSYN-PWY', name: "enterobactin biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.30688592, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 1.07E-05 },
-    { id: 'ECASYN-PWY', name: "enterobacterial common antigen biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.300308325, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 2.35E-06 },
-    { id: 'PWY-7286', name: "7-(3-amino-3-carboxypropyl)-wyosine biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.297636177, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 3.28E-06 },
+    { id: 'PWY-6708', name: "ubiquinol-8 biosynthesis (prokaryotic)", category: 'biosynthesis', subcategory: 'Isoprenoids', prevalence: 0.308530319, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 1.63E-06 },
+    { id: 'PWY-6478', name: "GDP-D-glycero-&alpha;-D-manno-heptose biosynthesis", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.30709147, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 1.44E-06 },
+    { id: 'ENTBACSYN-PWY', name: "enterobactin biosynthesis", category: 'biosynthesis', subcategory: 'Specialized', prevalence: 0.30688592, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 1.07E-05 },
+    { id: 'ECASYN-PWY', name: "enterobacterial common antigen biosynthesis", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.300308325, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 2.35E-06 },
+    { id: 'PWY-7286', name: "7-(3-amino-3-carboxypropyl)-wyosine biosynthesis", category: 'biosynthesis', subcategory: 'Specialized', prevalence: 0.297636177, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 3.28E-06 },
     { id: 'PWY-5198', name: "factor 420 biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.296608428, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 2.64E-06 },
     { id: 'UBISYN-PWY', name: "superpathway of ubiquinol-8 biosynthesis (prokaryotic)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.290030832, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 1.77E-06 },
     { id: 'PWY-6349', name: "CDP-archaeol biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.282425488, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 2.88E-06 },
     { id: 'PWY-6167', name: "flavin biosynthesis II (archaea)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.273792395, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 6.58E-06 },
-    { id: 'PWY-5910', name: "superpathway of geranylgeranyldiphosphate biosynthesis I (via mevalonate)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.264337102, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 1.16E-06 },
+    { id: 'PWY-5910', name: "superpathway of geranylgeranyldiphosphate biosynthesis I (via mevalonate)", category: 'biosynthesis', subcategory: 'Isoprenoids', prevalence: 0.264337102, tier: 'UNCOMMON', medianAbundance: 0, meanAbundance: 1.16E-06 },
     { id: 'PWY3DJ-35471', name: "L-ascorbate biosynthesis IV", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.175128469, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.38E-06 },
     { id: 'PWY-6165', name: "chorismate biosynthesis II (archaea)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.171634121, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.36E-06 },
-    { id: 'PWY-6953', name: "dTDP-3-acetamido-3,6-dideoxy-&alpha;-D-galactose biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.158273381, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.26E-06 },
+    { id: 'PWY-6953', name: "dTDP-3-acetamido-3,6-dideoxy-&alpha;-D-galactose biosynthesis", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.158273381, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.26E-06 },
     { id: 'PWY-6396', name: "superpathway of 2,3-butanediol biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.101747174, tier: 'RARE', medianAbundance: 0, meanAbundance: 5.16E-07 },
-    { id: 'PWY1G-0', name: "mycothiol biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.09373073, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.77E-07 },
-    { id: 'AEROBACTINSYN-PWY', name: "aerobactin biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.069064748, tier: 'RARE', medianAbundance: 0, meanAbundance: 2.73E-07 },
+    { id: 'PWY1G-0', name: "mycothiol biosynthesis", category: 'biosynthesis', subcategory: 'Specialized', prevalence: 0.09373073, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.77E-07 },
+    { id: 'AEROBACTINSYN-PWY', name: "aerobactin biosynthesis", category: 'biosynthesis', subcategory: 'Specialized', prevalence: 0.069064748, tier: 'RARE', medianAbundance: 0, meanAbundance: 2.73E-07 },
     { id: 'UDPNACETYLGALSYN-PWY', name: "UDP-N-acetyl-D-glucosamine biosynthesis II", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.064953751, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.34E-07 },
     { id: 'PWY-5754', name: "4-hydroxybenzoate biosynthesis I (eukaryotes)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.060431655, tier: 'RARE', medianAbundance: 0, meanAbundance: 7.98E-08 },
     { id: 'PWY3O-1109', name: "superpathway of 4-hydroxybenzoate biosynthesis (yeast)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.058376156, tier: 'RARE', medianAbundance: 0, meanAbundance: 9.33E-08 },
-    { id: 'URSIN-PWY', name: "ureide biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.05364851, tier: 'RARE', medianAbundance: 0, meanAbundance: 3.50E-07 },
+    { id: 'URSIN-PWY', name: "ureide biosynthesis", category: 'biosynthesis', subcategory: 'Specialized', prevalence: 0.05364851, tier: 'RARE', medianAbundance: 0, meanAbundance: 3.50E-07 },
     { id: 'PWY-7374', name: "1,4-dihydroxy-6-naphthoate biosynthesis I", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.029599178, tier: 'RARE', medianAbundance: 0, meanAbundance: 6.76E-08 },
     { id: 'PWY-7007', name: "methyl ketone biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.029188078, tier: 'RARE', medianAbundance: 0, meanAbundance: 3.67E-07 },
     { id: 'PWY-6138', name: "CMP-N-acetylneuraminate biosynthesis I (eukaryotes)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.025488181, tier: 'RARE', medianAbundance: 0, meanAbundance: 5.58E-08 },
-    { id: 'PWY-5514', name: "UDP-N-acetyl-D-galactosamine biosynthesis II", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.025282631, tier: 'RARE', medianAbundance: 0, meanAbundance: 3.52E-08 },
+    { id: 'PWY-5514', name: "UDP-N-acetyl-D-galactosamine biosynthesis II", category: 'biosynthesis', subcategory: 'Specialized', prevalence: 0.025282631, tier: 'RARE', medianAbundance: 0, meanAbundance: 3.52E-08 },
     { id: 'PWY-6145', name: "superpathway of sialic acids and CMP-sialic acids biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.024871531, tier: 'RARE', medianAbundance: 0, meanAbundance: 7.76E-08 },
     { id: 'PWY-7317', name: "superpathway of dTDP-glucose-derived O-antigen building blocks biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.01377184, tier: 'RARE', medianAbundance: 0, meanAbundance: 3.79E-08 },
     { id: 'PWY1F-823', name: "leucopelargonidin and leucocyanidin biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.011305242, tier: 'RARE', medianAbundance: 0, meanAbundance: 3.06E-08 },
@@ -428,15 +911,15 @@ const ALL_PATHWAYS_RAW = [
     { id: 'PWY-5873', name: "ubiquinol-7 biosynthesis (eukaryotic)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.004110997, tier: 'RARE', medianAbundance: 0, meanAbundance: 5.87E-09 },
     { id: 'PWY-6797', name: "6-hydroxymethyl-dihydropterin diphosphate biosynthesis II (archaea)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.003699897, tier: 'RARE', medianAbundance: 0, meanAbundance: 3.13E-08 },
     { id: 'PWY-5870', name: "ubiquinol-8 biosynthesis (eukaryotic)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.003699897, tier: 'RARE', medianAbundance: 0, meanAbundance: 6.82E-09 },
-    { id: 'PWY-7413', name: "dTDP-6-deoxy-&alpha;-D-allose biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.002672148, tier: 'RARE', medianAbundance: 0, meanAbundance: 5.38E-09 },
+    { id: 'PWY-7413', name: "dTDP-6-deoxy-&alpha;-D-allose biosynthesis", category: 'biosynthesis', subcategory: 'Cell Envelope', prevalence: 0.002672148, tier: 'RARE', medianAbundance: 0, meanAbundance: 5.38E-09 },
     { id: 'PWY-6350', name: "archaetidylinositol biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.001027749, tier: 'RARE', medianAbundance: 0, meanAbundance: 2.52E-09 },
     { id: 'PWY-5751', name: "phenylethanol biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.001027749, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.40E-09 },
     { id: 'PWY-5757', name: "fosfomycin biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.000822199, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.44E-09 },
-    { id: 'PWY-7090', name: "UDP-2,3-diacetamido-2,3-dideoxy-&alpha;-D-mannuronate biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.000822199, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.40E-09 },
+    { id: 'PWY-7090', name: "UDP-2,3-diacetamido-2,3-dideoxy-&alpha;-D-mannuronate biosynthesis", category: 'biosynthesis', subcategory: 'Specialized', prevalence: 0.000822199, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.40E-09 },
     { id: 'PWY-6148', name: "tetrahydromethanopterin biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.000822199, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.95E-09 },
     { id: 'PWY-7411', name: "superpathway of phosphatidate biosynthesis (yeast)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.000822199, tier: 'RARE', medianAbundance: 0, meanAbundance: 5.93E-10 },
     { id: 'PWY-6351', name: "D-myo-inositol (1,4,5)-trisphosphate biosynthesis", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.000822199, tier: 'RARE', medianAbundance: 0, meanAbundance: 4.74E-10 },
-    { id: 'PWY-7255', name: "ergothioneine biosynthesis I (bacteria)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.000822199, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.02E-09 },
+    { id: 'PWY-7255', name: "ergothioneine biosynthesis I (bacteria)", category: 'biosynthesis', subcategory: 'Specialized', prevalence: 0.000822199, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.02E-09 },
     { id: 'PWY-5067', name: "glycogen biosynthesis II (from UDP-D-Glucose)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.00061665, tier: 'RARE', medianAbundance: 0, meanAbundance: 7.53E-10 },
     { id: 'PWY3O-19', name: "ubiquinol-6 biosynthesis from 4-hydroxybenzoate (eukaryotic)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.00061665, tier: 'RARE', medianAbundance: 0, meanAbundance: 7.46E-10 },
     { id: 'PWY-5872', name: "ubiquinol-10 biosynthesis (eukaryotic)", category: 'biosynthesis', subcategory: 'Other', prevalence: 0.00061665, tier: 'RARE', medianAbundance: 0, meanAbundance: 5.28E-10 },
@@ -493,6 +976,7 @@ const ALL_PATHWAYS_RAW = [
     { id: 'PWY-4321', name: "L-glutamate degradation IV", category: 'degradation', subcategory: 'Amino Acids', prevalence: 0.075025694, tier: 'RARE', medianAbundance: 0, meanAbundance: 3.67E-07 },
     { id: 'PWY-5028', name: "L-histidine degradation II", category: 'degradation', subcategory: 'Amino Acids', prevalence: 0.036176773, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.77E-07 },
     { id: 'PWY-6307', name: "L-tryptophan degradation X (mammalian, via tryptamine)", category: 'degradation', subcategory: 'Amino Acids', prevalence: 0.010071942, tier: 'RARE', medianAbundance: 0, meanAbundance: 5.43E-09 },
+    { id: 'TRPKYNCAT-PWY', name: "L-tryptophan degradation IV (via indole-3-lactate)", category: 'degradation', subcategory: 'Amino Acids', prevalence: 0.15, tier: 'RARE', medianAbundance: 0.00001, meanAbundance: 0.00001, note: 'Bacterial indolelactate pathway - Clostridium, Lactobacillus' },
     { id: 'VALDEG-PWY', name: "L-valine degradation I", category: 'degradation', subcategory: 'Amino Acids', prevalence: 0.008427544, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.53E-08 },
     { id: 'TYRFUMCAT-PWY', name: "L-tyrosine degradation I", category: 'degradation', subcategory: 'Amino Acids', prevalence: 0.006783145, tier: 'RARE', medianAbundance: 0, meanAbundance: 2.55E-08 },
     { id: 'LYSINE-DEG1-PWY', name: "L-lysine degradation XI (mammalian)", category: 'degradation', subcategory: 'Amino Acids', prevalence: 0.001438849, tier: 'RARE', medianAbundance: 0, meanAbundance: 1.38E-09 },
@@ -824,346 +1308,125 @@ const SUBCATEGORY_RATIOS = typeof RATIO_MAPS !== 'undefined' ? RATIO_MAPS : {};
 // enrichedIn: 'dysregulated' = pathway active but producing imbalanced products
 // ============================================================
 
-const MS_COMPARISON_DATA = {
-    // ═══════════════════════════════════════════════════════════════════════
-    // CANTONI 2022 - DIRECT METAGENOMIC DATA (64 pathways)
-    // ═══════════════════════════════════════════════════════════════════════
-    
-    // MS-ELEVATED (2 from Cantoni)
-    'PWY-6269': { enrichedIn: 'ms', ldaScore: 1.4655, pValue: 0.023652, confidence: 'cantoni' },
-    'PWY-5306': { enrichedIn: 'ms', ldaScore: 0.7060, pValue: 0.026635, confidence: 'cantoni' },
-    
-    // HEALTHY-ENRICHED / DEPLETED IN MS (62 from Cantoni)
-    'PWY-6895': { enrichedIn: 'healthy', ldaScore: 1.5538, pValue: 0.042658, confidence: 'cantoni' },
-    'P42-PWY': { enrichedIn: 'healthy', ldaScore: 1.5455, pValue: 0.031962, confidence: 'cantoni' },
-    'TCA': { enrichedIn: 'healthy', ldaScore: 1.5033, pValue: 0.035927, confidence: 'cantoni' },
-    'PWY-5690': { enrichedIn: 'healthy', ldaScore: 1.4957, pValue: 0.026719, confidence: 'cantoni' },
-    'PWY-7357': { enrichedIn: 'healthy', ldaScore: 1.4681, pValue: 0.040305, confidence: 'cantoni' },
-    'PWY-6269': { enrichedIn: 'ms', ldaScore: 1.4655, pValue: 0.023652 },
-    'PWY0-1061': { enrichedIn: 'healthy', ldaScore: 1.4492, pValue: 0.019624, confidence: 'cantoni' },
-    'ARGSYNBSUB-PWY': { enrichedIn: 'healthy', ldaScore: 1.4433, pValue: 0.020895, confidence: 'cantoni' },
-    'P4-PWY': { enrichedIn: 'healthy', ldaScore: 1.4367, pValue: 0.007735, confidence: 'cantoni' },
-    'PWY0-781': { enrichedIn: 'healthy', ldaScore: 1.4300, pValue: 0.006717, confidence: 'cantoni' },
-    'PWY-6305': { enrichedIn: 'healthy', ldaScore: 1.4272, pValue: 0.001586, confidence: 'cantoni' },
-    'DAPLYSINESYN-PWY': { enrichedIn: 'healthy', ldaScore: 1.3717, pValue: 0.028377, confidence: 'cantoni' },
-    'FAO-PWY': { enrichedIn: 'healthy', ldaScore: 1.3702, pValue: 0.026719, confidence: 'cantoni' },
-    // PWY-7115 REMOVED - C4 photosynthesis, likely HUMAnN3 false positive
-    'PWY-5136': { enrichedIn: 'healthy', ldaScore: 1.3674, pValue: 0.020895, confidence: 'cantoni' },
-    'PWY-6897': { enrichedIn: 'healthy', ldaScore: 1.3617, pValue: 0.013328, confidence: 'cantoni' },
-    'PWY-6590': { enrichedIn: 'healthy', ldaScore: 1.3459, pValue: 0.008889, confidence: 'cantoni' },
-    'P105-PWY': { enrichedIn: 'healthy', ldaScore: 1.3287, pValue: 0.010093, confidence: 'cantoni' },
-    'CENTFERM-PWY': { enrichedIn: 'healthy', ldaScore: 1.3123, pValue: 0.013328, confidence: 'cantoni' },
-    'ARG+POLYAMINE-SYN': { enrichedIn: 'healthy', ldaScore: 1.3024, pValue: 0.015194, confidence: 'cantoni' },
-    'PWY0-1296': { enrichedIn: 'healthy', ldaScore: 1.2929, pValue: 0.008889, confidence: 'cantoni' },
-    'PWY-5177': { enrichedIn: 'healthy', ldaScore: 1.2812, pValue: 0.035927, confidence: 'cantoni' },
-    'PWY0-1297': { enrichedIn: 'healthy', ldaScore: 1.2686, pValue: 0.008294, confidence: 'cantoni' },
-    'LACTOSECAT-PWY': { enrichedIn: 'healthy', ldaScore: 1.2677, pValue: 0.005034, confidence: 'cantoni' },
-    'PWY-5083': { enrichedIn: 'healthy', ldaScore: 1.2464, pValue: 0.028377, confidence: 'cantoni' },
-    'GOLPDLCAT-PWY': { enrichedIn: 'healthy', ldaScore: 1.2268, pValue: 0.040305, confidence: 'cantoni' },
-    'PWY0-1298': { enrichedIn: 'healthy', ldaScore: 1.1995, pValue: 0.011669, confidence: 'cantoni' },
-    'PWY-6435': { enrichedIn: 'healthy', ldaScore: 1.1891, pValue: 0.022236, confidence: 'cantoni' },
-    'PWY-5464': { enrichedIn: 'healthy', ldaScore: 1.1839, pValue: 0.030124, confidence: 'cantoni' },
-    'GLYCOLYSIS': { enrichedIn: 'healthy', ldaScore: 1.1714, pValue: 0.029040, confidence: 'cantoni' },
-    'KETOGLUCONMET-PWY': { enrichedIn: 'healthy', ldaScore: 1.1446, pValue: 0.003742, confidence: 'cantoni' },
-    'POLYAMSYN-PWY': { enrichedIn: 'healthy', ldaScore: 1.1226, pValue: 0.017285, confidence: 'cantoni' },
-    'PWY-7279': { enrichedIn: 'healthy', ldaScore: 1.1031, pValue: 0.014115, confidence: 'cantoni' },
-    'GLYOXYLATE-BYPASS': { enrichedIn: 'healthy', ldaScore: 1.0762, pValue: 0.020097, confidence: 'cantoni' },
-    'PWY-4702': { enrichedIn: 'healthy', ldaScore: 1.0750, pValue: 0.042658, confidence: 'cantoni' },
-    'ENTBACSYN-PWY': { enrichedIn: 'healthy', ldaScore: 1.0706, pValue: 0.024939, confidence: 'cantoni' },
-    'PWY-561': { enrichedIn: 'healthy', ldaScore: 1.0629, pValue: 0.010067, confidence: 'cantoni' },
-    'TCA-GLYOX-BYPASS': { enrichedIn: 'healthy', ldaScore: 1.0525, pValue: 0.029040, confidence: 'cantoni' },
-    'GALACTARDEG-PWY': { enrichedIn: 'healthy', ldaScore: 1.0340, pValue: 0.040305, confidence: 'cantoni' },
-    'GLUCARGALACTSUPER-PWY': { enrichedIn: 'healthy', ldaScore: 1.0340, pValue: 0.040305, confidence: 'cantoni' },
-    'PWY-5173': { enrichedIn: 'healthy', ldaScore: 1.0158, pValue: 0.035927, confidence: 'cantoni' },
-    'P23-PWY': { enrichedIn: 'healthy', ldaScore: 1.0129, pValue: 0.031956, confidence: 'cantoni' },
-    'PWY-4041': { enrichedIn: 'healthy', ldaScore: 0.9763, pValue: 0.042658, confidence: 'cantoni' },
-    'PWY-4321': { enrichedIn: 'healthy', ldaScore: 0.9588, pValue: 0.036816, confidence: 'cantoni' },
-    'P125-PWY': { enrichedIn: 'healthy', ldaScore: 0.8644, pValue: 0.001052, confidence: 'cantoni' },
-    'PWY-7389': { enrichedIn: 'healthy', ldaScore: 0.8640, pValue: 0.042658, confidence: 'cantoni' },
-    'NAGLIPASYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.8583, pValue: 0.036749, confidence: 'cantoni' },
-    'TYRFUMCAT-PWY': { enrichedIn: 'healthy', ldaScore: 0.8066, pValue: 0.034618, confidence: 'cantoni' },
-    'PWY-6837': { enrichedIn: 'healthy', ldaScore: 0.7750, pValue: 0.033571, confidence: 'cantoni' },
-    'TRPSYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.7746, pValue: 0.047715, confidence: 'cantoni' },
-    'PWY-7165': { enrichedIn: 'healthy', ldaScore: 0.7667, pValue: 0.030568, confidence: 'cantoni' },
-    'PWY-6467': { enrichedIn: 'healthy', ldaScore: 0.7590, pValue: 0.032485, confidence: 'cantoni' },
-    'PWY-5392': { enrichedIn: 'healthy', ldaScore: 0.7233, pValue: 0.026713, confidence: 'cantoni' },
-    'PWY-7616': { enrichedIn: 'healthy', ldaScore: 0.6915, pValue: 0.025093, confidence: 'cantoni' },
-    'PWY-6470': { enrichedIn: 'healthy', ldaScore: 0.6834, pValue: 0.040933, confidence: 'cantoni' },
-    'VALDEG-PWY': { enrichedIn: 'healthy', ldaScore: 0.6795, pValue: 0.002923, confidence: 'cantoni' },
-    'PWY0-1277': { enrichedIn: 'healthy', ldaScore: 0.6396, pValue: 0.047293, confidence: 'cantoni' },
-    'DENITRIFICATION-PWY': { enrichedIn: 'healthy', ldaScore: 0.5962, pValue: 0.038615, confidence: 'cantoni' },
-    'PWY-6863': { enrichedIn: 'healthy', ldaScore: 0.5819, pValue: 0.011669, confidence: 'cantoni' },
-    'PWY-922': { enrichedIn: 'healthy', ldaScore: 0.5716, pValue: 0.046548, confidence: 'cantoni' },
-    'PWY-5415': { enrichedIn: 'healthy', ldaScore: 0.5555, pValue: 0.048594, confidence: 'cantoni' },
-    'PWY-5910': { enrichedIn: 'healthy', ldaScore: 0.5193, pValue: 0.043843, confidence: 'cantoni' },
-    'PWY-6690': { enrichedIn: 'healthy', ldaScore: 0.4677, pValue: 0.047293, confidence: 'cantoni' },
-    'HCAMHPDEG-PWY': { enrichedIn: 'healthy', ldaScore: 0.4647, pValue: 0.047293, confidence: 'cantoni' },
-    
-    // ═══════════════════════════════════════════════════════════════════════
-    // METABOLOMICS-INFERRED (23 pathways from Smusz 2024 review)
-    // ═══════════════════════════════════════════════════════════════════════
-    
-    // SCFA PRODUCTION (depleted in MS - strong evidence)
-    'P108-PWY': { enrichedIn: 'healthy', ldaScore: 0.90, confidence: 'metabolite-high', source: 'Duscha 2020', metabolite: 'propionate ↓' },
-    'PWY-5100': { enrichedIn: 'healthy', ldaScore: 0.75, confidence: 'metabolite-medium', source: 'Olsson 2021', metabolite: 'acetate ↓' },
-    'PWY-5676': { enrichedIn: 'healthy', ldaScore: 0.70, confidence: 'metabolite-medium', source: 'inferred', metabolite: 'butanoate via acetyl-CoA' },
-    
-    // AMINO ACID BIOSYNTHESIS (depleted amino acids)
-    'LYSINE-AMINOAD-PWY': { enrichedIn: 'healthy', ldaScore: 0.80, confidence: 'metabolite-high', source: 'Alwahsh 2024', metabolite: 'lysine ↓ 0.48-fold' },
-    'HISTSYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.70, confidence: 'metabolite-medium', source: 'Zido 2023', metabolite: 'histidine ↓' },
-    'VALSYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.65, confidence: 'metabolite-medium', source: 'Olsson 2021', metabolite: 'valine ↓' },
-    'ILEUSYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.65, confidence: 'metabolite-medium', source: 'Yang 2021', metabolite: 'isoleucine ↓' },
-    'BRANCHED-CHAIN-AA-SYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.70, confidence: 'metabolite-medium', source: 'multiple', metabolite: 'BCAAs ↓' },
-    'HOMOSER-METSYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.65, confidence: 'metabolite-medium', source: 'Zido 2023', metabolite: 'methionine dysregulated' },
-    'PWY-6628': { enrichedIn: 'healthy', ldaScore: 0.70, confidence: 'metabolite-medium', source: 'Yang 2021', metabolite: 'Phe ↓' },
-    'COMPLETE-ARO-PWY': { enrichedIn: 'healthy', ldaScore: 0.75, confidence: 'metabolite-medium', source: 'multiple', metabolite: 'aromatic AAs ↓' },
-    'PWY-5505': { enrichedIn: 'healthy', ldaScore: 0.75, confidence: 'metabolite-high', source: 'Alwahsh 2024', metabolite: 'glutamate ↓ 0.57-fold' },
-    
-    // NAD METABOLISM (niacinamide depleted)
-    'NADSYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.70, confidence: 'metabolite-medium', source: 'Yang 2021', metabolite: 'niacinamide ↓' },
-    'NAD-BIOSYNTHESIS-II': { enrichedIn: 'healthy', ldaScore: 0.70, confidence: 'metabolite-medium', source: 'Yang 2021', metabolite: 'NAD from tryptophan' },
-    'PYRIDNUCSYN-PWY': { enrichedIn: 'healthy', ldaScore: 0.65, confidence: 'metabolite-medium', source: 'inferred', metabolite: 'NAD biosynthesis' },
-    
-    // PANTOTHENATE (elevated in MS - metabolic compensation?)
-    'PANTOSYN-PWY': { enrichedIn: 'ms', ldaScore: 0.60, confidence: 'metabolite-high', source: 'Alwahsh 2024', metabolite: 'pantothenate ↑ 1.37-fold' },
-    'COA-PWY': { enrichedIn: 'ms', ldaScore: 0.50, confidence: 'metabolite-medium', source: 'Alwahsh 2024', metabolite: 'CoA from pantothenate' },
-    
-    // TRYPTOPHAN/INDOLE CATABOLISM
-    'PWY-5030': { enrichedIn: 'healthy', ldaScore: 0.80, confidence: 'metabolite-high', source: 'Levi 2021', metabolite: 'indolepropionate ↓' },
-    'PWY-5651': { enrichedIn: 'healthy', ldaScore: 0.75, confidence: 'metabolite-medium', source: 'Fitzgerald 2021', metabolite: 'indolelactate ↓' },
-    'PWY-6309': { enrichedIn: 'dysregulated', ldaScore: 0.80, confidence: 'metabolite-high', source: 'Staats Pires 2025', metabolite: 'KYNA ↓, QUIN/KYNA ↑', note: 'Neurotoxic kynurenine imbalance' },
-    
-    // SPHINGOLIPID (S1P depleted)
-    'PWY-5129': { enrichedIn: 'healthy', ldaScore: 0.70, confidence: 'metabolite-high', source: 'Yang 2021', metabolite: 'S1P ↓' },
-    
-    // PHOSPHOLIPID (choline/phosphocholine depleted)
-    'PWY-5667': { enrichedIn: 'healthy', ldaScore: 0.65, confidence: 'metabolite-medium', source: 'Alwahsh 2024', metabolite: 'phosphocholine ↓' },
-    'PWY4FS-5': { enrichedIn: 'healthy', ldaScore: 0.60, confidence: 'metabolite-medium', source: 'Alwahsh 2024', metabolite: 'choline ↓ 0.50-fold' },
-};
+
 
 // ============================================================
-// USAGE EXAMPLE
-// ============================================================
-// 
-// In your main code, after loading pathways:
-//
-// function applyMSComparison(pathways, msMode = false) {
-//     pathways.forEach(p => {
-//         const msData = MS_COMPARISON_DATA[p.id];
-//         if (msData) {
-//             p.msData = msData;
-//             p.hasMSData = true;
-//             
-//             if (msMode) {
-//                 // Apply MS modulation to amplitude
-//                 if (msData.enrichedIn === 'healthy') {
-//                     // Depleted in MS - reduce amplitude
-//                     p.amplitude *= (1 - msData.ldaScore * 0.4);
-//                 } else {
-//                     // Elevated in MS - increase amplitude
-//                     p.amplitude *= (1 + msData.ldaScore * 0.4);
-//                 }
-//             }
-//         } else {
-//             p.hasMSData = false;
-//         }
-//     });
-//     return pathways;
-// }
-//
-// ============================================================
-
-// Quick stats:
-// Total pathways with MS data: 65
-// Enriched in healthy (depleted in MS): 63
-// Enriched in MS (elevated in MS): 2
-//
-// The 2 MS-elevated pathways:
-// - PWY-6269: adenosylcobalamin salvage from cobinamide II (LDA 1.47)
-// - PWY-5306: superpathway of thiosulfate metabolism (LDA 0.71)
-
-// ============================================================
-// TIER PRIORITY FOR SORTING
+// SECTION 5: CATEGORY METADATA
 // ============================================================
 
 const TIER_PRIORITY = {
-    UNIVERSAL: 0,
-    VERY_COMMON: 1,
-    COMMON: 2,
-    MODERATE: 3,
-    UNCOMMON: 4,
-    RARE: 5
+  'UNIVERSAL': 1,
+  'VERY_COMMON': 2,
+  'MODERATE': 3,
+  'UNCOMMON': 4,
+  'RARE': 5
+};
+
+const CATEGORIES = {
+  energy: {
+    name: 'Energy',
+    color: '#22c55e',
+    description: '2-3 limit (glycolysis, TCA, fermentation)',
+    subcategories: ['Fermentation', 'Glycolysis/Gluconeogenesis', 'Pentose Phosphate', 'TCA Cycle', 'Glyoxylate Cycle', 'Respiration']
+  },
+  biosynthesis: {
+    name: 'Biosynthesis',
+    color: '#3b82f6',
+    description: '5-7 limit (building molecules)',
+    subcategories: ['Amino Acids', 'Cofactors/Vitamins', 'Cell Envelope', 'Fatty Acids/Lipids', 'Specialized', 'Nucleotides', 'Isoprenoids', 'Polyamines', 'Other']
+  },
+  degradation: {
+    name: 'Degradation',
+    color: '#ef4444',
+    description: 'Subharmonic (breaking down)',
+    subcategories: ['Other', 'Amino Acids', 'Nucleotides', 'Carbohydrates', 'Aromatics']
+  },
+  salvage: {
+    name: 'Salvage',
+    color: '#eab308',
+    description: 'Recycling pathways',
+    subcategories: ['Salvage/Recycling']
+  },
+  superpathways: {
+    name: 'Superpathways',
+    color: '#8b5cf6',
+    description: 'Composite pathways',
+    subcategories: ['Superpathways']
+  },
+  other: {
+    name: 'Other',
+    color: '#6b7280',
+    description: 'Uncategorized',
+    subcategories: ['Unclassified']
+  }
 };
 
 
 // ============================================================
-// MAIN RATIO APPLICATION FUNCTION
+// SECTION 6: MODE PROCESSING
 // ============================================================
 
-function applyRatioMaps(pathways, mode = MAPPING_MODE) {
-    console.log(`Applying ratios in "${mode}" mode...`);
-    
-    if (mode === 'abundance') {
-        return applyAbundanceMode(pathways);
-    } else if (mode === 'category') {
-        return applyCategoryMode(pathways);
-    } else if (mode === 'subcategory') {
-        return applySubcategoryMode(pathways);
-    } else {
-        console.error(`Unknown mapping mode: ${mode}, falling back to 'category'`);
-        return applyCategoryMode(pathways);
+function applyComposedMode(pathways) {
+  // Filter to only curated pathways
+  const curated = pathways.filter(p => CURATED_IDS.has(p.id));
+  
+  // Apply composed ratios and names
+  curated.forEach(p => {
+    const composed = COMPOSED_RATIOS[p.id];
+    if (composed) {
+      p.ratio = [composed.n, composed.d];
+      p.derivation = composed.derivation || '';
+      p.isComposed = true;
+      // Override name if composedName is specified
+      if (composed.composedName) {
+        p.name = composed.composedName;
+      }
     }
+  });
+  
+  console.log(`  Composed mode: ${curated.length} curated pathways`);
+  return curated;
 }
 
-
-// ============================================================
-// MODE 1: ABUNDANCE - Pure consonance by global rank
-// ============================================================
-
-function applyAbundanceMode(pathways) {
-    // Sort ALL pathways by abundance (tier first, then abundance)
-    const sorted = [...pathways].sort((a, b) => {
-        const tierDiff = (TIER_PRIORITY[a.tier] ?? 999) - (TIER_PRIORITY[b.tier] ?? 999);
-        if (tierDiff !== 0) return tierDiff;
-        
-        const aAbund = a.medianAbundance > 0 ? a.medianAbundance : a.meanAbundance;
-        const bAbund = b.medianAbundance > 0 ? b.medianAbundance : b.meanAbundance;
-        if (bAbund !== aAbund) return bAbund - aAbund;
-        
-        return a.id.localeCompare(b.id);
-    });
+function applyRawMode(pathways) {
+  // Sort by tier then abundance
+  const sorted = [...pathways].sort((a, b) => {
+    const tierDiff = (TIER_PRIORITY[a.tier] ?? 999) - (TIER_PRIORITY[b.tier] ?? 999);
+    if (tierDiff !== 0) return tierDiff;
     
-    // Assign ratios by rank
-    sorted.forEach((p, index) => {
-        p.ratio = ABUNDANCE_RATIOS[index] || ABUNDANCE_RATIOS[ABUNDANCE_RATIOS.length - 1];
-    });
+    const aAbund = a.medianAbundance > 0 ? a.medianAbundance : a.meanAbundance;
+    const bAbund = b.medianAbundance > 0 ? b.medianAbundance : b.meanAbundance;
+    if (bAbund !== aAbund) return bAbund - aAbund;
     
-    console.log(`  Assigned ${sorted.length} pathways by pure abundance ranking`);
-    return pathways;
+    return a.id.localeCompare(b.id);
+  });
+  
+  // Apply abundance-based ratios
+  sorted.forEach((p, index) => {
+    p.ratio = ABUNDANCE_RATIOS[index] || ABUNDANCE_RATIOS[ABUNDANCE_RATIOS.length - 1];
+    p.derivation = 'abundance rank';
+    p.isComposed = false;
+  });
+  
+  console.log(`  Raw mode: ${sorted.length} pathways by abundance`);
+  return sorted;
 }
 
-
-// ============================================================
-// MODE 2: CATEGORY - Group by category, then by abundance within
-// ============================================================
-
-function applyCategoryMode(pathways) {
-    // Group by category
-    const byCategory = {};
-    pathways.forEach(p => {
-        const cat = p.category || 'other';
-        if (!byCategory[cat]) byCategory[cat] = [];
-        byCategory[cat].push(p);
-    });
-    
-    // Sort each category by abundance
-    for (const cat in byCategory) {
-        byCategory[cat].sort((a, b) => {
-            const tierDiff = (TIER_PRIORITY[a.tier] ?? 999) - (TIER_PRIORITY[b.tier] ?? 999);
-            if (tierDiff !== 0) return tierDiff;
-            
-            const aAbund = a.medianAbundance > 0 ? a.medianAbundance : a.meanAbundance;
-            const bAbund = b.medianAbundance > 0 ? b.medianAbundance : b.meanAbundance;
-            if (bAbund !== aAbund) return bAbund - aAbund;
-            
-            return a.id.localeCompare(b.id);
-        });
-    }
-    
-    // Apply ratios by category
-    for (const cat in byCategory) {
-        const ratios = CATEGORY_RATIOS[cat] || CATEGORY_RATIOS['other'] || [[1,1]];
-        const pathwayList = byCategory[cat];
-        
-        pathwayList.forEach((p, index) => {
-            p.ratio = ratios[index % ratios.length];  // Wrap around if needed
-        });
-        
-        if (pathwayList.length > ratios.length) {
-            console.warn(`  ${cat}: ${pathwayList.length} pathways, ${ratios.length} ratios (wrapping)`);
-        } else {
-            console.log(`  ${cat}: ${pathwayList.length} pathways assigned`);
-        }
-    }
-    
-    return pathways;
-}
-
-
-// ============================================================
-// MODE 3: SUBCATEGORY - Original detailed mapping
-// ============================================================
-
-function applySubcategoryMode(pathways) {
-    // Group by subcategory with special mapping keys
-    const bySubcategory = {};
-    pathways.forEach(p => {
-        let mapKey = p.subcategory || 'Unclassified';
-        
-        // Handle disambiguation for duplicate subcategory names
-        if (p.category === 'biosynthesis' && p.subcategory === 'Other') {
-            mapKey = 'Biosynthesis_Other';
-        } else if (p.category === 'degradation' && p.subcategory === 'Other') {
-            mapKey = 'Degradation_Other';
-        } else if (p.category === 'degradation' && p.subcategory === 'Amino Acids') {
-            mapKey = 'Degradation_Amino Acids';
-        } else if (p.category === 'degradation' && p.subcategory === 'Nucleotides') {
-            mapKey = 'Degradation_Nucleotides';
-        } else if (p.category === 'degradation' && p.subcategory === 'Aromatics') {
-            mapKey = 'Degradation_Aromatics';
-        } else if (p.category === 'degradation' && p.subcategory === 'Carbohydrates') {
-            mapKey = 'Degradation_Carbohydrates';
-        }
-        
-        p._mapKey = mapKey;
-        if (!bySubcategory[mapKey]) bySubcategory[mapKey] = [];
-        bySubcategory[mapKey].push(p);
-    });
-    
-    // Sort each subcategory by abundance
-    for (const key in bySubcategory) {
-        bySubcategory[key].sort((a, b) => {
-            const tierDiff = (TIER_PRIORITY[a.tier] ?? 999) - (TIER_PRIORITY[b.tier] ?? 999);
-            if (tierDiff !== 0) return tierDiff;
-            
-            const aAbund = a.medianAbundance > 0 ? a.medianAbundance : a.meanAbundance;
-            const bAbund = b.medianAbundance > 0 ? b.medianAbundance : b.meanAbundance;
-            if (bAbund !== aAbund) return bAbund - aAbund;
-            
-            return a.id.localeCompare(b.id);
-        });
-    }
-    
-    // Apply ratios
-    for (const key in bySubcategory) {
-        const ratios = SUBCATEGORY_RATIOS[key] || [[1,1]];
-        const pathwayList = bySubcategory[key];
-        
-        pathwayList.forEach((p, index) => {
-            p.ratio = ratios[index] || ratios[ratios.length - 1];
-        });
-        
-        if (pathwayList.length > ratios.length) {
-            console.warn(`  ${key}: ${pathwayList.length} pathways, only ${ratios.length} ratios`);
-        }
-    }
-    
-    return pathways;
-}
-
-
-// ============================================================
-// PROCESS AND EXPORT
-// ============================================================
-
-const ALL_PATHWAYS = applyRatioMaps([...ALL_PATHWAYS_RAW]);
-
-// Find max abundance for normalization
-const maxAbundance = Math.max(...ALL_PATHWAYS.map(p => p.medianAbundance || p.meanAbundance || 0.0001));
-
-// Process pathways - add computed fields
-ALL_PATHWAYS.forEach(p => {
-    // Explicit n and d fields (so worklet doesn't need to parse array)
+function processPathways(mode) {
+  // Deep copy to avoid mutating original data
+  let pathways = ALL_PATHWAYS_RAW.map(p => ({...p}));
+  
+  if (mode === 'composed') {
+    pathways = applyComposedMode(pathways);
+  } else {
+    pathways = applyRawMode(pathways);
+  }
+  
+  // Find max abundance for normalization
+  const maxAbundance = Math.max(...pathways.map(p => p.medianAbundance || p.meanAbundance || 0.0001));
+  
+  // Add computed fields
+  pathways.forEach(p => {
     p.n = p.ratio[0];
     p.d = p.ratio[1];
     
@@ -1178,100 +1441,90 @@ ALL_PATHWAYS.forEach(p => {
     p.amplitude = Math.max(0.02, Math.sqrt(p.normalizedAbundance));
     p.abundanceDisplay = formatAbundance(abundance, maxAbundance);
     p.abundanceRaw = abundance;
-});
+  });
+  
+  return { pathways, maxAbundance };
+}
 
-// Get unique subcategories
+
+// ============================================================
+// SECTION 7: INITIALIZE & EXPORT
+// ============================================================
+
+const { pathways: ALL_PATHWAYS, maxAbundance } = processPathways(MAPPING_MODE);
 const SUBCATEGORIES = [...new Set(ALL_PATHWAYS.map(p => p.subcategory).filter(Boolean))];
 
-// Category metadata
-const CATEGORIES = {
-    energy: {
-        name: 'Energy',
-        color: '#22c55e',
-        description: '3-limit harmonics (pure fifths/octaves)',
-        subcategories: ['Glycolysis/Gluconeogenesis', 'Fermentation', 'TCA Cycle', 'Glyoxylate Cycle', 'Pentose Phosphate', 'Respiration', 'Carbon Fixation']
-    },
-    biosynthesis: {
-        name: 'Biosynthesis',
-        color: '#3b82f6',
-        description: '7+ limit harmonics (rich, building)',
-        subcategories: ['Amino Acids', 'Nucleotides', 'Cofactors/Vitamins', 'Fatty Acids/Lipids', 'Cell Wall', 'Polyamines', 'Other']
-    },
-    degradation: {
-        name: 'Degradation',
-        color: '#ef4444',
-        description: '5+ limit subharmonics (breaking down)',
-        subcategories: ['Amino Acids', 'Nucleotides', 'Aromatics', 'Carbohydrates', 'Other']
-    },
-    salvage: {
-        name: 'Salvage',
-        color: '#eab308',
-        description: '3-limit subharmonics (pure, recycling)',
-        subcategories: ['Salvage/Recycling']
-    },
-    superpathways: {
-        name: 'Superpathways',
-        color: '#8b5cf6',
-        description: 'Superparticular (smooth steps)',
-        subcategories: ['Superpathways']
-    },
-    other: {
-        name: 'Other',
-        color: '#6b7280',
-        description: 'Remaining consonant ratios',
-        subcategories: ['Unclassified']
-    }
-};
-
-// Export
+// Export to window
 window.PATHWAY_DATA = {
-    ALL_PATHWAYS,
-    CATEGORIES,
-    SUBCATEGORIES,
-    MAPPING_MODE,
-    CATEGORY_RATIOS,
-    ABUNDANCE_RATIOS,
-    MS_COMPARISON_DATA,
-    maxAbundance,
-    ratioInfo,
-    formatAbundance
+  // Data
+  ALL_PATHWAYS,
+  ALL_PATHWAYS_RAW,
+  CATEGORIES,
+  SUBCATEGORIES,
+  MS_COMPARISON_DATA,
+  
+  // Composed ratios (for reference/debugging)
+  COMPOSED_RATIOS,
+  CURATED_IDS,
+  
+  // Config
+  MAPPING_MODE,
+  maxAbundance,
+  
+  // Utilities
+  ratioInfo,
+  formatAbundance,
+  
+  // Mode switching (for future UI toggle)
+  switchMode: function(newMode) {
+    console.log(`Switching to ${newMode} mode...`);
+    const { pathways, maxAbundance } = processPathways(newMode);
+    this.ALL_PATHWAYS = pathways;
+    this.maxAbundance = maxAbundance;
+    this.MAPPING_MODE = newMode;
+    console.log(`Now showing ${pathways.length} pathways`);
+    return pathways;
+  }
 };
 
 
 // ============================================================
-// STARTUP LOG
+// SECTION 8: STARTUP LOG
 // ============================================================
-console.log('First 5 ABUNDANCE_RATIOS:', ABUNDANCE_RATIOS.slice(0, 5));
-console.log('Last 5 ABUNDANCE_RATIOS:', ABUNDANCE_RATIOS.slice(-5));
-console.log('ABUNDANCE_RATIOS[599]:', ABUNDANCE_RATIOS[599]);
+
 console.log('');
 console.log('═══════════════════════════════════════════════════════════════');
-console.log('METABOLIC HARMONY - Pathway Data Loaded');
+console.log('METABOLIC HARMONY v4 - Pathway Data Loaded');
 console.log('═══════════════════════════════════════════════════════════════');
-console.log(`Mapping mode: ${MAPPING_MODE.toUpperCase()}`);
-console.log(`Total pathways: ${ALL_PATHWAYS.length}`);
-console.log('');
-console.log('BY CATEGORY:');
-const catCounts = {};
-ALL_PATHWAYS.forEach(p => {
-    catCounts[p.category] = (catCounts[p.category] || 0) + 1;
-});
-for (const cat in catCounts) {
-    const info = CATEGORIES[cat];
-    console.log(`  ${cat.padEnd(14)} ${String(catCounts[cat]).padStart(3)} pathways  │ ${info?.description || ''}`);
-}
+console.log(`Mode: ${MAPPING_MODE.toUpperCase()}`);
+console.log(`Pathways: ${ALL_PATHWAYS.length}`);
+console.log(`Curated available: ${CURATED_IDS.size}`);
 console.log('');
 
-// Show ratio range
-const allRatioValues = ALL_PATHWAYS.map(p => p.ratioValue);
-const minRatio = Math.min(...allRatioValues);
-const maxRatio = Math.max(...allRatioValues);
-console.log(`Ratio range: ${minRatio.toFixed(4)} to ${maxRatio.toFixed(2)}`);
-console.log(`At 600 Hz: ${(600 * minRatio).toFixed(1)} Hz to ${(600 * maxRatio).toFixed(1)} Hz`);
+if (MAPPING_MODE === 'composed') {
+  // Group by category for display
+  const byCat = {};
+  ALL_PATHWAYS.forEach(p => {
+    const cat = p.category || 'other';
+    if (!byCat[cat]) byCat[cat] = [];
+    byCat[cat].push(p);
+  });
+  
+  console.log('COMPOSED RATIOS BY CATEGORY:');
+  for (const cat in byCat) {
+    console.log(`\n  ${cat.toUpperCase()} (${byCat[cat].length}):`);
+    byCat[cat]
+      .sort((a, b) => a.ratioValue - b.ratioValue)
+      .slice(0, 5)
+      .forEach(p => {
+        console.log(`    ${p.n}/${p.d}  ${p.id}`);
+      });
+    if (byCat[cat].length > 5) console.log(`    ... and ${byCat[cat].length - 5} more`);
+  }
+}
+
+const ratioValues = ALL_PATHWAYS.map(p => p.ratioValue);
+console.log('');
+console.log(`Ratio range: ${Math.min(...ratioValues).toFixed(3)} to ${Math.max(...ratioValues).toFixed(1)}`);
+console.log(`At 660 Hz: ${(660 * Math.min(...ratioValues)).toFixed(1)} Hz to ${(660 * Math.max(...ratioValues)).toFixed(1)} Hz`);
 console.log('═══════════════════════════════════════════════════════════════');
-console.log('=== FINAL RATIO CHECK ===');
-const badRatios = ALL_PATHWAYS.filter(p => !Array.isArray(p.ratio));
-console.log('Pathways with non-array ratios:', badRatios.length);
-badRatios.forEach(p => {
-    console.log(`  ${p.id}: ratio =`, p.ratio, typeof p.ratio);
-});

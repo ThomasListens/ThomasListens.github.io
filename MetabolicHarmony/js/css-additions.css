@@ -1,0 +1,219 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   METABOLIC HARMONY v4.0 - CSS ADDITIONS
+   Add these styles to your existing <style> section
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   MODE TOGGLE - Composed vs Consonance
+   Insert after .title-section styles
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.mode-section {
+    padding: 8px 0 12px 0;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+.mode-toggle {
+    display: flex;
+    background: #f0f0f0;
+    border-radius: 6px;
+    padding: 3px;
+    position: relative;
+}
+
+.mode-toggle::before {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: calc(50% - 3px);
+    height: calc(100% - 6px);
+    background: #fff;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mode-toggle.consonance::before {
+    transform: translateX(100%);
+}
+
+.mode-btn {
+    flex: 1;
+    padding: 8px 10px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: #888;
+    position: relative;
+    z-index: 1;
+    transition: color 0.2s;
+    text-align: center;
+}
+
+.mode-btn:hover {
+    color: #555;
+}
+
+.mode-btn.active {
+    color: #111;
+    font-weight: 600;
+}
+
+.mode-btn .mode-sub {
+    display: block;
+    font-size: 0.55rem;
+    font-weight: 400;
+    color: #aaa;
+    margin-top: 1px;
+}
+
+.mode-btn.active .mode-sub {
+    color: #888;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   MUTE BUTTONS - Discrete mute toggle per category
+   Update .category-fader grid to include mute button
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Update category-fader grid (was: 10px 70px 1fr 28px) */
+.category-fader {
+    display: grid;
+    grid-template-columns: 10px 70px 1fr 28px 16px;  /* Added 16px for mute */
+    align-items: center;
+    gap: 6px;
+}
+
+.mute-btn {
+    width: 14px;
+    height: 14px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    opacity: 0.3;
+    transition: opacity 0.15s;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mute-btn:hover {
+    opacity: 0.7;
+}
+
+.mute-btn.muted {
+    opacity: 1;
+}
+
+.mute-btn svg {
+    width: 12px;
+    height: 12px;
+    fill: currentColor;
+}
+
+.mute-btn.muted svg {
+    fill: #dc2626;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SUBCATEGORY INTERACTION HINTS
+   Make subcategory clicks more discoverable
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.subcategory-header {
+    font-size: 0.65rem;
+    color: #666;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.subcategory-header .hint {
+    font-size: 0.5rem;
+    color: #bbb;
+    font-weight: 400;
+    margin-left: auto;
+}
+
+.subcat-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.4;
+    cursor: pointer;
+    transition: transform 0.15s, opacity 0.15s, box-shadow 0.15s;
+}
+
+.subcat-dot:hover {
+    transform: scale(1.6);
+    opacity: 0.9;
+    box-shadow: 0 0 4px currentColor;
+}
+
+.subcat-label {
+    font-size: 0.6rem;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.subcat-label:hover {
+    color: #111;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+}
+
+.subcat-dot.cycling {
+    opacity: 1;
+    animation: pulse-glow 1s infinite;
+}
+
+@keyframes pulse-glow {
+    0%, 100% { 
+        transform: scale(1); 
+        box-shadow: 0 0 2px currentColor;
+    }
+    50% { 
+        transform: scale(1.5); 
+        box-shadow: 0 0 8px currentColor;
+    }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   MODE INDICATOR BADGE - Shows current mode in summary
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.mode-badge {
+    display: inline-block;
+    font-size: 0.55rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.mode-badge.composed {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.mode-badge.consonance {
+    background: #dcfce7;
+    color: #166534;
+}
