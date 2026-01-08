@@ -4994,6 +4994,40 @@ async function updatePathwaySummary(pathwayId) {
                 });
             }
             
+            // ═══════════════════════════════════════════════════════════════════════
+            // MOBILE SCRUBBER - Draw scrubber line when active
+            // ═══════════════════════════════════════════════════════════════════════
+            const isMobile = window.matchMedia('(max-width: 900px)').matches;
+            if (isMobile && typeof isScrubbing !== 'undefined') {
+                // Animate zoom
+                const targetZoom = isScrubbing ? SCRUB_ZOOM : 1;
+                if (typeof scrubberZoom !== 'undefined') {
+                    scrubberZoom += (targetZoom - scrubberZoom) * ZOOM_SPEED;
+                }
+                
+                // Draw scrubber line when active
+                if (isScrubbing && scrubberX !== null) {
+                    spectrumCtx.save();
+                    
+                    // Vertical line - rich red, thinner
+                    spectrumCtx.strokeStyle = '#dc2626';
+                    spectrumCtx.lineWidth = 1;
+                    spectrumCtx.setLineDash([]);
+                    spectrumCtx.beginPath();
+                    spectrumCtx.moveTo(scrubberX, 0);
+                    spectrumCtx.lineTo(scrubberX, height);
+                    spectrumCtx.stroke();
+                    
+                    // Touch indicator circle - higher up (1/4 from top)
+                    spectrumCtx.fillStyle = 'rgba(220, 38, 38, 0.15)';
+                    spectrumCtx.beginPath();
+                    spectrumCtx.arc(scrubberX, height * 0.25, 25, 0, Math.PI * 2);
+                    spectrumCtx.fill();
+                    
+                    spectrumCtx.restore();
+                }
+            }
+            
             // Peristalsis wave
             if (isPlaying) {
                 // Peristalsis wave - intensity varies with MMC phase
@@ -5317,125 +5351,198 @@ function drawWaveformOverlay(width, height, isMobile = false) {
         });
         
         // ===========================================
-        // MOBILE TOUCH - Tap to pip, Long-press to focus, Drag to explore
+        // MOBILE TOUCH - Scrubber Mode
         // ===========================================
-        let touchStartTime = 0;
-        let touchStartPos = { x: 0, y: 0 };
-        let longPressTimer = null;
-        let touchedPathway = null;
-        let isDraggingToExplore = false;
-        let lastDragPipTime = 0;
-        const LONG_PRESS_DURATION = 500; // ms - slightly longer for easier use
-        const DRAG_PIP_INTERVAL = 150; // ms between pips while dragging
+        let isScrubbing = false;
+        let scrubberX = null;
+        let scrubberZoom = 1;
+        let scrubberCenterFreq = null;
+        let lastPippedPathway = null;
+        let scrubberAnimationFrame = null;
         
+        // Hold-to-focus
+        let holdTimer = null;
+        let holdPathway = null;
+        const HOLD_DURATION = 900; // ms to hold for focus
+        
+        // Target zoom when scrubbing (shows narrower freq range)
+        const SCRUB_ZOOM = 3;
+        const ZOOM_SPEED = 0.15; // How fast zoom animates
+        
+        function startScrubbing(touchX, canvasWidth) {
+            // If already focused, any touch clears focus
+            if (focusedPathway) {
+                clearFocus();
+                if (navigator.vibrate) navigator.vibrate(15);
+                return;
+            }
+            
+            isScrubbing = true;
+            scrubberX = touchX;
+            
+            // Initialize audio if not already (needed for pips)
+            if (!audioContext) {
+                initAudio();
+            }
+            
+            // Find pathway at this position and pip it
+            const pathway = findPathwayAtX(touchX, canvasWidth);
+            console.log('Scrubber start:', { touchX, canvasWidth, pathway: pathway?.id, pipGain: !!pipGain, audioContext: !!audioContext });
+            
+            if (pathway && pathway !== lastPippedPathway) {
+                playPip(pathway);
+                updatePathwayInfo(pathway);
+                if (navigator.vibrate) navigator.vibrate(10);
+                lastPippedPathway = pathway;
+                hoveredPathway = pathway;
+                
+                // Start hold timer for focus
+                holdPathway = pathway;
+                holdTimer = setTimeout(() => {
+                    if (holdPathway && holdPathway === pathway) {
+                        setFocusedPathway(pathway);
+                        if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+                        isScrubbing = false;
+                        scrubberX = null;
+                    }
+                }, HOLD_DURATION);
+            }
+        }
+        
+        function updateScrubber(touchX, canvasWidth) {
+            if (!isScrubbing) return;
+            
+            scrubberX = touchX;
+            const freq = xToFreq(touchX, canvasWidth);
+            scrubberCenterFreq = freq;
+            
+            // Find pathway at this position
+            const pathway = findPathwayAtX(touchX, canvasWidth);
+            if (pathway && pathway !== lastPippedPathway) {
+                // Moved to new pathway - cancel hold timer
+                if (holdTimer) {
+                    clearTimeout(holdTimer);
+                    holdTimer = null;
+                }
+                
+                playPip(pathway);
+                updatePathwayInfo(pathway);
+                if (navigator.vibrate) navigator.vibrate(10);
+                lastPippedPathway = pathway;
+                hoveredPathway = pathway;
+                
+                // Start new hold timer
+                holdPathway = pathway;
+                holdTimer = setTimeout(() => {
+                    if (holdPathway && holdPathway === pathway) {
+                        setFocusedPathway(pathway);
+                        if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+                        isScrubbing = false;
+                        scrubberX = null;
+                    }
+                }, HOLD_DURATION);
+            }
+        }
+        
+        function endScrubbing() {
+            isScrubbing = false;
+            scrubberX = null;
+            lastPippedPathway = null;
+            
+            // Clear hold timer
+            if (holdTimer) {
+                clearTimeout(holdTimer);
+                holdTimer = null;
+            }
+            holdPathway = null;
+        }
+        
+        function findPathwayAtX(x, canvasWidth) {
+            // Use cached bars from last draw - most accurate
+            if (cachedBars && cachedBars.length > 0) {
+                let closest = null;
+                let closestDist = Infinity;
+                
+                for (const bar of cachedBars) {
+                    const dist = Math.abs(bar.x - x);
+                    if (dist < closestDist) {
+                        closestDist = dist;
+                        closest = bar.pathway;
+                    }
+                }
+                
+                // Return if within reasonable distance (15px)
+                if (closest && closestDist < 15) {
+                    return closest;
+                }
+            }
+            
+            // Fallback: calculate from frequency
+            if (typeof PATHWAY_DATA === 'undefined' || !PATHWAY_DATA.ALL_PATHWAYS) {
+                return null;
+            }
+            const pathways = PATHWAY_DATA.ALL_PATHWAYS;
+            const fundamental = CONFIG.fundamental || 660;
+            
+            // Convert x to frequency using current zoom
+            const minLog = Math.log10(ZOOM.minFreq);
+            const maxLog = Math.log10(ZOOM.maxFreq);
+            const xRatio = (x - 20) / (canvasWidth - 40);
+            const freqLog = minLog + xRatio * (maxLog - minLog);
+            const targetFreq = Math.pow(10, freqLog);
+            
+            let closest = null;
+            let closestDist = Infinity;
+            
+            for (const p of pathways) {
+                if ((CONFIG.categoryGains[p.category] ?? 1) === 0) continue;
+                if ((CONFIG.subcategoryGains[p.subcategory] ?? 1) === 0) continue;
+                
+                const pFreq = fundamental * p.ratioValue;
+                const dist = Math.abs(Math.log10(pFreq) - Math.log10(targetFreq));
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    closest = p;
+                }
+            }
+            
+            if (closest && closestDist < 0.06) {
+                return closest;
+            }
+            return null;
+        }
+        
+        // Touch event handlers for spectrum canvas
         spectrumCanvas.addEventListener('touchstart', (e) => {
             if (e.touches.length !== 1) return;
+            e.preventDefault(); // Prevent scroll
             
             const touch = e.touches[0];
             const rect = spectrumCanvas.getBoundingClientRect();
             const touchX = touch.clientX - rect.left;
-            const touchY = touch.clientY - rect.top;
+            const canvasWidth = rect.width;
             
-            touchStartTime = Date.now();
-            touchStartPos = { x: touch.clientX, y: touch.clientY };
-            touchedPathway = findPathwayAtPoint(touchX, touchY);
-            isDraggingToExplore = false;
-            
-            if (touchedPathway) {
-                // Start long-press timer for focus
-                longPressTimer = setTimeout(() => {
-                    // Long press detected - focus the pathway
-                    setFocusedPathway(touchedPathway);
-                    // Vibrate if available
-                    if (navigator.vibrate) navigator.vibrate(30);
-                    touchedPathway = null; // Prevent tap action
-                }, LONG_PRESS_DURATION);
-            }
-        }, { passive: true });
+            startScrubbing(touchX, canvasWidth);
+        }, { passive: false });
         
         spectrumCanvas.addEventListener('touchmove', (e) => {
-            if (e.touches.length !== 1) return;
+            if (!isScrubbing || e.touches.length !== 1) return;
+            e.preventDefault();
             
             const touch = e.touches[0];
-            const dx = Math.abs(touch.clientX - touchStartPos.x);
-            const dy = Math.abs(touch.clientY - touchStartPos.y);
+            const rect = spectrumCanvas.getBoundingClientRect();
+            const touchX = touch.clientX - rect.left;
+            const canvasWidth = rect.width;
             
-            // If moved enough, cancel long-press and start drag-to-explore
-            if (dx > 10 || dy > 10) {
-                if (longPressTimer) {
-                    clearTimeout(longPressTimer);
-                    longPressTimer = null;
-                }
-                isDraggingToExplore = true;
-                
-                // Find pathway under finger and pip it
-                const rect = spectrumCanvas.getBoundingClientRect();
-                const touchX = touch.clientX - rect.left;
-                const touchY = touch.clientY - rect.top;
-                const pathwayUnderFinger = findPathwayAtPoint(touchX, touchY);
-                
-                if (pathwayUnderFinger) {
-                    const now = Date.now();
-                    // Throttle pips while dragging
-                    if (now - lastDragPipTime > DRAG_PIP_INTERVAL) {
-                        // Only pip if it's a different pathway than last
-                        if (!hoveredPathway || hoveredPathway.id !== pathwayUnderFinger.id) {
-                            playPip(pathwayUnderFinger);
-                            updatePathwayInfo(pathwayUnderFinger);
-                            hoveredPathway = pathwayUnderFinger;
-                            lastDragPipTime = now;
-                        }
-                    }
-                }
-            }
-        }, { passive: true });
+            updateScrubber(touchX, canvasWidth);
+        }, { passive: false });
         
         spectrumCanvas.addEventListener('touchend', (e) => {
-            // Clear long-press timer
-            if (longPressTimer) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
-            }
-            
-            const touchDuration = Date.now() - touchStartTime;
-            
-            // If we were dragging, just end
-            if (isDraggingToExplore) {
-                isDraggingToExplore = false;
-                touchedPathway = null;
-                return;
-            }
-            
-            // If it was a short tap and we have a pathway
-            if (touchDuration < LONG_PRESS_DURATION && touchedPathway) {
-                // Tap = pip (play sound briefly)
-                if (isPlaying) {
-                    // Just update the display, the pathway is already sounding
-                    updatePathwayInfo(touchedPathway);
-                    hoveredPathway = touchedPathway;
-                } else {
-                    // Not playing - pip the pathway
-                    playPip(touchedPathway);
-                    updatePathwayInfo(touchedPathway);
-                }
-            } else if (touchDuration < LONG_PRESS_DURATION && !touchedPathway) {
-                // Tapped empty space - clear focus (easy unfocus!)
-                if (focusedPathway) {
-                    clearFocus();
-                    if (navigator.vibrate) navigator.vibrate(15); // Light feedback
-                }
-            }
-            
-            touchedPathway = null;
+            endScrubbing();
         }, { passive: true });
         
-        spectrumCanvas.addEventListener('touchcancel', () => {
-            if (longPressTimer) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
-            }
-            touchedPathway = null;
-            isDraggingToExplore = false;
+        spectrumCanvas.addEventListener('touchcancel', (e) => {
+            endScrubbing();
         }, { passive: true });
 
         spectrumCanvas.addEventListener('dblclick', (e) => {
