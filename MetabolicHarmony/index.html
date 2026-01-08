@@ -380,6 +380,9 @@
         .play-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70px; height: 70px; background: #fff; border: 2px solid #333; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 2; }
         .play-btn:hover { transform: translate(-50%, -50%) scale(1.05); box-shadow: 0 4px 16px rgba(0,0,0,0.15); }
         .play-btn svg { width: 28px; height: 28px; fill: #333; }
+        .play-btn.loading { opacity: 0.5; cursor: wait; }
+        .play-btn.loading svg { animation: pulse-loading 1s ease-in-out infinite; }
+        @keyframes pulse-loading { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
         .play-btn.playing { top: auto; bottom: 12px; left: 12px; transform: none; width: 44px; height: 44px; background: #111; border-color: #111; }
         .play-btn.playing:hover { transform: scale(1.05); }
         .play-btn.playing svg { width: 18px; height: 18px; fill: #fff; }
@@ -2969,16 +2972,46 @@ Always verify taxonomic range.
         // ===========================================
         // HELPERS
         // ===========================================
+        function getEffectiveZoomRange() {
+            // On mobile with active scrubber zoom, narrow the frequency range
+            const isMobile = window.matchMedia('(max-width: 900px)').matches;
+            if (isMobile && typeof scrubberZoom !== 'undefined' && scrubberZoom > 1 && scrubberX !== null) {
+                // Get frequency at scrubber position (center of zoom)
+                const minLog = Math.log10(ZOOM.minFreq);
+                const maxLog = Math.log10(ZOOM.maxFreq);
+                const fullRange = maxLog - minLog;
+                
+                // Narrow the range based on zoom level
+                const zoomedRange = fullRange / scrubberZoom;
+                
+                // Center on scrubber X position
+                const width = spectrumCanvas.width / (window.devicePixelRatio || 1);
+                const xRatio = (scrubberX - 40) / (width - 60);
+                const centerLog = minLog + xRatio * fullRange;
+                
+                const newMinLog = centerLog - zoomedRange / 2;
+                const newMaxLog = centerLog + zoomedRange / 2;
+                
+                return {
+                    minFreq: Math.pow(10, Math.max(newMinLog, Math.log10(20))),
+                    maxFreq: Math.pow(10, Math.min(newMaxLog, Math.log10(20000)))
+                };
+            }
+            return { minFreq: ZOOM.minFreq, maxFreq: ZOOM.maxFreq };
+        }
+        
         function freqToX(freq, width) {
-            const minLog = Math.log10(ZOOM.minFreq);
-            const maxLog = Math.log10(ZOOM.maxFreq);
+            const zoom = getEffectiveZoomRange();
+            const minLog = Math.log10(zoom.minFreq);
+            const maxLog = Math.log10(zoom.maxFreq);
             const freqLog = Math.log10(freq);
             return 40 + ((freqLog - minLog) / (maxLog - minLog)) * (width - 60);
         }
         
         function xToFreq(x, width) {
-            const minLog = Math.log10(ZOOM.minFreq);
-            const maxLog = Math.log10(ZOOM.maxFreq);
+            const zoom = getEffectiveZoomRange();
+            const minLog = Math.log10(zoom.minFreq);
+            const maxLog = Math.log10(zoom.maxFreq);
             const ratio = (x - 40) / (width - 60);
             return Math.pow(10, minLog + ratio * (maxLog - minLog));
         }
@@ -3376,13 +3409,11 @@ Always verify taxonomic range.
         const playBtn = document.getElementById('playBtn');
         const mobilePlayBtn = document.querySelector('.mobile-play-btn');
         if (playBtn) {
-            playBtn.dataset.originalText = playBtn.textContent;
-            playBtn.textContent = 'Loading...';
+            playBtn.classList.add('loading');
             playBtn.disabled = true;
         }
         if (mobilePlayBtn) {
-            mobilePlayBtn.dataset.originalText = mobilePlayBtn.textContent;
-            mobilePlayBtn.textContent = '...';
+            mobilePlayBtn.classList.add('loading');
             mobilePlayBtn.disabled = true;
         }
         
@@ -3492,11 +3523,11 @@ Always verify taxonomic range.
         const playBtnRestore = document.getElementById('playBtn');
         const mobilePlayBtnRestore = document.querySelector('.mobile-play-btn');
         if (playBtnRestore) {
-            playBtnRestore.textContent = playBtnRestore.dataset.originalText || '▶ Play';
+            playBtnRestore.classList.remove('loading');
             playBtnRestore.disabled = false;
         }
         if (mobilePlayBtnRestore) {
-            mobilePlayBtnRestore.textContent = mobilePlayBtnRestore.dataset.originalText || '▶';
+            mobilePlayBtnRestore.classList.remove('loading');
             mobilePlayBtnRestore.disabled = false;
         }
         
@@ -3509,11 +3540,11 @@ Always verify taxonomic range.
         const playBtnErr = document.getElementById('playBtn');
         const mobilePlayBtnErr = document.querySelector('.mobile-play-btn');
         if (playBtnErr) {
-            playBtnErr.textContent = playBtnErr.dataset.originalText || '▶ Play';
+            playBtnErr.classList.remove('loading');
             playBtnErr.disabled = false;
         }
         if (mobilePlayBtnErr) {
-            mobilePlayBtnErr.textContent = mobilePlayBtnErr.dataset.originalText || '▶';
+            mobilePlayBtnErr.classList.remove('loading');
             mobilePlayBtnErr.disabled = false;
         }
         
@@ -5390,7 +5421,7 @@ function drawWaveformOverlay(width, height, isMobile = false) {
         });
         
         // ===========================================
-        // MOBILE TOUCH - Scrubber Mode
+        // MOBILE TOUCH - Scrubber Mode with Zoom
         // ===========================================
         let isScrubbing = false;
         let scrubberX = null;
@@ -5404,11 +5435,18 @@ function drawWaveformOverlay(width, height, isMobile = false) {
         let holdPathway = null;
         const HOLD_DURATION = 900; // ms to hold for focus
         
+        // Zoom via vertical drag
+        let scrubberStartY = null;
+        let scrubberCurrentY = null;
+        const ZOOM_SENSITIVITY = 0.01; // How much Y movement affects zoom
+        const MIN_ZOOM = 1;
+        const MAX_ZOOM = 8;
+        
         // Target zoom when scrubbing (shows narrower freq range)
         const SCRUB_ZOOM = 3;
         const ZOOM_SPEED = 0.15; // How fast zoom animates
         
-        function startScrubbing(touchX, canvasWidth) {
+        function startScrubbing(touchX, touchY, canvasWidth) {
             // If already focused, any touch clears focus
             if (focusedPathway) {
                 clearFocus();
@@ -5418,6 +5456,8 @@ function drawWaveformOverlay(width, height, isMobile = false) {
             
             isScrubbing = true;
             scrubberX = touchX;
+            scrubberStartY = touchY;
+            scrubberCurrentY = touchY;
             
             // Initialize audio if not already (needed for pips)
             if (!audioContext) {
@@ -5426,7 +5466,6 @@ function drawWaveformOverlay(width, height, isMobile = false) {
             
             // Find pathway at this position and pip it
             const pathway = findPathwayAtX(touchX, canvasWidth);
-            console.log('Scrubber start:', { touchX, canvasWidth, pathway: pathway?.id, pipGain: !!pipGain, audioContext: !!audioContext });
             
             if (pathway && pathway !== lastPippedPathway) {
                 playPip(pathway);
@@ -5448,12 +5487,18 @@ function drawWaveformOverlay(width, height, isMobile = false) {
             }
         }
         
-        function updateScrubber(touchX, canvasWidth) {
+        function updateScrubber(touchX, touchY, canvasWidth) {
             if (!isScrubbing) return;
             
             scrubberX = touchX;
-            const freq = xToFreq(touchX, canvasWidth);
-            scrubberCenterFreq = freq;
+            
+            // Vertical drag controls zoom
+            if (scrubberStartY !== null) {
+                const deltaY = scrubberStartY - touchY; // Drag up = positive = zoom in
+                const zoomFactor = 1 + (deltaY * ZOOM_SENSITIVITY);
+                scrubberZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomFactor));
+                scrubberCurrentY = touchY;
+            }
             
             // Find pathway at this position
             const pathway = findPathwayAtX(touchX, canvasWidth);
@@ -5486,6 +5531,9 @@ function drawWaveformOverlay(width, height, isMobile = false) {
         function endScrubbing() {
             isScrubbing = false;
             scrubberX = null;
+            scrubberStartY = null;
+            scrubberCurrentY = null;
+            scrubberZoom = 1; // Reset zoom on release
             lastPippedPathway = null;
             
             // Clear hold timer
@@ -5551,29 +5599,35 @@ function drawWaveformOverlay(width, height, isMobile = false) {
             return null;
         }
         
-        // Touch event handlers for spectrum canvas
+        // Touch event handlers for spectrum canvas (MOBILE ONLY)
         spectrumCanvas.addEventListener('touchstart', (e) => {
+            const isMobile = window.matchMedia('(max-width: 900px)').matches;
+            if (!isMobile) return;
             if (e.touches.length !== 1) return;
             e.preventDefault(); // Prevent scroll
             
             const touch = e.touches[0];
             const rect = spectrumCanvas.getBoundingClientRect();
             const touchX = touch.clientX - rect.left;
+            const touchY = touch.clientY - rect.top;
             const canvasWidth = rect.width;
             
-            startScrubbing(touchX, canvasWidth);
+            startScrubbing(touchX, touchY, canvasWidth);
         }, { passive: false });
         
         spectrumCanvas.addEventListener('touchmove', (e) => {
+            const isMobile = window.matchMedia('(max-width: 900px)').matches;
+            if (!isMobile) return;
             if (!isScrubbing || e.touches.length !== 1) return;
             e.preventDefault();
             
             const touch = e.touches[0];
             const rect = spectrumCanvas.getBoundingClientRect();
             const touchX = touch.clientX - rect.left;
+            const touchY = touch.clientY - rect.top;
             const canvasWidth = rect.width;
             
-            updateScrubber(touchX, canvasWidth);
+            updateScrubber(touchX, touchY, canvasWidth);
         }, { passive: false });
         
         spectrumCanvas.addEventListener('touchend', (e) => {
