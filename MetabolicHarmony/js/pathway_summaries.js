@@ -887,7 +887,7 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5860"
   },
   "PWY-5861": {
-    "summary": null,
+    "summary": "Menaquinones (MK) and demethylmenaquinones (DMK) are low-molecular weight lipophilic components of the cytoplasmic membrane, found in many bacterial species. These quinones function as a reversible redox component of the electron transfer chain, mediating electron transfer between hydrogenases and cytochromes. Menaquinones have also been implicated in regulation, as they are necessary for sporulation and proper regulation of cytochrome formation in some Gram-positive bacteria [Farrand73, Farrand74].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5861"
   },
   "PWY-5862": {
@@ -919,7 +919,7 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5910"
   },
   "PWY-5913": {
-    "summary": null,
+    "summary": "The TCA pathway is a catabolic pathway of aerobic respiration that generates both energy and reducing power. In addition, it is also the first step in generating precursors for biosynthesis. The pathway is very common, and a variation of it exists in practically all aerobic living organisms [Krebs37, Krebs38, Krebs45].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5913"
   },
   "PWY-5918": {
@@ -943,7 +943,7 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5973"
   },
   "PWY-5989": {
-    "summary": null,
+    "summary": "De novo plant fatty acid synthesis occurs primarily in plastids and chloroplasts (it was shown that at least in Arabidopsis fatty acid synthesis also occurs in the mitochondria). The process involves a series of reactions catalyzed by fatty acid synthase (FAS) complexes that provoke the condensation of a malonyl-[acp] and an acyl-[acyl-carrier protein] (see fatty acid elongation -- saturated).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5989"
   },
   "PWY-6071": {
@@ -1095,7 +1095,7 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6387"
   },
   "PWY-6396": {
-    "summary": null,
+    "summary": "2,3-butanediol is a compound of commercial interest, mostly as an antifreeze agent due to to its low freezing point [Magee87]. One of its well known applications is the formation of methyl ethyl ketone, by dehydration, which can be used as a liquid fuel additive [Syu01].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6396"
   },
   "PWY-6470": {
@@ -1111,7 +1111,7 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6478"
   },
   "PWY-6507": {
-    "summary": null,
+    "summary": "Many organisms produce large complex polymers that contain uronic acids. A few examples include pectin, an important component of plant cell walls that contains D-galacturonate, and glycosaminoglycans produced by animals, which include heparin, heparan sulfate, hyaluronan, a chondroitin sulfate etc.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6507"
   },
   "PWY-6519": {
@@ -1147,7 +1147,7 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6606"
   },
   "PWY-6608": {
-    "summary": null,
+    "summary": "The distinction between nucleoside degradation and salvage is not always straight forward. A general rule is that degradation pathways start with the nucleotide forms and convert them to simpler forms, eventually leading to complete mineralization, while salvage pathways start with either the nucleoside or the free base form, and convert those to the nucleotide forms.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6608"
   },
   "PWY-6609": {
@@ -1219,7 +1219,7 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6737"
   },
   "PWY-6749": {
-    "summary": null,
+    "summary": "5,7-diacetamido-3,5,7,9-tetradeoxy-D-glycero-D-galacto-nonulopyranosonate (legionaminic acid, 5,7-diacetamido-3,5,7,9-tetradeoxy-D-glycero-D-galacto-nonulosonic acid) is part of the diverse sialic acid family of \u03b1-keto sugars. Members of this family mediate or modulate many cellular interactions in prokaryotes and eukaryotes. Many pathogenic organisms can display, bind, or catabolize sialic acids, helping them to evade host immune responses and invade cells (in [Schoenhofen09]).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6749"
   },
   "PWY-6823": {
@@ -1227,7 +1227,7 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6823"
   },
   "PWY-6834": {
-    "summary": null,
+    "summary": "Polyamines are found in bacteria, archaea and eukaryotes and are necessary for normal cellular physiology. Examples include the standard polyamines putrescine, spermidine and spermine. Several independent pathways have been identified for the biosynthesis of spermidine. In pathway spermidine biosynthesis I, S-adenosyl 3-(methylsulfanyl)propylamine (decarboxylated S-adenosyl-L-methionine) donates an aminopropyl group to putrescine to form spermidine in a reaction catalyzed by spermidine synthase. In contrast, in pathway spermidine biosynthesis II L-aspartate 4-semialdehyde donates a carboxyaminopropyl group to putrescine to form carboxyspermidine in a reaction catalyzed by carboxynorspermidine/carboxyspermidine dehydrogenase. Then, decarboxylation of carboxyspermidine catalyzed by carboxynorspermidine/carboxyspermidine decarboxylase produces spermidine [Lee09a] and in [Shaw10]. The pathway shown here has been proposed in hyperthermophilic bacteria and archaea based on genetic and functional analyses and involves N1-(3-aminopropyl)agmatine as the key intermediate [Morimoto10, Ohnuma05] (see below).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6834"
   },
   "PWY-6837": {
@@ -1255,23 +1255,23 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6895"
   },
   "PWY-6897": {
-    "summary": null,
+    "summary": "Thiamine diphosphate, also known as vitamin B1, is known to play a fundamental role in energy metabolism. It is an essential cofactor for a variety of enzymes such as transketolase, pyruvate dehydrogenase, pyruvate decarboxylase, and \u03b1-ketoglutarate dehydrogenase [Lawhorn04]. Its discovery followed from the original early research on the anti-beriberi factor found in rice bran. Beriberi, a neurological disease, was particularly prevalent in Asia, where the refining of rice resulted in the removal of the thiamine-containing husk [Begley96]. Thiamine is synthesized de novo by microorganisms, plants and some lower eukaryotes (e.g. Plasmodium <Plasmodium>), but not by higher eukaryotes, which must obtain it through their diet.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6897"
   },
   "PWY-6901": {
-    "summary": null,
+    "summary": "There is renewed interest in lignocellulosic biomass as a renewable feedstock for the production of ethanol and other chemicals as result of increasing fuel costs and limited resources for fossil fuels [Patel06]. Ethanol production from lignocellulose is not a straightforward process. Cellulose and hemicellulose form a complex with lignin and need to be liberated first by delignification. Cellulose and hemicellulose then need to be depolymerized to release free sugars such as glucose and xylose. These mixed hexose and pentose sugars then require fermentation to produce ethanol [Lee97b].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6901"
   },
   "PWY-6906": {
-    "summary": null,
+    "summary": "Chitin is the second most abundant biologically produced polymer (cellulose is the most abundant). Chitin is found in the cell walls of fungi, yeast and green algae, as well as the exoskeletons of crustaceans (including planktonic types) and insects. In the marine environment chitin is an abundant polysaccharide that is a source of carbon and nitrogen for marine organisms. Its degradation by several genera of marine chitinolytic bacteria is part of the cycling of nutrients in ocean water In addition to ocean water, chitinase genes have been identified in bacteria from freshwater and saline lakes, estuaries, and soil. The ability to degrade chitin appears to be limited to the Proteobacteria, Bactriodetes, Actinobacteria and Firmicutes (in [Hunt08] and reviewed in [Souza11]). Some bacterial species have been shown to contain multiple chitinase genes to efficiently utilize different forms of chitin and some of its by-products [Svitil97].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6906"
   },
   "PWY-6936": {
-    "summary": null,
+    "summary": "Selenium is an essential micronutrient for many organisms (see L-selenocysteine biosynthesis I (bacteria) and L-selenocysteine biosynthesis II (archaea and eukaryotes)) but has not yet been proven to be an essential micronutrient for land plants [Brown01, Sors05a]. There is evidence, however, of Chlamydomonas reinhardtii proteins that contains a L-selenocysteine residue suggesting that algal species might also require elemental selenium [Kim06b, Novoselov02].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6936"
   },
   "PWY-6969": {
-    "summary": null,
+    "summary": "The TCA pathway is a catabolic pathway of mostly aerobic respiration that generates both energy and reducing power. In addition, it is also the first step in generating precursors for biosynthesis. The pathway is very common, and a variation of it exists in practically all aerobic living organisms [Krebs37, Krebs38, Krebs45] as well as some anaerobic bacteria [Thauer88, Galushko00].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6969"
   },
   "PWY-6981": {
@@ -1279,83 +1279,83 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6981"
   },
   "PWY-6992": {
-    "summary": null,
+    "summary": "1,5-anhydro-D-fructose has been found in fungi, red algae, Escherichia coli C600 and rat liver tissue [Baute91, Kametani96, Broberg99, Shiga99]. It acts as an antioxidant [Yamaji02], an antibiotic [Meng11a], and a precursor of several other antibiotics [Yu99].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6992"
   },
   "PWY-6993": {
-    "summary": null,
+    "summary": "Early studies of nicotine degradation by Pseudomonas species identified several intermediates, including pseudooxynicotine, methylamine, 4-oxo-4-(3-pyridyl)-butanoate and 4-(6-hydroxypyridin-3-yl)-4-oxobutanoate [Tabuchi55, Wada57]. The latter was predicted to be further metabolized by cleavage at the 3 position to form 2,5-dihydroxypyridine and succinate semialdehyde [Kaiser96]. 2,5-dihydroxypyridine is believed to be further degraded into the central metabolite fumarate via maleamate and maleate [Wang07b].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6993"
   },
   "PWY-7003": {
-    "summary": null,
+    "summary": "The production of biofuels from renewable feedstock is a growing field, in the face of dwindling supplies and the cost of petroleum-based fuels. The primary alcohol butanol is an excellent example of a good biofuel, and is produced by several species of Clostridium. Butanol is produced by Clostridium acetobutylicum and Clostridium pasteurianum by the process of acetone-butanol-ethanol (ABE) fermentation. However, this system is hampered by productivity limitations. To circumvent these issues Clostridium pasteurianum was chemically mutated to produce copious amounts of butanol using glycerol as the sole carbon source [Malaviya12]. Glycerol is a good feedstock for butanol production because it is inexpensive and readily available, being a byproduct of biodiesel production.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7003"
   },
   "PWY-7007": {
-    "summary": null,
+    "summary": "2-tridecanone is an aliphatic methyl ketone that is naturally occurring in plants, where it can play a role as both a pheromone and insecticide [Antonious03]. The methyl ketone biosynthetic pathway was characterized in tomato plants, specifically Solanum habrochaites, from which two key genes (MKS1 and MKS2) were identified that were required for methyl ketone synthesis from fatty acid intermediates [Yu10]. MKS1 is purported to hydrolyze a \u03b2-ketoacyl ACP to generate a \u03b2-keto acid, and MKS2 may decarboxylate the \u03b2-keto acid to a methyl ketone (see 2-methylketone biosynthesis).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7007"
   },
   "PWY-7013": {
-    "summary": null,
+    "summary": "(S)-propane-1,2-diol (propylene glycol) is produced from (S)-lactaldehyde during the bacterial degradation of L-rhamnose and L-fucopyranose (see L-lactaldehyde degradation (anaerobic) and the associated pathway links) (in [Xue08]). Salmonella enterica can utilize (S)-propane-1,2-diol as a carbon source and its metabolism may be a virulence factor [Bobik99]. Under fermentative conditions, 1-propanal (propionaldehyde) is formed and converted to propan-1-ol and propanoate (propionate), ATP is produced, and NAD+ is regenerated (in [Xue08]). The reactions forming 1-propanal and propanoyl-CoA occur within a specialized bacterial microcompartment known as a metabolosome (see the About This Pathway section below).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7013"
   },
   "PWY-7094": {
-    "summary": null,
+    "summary": "fabY-mutants are defficient in fatty acid biosynthesis. However, this phenotype can be suppressed by supplementation of the growth media with exogenous fatty acids with chain lengths of eight or more carbons [Yuan12]. Upon transport into the cell the fatty acids form acyl-CoA thioesters, which are catabolized by the \u03b2-oxidation cycle.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7094"
   },
   "PWY-7111": {
-    "summary": null,
+    "summary": "Isobutanol is produced biologically as a by-product of yeast fermentation. While most other eukaryotes (as well as many prokaryotes) catabolize L-valine through a succession of acyl-coA derivatives to metabolites that can enter the TCA cycle (see L-valine degradation I), providing the organism with carbon as well as nitrogen, yeast are not able to use L-valine as a carbon source, and process it through the Ehrlich pathway to isobutanol [Derrick93]. In this pathway, the nitrogen is removed, creating the 2-oxo acid 3-methyl-2-oxobutanoate, which is metabolized to isobutanol via isobutanal.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7111"
   },
   "PWY-7115": {
-    "summary": null,
+    "summary": "The main CO2 fixation enzyme in plants, EC 4.1.1.39, ribulose-bisphosphate carboxylase/oxygenase (RuBisCO), has both carboxylase (photosynthetic CO2 fixation) and oxygenase (photorespiration) activities. The carboxylase activity is favored at high CO2/O2 ratio, whereas the oxygenase activity predominates at a decreased CO2/O2 ratio.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7115"
   },
   "PWY-7117": {
-    "summary": null,
+    "summary": "The main CO2 fixation enzyme in plants, EC 4.1.1.39, ribulose-bisphosphate carboxylase/oxygenase (RuBisCO), has both carboxylase (photosynthetic CO2 fixation) and oxygenase (photorespiration) activities. The carboxylase activity is favored at high CO2/O2 ratio, whereas the oxygenase activity predominates at a decreased CO2/O2 ratio.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7117"
   },
   "PWY-7184": {
-    "summary": null,
+    "summary": "Pyrimidine and purine nucleoside triphosphates are the activated precursors of DNA and RNA. The pyrimidine deoxyribonucleoside triphosphates dCTP and dTTP are incorporated into DNA while the ribonucleoside triphosphates CTP and UTP are incorporated into RNA. In addition, their diphosphates form activated derivatives of other molecules, such as UDP-\u03b1-D-glucose, CMP-3-deoxy-\u03b2-D-manno-octulosonate and dTDP-\u03b1-D-fucopyranose, for use in biosynthesis of polysaccharides, glycoproteins and phospholipids [Zhou98, Giermann02, Schroder05, Zrenner06].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7184"
   },
   "PWY-7187": {
-    "summary": null,
+    "summary": "Pyrimidine and purine nucleoside triphosphates are the activated precursors of DNA and RNA. The pyrimidine deoxyribonucleoside triphosphates dCTP and dTTP are incorporated into DNA while the ribonucleoside triphosphates CTP and UTP are incorporated into RNA. In addition, their diphosphates form activated derivatives of other molecules, such as UDP-\u03b1-D-glucose, CMP-3-deoxy-\u03b2-D-manno-octulosonate and dTDP-\u03b1-D-fucopyranose, for use in biosynthesis of polysaccharides, glycoproteins and phospholipids [Zhou98, Giermann02, Schroder05, Zrenner06].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7187"
   },
   "PWY-7196": {
-    "summary": null,
+    "summary": "The essential ribonucleoside triphosphates (UTP and CTP) can be synthesized either de novo (see superpathway of pyrimidine ribonucleotides de novo biosynthesis) or by utilizing free pyrimidine bases (uracil and cytosine) or their nucleosides (uridine and cytidine) by importing them from the environment. Both free bases and nucleosides can be imported into the cell by specialized transporters [Griffith96, Mourad12, Choi12]. On the other hand, nucleotides (which are phosphorylated) can not be imported due to their negative charge, and thus can not be salvaged from the environment.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7196"
   },
   "PWY-7197": {
-    "summary": null,
+    "summary": "Deoxyribonucleotides are synthesised de novo at the diphosphate level through reduction of the 2'-hydroxyl group of the corresponding ribonucleotides (see pyrimidine deoxyribonucleotides de novo biosynthesis I). This reduction is mediated by the key enzyme ribonucleoside-diphosphate reductase.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7197"
   },
   "PWY-7198": {
-    "summary": null,
+    "summary": "Pyrimidine and purine nucleoside triphosphates are the activated precursors of DNA and RNA. The pyrimidine deoxyribonucleoside triphosphates dCTP and dTTP are incorporated into DNA while the ribonucleoside triphosphates CTP and UTP are incorporated into RNA. In addition, their diphosphates form activated derivatives of other molecules, such as UDP-\u03b1-D-glucose, CMP-3-deoxy-\u03b2-D-manno-octulosonate and dTDP-\u03b1-D-fucopyranose, for use in biosynthesis of polysaccharides, glycoproteins and phospholipids [Zhou98, Giermann02, Schroder05, Zrenner06].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7198"
   },
   "PWY-7199": {
-    "summary": null,
+    "summary": "Deoxyribonucleotides are synthesised de novo at the diphosphate level through reduction of the 2'-hydroxyl group of the corresponding ribonucleotides (see pyrimidine deoxyribonucleotides de novo biosynthesis I). This reduction is mediated by the key enzyme ribonucleoside-diphosphate reductase.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7199"
   },
   "PWY-7200": {
-    "summary": null,
+    "summary": "Deoxyribonucleotides are synthesised de novo at the diphosphate level through reduction of the 2'-hydroxyl group of the corresponding ribonucleotides (see pyrimidine deoxyribonucleotides de novo biosynthesis I). This reduction is mediated by the key enzyme ribonucleoside-diphosphate reductase.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7200"
   },
   "PWY-7208": {
-    "summary": null,
+    "summary": "The essential ribonucleoside triphosphates (UTP and CTP) can be synthesized either de novo (see superpathway of pyrimidine ribonucleotides de novo biosynthesis) or by utilizing free pyrimidine bases (uracil and cytosine) or their nucleosides (uridine and cytidine) by importing them from the environment. Both free bases and nucleosides can be imported into the cell by specialized transporters [Griffith96, Mourad12, Choi12]. On the other hand, nucleotides (which are phosphorylated) can not be imported due to their negative charge, and thus can not be salvaged from the environment.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7208"
   },
   "PWY-7209": {
-    "summary": null,
+    "summary": "The predominant circulating pyrimidine in many species, including humans is uridine [Wu94, Cansev06]. In mammals Uridine is produced de novo in the liver and kidney, and is circulated to other organs, where it serves as an important precursor of pyrimidine salvage pathways [Shambaugh79, Karle84, Moyer85, Traut96, Barsotti02]. Its plasma level is strictly maintained at 3-5 \u03bcM, a concentration higher than that of other nucleosides [Traut94]. Cells maintain uridine concentration by balancing its input, salvage, and catabolism. The main enzyme responsible for uridine catabolism is uridine phosphorylase.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7209"
   },
   "PWY-7210": {
-    "summary": null,
+    "summary": "Pyrimidine and purine nucleoside triphosphates are the activated precursors of DNA and RNA. The pyrimidine deoxyribonucleoside triphosphates dCTP and dTTP are incorporated into DNA while the ribonucleoside triphosphates CTP and UTP are incorporated into RNA. In addition, their diphosphates form activated derivatives of other molecules, such as UDP-\u03b1-D-glucose, CMP-3-deoxy-\u03b2-D-manno-octulosonate and dTDP-\u03b1-D-fucopyranose, for use in biosynthesis of polysaccharides, glycoproteins and phospholipids [Zhou98, Giermann02, Schroder05, Zrenner06].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7210"
   },
   "PWY-7211": {
-    "summary": null,
+    "summary": "Pyrimidine and purine nucleoside triphosphates are the activated precursors of DNA and RNA. The pyrimidine deoxyribonucleoside triphosphate dCTP and dTTP are incorporated into DNA while the ribonucleoside triphosphates CTP and UTP are incorporated into RNA. In addition, their diphosphates form activated derivatives of other molecules, such as UDP-\u03b1-D-glucose, CMP-3-deoxy-\u03b2-D-manno-octulosonate and dTDP-\u03b1-D-fucopyranose, for use in biosynthesis of polysaccharides, glycoproteins and phospholipids [Zhou98, Giermann02, Schroder05, Zrenner06].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7211"
   },
   "PWY-7219": {
