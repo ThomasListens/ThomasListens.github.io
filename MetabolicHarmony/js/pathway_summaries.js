@@ -663,7 +663,7 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-3081"
   },
   "PWY-3841": {
-    "summary": null,
+    "summary": "This pathway describes the formation of the formyl and methyl derivatives of tetrahydrofolate (vitamin B9) [Cossins97, Hanson00]. Folates are involved in a wide range of key metabolic functions in plants [Hanson02, Jabrin03], mediating fluxes through C1-pathways with a high demand for methylated compounds such as secondary metabolites [Hanson01].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-3841"
   },
   "PWY-4242": {
@@ -691,7 +691,7 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5028"
   },
   "PWY-5097": {
-    "summary": null,
+    "summary": "Six pathways are now recognized in bacteria, most algae, fungi and higher plants for the biosynthesis of lysine. They are divided into two groups - the diaminopimelate (DAP) pathways, and the L-2-aminoadipate pathways.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5097"
   },
   "PWY-5100": {
@@ -811,79 +811,79 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5659"
   },
   "PWY-5667": {
-    "summary": null,
+    "summary": "Phospholipids are important membrane components. Most of the phospholipids belong to the category of phosphoglycerides. The simplest phosphoglycerides, which are known as phosphatidate (or diacylglycerol phosphate), are composed of a glycerol molecule attached to two fatty acids and one phosphate group. The carboxyl group of each fatty acid is esterified to the hydroxyl groups on carbon-1 and carbon-2 of the glycerol molecule, while the phosphate group is attached to carbon-3 by an ester link. Phosphatidates are precursors for many phosphoglycerides found in animals, plants and yeast, including a phosphatidylinositol, a phosphatidylserine, a phosphatidylethanolamine, and a cardiolipin.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5667"
   },
   "PWY-5675": {
-    "summary": null,
+    "summary": "Assimilatory nitrate reductase passes a pair of electrons from the donor molecule NAD(P)H to nitrate through a series of enzyme prosthetic groups, which can include FAD, cytochrome b-557, and a MoO2(OH)-molybdopterin cofactor, reducing nitrate to nitrite [Garrett69].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5675"
   },
   "PWY-5676": {
-    "summary": null,
+    "summary": "In this pathway, acetyl-CoA, which is derived from ethanol (see ethanol degradation I) can be processed in two routes. In the first route, acetyl-CoA is converted to acetate via acetyl phosphate. This conversion generates ATP, which is required for growth, by substrate-level phosphorylation [Thauer68]. In the second route, the reducing power which accumulates during the conversion of ethanol to acetyl-CoA is dispensed via a cycle that results in the excretion of butanoate (or hexanoate). The cycle starts with the condensation of two acetyl-CoA molecules to form acetoacetyl-CoA. This compund then proceeds in a cycle via the intermediates (3R)-hydroxybutanoyl-CoA and crotonyl-CoA, forming butanoyl-CoA.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5676"
   },
   "PWY-5677": {
-    "summary": null,
+    "summary": "A pathway has been proposed in which succinate is first activated to succinyl-CoA and then reduced by a two-step reaction to give 4-hydroxybutanoate, which is then further metabolized to crotonyl-CoA [Kenealy85].The first three enzymes of the propsed pathway,succinyl-CoA:CoA transferase, succinate semialdehyde dehydrogenase and 4-hydroxybutyrate dehydrogenase (NAD) were subsequently described [Sohling93]. A study utilizing 13C-nuclear magnetic resonance as well as enzymatic investigations on the dehydrogenases involved confirmed the proposed pathway [Wolff93]. Another enzyme of the pathway, 4-hydroxybutyryl-CoA dehydratase, a dual function enzyme that catalyzes the dehydration and isomerization of 4-hydroxybutanoyl-CoA to crotonyl-CoA, has been previously described [Bartsch61] and much more recently purified and characterized [Scherf94].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5677"
   },
   "PWY-5686": {
-    "summary": null,
+    "summary": "Pyrimidine and purine nucleoside triphosphates are the activated precursors of DNA and RNA. The pyrimidine deoxyribonucleoside triphosphates dCTP and dTTP are incorporated into DNA while the pyrimidine ribonucleoside triphosphates CTP and UTP are incorporated into RNA. In addition, mono- or diphosphorylated forms of pyrimidine nucleotides activate other molecules, as in CMP-3-deoxy-\u03b2-D-manno-octulosonate, UDP-\u03b1-D-glucose, and dTDP-\u03b1-D-fucopyranose, for use in biosynthesis of polysaccharides, glycoproteins and phospholipids [Zhou98, Giermann02, Schroder05, Zrenner06].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5686"
   },
   "PWY-5695": {
-    "summary": null,
+    "summary": "The ammonia generated by the bacteria is first converted into the amino acid L-glutamine and then incorporated into IMP (IMP), a purine synthesized de novo during nitrogen fixation by roots (see superpathway of purine nucleotides de novo biosynthesis I).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5695"
   },
   "PWY-5705": {
-    "summary": null,
+    "summary": "(S)-(+)-allantoin is a common product of purine degradation. Allantoin is rich in nitrogen, and many organisms are able to degrade and recycle it. Some bacteria, including Metabacillus fastidiosus, Delftia acidovorans and Cupriavidus pinatubonensis JMP134, do so under aerobic conditions, while others such as Escherichia coli K-12, Streptococcus allantoicus and Providencia rettgeri do so only anaerobically.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5705"
   },
   "PWY-5723": {
-    "summary": null,
+    "summary": "There are three stages in the Rubisco shunt.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5723"
   },
   "PWY-5724": {
-    "summary": null,
+    "summary": "Early investigations of microbial atrazine degradation found that degradation proceeded mostly via dealkylation of the N-alkyl substituents on the s-triazine ring, usually with no subsequent ring cleavage. However, currently most atrazine-degrading bacteria utilize a pathway that does involve ring cleavage. At the first stage, acyl substituents are removed from the compounds, ending with cyanuric acid. At the second stage the ring is cleaved, and complete degradation to CO2 and ammonia follows [Shapir07].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5724"
   },
   "PWY-5747": {
-    "summary": null,
+    "summary": "The pathway, which was discovered in fungi [Tabuchi74] was best characterized in Salmonella enterica enterica serovar Typhimurium [Horswill99, Horswill01] (see 2-methylcitrate cycle I). In that organism the pathway begins with the activation of propanoate to propanoyl-CoA by propionate-CoA ligase, followed by the synthesis of (2S,3S)-2-methylcitrate from propanoyl-CoA and oxaloacetate, catalyzed by 2-methylcitrate synthase. (2S,3S)-2-methylcitrate is then dehydrated to (Z)-2-methylaconitate by 2-methylcitrate dehydratase, followed by rehydration to (2R,3S)-2-methylisocitrate (catalyzed by aconitate hydratase 1 and aconitate hydratase 2) and cleavage of the later into pyruvate and succinate, performed by 2-methylisocitrate lyase.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5747"
   },
   "PWY-5837": {
-    "summary": null,
+    "summary": "1,4-dihydroxy-2-naphthoate is a branch point metabolite leading to the biosynthesis of menaquinone (vitamin K2, in bacteria), phylloquinone (vitamin K1 in plants), and many plant pigments, including some two-ring naphthoquinones (such as lawsone and juglone) and the three-ring anthraquinones (such as alizarin and munjistin). These pigments are mostly found in Rubiaceae, where at least some of them are phytoalexins involved in plant defense. Many of these pigments were used as dyes since the early human history.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5837"
   },
   "PWY-5838": {
-    "summary": null,
+    "summary": "Menaquinones (MK) and demethylmenaquinones (DMK) are low-molecular weight lipophilic components of the cytoplasmic membrane, found in many bacterial species. These quinones function as a reversible redox component of the electron transfer chain, mediating electron transfer between hydrogenases and cytochromes. Menaquinones have also been implicated in regulation, as they are necessary for sporulation and proper regulation of cytochrome formation in some Gram-positive bacteria [Farrand73, Farrand74].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5838"
   },
   "PWY-5840": {
-    "summary": null,
+    "summary": "Menaquinones (MK) and demethylmenaquinones (DMK) are low-molecular weight lipophilic components of the cytoplasmic membrane, found in many bacterial species. These quinones function as a reversible redox component of the electron transfer chain, mediating electron transfer between hydrogenases and cytochromes. Menaquinones have also been implicated in regulation, as they are necessary for sporulation and proper regulation of cytochrome formation in some Gram-positive bacteria [Farrand73, Farrand74].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5840"
   },
   "PWY-5845": {
-    "summary": null,
+    "summary": "Menaquinones (MK) and demethylmenaquinones (DMK) are low-molecular weight lipophilic components of the cytoplasmic membrane, found in many bacterial species. These quinones function as a reversible redox component of the electron transfer chain, mediating electron transfer between hydrogenases and cytochromes. Menaquinones have also been implicated in regulation, as they are necessary for sporulation and proper regulation of cytochrome formation in some Gram-positive bacteria [Farrand73, Farrand74].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5845"
   },
   "PWY-5850": {
-    "summary": null,
+    "summary": "Menaquinones (MK) and demethylmenaquinones (DMK) are low-molecular weight lipophilic components of the cytoplasmic membrane, found in many bacterial species. These quinones function as a reversible redox component of the electron transfer chain, mediating electron transfer between hydrogenases and cytochromes. Menaquinones have also been implicated in regulation, as they are necessary for sporulation and proper regulation of cytochrome formation in some Gram-positive bacteria [Farrand73, Farrand74].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5850"
   },
   "PWY-5855": {
-    "summary": null,
+    "summary": "Ubiquinone (also known as coenzyme Q) is an isoprenoid quinone that functions as an electron carrier in membranes. In eukaryotes ubiquinone is found mostly within the inner mitochondrial membrane, where it functions in respiratory electron transport, transferring two electrons from either complex I (NADH dehydrogenase) or complex II (succinate-ubiquinone reductase) to complex III (bc1 complex). The quinone nucleus of ubiquinone is derived directly from 4-hydroxybenzoate, while the isoprenoid subunits of the polyisoprenoid tail are synthesized via the methylerythritol phosphate pathway I, which feeds isoprene units into the Polyprenyl Biosynthesis pathways.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5855"
   },
   "PWY-5856": {
-    "summary": null,
+    "summary": "Ubiquinone (also known as coenzyme Q) is an isoprenoid quinone that functions as an electron carrier in membranes. In eukaryotes ubiquinone is found mostly within the inner mitochondrial membrane, where it functions in respiratory electron transport, transferring two electrons from either complex I (NADH dehydrogenase) or complex II (succinate-ubiquinone reductase) to complex III (bc1 complex). The quinone nucleus of ubiquinone is derived directly from 4-hydroxybenzoate, while the isoprenoid subunits of the polyisoprenoid tail are synthesized via either a methylerythritol phosphate pathway or a mevalonate pathway, which feed isoprene units into the Polyprenyl Biosynthesis pathways.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5856"
   },
   "PWY-5857": {
-    "summary": null,
+    "summary": "Ubiquinone (also known as coenzyme Q) is an isoprenoid quinone that functions as an electron carrier in membranes. In eukaryotes ubiquinone is found mostly within the inner mitochondrial membrane, where it functions in respiratory electron transport, transferring two electrons from either complex I (NADH dehydrogenase) or complex II (succinate-ubiquinone reductase) to complex III (bc1 complex). The quinone nucleus of ubiquinone is derived directly from 4-hydroxybenzoate, while the isoprenoid subunits of the polyisoprenoid tail are synthesized via either a methylerythritol phosphate pathway or a mevalonate pathway, which feed isoprene units into the Polyprenyl Biosynthesis pathways.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5857"
   },
   "PWY-5860": {
-    "summary": null,
+    "summary": "Menaquinones (MK) and demethylmenaquinones (DMK) are low-molecular weight lipophilic components of the cytoplasmic membrane, found in many bacterial species. These quinones function as a reversible redox component of the electron transfer chain, mediating electron transfer between hydrogenases and cytochromes. Menaquinones have also been implicated in regulation, as they are necessary for sporulation and proper regulation of cytochrome formation in some Gram-positive bacteria [Farrand73, Farrand74].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5860"
   },
   "PWY-5861": {
@@ -891,31 +891,31 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5861"
   },
   "PWY-5862": {
-    "summary": null,
+    "summary": "Menaquinones (MK) and demethylmenaquinones (DMK) are low-molecular weight lipophilic components of the cytoplasmic membrane, found in many bacterial species. These quinones function as a reversible redox component of the electron transfer chain, mediating electron transfer between hydrogenases and cytochromes. Menaquinones have also been implicated in regulation, as they are necessary for sporulation and proper regulation of cytochrome formation in some Gram-positive bacteria [Farrand73, Farrand74].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5862"
   },
   "PWY-5863": {
-    "summary": null,
+    "summary": "Phylloquinone (vitamin K1, 2-methyl-3-phytyl-1,4-naphthoquinone) acts as the electron transfer cofactor A1 of photosystem I (PS I) in higher plants and cyanobacteria. In non-photosynthetic microbes the very similar compound a menaquinone plays an essential role in several anaerobic electron transport systems [Sharma96]. The chemical structure of menaquinone (vitamin K2) exhibits a partly unsaturated side chain consisting most often 7 prenyl units, whereas phylloquinone consists of a mostly saturated phytyl side chain of 4 units [Shimada05a].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5863"
   },
   "PWY-5896": {
-    "summary": null,
+    "summary": "Menaquinones (MK) and demethylmenaquinones (DMK) are low-molecular weight lipophilic components of the cytoplasmic membrane, found in many bacterial species. These quinones function as a reversible redox component of the electron transfer chain, mediating electron transfer between hydrogenases and cytochromes. Menaquinones have also been implicated in regulation, as they are necessary for sporulation and proper regulation of cytochrome formation in some Gram-positive bacteria [Farrand73, Farrand74].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5896"
   },
   "PWY-5897": {
-    "summary": null,
+    "summary": "Menaquinones (MK) and demethylmenaquinones (DMK) are low-molecular weight lipophilic components of the cytoplasmic membrane, found in many bacterial species. These quinones function as a reversible redox component of the electron transfer chain, mediating electron transfer between hydrogenases and cytochromes. Menaquinones have also been implicated in regulation, as they are necessary for sporulation and proper regulation of cytochrome formation in some Gram-positive bacteria [Farrand73, Farrand74].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5897"
   },
   "PWY-5898": {
-    "summary": null,
+    "summary": "Menaquinones (MK) and demethylmenaquinones (DMK) are low-molecular weight lipophilic components of the cytoplasmic membrane, found in many bacterial species. These quinones function as a reversible redox component of the electron transfer chain, mediating electron transfer between hydrogenases and cytochromes. Menaquinones have also been implicated in regulation, as they are necessary for sporulation and proper regulation of cytochrome formation in some Gram-positive bacteria [Farrand73, Farrand74].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5898"
   },
   "PWY-5899": {
-    "summary": null,
+    "summary": "Menaquinones (MK) and demethylmenaquinones (DMK) are low-molecular weight lipophilic components of the cytoplasmic membrane, found in many bacterial species. These quinones function as a reversible redox component of the electron transfer chain, mediating electron transfer between hydrogenases and cytochromes. Menaquinones have also been implicated in regulation, as they are necessary for sporulation and proper regulation of cytochrome formation in some Gram-positive bacteria [Farrand73, Farrand74].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5899"
   },
   "PWY-5910": {
-    "summary": null,
+    "summary": "In plants, geranylgeranyl diphosphate is an intermediate in the biosynthesis of essentail compounds such as chlorophylls, carotenoids, tocopherols, plastoquinones, and gibberellins [RodriguezConcep02], as well as a variety of secondary metabolites.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5910"
   },
   "PWY-5913": {
@@ -923,23 +923,23 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5913"
   },
   "PWY-5918": {
-    "summary": null,
+    "summary": "Heme is a porphyrin member of the cyclic tetrapyrroles. Even though it is biosynthesized as heme b, different derivatives of protoheme can be formed that differ in modifications to the porphyrin ring, including how it is bound to the protein, such as heme o, heme a, heme c, and heme d.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5918"
   },
   "PWY-5920": {
-    "summary": null,
+    "summary": "Heme (protoheme, heme b) is an iron-containing prosthetic group found in many essential proteins including cytochromes and heme-containing globins. In addition to its role in oxidative metabolism, heme also functions as a regulatory molecule in transcription, translation, protein targeting, protein stability, and cellular differentiation.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5920"
   },
   "PWY-5941": {
-    "summary": null,
+    "summary": "Glycogen, a branched polymer of glucose, is a storage molecule whose accumulation is under rigorous control in many cells. Glycogen metabolism increases in response to a wide variety of environmental stresses, including heat stress or exposure to sodium chloride, hydrogen peroxide, copper sulfate, high levels of ethanol, or weak organic acids, such as sorbate or benzoate. Glycogen metabolism also increases in response to conditions of nutrient starvation, such as limited nitrogen, carbon, phosphorous, or sulfur, and during diauxic growth on glucose [Francois01].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5941"
   },
   "PWY-5971": {
-    "summary": null,
+    "summary": "Fatty acids are key building blocks for the phospholipid components of cell membranes. They are also determinants of intracellular communication in the form of lipid second messengers [Prieschl00] and protein modification, where fatty acyl moieties of proteins modify their location and function [Resh99].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5971"
   },
   "PWY-5973": {
-    "summary": null,
+    "summary": "3-oxoacyl-[acyl carrier protein] synthase 2 is the only enzyme that can catalyze the conversion of palmitoleate to cis-vaccenate, and is believed to play a major role in the thermal regulation of fatty acid composition of the membrane phospholipids of Escherichia coli [Garwin80]. 3-oxoacyl-[acyl carrier protein] synthase 2 is one of three \u03b2-ketoacyl-ACP synthases (KAS) in Escherichia coli: 3-oxoacyl-[acyl carrier protein] synthase 1, 3-oxoacyl-[acyl carrier protein] synthase 2 and 3-oxoacyl-[acyl carrier protein] synthase 3, encoded by fabB, fabF and fabH, respectively.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-5973"
   },
   "PWY-5989": {
@@ -1011,35 +1011,35 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6185"
   },
   "PWY-6210": {
-    "summary": null,
+    "summary": "The genes that encode the enzymes needed for the complete degradation of 2-aminophenol by this organism are located on its chromosome, although similar genes have been found on catabolic plasmids in other organisms [Park00a].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6210"
   },
   "PWY-621": {
-    "summary": null,
+    "summary": "Invertases were studied extensively in yeast [Neumann67, Bacon54], from which the enzyme was originally isolated in 1860 [Berthelot60]. However, invertase activity is very common in plants and other organisms.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-621"
   },
   "PWY-6263": {
-    "summary": null,
+    "summary": "Menaquinones (MK) and demethylmenaquinones (DMK) are low-molecular weight lipophilic components of the cytoplasmic membrane, found in many bacterial species. These quinones function as a reversible redox component of the electron transfer chain, mediating electron transfer between hydrogenases and cytochromes. Menaquinones have also been implicated in regulation, as they are necessary for sporulation and proper regulation of cytochrome formation in some Gram-positive bacteria [Farrand73, Farrand74].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6263"
   },
   "PWY-6269": {
-    "summary": null,
+    "summary": "In order to process cob(I)inamide to adenosylcobalamin, it has to be converted into a real intermediate of the pathway. In most bacteria this is done by the attachment of the upper ligand 5'-deoxyadenosine to yield adenosylcobinamide, followed by phosphorylation to yield adenosyl-cobinamide phosphate, an intermediate of the de novo biosynthetic pathway (see superpathway of adenosylcobalamin salvage from cobinamide I).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6269"
   },
   "PWY-6270": {
-    "summary": null,
+    "summary": "There are a few potential biological explanations for isoprene emissions by plants. Isoprene appears to help protect plants against sun flecks that can rapidly raise leaf temperatures [Sharkey01, Velikova05]. In addition, isoprene-emitting plants have increased tolerance to ozone and other reactive oxygen species (ROS) [Loreto01, Loreto01a, Affek02, Behnke09]. But, the molecular mechanisms of these isoprene-mediated stress responses are still under investigation. One hypothesis is that isoprene stabilizes lipid membranes [Siwko07].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6270"
   },
   "PWY-6277": {
-    "summary": null,
+    "summary": "In most organisms the third step is catalyzed by a folate-dependent phosphoribosylglycinamide formyltransferase 1. However, Escherichia coli the has two enzymes that catalyze this step - a folate-dependent phosphoribosylglycinamide formyltransferase 1 that utilizes 10-formyl-tetrahydrofolate mono-L-glutamate, as well as a formate-utilizing phosphoribosylglycinamide formyltransferase 2. These two enzymes share little homology.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6277"
   },
   "PWY-6282": {
-    "summary": null,
+    "summary": "In Escherichia coli palmitoleate is one of only two unsaturated fatty acids (along with cis-vaccenate), which together comprise about one-half of the total fatty acid content of the organism. Palmitate, palmitoleate, and cis-vaccenate make up the bulk of the fatty acids found in Escherichia coli membranes [Magnuson93].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6282"
   },
   "PWY-6284": {
-    "summary": null,
+    "summary": "The pathway of biosynthesis of unsaturated fatty acids branches from the pathway leading to saturated fatty acids at a (3R)-3-hydroxydecanoyl-[acp]. \u03b2-hydroxyacyl-acyl carrier protein dehydratase/isomerase (fabA) converts the saturated fatty-acyl-[acp] to the corresponding unsaturated form, and then converts some of the a (2E)-dec-2-enoyl-[acp] produced to a (3Z)-dec-3-enoyl-[acp]. The cis-form cannot be reduced and serves directly as a substrate for the \u03b2-ketoacyl-[acp] synthase (condensing enzyme) 3-oxoacyl-[acyl carrier protein] synthase 1 and the subsequent three reactions that lengthen the chain by two carbon atoms (for a discussion of the basic elongation mechanism, see fatty acid elongation -- saturated).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6284"
   },
   "PWY-6285": {
@@ -1047,11 +1047,11 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6285"
   },
   "PWY-6286": {
-    "summary": null,
+    "summary": "Carotenoids are isoprenoid pigments in the yellow to red color range. They have conjugated double bond chains of varying length with varying substituents, which determines their light absorption spectrum. They are produced by photosynthetic organisms and some non-photosynthetic fungi and bacteria. Animals, including humans, cannot synthesize carotenoids, although they are an essential source of retinoids and vitamin A.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6286"
   },
   "PWY-6292": {
-    "summary": null,
+    "summary": "L-Methionine is converted to L-homocysteine by the actions of methionine adenosyltransferase (EC 2.5.1.6), various S-adenosylmethionine methyltransferases, (EC 2.1.1.-) and S-adenosylhomocysteine hydrolase (EC 3.3.1.1).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6292"
   },
   "PWY-6295": {
@@ -1063,35 +1063,35 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6300"
   },
   "PWY-6305": {
-    "summary": null,
+    "summary": "Polyamines also accumulate in plant organs as conjugates of hydrocinnamate, formed by an amide bond. The polyamines are stored in organs in any one predominant form of the conjugated putrescine [Michael96].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6305"
   },
   "PWY-6309": {
-    "summary": null,
+    "summary": "In mammals L-tryptophan is an essential amino acid that must be obtained in the diet. It is utilized in protein synthesis and in biosynthesis of the neurotransmitter serotonin. It is catabolized via the kynurenine pathway in most tissues. This pathway is the major catabolic route of L-tryptophan in mammals, as well as an anabolic source of NAD+. L-tryptophan is also catabolized via the serotonergic pathway in the central nervous system (CNS), producing serotonin and other indoleamines. Metabolites of the kynurenine pathway are involved in many biological processes. In the CNS products of both pathways have consequences for the modulation of physiology and behavior and for the pathophysiology of some diseases (in [Ball09a], [Heyes97] and reviewed in [Ruddick06] and [Schwarcz04]). See pathways L-tryptophan degradation to 2-amino-3-carboxymuconate semialdehyde and its pathway links and pathway serotonin and melatonin biosynthesis I.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6309"
   },
   "PWY-6317": {
-    "summary": null,
+    "summary": "In most organisms five enzymes are required to catalyze this conversion: a EC 5.1.3.3, aldose 1-epimerase, a EC 2.7.1.6, galactokinase, a EC 2.7.7.12, UDP-glucose\u2014hexose-1-phosphate uridylyltransferase, a EC 5.1.3.2, UDP-glucose 4-epimerase, and a EC 5.4.2.2, phosphoglucomutase (\u03b1-D-glucose-1,6-bisphosphate-dependent).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6317"
   },
   "PWY-6353": {
-    "summary": null,
+    "summary": "This pathway depicts the degradation of purine nucleotides to purine nucleosides, purine bases, and urate. Further degradation is shown in the pathway llink. Purine degradation plays an important role in nitrogen metabolism in most organisms. The pathway in vertebrates is discussed below. Fungi, bacteria and archaea can utilize some of the intermediates in this pathway and the linked pathway as sole sources of nitrogen, or nitrogen and carbon ([Pope09, Schultz01, DeMoll93] and reviewed in [Vogels76].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6353"
   },
   "PWY-6383": {
-    "summary": null,
+    "summary": "Mono-trans, poly-cis-decaprenyl diphosphate plays a central role in the biosynthesis of essential mycobacterial cell wall components, such as the mycolyl-arabinogalactan-peptidoglycan complex and lipoarabinomannan, serving as a membrane anchor. This compound is unique to mycobacteria [Crick01].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6383"
   },
   "PWY-6385": {
-    "summary": null,
+    "summary": "The bacterial bag-shaped envelope (sacculus) can resist turgor pressures of 2-5 atmpspheres in Gram-negative bacteria, and up to 20 atm in Gram-positive bacteria. This remarkable tensile strength, combined with elasticity, is achieved by the structure of the cell wall's main component, peptidoglycan (also known as \"basal structure\", \"mucopeptide\", \"glycopeptide\", \"glycosaminopeptide\" and \"murein\"). Peptidoglycan is found on the outside of the cytoplasmic membrane of almost all eubacteria, and is unique to these organisms.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6385"
   },
   "PWY-6386": {
-    "summary": null,
+    "summary": "The composition and structure of peptidoglycan varies among different bacterial species, but in general consists of alternating \u03b2-1,4-linked N-acetylglucosamine and N-acetyl muramate residues. The pentapeptide is bound through its N terminus to the carboxyl group of muramate.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6386"
   },
   "PWY-6387": {
-    "summary": null,
+    "summary": "The composition and structure of peptidoglycan varies among different bacterial species, but in general consists of alternating \u03b2-1,4-linked N-acetylglucosamine and N-acetyl muramate residues. The pentapeptide is bound through its N terminus to the carboxyl group of muramate.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6387"
   },
   "PWY-6396": {
@@ -1099,15 +1099,15 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6396"
   },
   "PWY-6470": {
-    "summary": null,
+    "summary": "Two main classes of drugs that are used to treat severe infections due to Gram-positive bacteria, the \u03b2-lactams and the glycopeptides antibiotics, are targeting this pathway. The mechanism of glycopeptides activity and resistance are described in the pathways of Vancomycin Resistance.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6470"
   },
   "PWY-6471": {
-    "summary": null,
+    "summary": "The bacterial bag-shaped envelope (sacculus) can resist turgor pressures of 2-5 atmospheres in Gram-negative bacteria, and up to 20 atm in Gram-positive bacteria. This remarkable tensile strength, combined with elasticity, is achieved by the structure of the cell wall's main component, peptidoglycan (also known as \"basal structure\", \"mucopeptide\", \"glycopeptide\", \"glycosaminopeptide\" and \"murein\"). Peptidoglycan is found on the outside of the cytoplasmic membrane of almost all eubacteria, and is unique to these organisms.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6471"
   },
   "PWY-6478": {
-    "summary": null,
+    "summary": "Heptose sugars, mostly glycero-manno-heptoses, are found in the cell surface polymers of many bacteria. They are most common in the lipopolysaccharides (LPS) of most Gram-negative bacteria [Holst91, Melaugh92], but are also found in capsules [DeShazer01] and O-antigens [Jachymek99] of some Gram-negatives, and in the S-layer of certain Gram-positive bacteria [Kosma95, Wugeditsch99, Valvano02]. Glycosylation of an autotransporter adhesin protein with glycero-manno-heptose residues has also been reported [Benz01].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6478"
   },
   "PWY-6507": {
@@ -1115,35 +1115,35 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6507"
   },
   "PWY-6519": {
-    "summary": null,
+    "summary": "Biotin is a water soluble, heterocyclic cofactor for a small number of enzymes that facilitate the transfer of CO2 during carboxylation, decarboxylation and transcarboxylation reactions involved in fatty acid and carbohydrate metabolism [Shellhammer90, Picciocchi01, Alban00]. The biotin-requiring enzymes identified so far (including EC 6.4.1.1, pyruvate carboxylase, EC 6.4.1.2, acetyl-CoA carboxylase, EC 6.4.1.3, propionyl-CoA carboxylase, and EC 6.4.1.4, methylcrotonoyl-CoA carboxylase) play essential roles in cell metabolism [Patton96]. Biotin may also have functions in metabolism other than its mere catalytic role as an enzyme cofactor. It has been shown that biotin also carries out non-catalytic functions in the expression of methylcrotonyl-CoA carboxylase in Arabidopsis biotin-auxotroph mutants, by modulating and regulating gene expression [Che03].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6519"
   },
   "PWY-6527": {
-    "summary": null,
+    "summary": "This pathway describes the degradation of stachyose and raffinose and recruitment of \u03b1-D-galactopyranose into the fruit sink where a series of enzymes phosphorylate them. Free galactose is not present in the sink tissues.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6527"
   },
   "PWY-6545": {
-    "summary": null,
+    "summary": "Pyrimidine and purine nucleoside triphosphates are the activated precursors of DNA and RNA. The pyrimidine deoxyribonucleoside triphosphates dCTP and dTTP are incorporated into DNA while the ribonucleoside triphosphates CTP and UTP are incorporated into RNA. In addition, their diphosphates form activated derivatives of other molecules, such as UDP-\u03b1-D-glucose, CMP-3-deoxy-\u03b2-D-manno-octulosonate and dTDP-\u03b1-D-fucopyranose, for use in biosynthesis of polysaccharides, glycoproteins and phospholipids [Zhou98, Giermann02, Schroder05, Zrenner06].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6545"
   },
   "PWY-6549": {
-    "summary": null,
+    "summary": "In plants, the protein levels in seeds influence seed survival in natural settings and help determine the seeds' nutritional value and processing properties when they are grown for human and animal consumption. A large fraction of this protein content may be derived from the remobilization of nitrogen from proteins in senescing leaves [Hirel01, Barneix07, Donnison07]. This nitrogen can be transported in the form of amino acids, prinicipally glutamine, through the phloem. Improving the efficiency of this process could lead to the production of seed-based crops with higher protein levels [Taylor10].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6549"
   },
   "PWY-6562": {
-    "summary": null,
+    "summary": "Polyamines are found in bacteria, archaea and eukaryotes and are necessary for normal cellular physiology. They include the diamine putrescine, the triamines spermidine, norspermidine (sym-norspermidine) and sym-homospermidine (homospermidine) and the tetraamine spermine (in [Shaw10] and in [Lee09a]). Links to their biosynthetic pathways can be found by clicking on these compounds links. See also superpathway of polyamine biosynthesis I, superpathway of polyamine biosynthesis II and superpathway of polyamine biosynthesis III. In members of the genus Vibrio, norspermidine is a major polyamine (in [Lee09a].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6562"
   },
   "PWY-6588": {
-    "summary": null,
+    "summary": "In the anaerobe Gram-positive bacterium Clostridium acetobutylicum pyruvate is converted to acetyl-CoA by the ferredoxin-dependent pyruvate:ferredoxin oxidoreductase. The enzyme contains an Fe-S cluster and a thiamine diphosphate that is not covalently attached [Meinecke89, Woods93]. Acetyl-coA can be fermented in several routes, leading to the formation of different end products. In Clostridium acetobutylicum the products are either organic acids (acetate and butyrate) or solvents (acetone, butanol, and ethanol).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6588"
   },
   "PWY-6590": {
-    "summary": null,
+    "summary": "In continuous culture, Clostridium acetobutylicum can be maintained in three different stable metabolic states [Girbal95]: acidogenic - production of acetate and butanoate when grown at neutral pH on glucose (see superpathway of Clostridium acetobutylicum acidogenic fermentation), solventogenic - production of acetone, butan-1-ol and ethanol when grown at low pH on glucose (superpathway of Clostridium acetobutylicum solventogenic fermentation), and alcohologenic - formation of butan-1-ol and ethanol but not acetone when grown at neutral pH under conditions of high NAD(P)H availability. Despite numerous physiological studies, it is still unclear how the metabolic switch from acid to solvent production is regulated at the molecular level [b]. Once this metabolic transition has been initiated, most of the excreted acids are taken up and converted into solvents",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6590"
   },
   "PWY-6606": {
-    "summary": null,
+    "summary": "The distinction between nucleoside degradation and salvage is not always straight forward. A general rule is that degradation pathways start with the nucleotide forms and convert them to simpler forms, eventually leading to complete mineralization, while salvage pathways start with either the nucleoside or the free base form, and convert those to the nucleotide forms.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6606"
   },
   "PWY-6608": {
@@ -1151,71 +1151,71 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6608"
   },
   "PWY-6609": {
-    "summary": null,
+    "summary": "Many organisms can also recycle adenosine nucleotides by a combination of degradation and salvage pathways. The degradation pathways are responsible for the conversion of the nucleotides to the nucleoside (adenosine) and free base form (adenine), and further degradation to compounds that can be catabolized to basic building blocks (for example, see adenosine nucleotides degradation II).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6609"
   },
   "PWY-6612": {
-    "summary": null,
+    "summary": "Tetrahydrofolate (vitamin B9) and its derivatives, commonly termed folates, are essential cofactors that facilitate the transfer of one-carbon units from donor molecules into important biosynthetic pathways leading to methionine, purine, and pyrimidine biosynthesis. Folates also mediate the interconversion of serine and glycine, play a role in histidine catabolism [Lucock00], and in plants are also involved in photorespiration, amino acid metabolism and chloroplastic protein biosynthesis [Hanson02] [Jabrin03].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6612"
   },
   "PWY-6628": {
-    "summary": null,
+    "summary": "For more information regarding L-phenylalanine biosynthesis see L-phenylalanine biosynthesis I.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6628"
   },
   "PWY-6629": {
-    "summary": null,
+    "summary": "For more information regarding tryptophan biosynthesis, see L-tryptophan biosynthesis.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6629"
   },
   "PWY-6630": {
-    "summary": null,
+    "summary": "For more information about L-tyrosine biosynthesis, see L-tyrosine biosynthesis I.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6630"
   },
   "PWY-6660": {
-    "summary": null,
+    "summary": "General Background",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6660"
   },
   "PWY-6666": {
-    "summary": null,
+    "summary": "Pyocyanin was first observed as a blue-pigmented phenazine compound present in infected wounds, and was shown in 1882 to be produced by the opportunistic human pathogen Pseudomonas aeruginosa. It is the principal phenazine compound produced by the organism and is believed to provide it with a competitive growth advantage and to be a virulence factor in diseases such as cystic fibrosis.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6666"
   },
   "PWY-6690": {
-    "summary": null,
+    "summary": "Microbial catabolism of phenylpropanoid compounds plays an important role in the natural degradation of these compounds. In addition, the degradation of several phenylpropanoid compounds is important for industrial applications such as wine making, aging, and storage [Cavin97].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6690"
   },
   "PWY-6692": {
-    "summary": null,
+    "summary": "Iron is the fourth most abundant element in the Earth's crust. In the environment, iron is mostly found in two different oxidation states: II and III. Fe(II) is the thermodynamically favored state at low pH and reducing conditions, while Fe(III) is favored at high pH and oxic conditions. In oxic environments iron forms various oxide and hydroxide compounds; iron(II,III) oxides (such as magnetite, Fe3O4) and iron(III) oxides (such as hematite, Fe2O3) are most common. Under anoxic conditions the soluble Fe2+ species is the most common. In certain environments Fe(III) can also be found in soluble form, coupled to stabilizing ligands.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6692"
   },
   "PWY-6694": {
-    "summary": null,
+    "summary": "The homoacetogenic bacterium Neomoorella thermoacetica can split one molecule of oxalate into two molecules of CO2, which feed into the reductive acetyl coenzyme A pathway I (homoacetogenic bacteria), in a single enzymatic step. During growth on oxalate, Neomoorella thermoacetica produces 1 mol of acetate and 6 mol of CO2 for every 4 mols of oxalate [Daniel04].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6694"
   },
   "PWY-6700": {
-    "summary": null,
+    "summary": "Queuosine and its derivatives occur exclusively at position 34 (the wobble position) in the anticodons of tRNAs coding for the amino acids L-histidine, L-aspartate, L-asparagine and L-tyrosine [Harada72]. Each of these tRNAs posses the anticodon sequence GUN (positions 34-36), where N can be any nucleotide. Queuosine improves accuracy of translation [Meier85, Urbonavicius01]. These tRNAs of the 'Q-family' originally contain guanine in the first position of anticodon, which is post-transcriptionally modified with queuine by an irreversible insertion during maturation.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6700"
   },
   "PWY-6703": {
-    "summary": null,
+    "summary": "Various species of Streptomyces produce 7-deazapurine nucleoside antibiotics, such as toyocamycin, sangivamycin, tubercidin, and cadeguomycin.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6703"
   },
   "PWY-6708": {
-    "summary": null,
+    "summary": "Ubiquinone (also known as coenzyme Q) is an isoprenoid quinone that functions as an electron carrier in membranes. In eukaryotes, ubiquinone is found mostly within the inner mitochondrial membrane, where it functions in respiratory electron transport, transferring two electrons from either complex I (NADH dehydrogenase) or complex II (succinate-ubiquinone reductase) to complex III (bc1 complex). The quinone nucleus of ubiquinone is derived directly from 4-hydroxybenzoate, while the isoprenoid subunits of the polyisoprenoid tail are synthesized via either a methylerythritol phosphate pathway or a mevalonate pathway, which feed isoprene units into the Polyprenyl Biosynthesis pathways.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6708"
   },
   "PWY-6728": {
-    "summary": null,
+    "summary": "A common solution to the problem is the glyoxylate cycle, a modified version of the TCA cycle that bypasses those steps in the cycle that lead to a loss of CO2. Acetyl-CoA enters the cycle at two steps, and since no carbon escapes it in the form of CO2, the output is the 4-carbon compound succinate.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6728"
   },
   "PWY-6731": {
-    "summary": null,
+    "summary": "Many organisms including bacteria, fungi, metazoa, and plants can degrade glucose polymers derived from starch or glycogen (see pathways starch degradation II, starch degradation I, glycogen degradation I and glycogen degradation II). Some hyperthermophilic archaea have also been shown to produce starch-degrading enzymes, and pathways for the utilization of starch and its derivatives, such as a cyclodextrin, a maltodextrin, and maltose have been proposed. These hyperthermophilic archaea can utilize starch and its degradation products as primary carbon sources during anaerobic growth. Thermostable starch-degrading enzymes produced by hyperthermophpilic organisms are of industrial interest [Lee06b, Hashimoto01, Labes07, Labes01].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6731"
   },
   "PWY-6733": {
-    "summary": null,
+    "summary": "The pollen grain wall in most plant species has the same basic structure, although the size, shape and external morphology are species-specific. It consists of an outer and inner layer, called the exine and intine, respectively. The exine consists of an outer sculptured portion, the sexine, and a simpler inner layer, the nexine. The sculptured sexine is made up of radially directed rods, the bacula, which have enlarged heads that fuse to form a patterned wall, and the tectum, which is the outermost edge of the exine. The exine wall has important roles in protecting the pollen from various environmental stresses and bacterial attacks when it moves from the anther to the stigma, and in the species-specific adhesion of pollen grains to the female stigma cells [Ariizumi03].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6733"
   },
   "PWY-6737": {
-    "summary": null,
+    "summary": "Many organisms including bacteria, fungi, metazoa, and plants can degrade glucose polymers derived from starch or glycogen (see pathways starch degradation II, starch degradation I, glycogen degradation I and glycogen degradation II). Some hyperthermophilic archaea have also been shown to produce starch-degrading enzymes, and pathways for the utilization of starch and its derivatives, such as a cyclodextrin, a maltodextrin, and maltose have been proposed. These hyperthermophilic archaea can utilize starch and its degradation products as primary carbon sources during anaerobic growth. Thermostable starch-degrading enzymes produced by hyperthermophilic organisms are of industrial interest [Lee06b, Hashimoto01, Labes07, Labes01].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6737"
   },
   "PWY-6749": {
@@ -1223,7 +1223,7 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6749"
   },
   "PWY-6823": {
-    "summary": null,
+    "summary": "The transition element molybdenum (Mo) has been long known as an essential micronutrient across the kingdoms of plants, animals, fungi and bacteria. However, molybdate itself is catalytically inactive and, with the exception of bacterial nitrogenase, needs to be activated through complexation by a special cofactor. There are several molybdenum cofactors, including molybdopterin (MPT), guanylyl molybdenum cofactor (MGD), cytidylyl MoO2(OH)-molybdopterin cofactor, or others [Rajagopalan92].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6823"
   },
   "PWY-6834": {
@@ -1231,27 +1231,27 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6834"
   },
   "PWY-6837": {
-    "summary": null,
+    "summary": "In this pathway, unsaturated fatty acids with cis-double bonds on odd-number carbons (i.e. a double bond on the 9th position in the case of oleate) are converted to cis-5-enoyl-CoA after two rounds of core beta oxidation cycle. Instead of continuing for another round of core beta-oxidation cycle which would yield cis-3-enoyl-CoA to enter fatty acid \u03b2-oxidation III (unsaturated, odd number), cis-5-enoyl-CoA once being oxidized to trans-2,cis-5-dienoyl-CoA exits the core beta oxidation. It is converted to trans-3,cis-5-dienoyl-CoA by delta3,delta2-enoyl-CoA isomerase. Trans-3,cis-5-dienoyl-CoA is then converted by the di-isomerase delta3,5-delta2,4-dienoyl-CoA isomerase to trans-2,trans-4-dienoyl-CoA. The latter is further converted to trans-3-enoyl-CoA by 2,4-dienoyl-CoA reductase. Finally, trans-3-enoyl-CoA is converted to trans-2-enoyl-CoA to reenter core beta oxidation for complete degradation.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6837"
   },
   "PWY-6859": {
-    "summary": null,
+    "summary": "There is growing need to find renewable biologically produced compounds as replacements for petroleum-based fuels. Due to the branched and ringed structures found in their hydrocarbon chain, isoprenoid compounds have the potential to be used as biofuels. The branching improves the cetane number (a measurement of the combustion quality) of fuel mixtures [Murley09]. The C15 isoprenoid compound farnesol is a putative biodiesel with a cetane number that falls withing the expected range for petroleum diesel.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6859"
   },
   "PWY-6876": {
-    "summary": null,
+    "summary": "The search for feasible petroleum substitutes from renewable resources is becoming increasingly important in the face of rising petroleum prices and increased atmospheric CO2 levels [Hanai07]. Isopropanol is a secondary alcohol produced by microbes that can be used to partially replace gasoline [Hanai07]. It can also be used instead of methanol to esterify fats and oils to produce biodiesel.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6876"
   },
   "PWY-6891": {
-    "summary": null,
+    "summary": "Thiamin diphosphate, also known as vitamin B1, is known to play a fundamental role in energy metabolism. It is an essential cofactor for a variety of enzymes such as transketolase, pyruvate dehydrogenase, pyruvate decarboxylase, and \u03b1-ketoglutarate dehydrogenase [Lawhorn04]. Its discovery followed from the original early research on the anti-beriberi factor found in rice bran. Beriberi, a neurological disease, was particularly prevalent in Asia, where the refining of rice resulted in the removal of the thiamin-containing husk [Begley96]. Thiamin is synthesized de novo by microorganisms, plants and some lower eukaryotes (e.g. Plasmodium <Plasmodium>), but not by higher eukaryotes, which must obtain it through their diet.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6891"
   },
   "PWY-6892": {
-    "summary": null,
+    "summary": "Thiamin diphosphate, also known as vitamin B1, is known to play a fundamental role in energy metabolism. It is an essential cofactor for a variety of enzymes such as transketolase, pyruvate dehydrogenase, pyruvate decarboxylase, and \u03b1-ketoglutarate dehydrogenase [Lawhorn04]. Its discovery followed from the original early research on the anti-beriberi factor found in rice bran. Beriberi, a neurological disease, was particularly prevalent in Asia, where the refining of rice resulted in the removal of the thiamin-containing husk [Begley96]. Thiamin is synthesized de novo by microorganisms, plants and some lower eukaryotes (e.g. Plasmodium <Plasmodium>), but not by higher eukaryotes, which must obtain it through their diet.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6892"
   },
   "PWY-6895": {
-    "summary": null,
+    "summary": "Thiamin diphosphate, also known as vitamin B1, is known to play a fundamental role in energy metabolism. It is an essential cofactor for a variety of enzymes such as transketolase, pyruvate dehydrogenase, pyruvate decarboxylase, and \u03b1-ketoglutarate dehydrogenase [Lawhorn04]. Its discovery followed from the original early research on the anti-beriberi factor found in rice bran. Beriberi, a neurological disease, was particularly prevalent in Asia, where the refining of rice resulted in the removal of the thiamine-containing husk [Begley96]. Thiamine is synthesized de novo by microorganisms, plants and some lower eukaryotes (e.g. Plasmodium <Plasmodium>), but not by higher eukaryotes, which must obtain it through their diet.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6895"
   },
   "PWY-6897": {
