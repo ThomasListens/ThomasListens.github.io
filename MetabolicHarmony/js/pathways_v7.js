@@ -127,7 +127,7 @@ const COMPOSED_RATIOS = {
   'PWY-6883': { n: 32, d: 27, derivation: 'Pythagorean comma zone - rare butanol' },
 
   // Glycolysis/Gluconeogenesis (4)
-  'PWY-1042': { n: 1, d: 1, derivation: 'exponential 2-limit growth (1→2→4→16)', composedName: 'Glycolysis IV (canonical)' },
+  'PWY-1042': { n: 1, d: 1, derivation: 'exponential 2-limit growth (1→2→4→16)', composedName: 'Glycolysis IV (*canonical)' },
   'GLUCONEO-PWY': { n: 2, d: 1, derivation: 'exponential 2-limit growth (1→2→4→16)' },
   'GLYCOLYSIS-E-D': { n: 4, d: 1, derivation: 'exponential 2-limit growth (1→2→4→16)' },
   'PWY-7446': { n: 16, d: 1, derivation: 'exponential 2-limit growth (1→2→4→16)' },
@@ -339,7 +339,7 @@ const COMPOSED_RATIOS = {
   'VALDEG-PWY': { n: 2, d: 7, derivation: 'valine deg ← inverse of VALSYN (2/7)' },
   'TYRFUMCAT-PWY': { n: 10, d: 21, derivation: '' },
   'LEU-DEG2-PWY': { n: 4, d: 9, derivation: 'leucine degradation — BCAA breakdown (4/9)' },
-  'TRPKYNCAT-PWY': { n: 20, d: 21, derivation: 'tryptophan XI ← inverse of TRPSYN (20/21)', composedName: 'Tryptophan → Indolelactate (bacterial)' },
+  'TRPKYNCAT-PWY': { n: 20, d: 21, derivation: 'tryptophan XI ← inverse of TRPSYN (20/21)', composedName: 'L-tryptophan degradation IV (via indole-3-lactate)' },
   'GLUDEG-II-PWY': { n: 5, d: 7, derivation: '' },
 
   // Aromatics (5)
