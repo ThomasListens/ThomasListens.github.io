@@ -959,55 +959,55 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6117"
   },
   "PWY-6118": {
-    "summary": null,
+    "summary": "One such shuttle is the glycerol-3-phosphate shuttle (G3P shuttle). This shuttle involves the combined actions of a cytoplasmic glycerol-3-phosphate dehydrogenase (NAD+) (EC 1.1.1.8) and a FAD-dependent mitochondrial glycerol-3-phosphate dehydrogenase (EC 1.1.5.3). The cytosolic enzyme consumes NADH during the conversion of glycerone phosphate to sn-glycerol 3-phosphate, which can pass through the permeable mitochondrial outer membrane. sn-glycerol 3-phosphate is then reoxidized to glycerone phosphate at the outer surface of the inner mitochondrial membrane by the mitochondrial FAD-dependent enzyme, which donates the electrons to the mitochondrial quinone pool. The glycerone phosphate is subsequently channeled back to the cytosol. The shuttle operates in yeast [Ansell97, Larsson98], animals and plants [Shen06].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6118"
   },
   "PWY-6121": {
-    "summary": null,
+    "summary": "The pathway is highly conserved among organisms, but its regulation and the organization of the genes encoding the enzymes vary. Regulation of the pathway has been well studied in microbes such as Escherichia coli, Bacillus subtilis and Saccharomyces cerevisiae, but little is known about its regulation in higher eukaryotes [Senecoff96].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6121"
   },
   "PWY-6122": {
-    "summary": null,
+    "summary": "In this variant of the pathway, found in Escherichia coli, the third step is catalyzed by a different enzyme - phosphoribosylglycinamide formyltransferase 2. Unlike phosphoribosylglycinamide formyltransferase 1, which utilizes 10-formyl-tetrahydrofolate mono-L-glutamate as the formyl donor, phosphoribosylglycinamide formyltransferase 2 utilizes formate. The two enzymes share little homology.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6122"
   },
   "PWY-6123": {
-    "summary": null,
+    "summary": "In bacteria and archaea IMP is synthesized from 5-amino-1-(5-phospho-\u03b2-D-ribosyl)imidazole in 6 steps, while in eukarya the first two steps are replaced by a single reaction (see inosine-5'-phosphate biosynthesis II).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6123"
   },
   "PWY-6124": {
-    "summary": null,
+    "summary": "In the bacterium Escherichia coli IMP is synthesized from 5-amino-1-(5-phospho-\u03b2-D-ribosyl)imidazole in 6 steps (see inosine-5'-phosphate biosynthesis I). In eukaryotes the pathway consists of only 5 steps. The difference is in the first two steps, which are replaced in eukaryotes with a single reaction.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6124"
   },
   "PWY-6125": {
-    "summary": null,
+    "summary": "In Escherichia coli both GDP and GTP can be converted to the deoxy forms of the nucleotide. GTP is converted to dGTP (dGTP) by the uncommon enzyme anaerobic ribonucleoside-triphosphate reductase, while GDP can be converted to dGDP (dGDP) by either ribonucleoside-diphosphate reductase 1 or ribonucleoside-diphosphate reductase 2.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6125"
   },
   "PWY-6126": {
-    "summary": null,
+    "summary": "AMP is phosphorylated to ADP and subsequently to ATP. While the first reaction is catalyzed by the dedicated enzyme adenylate kinase, reactions that convert ADP to ATP are numerous and found in multiple pathways, including fueling pathways such as anaerobic respiration, TCA-aerobic respiration, fermentation, and glycolysis. However, a major source for this conversion is the ATP synthase complex, which is membrane bound and utilizes the proton gradient across membranes to phosphorylate ADP. This is the reaction depicted in this pathway.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6126"
   },
   "PWY-6147": {
-    "summary": null,
+    "summary": "This pathway, which is found in bacteria, fungi and plants, starts with GTP cyclohydrolase 1, an enzyme that converts GTP into 7,8-dihydroneopterin 3'-triphosphate. The triphosphate motif is removed in a process that is still not completely understood, and the resulting D-erythro-7,8-dihydroneopterin is converted to 6-(hydroxymethyl)-7,8-dihydropterin by dihydroneopterin aldolase (FolB).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6147"
   },
   "PWY-6151": {
-    "summary": null,
+    "summary": "There are two main variations of this pathway, one found mostly in prokaryotes, while the other is found predominantly, but not exclusively, in eukaryotes. The main difference between the variants is the processing of S-adenosyl-L-homocysteine (SAH), the immediate product of the methylation reactions.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6151"
   },
   "PWY-6163": {
-    "summary": null,
+    "summary": "In this pathway chorismate is synthesized from 3-dehydroquinate. The pathway is found in prokaryotes (both bacteria and archaea) and several eukaryotes, including ascomycete fungi, apicomplexans, plants and algae [Richards06]. However, its starting point, 3-dehydroquinate, can be synthesized in different routes. In most microorganisms it is synthesized from D-erythrose 4-phosphate (see 3-dehydroquinate biosynthesis I), but the methanogens of the Methanobacteriota phylum utilize an alternative route [White04] (see 3-dehydroquinate biosynthesis II (archaea)).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6163"
   },
   "PWY-6168": {
-    "summary": null,
+    "summary": "The biosynthesis of one riboflavin molecule requires one molecule of GTP and two molecules of D-ribulose 5-phosphate as substrates. The imidazole ring of GTP is hydrolytically opened, yielding a 4, 5-diaminopyrimidine which is converted to 5-amino-6-(D-ribitylamino)uracil by a sequence of deamination, side chain reduction and dephosphorylation. Condensation of 5-amino-6-(D-ribitylamino)uracil with 1-deoxy-L-glycero-tetrulose 4-phosphate obtained from D-ribulose 5-phosphate results in the formation of 6,7-dimethyl-8-(1-D-ribityl)lumazine. Dismutation of the lumazine derivative yields riboflavin and 5-amino-6-(D-ribitylamino)uracil, which is recycled in the pathway [Bacher00].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6168"
   },
   "PWY-6182": {
-    "summary": null,
+    "summary": "salicylate, which is also an intermediate in the degradation of naphthalene, is degraded via catechol, a common intermediate in the degradation of many aromatic compounds, including benzoate, benzene and phenol.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6182"
   },
   "PWY-6185": {
-    "summary": null,
+    "summary": "This ortho-cleavage pathway of 4-methylcatechol has been demonstrated in full or in part in several organsims, including the fungus Cutaneotrichosporon cutaneum, that can degrade 4-methylphenol [Powlowski85], and several bacterial species.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6185"
   },
   "PWY-6210": {
@@ -1043,7 +1043,7 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6284"
   },
   "PWY-6285": {
-    "summary": null,
+    "summary": "E. coli also contains unsaturated fatty acids, namely palmitoleate and cis-vaccenate. These are formed by a pathway that branches off at the level of the 10-carbon intermediate [Cronan03, Magnuson93]. Once the 10-carbon unsaturated acyl-[acp] is formed, it is elongated by the same cycle.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6285"
   },
   "PWY-6286": {
@@ -1275,7 +1275,7 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6969"
   },
   "PWY-6981": {
-    "summary": null,
+    "summary": "chitin is the second most abundant biologically produced polymer (cellulose is the most abundant). It is a linear homopolymer of N-acetyl-\u03b2-D-glucosamine residues linked by \u03b2-1,4 glycosidic bonds. Note that in this pathway the final product chitin is shown using its polymeric name in the chitin synthase polymerization reaction. chitin exists is several crystalline forms termed \u03b1, \u03b2 and \u03b3 chitin. The most abundant form is \u03b1 chitin, which forms microfibrils arranged in an antiparallel manner resulting in high tensile strength. chitosan, which is partially deacetylated chitin, is also found naturally. Both chitin and chitosan are of interest in the chemical and pharmaceutical industries (reviewed in [Merzendorfer11]).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-6981"
   },
   "PWY-6992": {
@@ -1359,135 +1359,135 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7211"
   },
   "PWY-7219": {
-    "summary": null,
+    "summary": "AMP is phosphorylated to ADP and subsequently to ATP. The first reaction is catalyzed by EC 2.7.4.3, adenylate kinase.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7219"
   },
   "PWY-7220": {
-    "summary": null,
+    "summary": "dADP is phosphorylated to the DNA precursor dATP (dATP) by the broad-substrate range EC 2.7.4.6, nucleoside-diphosphate kinase.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7220"
   },
   "PWY-7221": {
-    "summary": null,
+    "summary": "GMP is phosphorylated to GDP and subsequently to GTP by the enzymes guanylate kinase and nucleoside diphosphate kinase, respectively.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7221"
   },
   "PWY-7222": {
-    "summary": null,
+    "summary": "dGDP is phosphorylated to the DNA precursor dGTP by the broad-substrate range nucleoside diphosphate kinase.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7222"
   },
   "PWY-7228": {
-    "summary": null,
+    "summary": "GMP is phosphorylated to GDP and subsequently to GTP by the enzymes guanylate kinase and nucleoside diphosphate kinase, respectively.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7228"
   },
   "PWY-7229": {
-    "summary": null,
+    "summary": "AMP is phosphorylated to ADP and subsequently to ATP. While the first phosphorylation is catalyzed by the dedicated enzyme adenylate kinase, reactions that convert ADP to ATP are numerous and found in multiple pathways, including fueling pathways such as anaerobic respiration, TCA-aerobic respiration, fermentation, and glycolysis. However, a major source for this conversion is the ATP synthase complex, which is membrane bound and utilizes the proton gradient across membranes to phosphorylate ADP. This is the reaction depicted in this pathway.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7229"
   },
   "PWY-7234": {
-    "summary": null,
+    "summary": "In bacteria and archaea IMP is synthesized from 5-amino-1-(5-phospho-\u03b2-D-ribosyl)imidazole in 6 steps, while in eukarya the first two steps are replaced by a single reaction (see inosine-5'-phosphate biosynthesis II).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7234"
   },
   "PWY-7237": {
-    "summary": null,
+    "summary": "Inositol is the generic name for 1,2,3,4,5,6-cyclohexanehexol. Epimerization of the six hydroxyl groups results in nine stereoisomers.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7237"
   },
   "PWY-7242": {
-    "summary": null,
+    "summary": "One group of such pathways is the degradation of glucuronate-containing polymers such as a glucuronoxylan. These pathways contain a step for the removal of D-glucuronate residues, which are then converted to D-fructuronate by the action of EC 5.3.1.12, glucuronate isomerase [Ashwell60].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7242"
   },
   "PWY-7315": {
-    "summary": null,
+    "summary": "Lipopolysaccharides (LPS) are a major component of the outer membrane of Gram-negative bacteria. While they are protecting the membrane from certain kinds of chemical attacks, they also induce a strong response from animal immune systems. Lipopolysaccharides can be conceptually divided into three parts: lipid A, which anchors LPS into the membrane; the core oligosaccharide, which contributes to membrane stability; and the O-antigen, which is a polysaccharide that extends away from the cell surface.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7315"
   },
   "PWY-7323": {
-    "summary": null,
+    "summary": "Lipopolysaccharides (LPS) are a major component of the outer membrane of Gram-negative bacteria. While they are protecting the membrane from certain kinds of chemical attacks, they also induce a strong response from animal immune systems. Lipopolysaccharides can be conceptually divided into three parts: lipid A, which anchors LPS into the membrane; core oligosaccharide, which contributes to membrane stability; and the O-antigen, which is a polysaccharide that extends away from the cell surface.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7323"
   },
   "PWY-7328": {
-    "summary": null,
+    "summary": "Lipopolysaccharides (LPS) are a major component of the outer membrane of Gram-negative bacteria. While they are protecting the membrane from certain kinds of chemical attacks, they also induce a strong response from animal immune systems. Lipopolysaccharides can be conceptually divided into three parts: lipid A, which anchors LPS into the membrane; the core oligosaccharide, which contributes to membrane stability; and the O-antigen, which is a polysaccharide that extends away from the cell surface.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7328"
   },
   "PWY-7332": {
-    "summary": null,
+    "summary": "Lipopolysaccharides (LPS) are a major component of the outer membrane of Gram-negative bacteria. While they are protecting the membrane from certain kinds of chemical attacks, they also induce a strong response from animal immune systems. Lipopolysaccharides can be conceptually divided into three parts: lipid A, which anchors LPS into the membrane; the core oligosaccharide, which contributes to membrane stability; and the O-antigen, which is a polysaccharide that extends away from the cell surface.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7332"
   },
   "PWY-7357": {
-    "summary": null,
+    "summary": "Thiaminase II activity has been observed in bacteria [Toms05] and fungi, more specifically in cell free extracts of Saccharomyces cerevisiae [Kimura87] but its physiological role remained unresolved for a long time. In bacteria a thiamine salvage pathway has been reported in which the key enzyme thiaminase II (TenA) catalyzed the hydrolysis of thiamine and thiamine analogs to form 4-amino-2-methyl-5-pyrimidinemethanol. The latter represents a precursor for the de novo biosynthesis of thiamine and its phosphorylated derivatives (see base-degraded thiamine salvage) [Jenkins07, Bettendorff07].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7357"
   },
   "PWY-7371": {
-    "summary": null,
+    "summary": "Menaquinones (MK) and demethylmenaquinones (DMK) are low-molecular weight lipophilic components of the cytoplasmic membrane, found in many bacterial species. These quinones function as a reversible redox component of the electron transfer chain, mediating electron transfer between hydrogenases and cytochromes. Menaquinones have also been implicated in regulation, as they are necessary for sporulation and proper regulation of cytochrome formation in some Gram-positive bacteria [Farrand73, Farrand74].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7371"
   },
   "PWY-7373": {
-    "summary": null,
+    "summary": "Menaquinones (MK) and demethylmenaquinones (DMK) are low-molecular weight lipophilic components of the cytoplasmic membrane, found in many bacterial species. These quinones function as a reversible redox component of the electron transfer chain, mediating electron transfer between hydrogenases and cytochromes. Menaquinones have also been implicated in regulation, as they are necessary for sporulation and proper regulation of cytochrome formation in some Gram-positive bacteria [Farrand73, Farrand74].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7373"
   },
   "PWY-7374": {
-    "summary": null,
+    "summary": "Menaquinones (MK) and demethylmenaquinones (DMK) are low-molecular weight lipophilic components of the cytoplasmic membrane, found in many bacterial species. These quinones function as a reversible redox component of the electron transfer chain, mediating electron transfer between hydrogenases and cytochromes. Menaquinones have also been implicated in regulation, as they are necessary for sporulation and proper regulation of cytochrome formation in some Gram-positive bacteria [Farrand73, Farrand74].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7374"
   },
   "PWY-7376": {
-    "summary": null,
+    "summary": "Vitamin B12 (also known as adenosylcobalamin or adenosylcobalamin) was discovered in the 1920s after Minot and Murphy reported that they could cure the symptoms of pernicious anaemia by feeding patients with crude liver extract [Minot26] (they received the Nobel prize in 1934 for this discovery). The unknown factor has been isolated and subsequently crystallized in 1948 [Smith48, Rickes48], and was given the name vitamin B12 and, as it was shown to contain a cobalt ion, cobalamin [Warren02].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7376"
   },
   "PWY-7377": {
-    "summary": null,
+    "summary": "Vitamin B12 (also known as adenosylcobalamin or adenosylcobalamin) was discovered in the 1920s after Minot and Murphy reported that they could cure the symptoms of pernicious anaemia by feeding patients with crude liver extract [Minot26] (they received the Nobel prize in 1934 for this discovery). The unknown factor has been isolated and subsequently crystallized in 1948 [Smith48, Rickes48], and was given the name vitamin B12 and, as it was shown to contain a cobalt ion, cobalamin [Warren02].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7377"
   },
   "PWY-7383": {
-    "summary": null,
+    "summary": "Some invertebrates, protists and fungi must survive prolonged exposure to hypoxia or anoxia. These facultative anaerobes may contain either mitochondria that function anaerobically, or hydrogenosomes as cellular organelles in which reactions of anaerobic respiration occur. Most anaerobic mitochondria use endogenously produced electron acceptors such as fumarate to generate succinate via membrane-bound fumarate reductase. This enzyme is usually associated with the electron carrier rhodoquinone, proton-pumping, and ATP synthase. The pathway shown here has been experimentally demonstrated in some marine invertebrates, but variations of it can be found in other organisms such as the parasites Ascaris and Fasciola hepatica (see below) (reviewed in [Muller12, vanHellemond03, Tielens02, Tielens98, Van94]).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7383"
   },
   "PWY-7388": {
-    "summary": null,
+    "summary": "It has been speculated that the main purpose of mitochondrial fatty acid biosynthesis lies in the maintenance of mitochondria [Torkko01] and respiration [Hiltunen05] which is closely connected to (R)-lipoate biosynthesis and incorporation [Wada97, Jordan97, Schonauer08] but may also contribute fatty acids as constituent of mitochondrial phospholipid membranes [Schneider95]. In addition, novel links have been proposed to exist between mitochondrial fatty acid synthesis and RNA processing where products from the mitochondrial FAS II pathway are required for RNase P activity in yeast which in turn is controlled by positive feedback mechanisms [Schonauer08, Hiltunen10].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7388"
   },
   "PWY-7392": {
-    "summary": null,
+    "summary": "Taxol (paclitaxel) is a highly effective anticancer drug extensively used in the treament of various carcinomas, melanomas and sarcomas [Jennewein01]. Taxol was first isolated from the bark of the Pacific yew tree (Taxus brevifolia). Limited supply prompted intensive research efforts to find alternate sources including isolation from renewable foliage tissues. Currently, biosynthesis in tissue culture systems from renewable plantation-grown Taxus species, along with semi synthesis of taxol and its analogs from advanced taxane diterpenoid metabolites, remain the main source for this potent chemotherapeutic agent [Wildung96]. However, total synthesis is not yet a commercially viable option, and as a result, the demand for paclitaxel greatly exceeds the supply from both natural sources and semisynthesis.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7392"
   },
   "PWY-7400": {
-    "summary": null,
+    "summary": "Arginine biosynthesis is notable for its complexity and variability at the genetic level, and by its connection with several other pathways, such as pyrimidine and polyamine biosynthesis, and certain degradative pathways. The initial steps of the arginine biosynthetic pathways proceed via N-acetylated intermediates. The presumed reason for this is that the acetylation prevents the spontaneous cyclization of glutamate derivatives, which leads to proline biosynthesis, thus keeping the two pathways separate [Caldovic03]. A variation of the pathway found in some archaebacteria and hyperthermophilic bacteria utilizes a dedicated carrier protein to protect the intermediates instead of acetylation.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7400"
   },
   "PWY-7446": {
-    "summary": null,
+    "summary": "Bacteria that are able to utilize sulfoquinovose as their sole source of carbon and energy for growth have been isolated, and multiple degradation pathways have been described [Liu21a].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7446"
   },
   "PWY-7456": {
-    "summary": null,
+    "summary": "\u03b2-(1,4)-D-Mannans are one of the major constituents of the hemicellulose present in the cell walls and tissues of higher plants. Enzymes that degrade \u03b2-(1,4)-D-mannans include endo-1,4-\u03b2-mannanases and \u03b1-galactosidases. Short \u03b2-(1,4)-D-mannooligosaccharides are further degraded by exo-\u03b2-mannosidases which catalyze the hydrolysis of \u03b2-D-mannopyranose at the nonreducing end (in [Senoura11] and reviewed in [Moreira08].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7456"
   },
   "PWY-7539": {
-    "summary": null,
+    "summary": "This pathway variant has been characterized from Chlamydia, obligate intracellular bacteria that cause a wide variety of infectious diseases in humans and animals. Unlike other intracellular bacteria that salvage tetrahydrofolate or its precursors from their hosts, many Chlamydia species have retained the ability to synthesize folate.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7539"
   },
   "PWY-7560": {
-    "summary": null,
+    "summary": "The biosynthesis of isopentenyl diphosphate (isopentenyl pyrophosphate, IPP) can occur via two distinct routes: the mevalonate pathway (MVA pathway) and the methylerythritol phosphate pathway (MEP pathway, this pathway) [Lange00]. In the former, IPP is synthesized from the condensation of three acetyl-CoA molecules; in the MEP pathway IPP is synthesized via the condensation of pyruvate and D-glyceraldehyde 3-phosphate.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7560"
   },
   "PWY-7616": {
-    "summary": null,
+    "summary": "In contrast to the methanol utilization/assimilation pathways of methylotrophic bacteria (for example see pathways methanol and methylamine oxidation to formaldehyde and methanol oxidation to formaldehyde I), strains of Corynebacterium glutamicum utilize the pathway shown here to metabolize the growth inhibiting and toxic compounds methanol, formaldehyde and formate [Witthoff12, Witthoff13, Lessmeier13].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7616"
   },
   "PWY-7663": {
-    "summary": null,
+    "summary": "The pathway in Aerococcus viridans is similar to the pathway used by many bacteria to produce (5Z)-dodec-5-enoate (see (5Z)-dodecenoate biosynthesis I). The key enzyme of that pathway is EC 5.3.3.14, trans-2-decenoyl-[acyl-carrier protein] isomerase (FabA), which has the unique ability of converting some of the (2E)-dec-2-enoyl-[acp] (an intermediate the palmitate biosynthesis pathway) to (3Z)-dec-3-enoyl-[acp], which is then elongated in the usual fatty acid elongation process to form (5Z)-dodec-5-enoyl-[acp].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7663"
   },
   "PWY-7664": {
-    "summary": null,
+    "summary": "The pathway used by the bacteria to produce these fatty acids has been studied in Aerococcus viridans [Bi13]. It is similar to the pathway used by many bacteria to produce (5Z)-dodec-5-enoate (see (5Z)-dodecenoate biosynthesis I). The key enzyme of that pathway is EC 5.3.3.14, trans-2-decenoyl-[acyl-carrier protein] isomerase (FabA), which has the unique ability of converting some of the (2E)-dec-2-enoyl-[acp] (an intermediate the palmitate biosynthesis pathway) to (3Z)-dec-3-enoyl-[acp], which is then elongated in the usual fatty acid elongation process to form (5Z)-dodec-5-enoyl-[acp].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7664"
   },
   "PWY-7791": {
-    "summary": null,
+    "summary": "Pyrimidine and purine nucleoside triphosphates are the activated precursors of DNA and RNA. The pyrimidine deoxyribonucleoside triphosphates dCTP and dTTP are incorporated into DNA while the pyrimidine ribonucleoside triphosphates CTP and UTP are incorporated into RNA. In addition, mono- or diphosphorylated forms of pyrimidine nucleotides activate other molecules, as in CMP-3-deoxy-\u03b2-D-manno-octulosonate, UDP-\u03b1-D-glucose, and dTDP-\u03b1-D-fucopyranose, for use in biosynthesis of polysaccharides, glycoproteins and phospholipids [Zhou98, Giermann02, Schroder05, Zrenner06].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7791"
   },
   "PWY-7805": {
-    "summary": null,
+    "summary": "AMPA has no significant toxicity in acute, subchronic and chronic animal studies, nor any genotoxicity, teratogenicity or carcinogenicity [Williams00]. AMPA was found to inhibit proliferation and promote apoptosis in cancer cells, but not in normal cells [Li13, Parajuli15].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7805"
   },
   "PWY-7851": {
-    "summary": null,
+    "summary": "|Coenzyme A (CoA) is a ubiquitous compound found in archaea, bacteria, plants, and animals. It is a common acyl carrier in prokaryotic and eukaryotic cells, and is required for a multitude of reactions for both biosynthetic and degradative pathways, including the oxidation of fatty acids, carbohydrates, and amino acids [Rubio06].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7851"
   },
   "PWY-7912": {
