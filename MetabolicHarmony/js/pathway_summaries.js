@@ -1491,107 +1491,107 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7851"
   },
   "PWY-7912": {
-    "summary": null,
+    "summary": "Luminous dinoflagellates are the main eukaryotic protists capable of light production and are responsible for much of the bioluminescence in ocean surface waters [Tett71]. The organisms emit blue-light flashes (max 475 nm) after mechanical or electrical stimulation.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7912"
   },
   "PWY-7929": {
-    "summary": null,
+    "summary": "Marine organisms, including bacteria, algae and invertebrates, contain many organobromine compounds. Over 2,200 of those, with a wide range of biological properties, have been reported by 2017. Some brominated compounds, such as polybrominated diphenyl ethers (BDEs) in their hydroxylated and methoxylated forms, are found across all trophic levels in marine biota, from cyanobacteria and macroalgae to whales and seabirds. In some marine sponges within the Dysideidae family BDEs can exceed 10% of the sponge tissue by dry weight [Unson94, Becerro04].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7929"
   },
   "PWY-7977": {
-    "summary": null,
+    "summary": "L-methionine (Met) is one of the proteinogenic amino acids. In addition to its role in protein biosynthesis, L-methionine is required for a number of important cellular functions, including the initiation of protein synthesis, the methylation of DNA, rRNA and xenobiotics, and the biosynthesis of cysteine, phospholipids and polyamines. In all metzoa L-methionine is an essential amino acid (an indispensable amino acid that cannot be synthesized de novo) and must be supplied in the diet.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7977"
   },
   "PWY-7989": {
-    "summary": null,
+    "summary": "Iron is an essential trace element. In the presence of oxygen, ferrous iron is oxidized to ferric iron which forms insoluble compounds, and is thus not available to organisms. As a result, the level of physiologically available iron can drop to far below 1 \u03bcM, and become growth-limiting for bacteria. To survive, many bacteria evolved specialized transport systems called siderophores, which can complex and retract ferric iron ions. The siderophores are low molecular mass compounds, and have been generally divided into three main types: catecholate-, hydroxamate-, and carboxylate-siderophores.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7989"
   },
   "PWY-7992": {
-    "summary": null,
+    "summary": "Menaquinones (MK) and demethylmenaquinones (DMK) are low-molecular weight lipophilic components of the cytoplasmic membrane, found in many bacterial species. These quinones function as a reversible redox component of the electron transfer chain, mediating electron transfer between hydrogenases and cytochromes. Menaquinones have also been implicated in regulation, as they are necessary for sporulation and proper regulation of cytochrome formation in some Gram-positive bacteria [Farrand73, Farrand74].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7992"
   },
   "PWY-7993": {
-    "summary": null,
+    "summary": "In mycobacteria, the predominant menaquinone is \u03b2-dihydromenaquinone-9 [Azerad67a, Dunphy68, Azerad73], although a further modified version exists as well (see \u03c9-sulfo-II-dihydromenaquinone-9 biosynthesis).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7993"
   },
   "PWY-7997": {
-    "summary": null,
+    "summary": "This particular pathway describes the step in organisms that produce menaquinol-4. MK-4 is present in photosystem I (PSI) of the cyanobacteria Gloeobacter violaceus and Picosynechococcus sp. PCC 7002 [Mimuro05, Sakuragi05], in Bacillariophyta (diatoms) [Ikeda08] and in the primitive red alga Cyanidium caldarium. It is also synthesized by the intraerythrocytic stages of Plasmodium falciparum [Tonhosolo10].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7997"
   },
   "PWY-7998": {
-    "summary": null,
+    "summary": "In contrast to other fat-soluble vitamins, dietary vitamin K is rapidly lost to the body resulting in comparatively low tissue stores. Plasma concentrations of phylloquinone in healthy fasting people are of the order of only 0.5 nM. Tissue reserves are low as well - the median total liver pool of phylloquinone measured in British adults was estimated at about 20 nmol. Menaquinone concentration is higher, up to 200-300 nmol [Thijssen96]. While the majority of vitamin K reserves in the liver comprise long chain forms (menaquinone-7 through to menaquinone-13), extrahepatic tissues contain mainly phylloquinone and/or menaquinone-4 [Thijssen94, Thijssen96, Thijssen96a].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7998"
   },
   "PWY-7999": {
-    "summary": null,
+    "summary": "The epoxidated forms of the vitamin can be recycled back to the native quinone form by EC 1.17.4.4, vitamin-K-epoxide reductase (warfarin-sensitive). The enzyme has a significant effect on blood clotting, and its deficiency in mice causes early postnatal lethality due to severe bleeding [Spohn09]. The activity has been identified in the early 1970s [Willingham74, Whitlon78], but the VKORC1 gene that encodes the enzyme was discovered only in 2004 [Rost04, Li04a]. The enzyme is an integral membrane protein, located in the endoplasmic reticulum membrane [Tie05]. Its activity is strongly inhibited by the coumarin derivative (S)-warfarin, which led to the use of this compound as the therapy of choice for the long-term treatment and prevention of thromboembolic events [Bell72, Suttie87]. Another naturally occurring and highly potent inhibitor of the enzyme is ferulenol, derived from Ferula communis (giant fennel), which is more than 20 times more potent an inhibitor than warfarin [Gebauer07].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-7999"
   },
   "PWY-8000": {
-    "summary": null,
+    "summary": "The main reason for the low concentration of vitamin K is that much of it is rapidly catabolized [Shearer74]. Both phylloquinone and menaquinone-4 are substrates for the cytochromes P-450 encoded by the CYP4F2 and CYP4F11 genes [McDonald09, Traber13, Edson13]. The former was shown to catalyze three sequential hydroxylations, forming the hydroxy-, oxo-, and carboxy-forms of the quinones. The hydroxy form could also be metabolized to the carboxylate by microsomal NAD+-dependent alcohol and aldehyde dehydrogenases. Following the hydroxylation, the polyisoprenoid side chain is shortened to two major carboxylic acid aglycones with 7- and 5-carbon side chains, respectively. This process is assumed to be similar to fatty acid \u03b2-oxidation, with the substrates in their coenzyme A ester forms, although this has not been demonstrated.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-8000"
   },
   "PWY-8001": {
-    "summary": null,
+    "summary": "Felinine itself is odorless, but it decomposes into the volatile mercaptan 3-methyl-3-sulfanylbutan-1-ol, which has a strong characteristic sulfur odor (Miyazaki et al. 2006a). Several related compounds are also detected in cat urine, including 3-methyl-3-sulfanylbutyl formate and 3-methyl-3-(methylsulfanyl)butan-1-ol [Westall53, MacDonald84, Miyazaki06]. 3-methyl-3-sulfanylbutan-1-ol, which is also present in cat feces, is a major male sex recognition pheromone in cats [Miyazaki18].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-8001"
   },
   "PWY-8002": {
-    "summary": null,
+    "summary": "The p-hydroxycinnamates 4-coumarate (p-coumarate), ferulate and caffeate are phenylpropanoid compounds produced by green plants (see pathways phenylpropanoid biosynthesis, initial reactions and free phenylpropanoid acid biosynthesis). These compounds are degraded by soil bacteria. An aerobic pathway for the degradation of ferulate has been elucidated in Sphingomonas sp. SYK6 [Masai02] (see pathway ferulate degradation). A similar pathway operates on 4-coumarate, as shown here.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-8002"
   },
   "PWY-8003": {
-    "summary": null,
+    "summary": "The p-hydroxycinnamates 4-coumarate (p-coumarate), ferulate and caffeate are phenylpropanoid compounds produced by green plants (see pathways phenylpropanoid biosynthesis, initial reactions and free phenylpropanoid acid biosynthesis). These compounds are degraded by soil bacteria. An aerobic pathway for the degradation of ferulate has been elucidated in Sphingomonas sp. SYK6 [Masai02] (see pathway ferulate degradation). A similar pathway operates on trans-caffeate, as shown here.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-8003"
   },
   "PWY-8004": {
-    "summary": null,
+    "summary": "The oxidative branch of the pentose phosphate pathway converts D-glucopyranose 6-phosphate to D-gluconate 6-phosphate in two steps. Instead of proceeding to the non-oxidative branch of that pathway, which forms several metabolite precursors, the Entner-Duodoroff pathway provides a shunt that returns D-gluconate 6-phosphate to glycolysis via the intermediate D-glyceraldehyde 3-phosphate.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-8004"
   },
   "PWY-8017": {
-    "summary": null,
+    "summary": "Acetoanaerobium sticklandii and other Clostridium species can utilize certain combinations of amino acids for growth using Stickland reactions. Stickland reactions, named after their discoverer, L. H. Stickland [Stickland34, Stickland35], are fermentations of amino acid pairs in which one amino acid is oxidized and the other one is reduced. The oxidative branch of some amino acids leads to formation of ATP by substrate-level phosphorylation, but produces 4 reducing equivalents per amino acid. These reducing equivalents are consumed by the reduction of other amino acids via the reducing branch, maintaining a balanced redox potential in the cell (reviewed in [Nisman54, Barker81]).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-8017"
   },
   "PWY-8020": {
-    "summary": null,
+    "summary": "Pentose sugars, including D-xylose, L-arabinose, and D-arabinose, are metabolized through three main types of pathways.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-8020"
   },
   "PWY-8093": {
-    "summary": null,
+    "summary": "D-apiose is a unique branched-chain pentose found principally in plants. It is a key component of structurally complex cell wall polysaccharides such as rhamnogalacturonan-II (RG-II) in the cell walls of higher plants and in apigalacturonan in the cell walls of aquatic monocots, and is a building block of a large number of naturally occurring secondary metabolites.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-8093"
   },
   "PWY-8094": {
-    "summary": null,
+    "summary": "Kavalactones are known for their psychoactive effects. The Polynesian plant Piper methysticum, also known as kava, contains kavalactones and is often ingested for its psychoactive effects by local natives. Kava roots are known to contain up to 15% of kavalacatones by dry weight. Piper methysticum derived enzymes have been experimentally examined, and hypothesized to generate 12 kavalactone compounds [Pluskal19]. This cocktail includes the six most present compounds, kavain, dihidrokavain, methysticin, dihidromethysticin, yangonin, and desmethoxyyangonin. Kavain has been demonstrated to bind to \u03b3-aminobutyric acid type A receptors, which can lead to intensified activity and possibly contribute to the calming effects experienced by kava ingestion [Chua16]. Unlike other compounds that elicit sedative effects in humans, there is currently no strong indication that individuals can overdose on kavalactones. Therefore, kavalactones have garnered international interest from the medical and recreational drug communities [Pluskal19].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-8094"
   },
   "PWY-8098": {
-    "summary": null,
+    "summary": "The highest intracellular concentrations of cyclic 2,3-bisphosphoglycerate were detected in the hyperthermophilic genera Methanothermus and Methanopyrus. In Methanothermus fervidus it has been shown that the concentration keeps increasing up to the optimal growth temperature (at which point it may reach 1M), suggesting that the actual role of the compound is related to thermoadaptation [Hensel88, Huber89].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-8098"
   },
   "PWY-8116": {
-    "summary": null,
+    "summary": "Ochratoxin A (OTA) is a natural, toxic, secondary metabolite produced by several fungal species of the genera Penicillium and Aspergillus [Belli05]. OTA spreads widely in many crops, particularly in areas with a hot and humid climate [Tassou09]. In particular, Penicillium verrucosum is mainly responsible for OTA contamination of cereal-based products, Penicillium nordicum is responsible for contamination of some dry-cured foods, Aspergillus ochraceus, Aspergillus carbonarius, Aspergillus westerdijkiae, and Aspergillus steynii are responsible for contamination of coffee, cocoa, spices, and dried fruits, and Aspergillus carbonarius, and, to a lesser extent, Aspergillus niger aggregate species, are responsible for contamination of grapes, grape juice, dried vine fruits, must, and wine.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-8116"
   },
   "PWY-8145": {
-    "summary": null,
+    "summary": "C-type cytochromes (cytC) are electron-transfer proteins that have one or more heme c groups. They are characterized by the covalent attachment of the heme to the polypeptide chain via two (or rarely one) thioether bonds formed between thiol groups of cysteine residues and vinyl groups of a protoheme molecule. The two cysteine residues almost always occur in the amino-acid sequence CXXCH [Barker99].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-8145"
   },
   "PWY-821": {
-    "summary": null,
+    "summary": "L-homoserine is biosynthesized from L-aspartate, which in turn is synthesized from oxaloacetate, a TCA cycle intermediate. Homoserine is activated through esterification to form the O-acetyl ester by the enzyme homoserine O-acetyltransferase. hydrogen sulfide, which is the end result of sulfate assimilation, reacts with O-acetyl-L-homoserine, replacing the acetyl group and forming L-homocysteine.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-821"
   },
   "PWY-8353": {
-    "summary": null,
+    "summary": "In this pathway, characterized from the bacterium Pseudomonas syringae pv. maculicola str. ES4326, the product is not a RiPP but the modified amino acid 3-thia-L-glutamate, whose function in the organism is still not known. However, the compound is produced in an unusual pathway, in which a RiPP is used as a scaffold for its synthesis.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-8353"
   },
   "PWY-841": {
-    "summary": null,
+    "summary": "The de novo biosynthetic pathway for purine nucleotides is highly conserved among organisms, but its regulation and the organization of the genes encoding the enzymes vary. This fourteen step pathway contains ten steps that branch at IMP to form AMP and GMP, each in two steps. Regulation of the pathway has been well studied in microbes such as Escherichia coli, Bacillus subtilis and Saccharomyces cerevisiae, but little is known about its regulation in higher eukaryotes (metazoa and plants [Senecoff96]). The pathway appears to vary in archaea [White97a]. Some organisms, such as the mycoplasmas, do not biosynthesize purine and pyrimidine bases de novo and must rely on salvage pathways [Wang01d].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-841"
   },
   "PWY-922": {
-    "summary": null,
+    "summary": "The biosynthesis of isopentenyl diphosphate (isopentenyl pyrophosphate, IPP) can occur via two distinct routes: the mevalonate pathway (MVA pathway, such as this pathway) and the methylerythritol phosphate pathway (MEP pathway). In the former, IPP is synthesized from the condensation of three acetyl-CoA molecules; in contrast, in the MEP pathway IPP is synthesized via the condensation of pyruvate and D-glyceraldehyde 3-phosphate.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY-922"
   },
   "PWY0-1061": {
-    "summary": null,
+    "summary": "At least three pathways (L-alanine biosynthesis I, L-alanine biosynthesis II, and L-alanine biosynthesis III) are known for production of L-alanine. The contribution of L-alanine biosynthesis I to alanine synthesis remains speculative because alanine auxotrophs have not yet been isolated. Because alanine, but not valine, represses EC 2.6.1.66, valine\u2014pyruvate transaminase, its primary purpose is probably synthesis of L-alanine [Falkinham79][Whalen82].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-1061"
   },
   "PWY0-1277": {
@@ -1599,47 +1599,47 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-1277"
   },
   "PWY0-1296": {
-    "summary": null,
+    "summary": "The amino nitrogens of adenosine and guanine, but not the ring-nitrogen of any of the four purines, generated as a by-product of this pathway, can serve as a total nitrogen source for Escherichia coli.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-1296"
   },
   "PWY0-1297": {
-    "summary": null,
+    "summary": "Although Escherichia coli is able to utilize the deoxyribose moiety of deoxyribonucleosides, it is unable to utilize exogenously supplied deoxyribose; however, the closely related organism Salmonella enterica enterica serovar Typhimurium can.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-1297"
   },
   "PWY0-1298": {
-    "summary": null,
+    "summary": "Although Escherichia coli is able to utilize the deoxyribose moiety of deoxyribonucleosides, it is unable to utilize exogenously supplied deoxyribose; however, the closely related organism Salmonella enterica enterica serovar Typhimurium can.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-1298"
   },
   "PWY0-1319": {
-    "summary": null,
+    "summary": "Phospholipids are important membrane components. Most of the phospholipids belong to the category of phosphoglycerides. The simplest phosphoglycerides, which are known as phosphatidate (or diacylglycerol phosphate), are composed of a glycerol molecule attached to two fatty acids and one phosphate group. The carboxyl group of each fatty acid is esterified to the hydroxyl groups on carbon-1 and carbon-2 of the glycerol molecule, while the phosphate group is attached to carbon-3 by an ester link. Phosphatidates are precursors for many phosphoglycerides found in animals, plants and yeast, including a phosphatidylinositol, a phosphatidylserine, a phosphatidylethanolamine, and a cardiolipin.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-1319"
   },
   "PWY0-1338": {
-    "summary": null,
+    "summary": "Some Gram-negative bacteria, specifically Salmonella typhimurium and Escherichia coli, can become resistant to polymyxin by the modification of their lipid A structure via the attachment of 4-amino-4-deoxy-L-arabinopyranose (L-Ara4N) groups to one or more phosphate groups [Fu07, Gunn08, Barchiesi09, Pilonieta09, Lim10a]. This addition causes an absolute increase in lipid A charge, thus lowering the affinity of positively charged polymyxins [Kline08].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-1338"
   },
   "PWY0-1415": {
-    "summary": null,
+    "summary": "This superpathway shows the two routes of synthesis found in the facultative anaerobe Escherichia coli. Under aerobic conditions, the transition from coproporphyrinogen III to protoporphyrinogen IX is catalyzed by the oxygen -dependent coproporphyrinogen III oxidase (EC 1.3.3.3). However, when oxygen is not available, the organism is still able to catalyze this transition, using the readical-SAM enzyme coproporphyrinogen III dehydrogenase (EC 1.3.99.22), which can catalyze the transition without the need for molecular oxygen. This enzyme, which contains an iron-sulfur cluster, is able to break SAM into L-methionine and a 5'-deoxyadenosineyl radical. This radical can attack coproporphyrinogen III and bring about the conversion to protoporphyrinogen IX.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-1415"
   },
   "PWY0-1479": {
-    "summary": null,
+    "summary": "tRNA processing is a multi-step pathway carried out by a mix of endonucleases and exonucleases. Processing begins with the endonucleolytic cleavage of individual tRNA precursors from RNAs containing multiple tRNAs, which is carried out by EC 3.1.26.12, ribonuclease E. This initial cleavage can generate precursor molecules with a long 3' trailing end or with a short 3' extension. Precursors with a long trailer require additional exonucleolytic processing by EC 3.1.13.1, exoribonuclease II before the other nucleases in the pathway can act.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-1479"
   },
   "PWY0-162": {
-    "summary": null,
+    "summary": "Pyrimidine and purine nucleoside triphosphates are the activated precursors of DNA and RNA. The pyrimidine deoxyribonucleoside triphosphates dCTP and dTTP are incorporated into DNA while the ribonucleoside triphosphates CTP and UTP are incorporated into RNA. In addition, their diphosphates form activated derivatives of other molecules, such as UDP-\u03b1-D-glucose, CMP-3-deoxy-\u03b2-D-manno-octulosonate and dTDP-\u03b1-D-fucopyranose, for use in biosynthesis of polysaccharides, glycoproteins and phospholipids [Zhou98, Giermann02, Schroder05, Zrenner06].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-162"
   },
   "PWY0-166": {
-    "summary": null,
+    "summary": "Pyrimidine and purine nucleoside triphosphates are the activated precursors of DNA and RNA. Their diphosphates form activated derivatives of other molecules, such as UDP-\u03b1-D-glucose, for use in biosynthesis. The pathway for de novo biosynthesis of pyrimidine deoxyribonucleotides is derived from the pathway for superpathway of pyrimidine ribonucleotides de novo biosynthesis as shown above in the pathway links. In addition to de novo biosynthesis, salvage pathways re-utilize exogenous free bases and nucleosides and some of the resulting pyrimidine nucleotides can enter the de novo biosynthesis pathways (see pyrimidine ribonucleosides salvage I, pyrimidine nucleobases salvage I and pyrimidine deoxyribonucleosides salvage). These essential, evolutionarily conserved biosynthetic and salvage pathways are found in both prokaryotes and eukaryotes.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-166"
   },
   "PWY0-41": {
-    "summary": null,
+    "summary": "Allantoin is a common product of purine degradation. Allantoin is rich in nitrogen, and many organisms are able to degrade and recycle it. Some bacteria, including Metabacillus fastidiosus, Delftia acidovorans and Cupriavidus pinatubonensis JMP134, do so under aerobic conditions, while others such as Escherichia coli K-12, Streptococcus allantoicus and Providencia rettgeri do so only anaerobically.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-41"
   },
   "PWY0-42": {
-    "summary": null,
+    "summary": "The pathway, which was discovered in fungi [Tabuchi74] was best characterized in Salmonella enterica enterica serovar Typhimurium [Horswill99, Horswill01]. In that organism the pathway begins with the activation of propanoate to propanoyl-CoA by propionate-CoA ligase, followed by the synthesis of (2S,3S)-2-methylcitrate from propanoyl-CoA and oxaloacetate, catalyzed by 2-methylcitrate synthase. (2S,3S)-2-methylcitrate is then dehydrated to (Z)-2-methylaconitate by 2-methylcitrate dehydratase, followed by rehydration to (2R,3S)-2-methylisocitrate (catalyzed by aconitate hydratase 1 and aconitate hydratase 2) and cleavage of the later into pyruvate and succinate, performed by 2-methylisocitrate lyase. As mentioned above, pyruvate is a common precursor for biosynthesis and energy production.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-42"
   },
   "PWY0-44": {
@@ -1647,11 +1647,11 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-44"
   },
   "PWY0-781": {
-    "summary": null,
+    "summary": "The pathway starts by the reversible transamination of oxaloacetate to L-aspartate, which is catalyzed by EC 2.6.1.1, aspartate transaminase, providing a link between carbohydrate and amino acid metabolism. Oxaloacetate, which is consumed in this pathway, is replenished from the TCA cycle, by EC 6.4.1.1, pyruvate carboxylase, and in some bacteria also by EC 4.1.1.31, phosphoenolpyruvate carboxylase [Gottschalk86].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-781"
   },
   "PWY0-823": {
-    "summary": null,
+    "summary": "Escherichia coli K-12 has two forms of the enzyme arginine decarboxylase: a constitutive biosynthetic form, encoded by the speA gene, and an inducible catabolic form, encoded by the adiA gene. When the catabolic form is not expressed, the pathway operates only in an anabolic manner, catalyzing the biosynthesis of putrescine, which is used by the bacteria either directly or as a precursor for the biosynthesis of other polyamines (see putrescine biosynthesis I and superpathway of polyamine biosynthesis I). However, when the cells are grown in an arginine-rich medium, especially if the medium is acidic and conditions are semi-anaerobic, the catabolic arginine decarboxylase is expressed, and the pathway operates in a catabolic manner, feeding putrescine via 4-aminobutanoate and succinate into the TCA cycle I (prokaryotic) [Tabor85].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-823"
   },
   "PWY0-845": {
@@ -1659,7 +1659,7 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-845"
   },
   "PWY0-862": {
-    "summary": null,
+    "summary": "Only bacteria can produce unsaturated fatty acids anaerobically, and thus the key enzymes of this pathway (particularly FabA) have been targeted for development of new antibacterial agents [Ishikawa12, Moynie13].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-862"
   },
   "PWY0-881": {
@@ -1667,23 +1667,23 @@ window.PATHWAY_SUMMARIES = {
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-881"
   },
   "PWY0-901": {
-    "summary": null,
+    "summary": "elemental selenium is an essential trace element for many (but not all) organisms. For example mammals require selenium, but some protists, such as Trypanosoma brucei, do not [Aeby09]. The green alga Chlamydomonas reinhardtii contains selenoproteins, but land plants and yeast do not [Novoselov02]. The best studied biological form of elemental selenium is the amino acid L-selenocysteine (sec). Examples for selenoproteins include EC 1.12.98.1, coenzyme F420 hydrogenase, EC 1.12.98.3, Methanosarcina-phenazine hydrogenase, EC 1.12.2.1, cytochrome-c3 hydrogenase and EC 1.8.4.12, peptide-methionine (R)-S-oxide reductase. For more selenoproteins see MetaCyc pages for elemental selenium and L-selenocysteine, which contain links to enzymes for which elemental selenium is functionally important. elemental selenium is also present in selenonucleosides that have been identified in bacterial tRNAs (reviewed in [Stock09]).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY0-901"
   },
   "PWY1-3": {
-    "summary": null,
+    "summary": "Polyhydroxyalkanoates (PHAs) are a class of bacterial storage compounds that accumulate inside cells in the form of inclusion bodies (granules) when carbon sources are oversupply. PHAs may accumulate to levels of up to 90% of cellular dry weight and can provide the bacterium with a source of carbon and energy during periods of nutritional deprivation. These polyesters are of industrial interest due to their biodegradability to water-soluble products, and their ability to be synthesized from renewable resources (in [Papageorgiou08] and in [Handrick01] and reviewed in [Jendrossek09]). There is evidence that archaea may also synthesize PHAs (in [Han09]).",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY1-3"
   },
   "PWY1G-0": {
-    "summary": null,
+    "summary": "Thiols play a major role in the detoxification of stress-inducing factors. Glutathione (GSH) is the major thiol in eukaryotic organisms, Gram negative bacteria and the majority of Gram positive bacteria, but it is not universal. In some organisms other thiols have taken its role, including coenzyme M, trypanothione, ergothioneine, and the ovothiols.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY1G-0"
   },
   "PWY3O-4106": {
-    "summary": null,
+    "summary": "Nicotinamide adenine dinucleotide (NAD) and its phosphorylated derivative, nicotinamide adenine dinucleotide phosphate (NADP) are two of the most important coenzymes in redox reactions in the cell. Generally, NAD is involved in catabolic reactions, while NADP is involved in anabolic reactions. Because of the positive charge on the nitrogen atom in the nicotinamide ring, the oxidized forms of these compounds are often depicted as NAD+ and NADP+, respectively.",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY3O-4106"
   },
   "PWY4FS-7": {
-    "summary": null,
+    "summary": "Within a decade it has been found in higher plants [Benson61], Gram-negative bacteria [Ames68, Ward68] and mammals [Stanacev68]. It was later discovered in the archaeon Haloferax volcanii, indicating that it is produced by all three domains of life. The biosynthetic pathway was elucidated in the early 60s [Kiyasu63], and a laboratory synthesis was completed a few years later [Saunders66].",
     "url": "https://metacyc.org/META/NEW-IMAGE?object=PWY4FS-7"
   },
   "PWY4FS-8": {
