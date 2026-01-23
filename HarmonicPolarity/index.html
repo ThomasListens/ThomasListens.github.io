@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harmonic Polarity | Thomas LeRoy Meier</title>
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>𝑃</text></svg>">
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            background: #000;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px 16px 12px;
+        }
+        
+        .container { width: 100%; max-width: 440px; }
+        
+        .red-line {
+            position: fixed;
+            left: 50%;
+            width: 2px;
+            background: #c44;
+            transform: translateX(-50%);
+            z-index: 100;
+            pointer-events: none;
+            box-shadow: 0 0 8px #c44;
+        }
+        
+        header { text-align: center; margin-bottom: 10px; }
+        
+        h1 { font-size: 2.1rem; font-weight: 400; letter-spacing: 0.05em; margin-bottom: 6px; }
+        h1 .harmonic { font-weight: 300; letter-spacing: 0.1em; }
+        h1 .polarity { font-weight: 600; }
+        
+        .formula { margin-bottom: 2px; }
+        .formula .katex { font-size: 1.2rem; }
+        .formula-sigma { color: #555; font-size: 0.85rem; }
+        .formula-sigma .katex { font-size: 0.9rem; }
+        
+        .input-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            margin-bottom: 12px;
+        }
+        
+        .input-label { font-size: 1.3rem; color: #666; }
+        .ratio-input { display: flex; flex-direction: column; align-items: center; }
+        
+        .ratio-input input {
+            width: 56px;
+            padding: 4px;
+            font-size: 1.3rem;
+            font-family: inherit;
+            text-align: center;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid #333;
+            color: #fff;
+        }
+        
+        .ratio-input input:focus { outline: none; border-color: #666; }
+        .ratio-bar { width: 56px; height: 1px; background: #666; }
+        
+        .calc-btn {
+            padding: 8px 20px;
+            font-family: inherit;
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            background: transparent;
+            border: 1px solid #444;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .calc-btn:hover { border-color: #888; color: #fff; }
+        
+        .steps {
+            text-align: center;
+            margin-bottom: 6px;
+            line-height: 1.8;
+            font-size: 1rem;
+        }
+        
+        .step {
+            opacity: 0;
+            transform: translateY(4px);
+            transition: all 0.3s ease;
+            color: #999;
+        }
+        
+        .step.visible { opacity: 1; transform: translateY(0); }
+        .step .katex { font-size: 1.05rem; }
+        .step.highlight { color: #fff; font-size: 1.1rem; }
+        .step.highlight .katex { font-size: 1.15rem; }
+        
+        .result-area {
+            position: relative;
+            width: 100%;
+            height: 160px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+        
+        #galaxy {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .result {
+            position: relative;
+            z-index: 5;
+            text-align: center;
+        }
+        
+        .result-value {
+            font-size: 3.2rem;
+            font-weight: 500;
+            opacity: 0;
+            transform: scale(0.9);
+            transition: all 0.4s ease;
+        }
+        
+        .result-value.visible { opacity: 1; transform: scale(1); }
+        .result-value.otonal { text-shadow: 0 0 40px rgba(255,255,255,0.3); }
+        .result-value.utonal { text-shadow: 0 0 40px rgba(204,68,68,0.35); }
+        
+        .polarity-label {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.22em;
+            margin-top: 4px;
+            opacity: 0;
+            transition: opacity 0.3s ease 0.1s;
+        }
+        
+        .polarity-label.visible { opacity: 1; }
+        .polarity-label.otonal { color: #666; }
+        .polarity-label.utonal { color: #966; }
+        
+        .audio {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            font-size: 0.75rem;
+            color: #444;
+        }
+        
+        .audio-group { display: flex; align-items: center; gap: 6px; }
+        
+        .slider {
+            width: 55px;
+            height: 2px;
+            -webkit-appearance: none;
+            background: #222;
+        }
+        
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 10px; height: 10px;
+            background: #555;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        .play-btn {
+            padding: 4px 10px;
+            font-family: inherit;
+            font-size: 0.75rem;
+            background: transparent;
+            border: 1px solid #333;
+            color: #555;
+            cursor: pointer;
+        }
+        
+        .play-btn:hover { border-color: #555; color: #888; }
+        
+        @media (max-width: 480px) {
+            body { padding: 12px 12px 10px; }
+            h1 { font-size: 1.9rem; }
+            .formula .katex { font-size: 1.1rem; }
+            .input-label { font-size: 1.2rem; }
+            .ratio-input input { width: 50px; font-size: 1.2rem; }
+            .ratio-bar { width: 50px; }
+            .step .katex { font-size: 0.95rem; }
+            .step.highlight .katex { font-size: 1.05rem; }
+            .result-value { font-size: 2.8rem; }
+            .result-area { height: 140px; }
+        }
+        
+        footer {
+            padding-top: 8px;
+            text-align: center;
+        }
+        
+        .creator {
+            font-size: 0.8rem;
+            color: #555;
+            margin-bottom: 4px;
+        }
+        
+        .tagline {
+            font-size: 0.75rem;
+            font-style: italic;
+            color: #444;
+            letter-spacing: 0.02em;
+        }
+    </style>
+</head>
+<body>
+    <div class="red-line" id="redLine"></div>
+    
+    <div class="container">
+        <header>
+            <h1><span class="harmonic">HARMONIC</span> <span class="polarity">POLARITY</span></h1>
+            <div class="formula" id="formula"></div>
+            <div class="formula-sigma" id="formulaSigma"></div>
+        </header>
+        
+        <div class="input-row" id="inputRow">
+            <span class="input-label">P(</span>
+            <div class="ratio-input">
+                <input type="number" id="num" value="196" min="1">
+                <div class="ratio-bar"></div>
+                <input type="number" id="den" value="169" min="1">
+            </div>
+            <span class="input-label">)</span>
+            <button class="calc-btn" onclick="calc()">Calculate</button>
+        </div>
+        
+        <div class="steps" id="steps"></div>
+        
+        <div class="result-area" id="resultArea">
+            <canvas id="galaxy"></canvas>
+            <div class="result">
+                <div class="result-value" id="resultVal">—</div>
+                <div class="polarity-label" id="polarityLbl">—</div>
+            </div>
+        </div>
+        
+        <div class="audio">
+            <div class="audio-group">
+                <span>1/1</span>
+                <input type="range" class="slider" id="droneVol" min="0" max="100" value="40">
+            </div>
+            <div class="audio-group">
+                <span id="ratioLbl">n/d</span>
+                <input type="range" class="slider" id="intVol" min="0" max="100" value="50">
+                <button class="play-btn" onclick="playInt()">▶</button>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        <div class="creator">Thomas LeRoy Meier · 2026</div>
+        <div class="tagline">Harmony can show us stars we have yet to see.</div>
+    </footer>
+    
+    <script>
+        const GAMMA = 0.5772156649015329;
+        const BASE = 220;
+        
+        let audioCtx = null, drone = null, droneGain = null;
+        
+        function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        
+        function startDrone() {
+            initAudio();
+            if (drone) return;
+            drone = audioCtx.createOscillator();
+            droneGain = audioCtx.createGain();
+            drone.frequency.value = BASE;
+            drone.type = 'sine';
+            droneGain.gain.value = 0;
+            drone.connect(droneGain).connect(audioCtx.destination);
+            drone.start();
+            droneGain.gain.linearRampToValueAtTime(document.getElementById('droneVol').value / 100 * 0.2, audioCtx.currentTime + 1.5);
+        }
+        
+        document.getElementById('droneVol').addEventListener('input', e => {
+            if (droneGain) droneGain.gain.linearRampToValueAtTime(e.target.value / 100 * 0.2, audioCtx.currentTime + 0.1);
+        });
+        
+        function playInt() {
+            initAudio();
+            const n = parseInt(document.getElementById('num').value) || 1;
+            const d = parseInt(document.getElementById('den').value) || 1;
+            const vol = document.getElementById('intVol').value / 100 * 0.15;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.frequency.value = BASE * n / d;
+            osc.type = 'sine';
+            osc.connect(gain).connect(audioCtx.destination);
+            const t = audioCtx.currentTime;
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(vol, t + 0.05);
+            gain.gain.setValueAtTime(vol, t + 1.5);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 2.2);
+            osc.start(t);
+            osc.stop(t + 2.3);
+        }
+        
+        const gcd = (a, b) => b ? gcd(b, a % b) : a;
+        
+        function factor(n) {
+            if (n === 1) return {};
+            const f = {};
+            let d = 2;
+            while (n > 1) {
+                while (n % d === 0) { f[d] = (f[d] || 0) + 1; n /= d; }
+                d++;
+                if (d * d > n && n > 1) { f[n] = 1; break; }
+            }
+            return f;
+        }
+        
+        function expandedPrimes(f) {
+            const parts = [];
+            for (const [p, k] of Object.entries(f)) for (let i = 0; i < k; i++) parts.push(p);
+            return parts.length ? parts.join(' \\cdot ') : '1';
+        }
+        
+        function withGamma(f) {
+            const parts = [];
+            for (const [p, k] of Object.entries(f)) {
+                const sym = p === '2' ? '\\gamma' : p;
+                for (let i = 0; i < k; i++) parts.push(sym);
+            }
+            return parts.length ? parts.join(' \\cdot ') : '1';
+        }
+        
+        function sqrtTerms(f) {
+            const terms = [];
+            for (const [p, k] of Object.entries(f)) {
+                const base = p === '2' ? '\\gamma' : p;
+                terms.push(k == 1 ? base : `${base}\\sqrt{${k}}`);
+            }
+            return terms.length ? terms.join(' + ') : '0';
+        }
+        
+        function sigma(f) {
+            let sum = 0;
+            for (const [p, k] of Object.entries(f)) sum += (p == 2 ? GAMMA : +p) * Math.sqrt(+k);
+            return sum;
+        }
+        
+        // === GALAXY ===
+        let canvas, ctx, particles = [], time = 0, highlighted = null, canvasW, canvasH;
+        
+        function setupGalaxy() {
+            canvas = document.getElementById('galaxy');
+            ctx = canvas.getContext('2d');
+            
+            const container = document.getElementById('resultArea');
+            canvasW = container.offsetWidth;
+            canvasH = container.offsetHeight;
+            
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = canvasW * dpr;
+            canvas.height = canvasH * dpr;
+            canvas.style.width = canvasW + 'px';
+            canvas.style.height = canvasH + 'px';
+            ctx.scale(dpr, dpr);
+            
+            // Create particles
+            particles = [];
+            for (let i = 0; i < 100; i++) {
+                const arm = i % 3;
+                const angle = arm * Math.PI * 2 / 3 + (Math.random() - 0.5) * 0.5 + i * 0.02;
+                const baseR = Math.pow(Math.random(), 1.3) * 70 + 3;
+                const mult = Math.random() < 0.2 ? [2, 3, 4][Math.floor(Math.random() * 3)] : 1;
+                particles.push({
+                    angle, baseR, mult,
+                    phase: Math.random() * Math.PI * 2,
+                    size: 0.6 + Math.random() * 0.6,
+                    opacity: 0.2 + Math.random() * 0.3
+                });
+            }
+            
+            // Start animation
+            requestAnimationFrame(animateGalaxy);
+        }
+        
+        function animateGalaxy() {
+            ctx.clearRect(0, 0, canvasW, canvasH);
+            time += 0.02;
+            
+            // Fade out highlight
+            if (highlightFade > 0) {
+                highlightFade -= 0.003;
+                if (highlightFade <= 0) {
+                    highlightFade = 0;
+                    highlighted = null;
+                }
+            }
+            
+            const cx = canvasW / 2;
+            const cy = canvasH / 2;
+            
+            for (let i = 0; i < particles.length; i++) {
+                const p = particles[i];
+                const rotSpeed = 0.12 / (p.baseR / 20 + 0.3);
+                const ang = p.angle + time * rotSpeed;
+                
+                let r = p.baseR;
+                if (p.mult > 1) {
+                    const pull = 1 / Math.sqrt(p.mult);
+                    const osc = 0.5 + 0.5 * Math.sin(time * 0.8 + p.phase);
+                    r = p.baseR * pull + (p.baseR - p.baseR * pull) * osc * 0.2;
+                }
+                r *= 1 + 0.02 * Math.sin(time * 0.5);
+                
+                const x = cx + r * Math.cos(ang);
+                const y = cy + r * Math.sin(ang);
+                const twinkle = 0.6 + 0.4 * Math.sin(time * 3 + p.phase * 2);
+                let alpha = p.opacity * twinkle;
+                
+                // Highlight effect - subtle red glow with fade
+                if (highlighted === i && highlightFade > 0) {
+                    const pulse = 0.8 + 0.2 * Math.sin(time * 3);
+                    const fade = highlightFade;
+                    ctx.beginPath();
+                    ctx.arc(x, y, p.size * 12 * pulse, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(204,100,100,${0.08 * pulse * fade})`;
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(x, y, p.size * 6 * pulse, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(204,100,100,${0.15 * pulse * fade})`;
+                    ctx.fill();
+                }
+                
+                ctx.beginPath();
+                const isHighlighted = highlighted === i && highlightFade > 0;
+                const starSize = isHighlighted ? p.size * (1 + 0.8 * highlightFade) : p.size;
+                ctx.arc(x, y, starSize, 0, Math.PI * 2);
+                if (isHighlighted) {
+                    const r = Math.round(255);
+                    const g = Math.round(255 - 75 * highlightFade);
+                    const b = Math.round(255 - 75 * highlightFade);
+                    ctx.fillStyle = `rgba(${r},${g},${b},${Math.min(alpha + 0.3 * highlightFade, 1)})`;
+                } else {
+                    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+                }
+                ctx.fill();
+            }
+            
+            requestAnimationFrame(animateGalaxy);
+        }
+        
+        let highlightFade = 0;
+        
+        function highlightStar(pol, ratio) {
+            const tAng = (ratio % 1) * Math.PI * 2;
+            let best = 0, bestScore = Infinity;
+            for (let i = 0; i < particles.length; i++) {
+                const score = Math.abs(((particles[i].angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) - tAng);
+                if (score < bestScore) { bestScore = score; best = i; }
+            }
+            highlighted = best;
+            highlightFade = 1;
+        }
+        
+        function redLine() {
+            const line = document.getElementById('redLine');
+            const start = document.getElementById('inputRow').getBoundingClientRect().bottom + window.scrollY;
+            const end = document.getElementById('resultVal').getBoundingClientRect().top + window.scrollY + 25;
+            line.style.top = start + 'px';
+            line.style.height = '0';
+            line.style.opacity = '1';
+            line.animate([
+                { height: '0', opacity: 1 },
+                { height: (end - start) + 'px', opacity: 1 },
+                { height: (end - start) + 'px', opacity: 0 }
+            ], { duration: 500, easing: 'ease-out', fill: 'forwards' });
+        }
+        
+        function calc() {
+            startDrone();
+            redLine();
+            
+            const n = parseInt(document.getElementById('num').value) || 1;
+            const d = parseInt(document.getElementById('den').value) || 1;
+            document.getElementById('ratioLbl').textContent = `${n}/${d}`;
+            
+            const g = gcd(n, d), nR = n / g, dR = d / g;
+            const fN = factor(nR), fD = factor(dR);
+            const sN = sigma(fN), sD = sigma(fD);
+            const pol = sN - sD;
+            const ot = pol >= 0;
+            
+            document.getElementById('steps').innerHTML = `
+                <div class="step highlight" style="transition-delay:0.03s"><span id="s1"></span></div>
+                <div class="step" style="transition-delay:0.08s"><span id="s2"></span></div>
+                <div class="step" style="transition-delay:0.13s"><span id="s3"></span></div>
+                <div class="step" style="transition-delay:0.18s"><span id="s4"></span></div>
+            `;
+            
+            katex.render(`\\frac{${nR}}{${dR}} = \\frac{${expandedPrimes(fN)}}{${expandedPrimes(fD)}}`, document.getElementById('s1'));
+            katex.render(`2 \\to \\gamma : \\frac{${withGamma(fN)}}{${withGamma(fD)}}`, document.getElementById('s2'));
+            katex.render(`${sqrtTerms(fN)} \\;|\\; ${sqrtTerms(fD)}`, document.getElementById('s3'));
+            katex.render(`${sN.toFixed(3)} - ${sD.toFixed(3)} =`, document.getElementById('s4'));
+            
+            setTimeout(() => document.querySelectorAll('.step').forEach(s => s.classList.add('visible')), 30);
+            
+            const rv = document.getElementById('resultVal');
+            const pl = document.getElementById('polarityLbl');
+            rv.classList.remove('visible', 'otonal', 'utonal');
+            pl.classList.remove('visible', 'otonal', 'utonal');
+            
+            setTimeout(() => {
+                rv.textContent = (pol >= 0 ? '+' : '') + pol.toFixed(2);
+                rv.classList.add('visible', ot ? 'otonal' : 'utonal');
+                pl.textContent = ot ? 'Otonal' : 'Utonal';
+                pl.classList.add('visible', ot ? 'otonal' : 'utonal');
+            }, 350);
+            
+            playInt();
+            highlightStar(pol, n / d);
+        }
+        
+        function renderInitial(n, d) {
+            const g = gcd(n, d), nR = n / g, dR = d / g;
+            const fN = factor(nR), fD = factor(dR);
+            const sN = sigma(fN), sD = sigma(fD);
+            const pol = sN - sD;
+            
+            document.getElementById('ratioLbl').textContent = `${n}/${d}`;
+            document.getElementById('steps').innerHTML = `
+                <div class="step highlight visible"><span id="s1"></span></div>
+                <div class="step visible"><span id="s2"></span></div>
+                <div class="step visible"><span id="s3"></span></div>
+                <div class="step visible"><span id="s4"></span></div>
+            `;
+            katex.render(`\\frac{${nR}}{${dR}} = \\frac{${expandedPrimes(fN)}}{${expandedPrimes(fD)}}`, document.getElementById('s1'));
+            katex.render(`2 \\to \\gamma : \\frac{${withGamma(fN)}}{${withGamma(fD)}}`, document.getElementById('s2'));
+            katex.render(`${sqrtTerms(fN)} \\;|\\; ${sqrtTerms(fD)}`, document.getElementById('s3'));
+            katex.render(`${sN.toFixed(3)} - ${sD.toFixed(3)} =`, document.getElementById('s4'));
+            document.getElementById('resultVal').textContent = (pol >= 0 ? '+' : '') + pol.toFixed(2);
+            document.getElementById('resultVal').classList.add('visible', pol >= 0 ? 'otonal' : 'utonal');
+            document.getElementById('polarityLbl').textContent = pol >= 0 ? 'Otonal' : 'Utonal';
+            document.getElementById('polarityLbl').classList.add('visible', pol >= 0 ? 'otonal' : 'utonal');
+        }
+        
+        // Initialize everything after DOM loads
+        document.addEventListener('DOMContentLoaded', () => {
+            katex.render("P\\left(\\frac{n}{d}\\right) = \\sigma(n) - \\sigma(d)", document.getElementById('formula'));
+            katex.render("\\sigma(n) = \\gamma\\sqrt{v_2(n)} + \\sum_{p>2} p\\sqrt{v_p(n)}", document.getElementById('formulaSigma'));
+            
+            setupGalaxy();
+            renderInitial(196, 169);
+        });
+        
+        document.addEventListener('keypress', e => { if (e.key === 'Enter') calc(); });
+    </script>
+</body>
+</html>
