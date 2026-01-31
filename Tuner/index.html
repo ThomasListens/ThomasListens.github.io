@@ -1,0 +1,1816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JI Pitch Ruler</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      background: #000;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      overflow: hidden;
+    }
+    
+    #app {
+      display: flex;
+      height: 100vh;
+    }
+    
+    #controls {
+      width: 320px;
+      padding: 20px;
+      background: #0a0a0a;
+      border-right: 1px solid #222;
+      color: #ccc;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      overflow-y: auto;
+    }
+    
+    #controls.hidden {
+      display: none;
+    }
+    
+    #controls h1 {
+      font-size: 1.3em;
+      color: #fff;
+      font-weight: 400;
+      letter-spacing: 0.5px;
+    }
+    
+    #controls label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 0.8em;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    #controls input, #controls textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #333;
+      border-radius: 3px;
+      background: #111;
+      color: #fff;
+      font-size: 14px;
+    }
+    
+    #controls input:focus, #controls textarea:focus {
+      outline: none;
+      border-color: #555;
+    }
+    
+    #controls textarea {
+      min-height: 100px;
+      font-family: 'SF Mono', 'Consolas', monospace;
+      resize: vertical;
+      line-height: 1.5;
+    }
+    
+    #controls button {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    
+    #startBtn {
+      background: #fff;
+      color: #000;
+    }
+    
+    #startBtn:hover {
+      background: #ddd;
+    }
+    
+    #startBtn.listening {
+      background: #cc4444;
+      color: #fff;
+    }
+    
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .checkbox-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: #cc4444;
+    }
+    
+    .checkbox-row label {
+      margin: 0;
+      text-transform: none;
+      font-size: 13px;
+      color: #aaa;
+    }
+    
+    #presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    
+    #presets button {
+      padding: 6px 10px;
+      font-size: 11px;
+      background: #1a1a1a;
+      color: #888;
+      border: 1px solid #333;
+    }
+    
+    #presets button:hover {
+      background: #222;
+      color: #fff;
+      border-color: #444;
+    }
+    
+    .section-divider {
+      height: 1px;
+      background: #222;
+      margin: 5px 0;
+    }
+    
+    #rulerContainer {
+      flex: 1;
+      position: relative;
+      background: #000;
+    }
+    
+    #rulerCanvas {
+      width: 100%;
+      height: 100%;
+    }
+    
+    .tip {
+      margin-top: auto;
+      font-size: 11px;
+      color: #555;
+      line-height: 1.5;
+    }
+    
+    .tip code {
+      background: #1a1a1a;
+      padding: 2px 5px;
+      border-radius: 2px;
+      color: #888;
+    }
+    
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .slider-row input[type="range"] {
+      flex: 1;
+    }
+    
+    .slider-row span {
+      min-width: 35px;
+      font-size: 12px;
+      color: #666;
+    }
+    
+    /* Mobile toggle button */
+    #mobileToggle {
+      display: none;
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      padding: 10px 14px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    
+    #mobileToggle:hover {
+      background: #222;
+    }
+    
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+      #app {
+        flex-direction: column;
+      }
+      
+      #controls {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 60%;
+        z-index: 100;
+        transform: translateY(-100%);
+        transition: transform 0.3s ease;
+        border-right: none;
+        border-bottom: 1px solid #333;
+      }
+      
+      #controls.mobile-open {
+        transform: translateY(0);
+      }
+      
+      #controls.hidden {
+        display: none;
+      }
+      
+      #mobileToggle {
+        display: block;
+      }
+      
+      #rulerContainer {
+        height: 100vh;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <button id="mobileToggle">☰ Settings</button>
+  <div id="app">
+    <div id="controls">
+      <h1>JI Pitch Ruler</h1>
+      
+      <div>
+        <label>Reference Frequency (Hz)</label>
+        <div class="slider-row">
+          <input type="number" id="refFreq" value="116.54" step="0.01" min="20" max="2000" style="width: 100px;">
+          <select id="refPreset" style="flex: 1; padding: 8px; background: #111; color: #fff; border: 1px solid #333; border-radius: 3px;">
+            <option value="">Custom</option>
+            <option value="65.41|C2">C2 (65.41)</option>
+            <option value="73.42|D2">D2 (73.42)</option>
+            <option value="82.41|E2">E2 (82.41)</option>
+            <option value="87.31|F2">F2 (87.31)</option>
+            <option value="98.00|G2">G2 (98.00)</option>
+            <option value="110.00|A2">A2 (110.00)</option>
+            <option value="116.54|Bb2" selected>Bb2 (116.54)</option>
+            <option value="123.47|B2">B2 (123.47)</option>
+            <option value="130.81|C3">C3 (130.81)</option>
+            <option value="146.83|D3">D3 (146.83)</option>
+            <option value="164.81|E3">E3 (164.81)</option>
+            <option value="174.61|F3">F3 (174.61)</option>
+            <option value="196.00|G3">G3 (196.00)</option>
+            <option value="220.00|A3">A3 (220.00)</option>
+            <option value="246.94|B3">B3 (246.94)</option>
+            <option value="261.63|C4">C4 (261.63)</option>
+            <option value="293.66|D4">D4 (293.66)</option>
+            <option value="329.63|E4">E4 (329.63)</option>
+            <option value="349.23|F4">F4 (349.23)</option>
+            <option value="392.00|G4">G4 (392.00)</option>
+            <option value="440.00|A4">A4 (440.00)</option>
+          </select>
+        </div>
+      </div>
+      
+      <div>
+        <label>Ratios (space or line separated)</label>
+        <textarea id="ratios" placeholder="1/1 5/4 3/2 7/4 2/1">1/1
+13/12
+8/7
+7/6
+196/169
+5/4
+4/3
+7/5
+3/2
+8/5
+22/13
+7/4
+13/7
+2/1</textarea>
+      </div>
+      
+      <div>
+        <label>Presets</label>
+        <div id="presets">
+          <button data-ratios="1/1 9/8 5/4 4/3 3/2 5/3 15/8 2/1">5-limit</button>
+          <button data-ratios="1/1 9/8 5/4 11/8 3/2 13/8 7/4 15/8 2/1">Harmonics</button>
+          <button data-ratios="1/1 16/15 9/8 6/5 5/4 4/3 7/5 3/2 8/5 5/3 9/5 15/8 2/1">Chromatic</button>
+          <button data-ratios="1/1 8/7 7/6 6/5 5/4 4/3 3/2 8/5 5/3 12/7 7/4 2/1">Over+Under</button>
+          <button data-ratios="1/1 5/4 6 8/5 2/1">JI+ET</button>
+        </div>
+      </div>
+      
+      <div class="section-divider"></div>
+      
+      <div class="checkbox-row">
+        <input type="checkbox" id="showCents">
+        <label for="showCents">Show cents deviation</label>
+      </div>
+      
+      <div class="checkbox-row">
+        <input type="checkbox" id="showHz" checked>
+        <label for="showHz">Show Hz values</label>
+      </div>
+      
+      <div class="checkbox-row">
+        <input type="checkbox" id="showGhost" checked>
+        <label for="showGhost">Ghost trail</label>
+      </div>
+      
+      <div class="checkbox-row">
+        <input type="checkbox" id="octaveWrap" checked>
+        <label for="octaveWrap">Wrap to octave</label>
+      </div>
+      
+      <div class="checkbox-row">
+        <input type="checkbox" id="show12EDO">
+        <label for="show12EDO">Show 12-EDO reference lines</label>
+      </div>
+      
+      <div id="edoOffsetRow" style="display: none;">
+        <label>12-EDO Label Position</label>
+        <div class="slider-row">
+          <input type="range" id="edoOffset" min="0" max="100" value="50">
+          <span id="edoOffsetVal">50%</span>
+        </div>
+      </div>
+      
+      <div class="section-divider"></div>
+      
+      <div>
+        <label>Indicator Display</label>
+        <div class="checkbox-row">
+          <input type="checkbox" id="showIndicatorHz" checked>
+          <label for="showIndicatorHz">Hz</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="showIndicatorDeviation" checked>
+          <label for="showIndicatorDeviation">Cents deviation</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="showIndicatorRatio" checked>
+          <label for="showIndicatorRatio">Nearest ratio</label>
+        </div>
+      </div>
+      
+      <div>
+        <label>Ruler Position</label>
+        <div class="slider-row">
+          <input type="range" id="rulerPosition" min="50" max="95" value="75">
+          <span id="rulerPosVal">75%</span>
+        </div>
+      </div>
+      
+      <div>
+        <label>Smoothing (visual stability)</label>
+        <div class="slider-row">
+          <input type="range" id="smoothing" min="1" max="15" value="8">
+          <span id="smoothVal">8</span>
+        </div>
+      </div>
+      
+      <div>
+        <label>Responsiveness (tracking speed)</label>
+        <div class="slider-row">
+          <input type="range" id="responsiveness" min="1" max="10" value="6">
+          <span id="respVal">6</span>
+        </div>
+      </div>
+      
+      <button id="startBtn">Start Listening</button>
+      
+      <div class="section-divider"></div>
+      
+      <div>
+        <label>Or Upload Audio File</label>
+        <input type="file" id="audioFile" accept="audio/*">
+      </div>
+      
+      <div id="playbackControls" style="display: none;">
+        <div class="slider-row">
+          <button id="playPauseBtn" style="padding: 8px 16px; font-size: 12px; background: #222; color: #fff; border: 1px solid #444;">Play</button>
+          <span id="timeDisplay" style="font-size: 12px; color: #888;">0:00 / 0:00</span>
+          <button id="clearFileBtn" style="padding: 8px 12px; font-size: 11px; background: #1a1a1a; color: #666; border: 1px solid #333; margin-left: auto;">Clear</button>
+        </div>
+        <div class="slider-row" style="margin-top: 8px;">
+          <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1" style="flex: 1;">
+        </div>
+      </div>
+      
+      <div class="tip">
+        <p><strong>Ratios:</strong> <code>5/4</code> JI, <code>6</code> = 6th semitone, <code>386c</code> = cents</p>
+        <p><strong>Drone:</strong> Click any ratio line to toggle a reference tone.</p>
+        <p><strong>Live:</strong> Click "Start Listening" for mic input.</p>
+        <p>Add <code>?obs=1</code> to URL to hide controls.</p>
+      </div>
+      
+      <button id="stopDronesBtn" style="display: none; width: 100%; padding: 10px; background: #331a1a; color: #cc6666; border: 1px solid #662222; cursor: pointer; margin-top: 10px;">🔇 Stop All Drones</button>
+    </div>
+    
+    <div id="rulerContainer">
+      <canvas id="rulerCanvas"></canvas>
+    </div>
+  </div>
+
+  <script>
+    // ============ CONFIG ============
+    const config = {
+      refFreq: 116.54,
+      refNote: 'Bb2',
+      ratios: [],
+      showCents: false,
+      showHz: true,
+      showGhost: true,
+      show12EDO: false,
+      edoOffset: 0.5,      // 0-1: how far left to push 12-EDO labels
+      rulerX: 0.75,
+      smoothing: 8,        // 1-15: visual stability (higher = more stable)
+      responsiveness: 6,   // 1-10: tracking speed (higher = faster response)
+      ghostLength: 20,
+      octaveWrap: true,
+      pitchHoldMs: 150,    // Hold pitch display after note loss
+      showIndicatorHz: true,
+      showIndicatorDeviation: true,
+      showIndicatorRatio: true
+    };
+    
+    // ============ 12-EDO NOTE SYSTEM ============
+    // Chromatic note names starting from C
+    const noteNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+    const noteNamesFlat = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
+    
+    // Parse note name like "Bb2" into {note: "Bb", octave: 2, index: 10}
+    function parseNoteName(noteName) {
+      const match = noteName.match(/^([A-Ga-g][#♯b♭]?)(\d+)?$/);
+      if (!match) return { note: 'A', octave: 4, index: 9 };
+      
+      const note = match[1].charAt(0).toUpperCase() + match[1].slice(1);
+      const octave = match[2] ? parseInt(match[2]) : 4;
+      
+      const noteMap = {
+        'C': 0, 'C#': 1, 'C♯': 1, 'Db': 1, 'D♭': 1,
+        'D': 2, 'D#': 3, 'D♯': 3, 'Eb': 3, 'E♭': 3,
+        'E': 4,
+        'F': 5, 'F#': 6, 'F♯': 6, 'Gb': 6, 'G♭': 6,
+        'G': 7, 'G#': 8, 'G♯': 8, 'Ab': 8, 'A♭': 8,
+        'A': 9, 'A#': 10, 'A♯': 10, 'Bb': 10, 'B♭': 10,
+        'B': 11
+      };
+      
+      return { note, octave, index: noteMap[note] ?? 0 };
+    }
+    
+    // Get note name at cents offset from reference
+    function getNoteAtCents(cents, refNoteName) {
+      const ref = parseNoteName(refNoteName);
+      const semitones = Math.round(cents / 100);
+      const totalSemitones = ref.index + semitones;
+      const noteIndex = ((totalSemitones % 12) + 12) % 12;
+      const octaveOffset = Math.floor(totalSemitones / 12);
+      const octave = ref.octave + octaveOffset;
+      
+      // Use flats if reference note uses flats
+      const useFlats = refNoteName.includes('b') || refNoteName.includes('♭');
+      const names = useFlats ? noteNamesFlat : noteNames;
+      
+      return { name: names[noteIndex], octave };
+    }
+    
+    // ============ STATE ============
+    let audioContext = null;
+    let analyser = null;
+    let isListening = false;
+    let smoothedFreq = null;
+    let smoothedCents = null;
+    let currentProbability = 0;
+    let ghostTrail = [];
+    let animationId = null;
+    let lastGhostTime = 0;
+    let lastPitchTime = 0;
+    let lastValidPitch = null;
+    let lastDetectTime = 0;
+    
+    // Smooth animation states
+    let ratioExtensions = {};  // Track extension amount per ratio label
+    let lastNearestLabel = null;
+    
+    // Smooth indicator state
+    let indicatorY = null;           // Smoothed Y position
+    let indicatorOpacity = 0;        // Smoothed opacity (0-1)
+    let indicatorActive = false;     // Whether we have valid pitch
+    let lastDisplayCents = null;     // Last known cents for grey-out mode
+    let lastDisplayFreq = null;      // Last known freq for grey-out mode
+    let smoothedProximity = 0;       // Smoothed lock-on proximity (0-1)
+    
+    // Drone state
+    let droneOscillators = {};       // Map of ratio label -> {osc, gain}
+    let droneRatioYPositions = {};   // Map of ratio label -> y position for click detection
+    
+    // Canvas optimization
+    let lastCanvasWidth = 0;
+    let lastCanvasHeight = 0;
+    
+    // File playback state
+    let audioBuffer = null;
+    let sourceNode = null;
+    let isPlaying = false;
+    let startTime = 0;
+    let pauseTime = 0;
+    let fileMode = false;
+    
+    // ============ PRIME COLORS ============
+    const primeHues = {
+      2: 0,      // Red (octave neutral)
+      3: 35,     // Orange
+      5: 170,    // Cyan
+      7: 280,    // Purple
+      11: 55,    // Yellow
+      13: 320,   // Pink/Magenta
+      17: 200,   // Blue
+      19: 100,   // Green
+    };
+    
+    function getPrimeFactors(n) {
+      const factors = {};
+      let num = Math.abs(n);
+      for (let p = 2; p * p <= num; p++) {
+        while (num % p === 0) {
+          factors[p] = (factors[p] || 0) + 1;
+          num /= p;
+        }
+      }
+      if (num > 1) factors[num] = (factors[num] || 0) + 1;
+      return factors;
+    }
+    
+    function getColorForRatio(ratio) {
+      const label = ratio.label;
+      
+      let num = 1, den = 1;
+      if (label.includes('/')) {
+        [num, den] = label.split('/').map(Number);
+      }
+      
+      const numFactors = getPrimeFactors(num);
+      const denFactors = getPrimeFactors(den);
+      
+      // Build factor map: positive = numerator (harmonic), negative = denominator (subharmonic)
+      const allFactors = { ...numFactors };
+      for (const [p, count] of Object.entries(denFactors)) {
+        allFactors[p] = (allFactors[p] || 0) - count;
+      }
+      
+      delete allFactors[2]; // Octave neutral
+      
+      if (Object.keys(allFactors).length === 0) {
+        return { h: 0, s: 0, l: 95, type: 'neutral' }; // White for unison/octave
+      }
+      
+      // Determine if overall harmonic (positive) or subharmonic (negative)
+      let harmonicWeight = 0;
+      let subharmonicWeight = 0;
+      let totalWeight = 0;
+      let hueSum = 0;
+      let maxPrime = 2;
+      
+      for (const [p, count] of Object.entries(allFactors)) {
+        const prime = parseInt(p);
+        const weight = Math.abs(count);
+        const hue = primeHues[prime] || (prime * 37) % 360;
+        
+        hueSum += hue * weight;
+        totalWeight += weight;
+        if (prime > maxPrime) maxPrime = prime;
+        
+        // Track harmonic vs subharmonic balance
+        if (count > 0) {
+          harmonicWeight += weight;
+        } else {
+          subharmonicWeight += weight;
+        }
+      }
+      
+      const avgHue = totalWeight > 0 ? hueSum / totalWeight : 0;
+      const complexity = Math.log2(maxPrime);
+      
+      // Determine type based on dominant direction
+      const isHarmonic = harmonicWeight > subharmonicWeight;
+      const isMixed = harmonicWeight > 0 && subharmonicWeight > 0;
+      
+      let hue, saturation, lightness;
+      
+      if (isHarmonic) {
+        // Harmonic (overtone): warmer, more saturated, brighter
+        hue = (avgHue - 10 + 360) % 360; // Shift slightly warm
+        saturation = Math.max(50, 85 - complexity * 6);
+        lightness = 72;
+      } else {
+        // Subharmonic (undertone): cooler, less saturated, slightly darker
+        hue = (avgHue + 15) % 360; // Shift cooler
+        saturation = Math.max(35, 65 - complexity * 6);
+        lightness = 62;
+      }
+      
+      // Mixed ratios (like 15/8 = 3*5/2³) get intermediate treatment
+      if (isMixed) {
+        saturation = Math.max(40, saturation - 10);
+        lightness = 67;
+      }
+      
+      return { 
+        h: hue, 
+        s: saturation, 
+        l: lightness, 
+        type: isHarmonic ? 'harmonic' : 'subharmonic',
+        mixed: isMixed
+      };
+    }
+    
+    function hslToString(hsl, alpha = 1) {
+      return `hsla(${hsl.h}, ${hsl.s}%, ${hsl.l}%, ${alpha})`;
+    }
+    
+    // ============ OPTIMIZED YIN PITCH DETECTION ============
+    // Based on de Cheveigné & Kawahara with early-exit optimization
+    function yinDetect(buffer, sampleRate) {
+      const threshold = 0.15;
+      const bufferSize = buffer.length;
+      const halfBuffer = Math.floor(bufferSize / 2);
+      
+      // Step 1: RMS silence gate (lowered for sensitivity)
+      let rms = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        rms += buffer[i] * buffer[i];
+      }
+      rms = Math.sqrt(rms / bufferSize);
+      if (rms < 0.005) return { freq: -1, probability: 0 };
+      
+      // Step 2: Difference function with running sum optimization
+      const yinBuffer = new Float32Array(halfBuffer);
+      let runningSum = 0;
+      
+      yinBuffer[0] = 1;
+      
+      for (let tau = 1; tau < halfBuffer; tau++) {
+        let diff = 0;
+        for (let i = 0; i < halfBuffer; i++) {
+          const delta = buffer[i] - buffer[i + tau];
+          diff += delta * delta;
+        }
+        yinBuffer[tau] = diff;
+        
+        // Step 3: Cumulative mean normalized difference (inline)
+        runningSum += diff;
+        yinBuffer[tau] = yinBuffer[tau] * tau / runningSum;
+      }
+      
+      // Step 4: Absolute threshold with early exit optimization
+      // IMPROVED: Check for fundamental preference (avoid octave errors)
+      let tauEstimate = -1;
+      let minVal = 1;
+      let foundBelow = false;
+      let candidates = []; // Store all good candidates
+      
+      for (let tau = 2; tau < halfBuffer; tau++) {
+        if (yinBuffer[tau] < threshold) {
+          foundBelow = true;
+          candidates.push({ tau, val: yinBuffer[tau] });
+          if (yinBuffer[tau] < minVal) {
+            minVal = yinBuffer[tau];
+            tauEstimate = tau;
+          }
+        } else if (foundBelow && yinBuffer[tau] > threshold * 2) {
+          // Early exit: CMND is rising significantly after finding minimum below threshold
+          break;
+        }
+      }
+      
+      // OCTAVE ERROR CORRECTION: Prefer higher tau (lower frequency / fundamental)
+      // if there's a candidate at ~2x tau that's almost as good
+      if (candidates.length > 1 && tauEstimate > 0) {
+        for (const cand of candidates) {
+          // Check if this candidate is roughly 2x our best tau (would be the fundamental)
+          const ratio = cand.tau / tauEstimate;
+          if (ratio > 1.9 && ratio < 2.1) {
+            // It's at double tau (half frequency) - likely the true fundamental
+            // Accept it if it's within 50% as good
+            if (cand.val < minVal * 1.5) {
+              tauEstimate = cand.tau;
+              minVal = cand.val;
+              break;
+            }
+          }
+        }
+      }
+      
+      // Fallback: find absolute minimum if nothing below threshold
+      if (tauEstimate === -1) {
+        minVal = yinBuffer[2];
+        tauEstimate = 2;
+        for (let tau = 3; tau < halfBuffer; tau++) {
+          if (yinBuffer[tau] < minVal) {
+            minVal = yinBuffer[tau];
+            tauEstimate = tau;
+          }
+        }
+        // Only use if reasonably confident
+        if (minVal > 0.5) {
+          return { freq: -1, probability: 0 };
+        }
+      }
+      
+      // Step 5: Parabolic interpolation for sub-sample accuracy
+      let betterTau = tauEstimate;
+      
+      if (tauEstimate > 0 && tauEstimate < halfBuffer - 1) {
+        const s0 = yinBuffer[tauEstimate - 1];
+        const s1 = yinBuffer[tauEstimate];
+        const s2 = yinBuffer[tauEstimate + 1];
+        
+        const denom = 2 * (2 * s1 - s2 - s0);
+        if (Math.abs(denom) > 0.0001) {
+          const adjustment = (s2 - s0) / denom;
+          if (Math.abs(adjustment) < 1) {
+            betterTau = tauEstimate + adjustment;
+          }
+        }
+      }
+      
+      const freq = sampleRate / betterTau;
+      const probability = 1 - minVal;
+      
+      return { freq, probability };
+    }
+    
+    // ============ RATIO PARSING ============
+    // Semitone labels for 12-EDO markers
+    const semitoneLabels = ['P1', 'm2', 'M2', 'm3', 'M3', 'P4', 'TT', 'P5', 'm6', 'M6', 'm7', 'M7', 'P8'];
+    
+    function parseRatios(text) {
+      const parts = text.trim().split(/[\s,\n]+/);
+      const ratios = [];
+      
+      for (const part of parts) {
+        if (!part) continue;
+        
+        if (part.includes('/')) {
+          // JI Ratio: 5/4, 3/2, etc.
+          const [num, den] = part.split('/').map(Number);
+          if (!isNaN(num) && !isNaN(den) && den !== 0) {
+            const ratio = num / den;
+            ratios.push({ 
+              ratio: ratio, 
+              label: part,
+              cents: 1200 * Math.log2(ratio),
+              color: getColorForRatio({ label: part }),
+              type: 'ji'
+            });
+          }
+        } else if (part.toLowerCase().endsWith('c')) {
+          // Cents value: 386c, 702c, etc.
+          const cents = parseFloat(part);
+          if (!isNaN(cents)) {
+            ratios.push({
+              ratio: Math.pow(2, cents / 1200),
+              label: part,
+              cents: cents,
+              color: { h: 0, s: 0, l: 70 },
+              type: 'cents'
+            });
+          }
+        } else {
+          const val = parseFloat(part);
+          // Check if it's an integer 0-24 (semitone marker)
+          if (!isNaN(val) && Number.isInteger(val) && val >= 0 && val <= 24 && !part.includes('.')) {
+            // 12-EDO semitone marker
+            const cents = val * 100;
+            const semitoneIndex = val % 12;
+            const octave = Math.floor(val / 12);
+            let label = semitoneLabels[semitoneIndex] || `${val}`;
+            if (octave > 0 && semitoneIndex !== 0) label = semitoneLabels[semitoneIndex];
+            
+            ratios.push({
+              ratio: Math.pow(2, cents / 1200),
+              label: label,
+              cents: cents,
+              color: { h: 0, s: 0, l: 55 },  // Grey for 12-EDO markers
+              type: 'edo'
+            });
+          } else if (!isNaN(val) && val > 0) {
+            // Decimal ratio
+            ratios.push({
+              ratio: val,
+              label: val.toFixed(3),
+              cents: 1200 * Math.log2(val),
+              color: { h: 0, s: 0, l: 70 },
+              type: 'decimal'
+            });
+          }
+        }
+      }
+      
+      ratios.sort((a, b) => a.cents - b.cents);
+      return ratios;
+    }
+    
+    // ============ DRONE TONE GENERATOR ============
+    // Completely separate audio context for clean playback
+    let droneAudioCtx = null;
+    let droneMasterGain = null;
+    let droneDCBlock = null;
+    let droneLimiter = null;
+    
+    function initDroneAudio() {
+      if (droneAudioCtx) return;
+      
+      droneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      
+      // Master gain
+      droneMasterGain = droneAudioCtx.createGain();
+      droneMasterGain.gain.value = 0.3;
+      
+      // DC blocker - removes DC offset and subsonics
+      droneDCBlock = droneAudioCtx.createBiquadFilter();
+      droneDCBlock.type = 'highpass';
+      droneDCBlock.frequency.value = 10;
+      droneDCBlock.Q.value = 0.7;
+      
+      // Safety limiter - prevents hard clipping
+      droneLimiter = droneAudioCtx.createDynamicsCompressor();
+      droneLimiter.threshold.value = -6;
+      droneLimiter.ratio.value = 20;
+      droneLimiter.attack.value = 0.003;
+      droneLimiter.release.value = 0.05;
+      
+      // Chain: [oscillators] -> dcBlock -> limiter -> masterGain -> destination
+      droneDCBlock.connect(droneLimiter);
+      droneLimiter.connect(droneMasterGain);
+      droneMasterGain.connect(droneAudioCtx.destination);
+    }
+    
+    function toggleDrone(ratio) {
+      const label = ratio.label;
+      const freq = config.refFreq * ratio.ratio;
+      
+      // If already playing, stop it
+      if (droneOscillators[label]) {
+        stopDrone(label);
+        updateStopButtonVisibility();
+        return;
+      }
+      
+      // Initialize audio system
+      initDroneAudio();
+      
+      // Resume if suspended (autoplay policy)
+      if (droneAudioCtx.state === 'suspended') {
+        droneAudioCtx.resume();
+      }
+      
+      const now = droneAudioCtx.currentTime;
+      
+      // Create oscillator
+      const osc = droneAudioCtx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+      
+      // Individual gain for this voice
+      const gain = droneAudioCtx.createGain();
+      gain.gain.setValueAtTime(0, now);
+      
+      // Connect to shared processing chain
+      osc.connect(gain);
+      gain.connect(droneDCBlock);
+      
+      // Delayed start for zero-phase alignment + short ramp to avoid transient
+      const startDelay = 0.01;
+      osc.start(now + startDelay);
+      gain.gain.setValueAtTime(0, now + startDelay);
+      gain.gain.linearRampToValueAtTime(0.12, now + startDelay + 0.02);
+      
+      droneOscillators[label] = { osc, gain, freq };
+      
+      updateStopButtonVisibility();
+      draw();
+    }
+    
+    function updateStopButtonVisibility() {
+      const btn = document.getElementById('stopDronesBtn');
+      const hasDrones = Object.keys(droneOscillators).length > 0;
+      btn.style.display = hasDrones ? 'block' : 'none';
+    }
+    
+    function stopDrone(label) {
+      if (droneOscillators[label]) {
+        const { osc, gain } = droneOscillators[label];
+        
+        const now = droneAudioCtx.currentTime;
+        
+        // Clean fade out
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.setValueAtTime(gain.gain.value, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.02);
+        
+        // Stop and cleanup after fade
+        setTimeout(() => {
+          try {
+            osc.stop();
+            osc.disconnect();
+            gain.disconnect();
+          } catch(e) {}
+        }, 50);
+        
+        delete droneOscillators[label];
+        draw();
+      }
+    }
+    
+    function stopAllDrones() {
+      for (const label of Object.keys(droneOscillators)) {
+        stopDrone(label);
+      }
+      updateStopButtonVisibility();
+    }
+    
+    function handleCanvasClick(event) {
+      const canvas = document.getElementById('rulerCanvas');
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      
+      // Check if click is near any ratio line
+      const rulerX = rect.width * config.rulerX;
+      
+      // Only respond to clicks in the ratio area (left side of ruler)
+      if (x > rulerX + 50) return;
+      
+      // Find which ratio was clicked (within 20px of line)
+      for (const ratio of config.ratios) {
+        const ratioY = droneRatioYPositions[ratio.label];
+        if (ratioY !== undefined && Math.abs(y - ratioY) < 20) {
+          toggleDrone(ratio);
+          return;
+        }
+      }
+    }
+    
+    // ============ DRAWING ============
+    function draw() {
+      const canvas = document.getElementById('rulerCanvas');
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const targetWidth = rect.width * dpr;
+      const targetHeight = rect.height * dpr;
+      
+      // Canvas resize optimization: only reset backing store on actual resize
+      if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        canvas.style.width = rect.width + 'px';
+        canvas.style.height = rect.height + 'px';
+      }
+      
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      
+      const W = rect.width;
+      const H = rect.height;
+      
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, W, H);
+      
+      if (config.ratios.length === 0) return;
+      
+      const minCents = config.ratios[0].cents;
+      const maxCents = config.ratios[config.ratios.length - 1].cents;
+      const centsRange = maxCents - minCents;
+      
+      const paddingCents = centsRange * 0.08;
+      const displayMin = minCents - paddingCents;
+      const displayMax = maxCents + paddingCents;
+      
+      const padding = 60;
+      const rulerTop = padding;
+      const rulerBottom = H - padding;
+      const rulerHeight = rulerBottom - rulerTop;
+      const rulerX = W * config.rulerX;
+      
+      function centsToY(cents) {
+        const normalized = (cents - displayMin) / (displayMax - displayMin);
+        return rulerBottom - normalized * rulerHeight;
+      }
+      
+      // Determine display pitch (with smooth fade and grey-out)
+      let displayCents = null;
+      let displayFreq = null;
+      let displayProbability = 0;
+      let isActive = false;  // Is there currently valid pitch input?
+      
+      const now = performance.now();
+      const timeSinceLastPitch = now - lastPitchTime;
+      
+      // Active pitch detection (200ms window for smoother tracking)
+      if (smoothedCents !== null && timeSinceLastPitch < 200) {
+        displayCents = smoothedCents;
+        displayFreq = smoothedFreq;
+        displayProbability = currentProbability;
+        isActive = true;
+        lastDisplayCents = smoothedCents;
+        lastDisplayFreq = smoothedFreq;
+      } 
+      // Recent pitch - fade but stay visible
+      else if (lastDisplayCents !== null) {
+        displayCents = lastDisplayCents;
+        displayFreq = lastDisplayFreq;
+        // Fade probability over 500ms
+        const fadeTime = 500;
+        if (timeSinceLastPitch < fadeTime) {
+          displayProbability = Math.max(0, 1 - (timeSinceLastPitch / fadeTime));
+        } else {
+          displayProbability = 0;
+        }
+        isActive = false;
+      }
+      
+      // Smooth opacity transitions
+      const targetOpacity = isActive ? Math.min(1, currentProbability * 1.2) : displayProbability * 0.5;
+      indicatorOpacity += (targetOpacity - indicatorOpacity) * 0.2;
+      
+      // Apply octave wrap for DISPLAY purposes only
+      let wrappedCents = displayCents;
+      if (config.octaveWrap && displayCents !== null && config.ratios.length >= 2) {
+        const minCents = config.ratios[0].cents;
+        const maxCents = config.ratios[config.ratios.length - 1].cents;
+        
+        while (wrappedCents < minCents - 50) wrappedCents += 1200;
+        while (wrappedCents > maxCents + 50) wrappedCents -= 1200;
+      }
+      
+      // Find nearest ratio (use wrapped cents for matching)
+      let nearestRatio = null;
+      let nearestDiff = Infinity;
+      
+      if (wrappedCents !== null) {
+        for (const ratio of config.ratios) {
+          const diff = Math.abs(ratio.cents - wrappedCents);
+          if (diff < nearestDiff) {
+            nearestDiff = diff;
+            nearestRatio = ratio;
+          }
+        }
+      }
+      
+      // Use wrappedCents for all display from here on
+      displayCents = wrappedCents;
+      
+      // Draw 12-EDO reference lines (behind JI ratios)
+      if (config.show12EDO) {
+        // Find which semitones fall within display range
+        const startSemitone = Math.floor(displayMin / 100);
+        const endSemitone = Math.ceil(displayMax / 100);
+        
+        // Check if we're in custom mode (no preset selected)
+        const isCustomMode = !document.getElementById('refPreset').value;
+        
+        // Position for 12-EDO labels (adjustable via slider)
+        const edoLabelX = rulerX - 95 - (config.edoOffset * 100);
+        
+        ctx.setLineDash([4, 6]);
+        
+        for (let semi = startSemitone; semi <= endSemitone; semi++) {
+          const cents = semi * 100;
+          if (cents < displayMin || cents > displayMax) continue;
+          
+          const y = centsToY(cents);
+          
+          // Full-width dashed line - MORE VISIBLE
+          ctx.strokeStyle = 'rgba(70, 70, 70, 0.7)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(W, y);
+          ctx.stroke();
+          
+          // Label: note name or scale degree (position controlled by slider)
+          ctx.fillStyle = 'rgba(100, 100, 100, 1)';
+          ctx.font = '11px system-ui';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'middle';
+          
+          let label;
+          if (isCustomMode) {
+            // Scale degree notation for custom Hz
+            const degree = ((semi % 12) + 12) % 12;
+            const degreeNames = ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'];
+            label = degreeNames[degree];
+          } else {
+            // Note name for preset notes
+            const noteInfo = getNoteAtCents(cents, config.refNote);
+            label = `${noteInfo.name}${noteInfo.octave}`;
+          }
+          
+          ctx.fillText(label, edoLabelX, y);
+        }
+        
+        ctx.setLineDash([]);
+      }
+      
+      // Draw ratio lines with SMOOTH animation
+      for (const ratio of config.ratios) {
+        const y = centsToY(ratio.cents);
+        const isNearest = (nearestRatio === ratio && nearestDiff < 25);
+        const isDroneActive = droneOscillators[ratio.label] !== undefined;
+        
+        // Store Y position for click detection
+        droneRatioYPositions[ratio.label] = y;
+        
+        // Initialize extension tracking if needed
+        if (ratioExtensions[ratio.label] === undefined) {
+          ratioExtensions[ratio.label] = 0;
+        }
+        
+        // Target extension: 1 if nearest, 0 otherwise
+        const targetExtension = isNearest ? 1 : 0;
+        
+        // Smooth interpolation (ease toward target)
+        const extensionSpeed = 0.15;  // How fast to animate
+        ratioExtensions[ratio.label] += (targetExtension - ratioExtensions[ratio.label]) * extensionSpeed;
+        const ext = ratioExtensions[ratio.label];
+        
+        const color = ratio.color;
+        // Subtle brightness boost when drone is active
+        const droneBoost = isDroneActive ? 0.12 : 0;
+        const alpha = 0.85 + ext * 0.15 + droneBoost;
+        const colorStr = hslToString(color, alpha);
+        
+        // Smooth line extension
+        const lineLeft = rulerX - 50 - (ext * 30);
+        const lineRight = rulerX + 25;
+        
+        // Smooth line width
+        const lineWidth = 1.5 + ext * 1.5;
+        
+        ctx.strokeStyle = colorStr;
+        ctx.lineWidth = lineWidth;
+        ctx.beginPath();
+        ctx.moveTo(lineLeft, y);
+        ctx.lineTo(lineRight, y);
+        ctx.stroke();
+        
+        // Smooth font size
+        const fontSize = 15 + ext * 3;
+        const fontWeight = ext > 0.5 ? 'bold' : 'normal';
+        
+        ctx.fillStyle = colorStr;
+        ctx.font = `${fontWeight} ${fontSize}px system-ui`;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(ratio.label, lineLeft - 12, y);
+        
+        if (config.showHz) {
+          const hz = config.refFreq * ratio.ratio;
+          ctx.font = '11px system-ui';
+          ctx.textAlign = 'left';
+          const hzAlpha = 0.35 + ext * 0.55 + droneBoost;
+          ctx.fillStyle = hslToString(color, hzAlpha);
+          ctx.fillText(`${hz.toFixed(1)}`, rulerX + 35, y);
+        }
+        
+        if (config.showCents) {
+          ctx.font = '10px system-ui';
+          ctx.fillStyle = 'rgba(255,255,255,0.25)';
+          // Position cents right after Hz (closer together)
+          const centsX = config.showHz ? rulerX + 75 : rulerX + 35;
+          ctx.fillText(`${ratio.cents.toFixed(0)}¢`, centsX, y);
+        }
+      }
+      
+      // Ghost trail
+      if (config.showGhost && ghostTrail.length > 0) {
+        for (let i = 0; i < ghostTrail.length; i++) {
+          const ghost = ghostTrail[i];
+          const age = ghostTrail.length - i;
+          const alpha = Math.pow(1 - age / config.ghostLength, 1.5) * 0.5;
+          const size = 10 - age * 0.3;
+          
+          if (ghost.cents >= displayMin && ghost.cents <= displayMax && size > 2) {
+            const y = centsToY(ghost.cents);
+            
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.4})`;
+            ctx.beginPath();
+            ctx.arc(rulerX, y, size + 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+            ctx.beginPath();
+            ctx.arc(rulerX, y, size / 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+      
+      // Current pitch indicator - TARGETING CROSSHAIR with smooth fade/grey-out
+      // Always try to render if we have any position data
+      if (displayCents !== null && displayFreq !== null) {
+        const targetY = centsToY(displayCents);
+        
+        // Smooth Y position interpolation
+        if (indicatorY === null) {
+          indicatorY = targetY;
+        } else {
+          indicatorY += (targetY - indicatorY) * 0.25;  // Smooth follow
+        }
+        
+        const y = indicatorY;
+        
+        // Only add to ghost trail when actively tracking
+        if (isActive && now - lastGhostTime > 40 && displayProbability > 0.3) {
+          ghostTrail.push({ cents: displayCents, time: now });
+          if (ghostTrail.length > config.ghostLength) {
+            ghostTrail.shift();
+          }
+          lastGhostTime = now;
+        }
+        
+        // Use smoothed indicatorOpacity for all rendering
+        const alpha = indicatorOpacity;
+        
+        // Skip drawing if fully faded
+        if (alpha < 0.02) return;
+        
+        // Proximity-based intensity (for lock-on effect) - only when active
+        const targetProximity = (nearestRatio && isActive) ? Math.max(0, 1 - nearestDiff / 50) : 0;
+        
+        // Smooth proximity transitions (slower ease for gentle lock-on feel)
+        smoothedProximity += (targetProximity - smoothedProximity) * 0.12;
+        const prox = smoothedProximity;
+        
+        // Lock threshold with hysteresis
+        const isLockedOn = prox > 0.75 && isActive;
+        
+        // Crosshair parameters - all smoothly animated
+        const baseSize = 16;
+        const bracketSize = baseSize - (prox * 5);
+        const bracketLength = 6 + (prox * 3);
+        const bracketThickness = 1.5 + (prox * 0.5);  // Smooth thickness
+        const armLength = 25 + (prox * 15);
+        
+        // Color: smooth blend from white → red based on proximity
+        let crosshairColor;
+        if (!isActive) {
+          // Greyed out - signal lost
+          crosshairColor = `rgba(100, 100, 100, ${alpha * 0.7})`;
+        } else {
+          // Blend white to red based on smoothed proximity
+          const r = Math.round(255 - (51 * prox));   // 255 → 204
+          const g = Math.round(255 - (187 * prox));  // 255 → 68
+          const b = Math.round(255 - (187 * prox));  // 255 → 68
+          crosshairColor = `rgba(${r}, ${g}, ${b}, ${alpha * (0.9 + prox * 0.1)})`;
+        }
+        
+        ctx.strokeStyle = crosshairColor;
+        ctx.lineWidth = bracketThickness;
+        ctx.lineCap = 'square';
+        
+        // Four corner brackets
+        ctx.beginPath();
+        ctx.moveTo(rulerX - bracketSize, y - bracketSize + bracketLength);
+        ctx.lineTo(rulerX - bracketSize, y - bracketSize);
+        ctx.lineTo(rulerX - bracketSize + bracketLength, y - bracketSize);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(rulerX + bracketSize - bracketLength, y - bracketSize);
+        ctx.lineTo(rulerX + bracketSize, y - bracketSize);
+        ctx.lineTo(rulerX + bracketSize, y - bracketSize + bracketLength);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(rulerX - bracketSize, y + bracketSize - bracketLength);
+        ctx.lineTo(rulerX - bracketSize, y + bracketSize);
+        ctx.lineTo(rulerX - bracketSize + bracketLength, y + bracketSize);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(rulerX + bracketSize - bracketLength, y + bracketSize);
+        ctx.lineTo(rulerX + bracketSize, y + bracketSize);
+        ctx.lineTo(rulerX + bracketSize, y + bracketSize - bracketLength);
+        ctx.stroke();
+        
+        // Horizontal arms - smooth line width
+        ctx.lineWidth = 1 + (prox * 1);
+        ctx.beginPath();
+        ctx.moveTo(rulerX - bracketSize - 6, y);
+        ctx.lineTo(rulerX - bracketSize - 6 - armLength, y);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(rulerX + bracketSize + 6, y);
+        ctx.lineTo(rulerX + bracketSize + 6 + armLength, y);
+        ctx.stroke();
+        
+        // Center dot - morphs from circle to square based on proximity
+        const dotSize = 2 + (prox * 1);
+        const cornerRadius = 2 * (1 - prox);  // Circle when prox=0, square when prox=1
+        ctx.fillStyle = crosshairColor;
+        ctx.beginPath();
+        if (cornerRadius < 0.5) {
+          // Near-square
+          ctx.fillRect(rulerX - dotSize, y - dotSize, dotSize * 2, dotSize * 2);
+        } else {
+          // Circle/rounded
+          ctx.arc(rulerX, y, dotSize, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        
+        // Tick marks on arms - fade with activity
+        ctx.lineWidth = 1;
+        const tickAlpha = isActive ? alpha * (0.3 + prox * 0.2) : alpha * 0.2;
+        ctx.strokeStyle = isActive 
+          ? `rgba(255, 255, 255, ${tickAlpha})`
+          : `rgba(100, 100, 100, ${tickAlpha})`;
+        for (let i = 1; i <= 2; i++) {
+          const tickX = bracketSize + 6 + (armLength / 3) * i;
+          ctx.beginPath();
+          ctx.moveTo(rulerX - tickX, y - 2);
+          ctx.lineTo(rulerX - tickX, y + 2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(rulerX + tickX, y - 2);
+          ctx.lineTo(rulerX + tickX, y + 2);
+          ctx.stroke();
+        }
+        
+        // Hz readout
+        if (config.showIndicatorHz) {
+          ctx.fillStyle = isActive 
+            ? `rgba(255, 255, 255, ${alpha})`
+            : `rgba(100, 100, 100, ${alpha * 0.7})`;
+          ctx.font = 'bold 22px system-ui';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(`${displayFreq.toFixed(1)} Hz`, rulerX, y - bracketSize - 6);
+        }
+        
+        // Deviation info
+        if (nearestRatio && nearestDiff < 50 && (config.showIndicatorDeviation || config.showIndicatorRatio)) {
+          const deviation = displayCents - nearestRatio.cents;
+          const sign = deviation >= 0 ? '+' : '';
+          
+          ctx.font = '12px system-ui';
+          if (!isActive) {
+            ctx.fillStyle = `rgba(100, 100, 100, ${alpha * 0.7})`;
+          } else {
+            // Blend from ratio color toward red based on proximity
+            const ratioColor = nearestRatio.color;
+            // Convert HSL to approximate RGB for blending
+            const baseH = ratioColor.h;
+            const targetH = 0;  // Red
+            const blendedH = baseH + (targetH - baseH) * prox * 0.8;
+            const blendedS = ratioColor.s + (80 - ratioColor.s) * prox;
+            const blendedL = ratioColor.l + (50 - ratioColor.l) * prox * 0.5;
+            ctx.fillStyle = `hsla(${blendedH}, ${blendedS}%, ${blendedL}%, ${alpha * 0.85})`;
+          }
+          ctx.textBaseline = 'top';
+          
+          let infoText = '';
+          if (config.showIndicatorRatio && config.showIndicatorDeviation) {
+            infoText = `${nearestRatio.label}  ${sign}${deviation.toFixed(1)}¢`;
+          } else if (config.showIndicatorRatio) {
+            infoText = nearestRatio.label;
+          } else if (config.showIndicatorDeviation) {
+            infoText = `${sign}${deviation.toFixed(1)}¢`;
+          }
+          
+          ctx.fillText(infoText, rulerX, y + bracketSize + 8);
+        }
+      }
+    }
+    
+    // ============ AUDIO LOOP (30fps pitch detection, 60fps render) ============
+    function audioLoop() {
+      if (!analyser) return;
+      if (!isListening && !isPlaying) return;
+      
+      const now = performance.now();
+      
+      // Run pitch detection at ~30fps for CPU efficiency
+      const detectInterval = 33; // ~30fps
+      if (now - lastDetectTime >= detectInterval) {
+        lastDetectTime = now;
+        
+        const bufferLength = analyser.fftSize;
+        const buffer = new Float32Array(bufferLength);
+        analyser.getFloatTimeDomainData(buffer);
+        
+        const result = yinDetect(buffer, audioContext.sampleRate);
+        
+        if (result.freq > 50 && result.freq < 2000 && result.probability > 0.5) {
+          // Convert to cents (NO octave wrap here - that happens at display time)
+          let rawCents = 1200 * Math.log2(result.freq / config.refFreq);
+          
+          // FIXED: Both smoothing AND responsiveness now affect the alpha
+          // responsiveness: base tracking speed (1-10)
+          // smoothing: additional stability (1-15, higher = more stable)
+          const baseAlpha = 0.03 + (config.responsiveness / 10) * 0.25;
+          const smoothingFactor = 16 / (config.smoothing + 1); // Inverted: higher smoothing = lower factor
+          const alpha = Math.max(0.005, baseAlpha * Math.min(1, smoothingFactor)); // Clamp to prevent "stuck" at extremes
+          
+          if (smoothedFreq === null) {
+            smoothedFreq = result.freq;
+            smoothedCents = rawCents;
+          } else {
+            // Frequency smoothing
+            smoothedFreq += (result.freq - smoothedFreq) * alpha;
+            
+            // Cents smoothing - allow full range, no artificial wrapping
+            smoothedCents += (rawCents - smoothedCents) * alpha;
+          }
+          
+          currentProbability = result.probability;
+          lastPitchTime = now;
+          lastValidPitch = {
+            freq: smoothedFreq,
+            cents: smoothedCents,
+            probability: result.probability
+          };
+        }
+      }
+      
+      // Update time display for file mode
+      if (fileMode && isPlaying && audioBuffer) {
+        const currentTime = audioContext.currentTime - startTime;
+        const duration = audioBuffer.duration;
+        updateTimeDisplay(currentTime, duration);
+        document.getElementById('seekBar').value = (currentTime / duration) * 100;
+        
+        if (currentTime >= duration) {
+          stopFilePlayback();
+        }
+      }
+      
+      // Always render at 60fps for smooth visuals
+      draw();
+      animationId = requestAnimationFrame(audioLoop);
+    }
+    
+    // ============ FILE UPLOAD HANDLING ============
+    async function handleFileUpload(file) {
+      if (!file) return;
+      
+      if (isListening) await toggleListening();
+      if (isPlaying) stopFilePlayback();
+      
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        
+        fileMode = true;
+        document.getElementById('playbackControls').style.display = 'block';
+        document.getElementById('startBtn').style.display = 'none';
+        
+        updateTimeDisplay(0, audioBuffer.duration);
+        
+      } catch (err) {
+        console.error('Error loading audio file:', err);
+        alert('Could not load audio file. Make sure it\'s a valid audio format.');
+      }
+    }
+    
+    function startFilePlayback() {
+      if (!audioBuffer || !audioContext) return;
+      
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+      
+      sourceNode = audioContext.createBufferSource();
+      sourceNode.buffer = audioBuffer;
+      
+      // Handle playback ending (edge case: WebAudio fires ended before time check)
+      sourceNode.onended = () => {
+        if (isPlaying) stopFilePlayback();
+      };
+      
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 4096;  // Larger buffer for better low-freq detection
+      
+      sourceNode.connect(analyser);
+      analyser.connect(audioContext.destination);
+      
+      const offset = pauseTime;
+      sourceNode.start(0, offset);
+      startTime = audioContext.currentTime - offset;
+      
+      isPlaying = true;
+      document.getElementById('playPauseBtn').textContent = 'Pause';
+      
+      smoothedFreq = null;
+      smoothedCents = null;
+      ghostTrail = [];
+      lastDetectTime = 0;
+      
+      audioLoop();
+    }
+    
+    function stopFilePlayback() {
+      if (sourceNode) {
+        sourceNode.stop();
+        sourceNode.disconnect();
+        sourceNode = null;
+      }
+      
+      if (isPlaying) {
+        pauseTime = audioContext.currentTime - startTime;
+      }
+      
+      isPlaying = false;
+      document.getElementById('playPauseBtn').textContent = 'Play';
+      
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+    }
+    
+    function toggleFilePlayback() {
+      if (isPlaying) {
+        stopFilePlayback();
+      } else {
+        startFilePlayback();
+      }
+    }
+    
+    function seekTo(percent) {
+      if (!audioBuffer) return;
+      
+      const wasPlaying = isPlaying;
+      if (isPlaying) {
+        stopFilePlayback();
+      }
+      
+      pauseTime = (percent / 100) * audioBuffer.duration;
+      updateTimeDisplay(pauseTime, audioBuffer.duration);
+      
+      smoothedFreq = null;
+      smoothedCents = null;
+      ghostTrail = [];
+      draw();
+      
+      if (wasPlaying) {
+        startFilePlayback();
+      }
+    }
+    
+    function updateTimeDisplay(current, total) {
+      const formatTime = (t) => {
+        const mins = Math.floor(t / 60);
+        const secs = Math.floor(t % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+      };
+      document.getElementById('timeDisplay').textContent = `${formatTime(current)} / ${formatTime(total)}`;
+    }
+    
+    function clearFile() {
+      if (isPlaying) stopFilePlayback();
+      
+      audioBuffer = null;
+      sourceNode = null;
+      pauseTime = 0;
+      fileMode = false;
+      
+      document.getElementById('playbackControls').style.display = 'none';
+      document.getElementById('startBtn').style.display = 'block';
+      document.getElementById('audioFile').value = '';
+      
+      smoothedFreq = null;
+      smoothedCents = null;
+      lastPitchTime = 0;  // Trigger fade
+      
+      // Animate fade-out
+      fadeOutIndicator();
+    }
+    
+    // ============ CONTROLS ============
+    async function toggleListening() {
+      const btn = document.getElementById('startBtn');
+      
+      if (!isListening) {
+        try {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false
+            } 
+          });
+          const source = audioContext.createMediaStreamSource(stream);
+          analyser = audioContext.createAnalyser();
+          analyser.fftSize = 4096;  // Larger buffer for better low-freq detection
+          source.connect(analyser);
+          
+          isListening = true;
+          btn.textContent = 'Stop';
+          btn.classList.add('listening');
+          lastDetectTime = 0;
+          audioLoop();
+        } catch (err) {
+          console.error('Microphone error:', err);
+          alert('Could not access microphone.');
+        }
+      } else {
+        isListening = false;
+        if (animationId) cancelAnimationFrame(animationId);
+        if (audioContext) audioContext.close();
+        audioContext = null;
+        analyser = null;
+        smoothedFreq = null;
+        smoothedCents = null;
+        // Don't clear lastDisplayCents/lastDisplayFreq - let indicator fade out
+        lastPitchTime = 0;  // Trigger fade
+        
+        btn.textContent = 'Start Listening';
+        btn.classList.remove('listening');
+        
+        // Animate fade-out
+        fadeOutIndicator();
+      }
+    }
+    
+    function fadeOutIndicator() {
+      // Keep drawing until indicator is fully faded
+      if (indicatorOpacity > 0.01) {
+        draw();
+        requestAnimationFrame(fadeOutIndicator);
+      } else {
+        // Fully faded, reset state
+        indicatorOpacity = 0;
+        smoothedProximity = 0;
+        lastDisplayCents = null;
+        lastDisplayFreq = null;
+        indicatorY = null;
+        ghostTrail = [];
+        draw();
+      }
+    }
+    
+    function updateConfig() {
+      config.refFreq = parseFloat(document.getElementById('refFreq').value) || 116.54;
+      config.ratios = parseRatios(document.getElementById('ratios').value);
+      config.showCents = document.getElementById('showCents').checked;
+      config.showHz = document.getElementById('showHz').checked;
+      config.showGhost = document.getElementById('showGhost').checked;
+      config.octaveWrap = document.getElementById('octaveWrap').checked;
+      config.show12EDO = document.getElementById('show12EDO').checked;
+      config.edoOffset = parseInt(document.getElementById('edoOffset').value) / 100;
+      config.rulerX = document.getElementById('rulerPosition').value / 100;
+      config.smoothing = parseInt(document.getElementById('smoothing').value);
+      config.responsiveness = parseInt(document.getElementById('responsiveness').value);
+      config.showIndicatorHz = document.getElementById('showIndicatorHz').checked;
+      config.showIndicatorDeviation = document.getElementById('showIndicatorDeviation').checked;
+      config.showIndicatorRatio = document.getElementById('showIndicatorRatio').checked;
+      
+      document.getElementById('rulerPosVal').textContent = document.getElementById('rulerPosition').value + '%';
+      document.getElementById('smoothVal').textContent = config.smoothing;
+      document.getElementById('respVal').textContent = config.responsiveness;
+      document.getElementById('edoOffsetVal').textContent = document.getElementById('edoOffset').value + '%';
+      
+      // Show/hide EDO offset slider based on 12-EDO toggle
+      document.getElementById('edoOffsetRow').style.display = config.show12EDO ? 'block' : 'none';
+      
+      smoothedFreq = null;
+      smoothedCents = null;
+      ghostTrail = [];
+      ratioExtensions = {};  // Reset ratio animations
+      smoothedProximity = 0;  // Reset lock-on animation
+      lastDisplayCents = null;
+      lastDisplayFreq = null;
+      indicatorOpacity = 0;  // Will fade back in
+      
+      draw();
+    }
+    
+    function handlePresetChange() {
+      const preset = document.getElementById('refPreset').value;
+      if (preset) {
+        const [freq, note] = preset.split('|');
+        document.getElementById('refFreq').value = freq;
+        config.refFreq = parseFloat(freq);
+        config.refNote = note;
+      }
+      updateConfig();
+    }
+    
+    function handleFreqChange() {
+      // When manually changing Hz, clear preset selection
+      document.getElementById('refPreset').value = '';
+      // Try to find nearest note name for 12-EDO labels
+      const freq = parseFloat(document.getElementById('refFreq').value);
+      if (freq > 0) {
+        // Calculate nearest 12-EDO note (A4 = 440Hz)
+        const semitonesFromA4 = 12 * Math.log2(freq / 440);
+        const nearestSemitone = Math.round(semitonesFromA4);
+        const noteIndex = ((nearestSemitone % 12) + 12 + 9) % 12; // A = index 9
+        const octave = 4 + Math.floor((nearestSemitone + 9) / 12);
+        const noteNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+        config.refNote = noteNames[noteIndex] + octave;
+      }
+      updateConfig();
+    }
+    
+    function init() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('obs') === '1') {
+        document.getElementById('controls').classList.add('hidden');
+        document.getElementById('mobileToggle').style.display = 'none';
+      }
+      
+      // Mobile toggle
+      document.getElementById('mobileToggle').addEventListener('click', () => {
+        const controls = document.getElementById('controls');
+        controls.classList.toggle('mobile-open');
+        document.getElementById('mobileToggle').textContent = 
+          controls.classList.contains('mobile-open') ? '✕ Close' : '☰ Settings';
+      });
+      
+      if (params.get('ref')) {
+        document.getElementById('refFreq').value = params.get('ref');
+      }
+      if (params.get('ratios')) {
+        document.getElementById('ratios').value = decodeURIComponent(params.get('ratios')).replace(/ /g, '\n');
+      }
+      
+      document.getElementById('startBtn').addEventListener('click', toggleListening);
+      document.getElementById('refFreq').addEventListener('input', handleFreqChange);
+      document.getElementById('refPreset').addEventListener('change', handlePresetChange);
+      document.getElementById('ratios').addEventListener('input', updateConfig);
+      document.getElementById('showCents').addEventListener('change', updateConfig);
+      document.getElementById('showHz').addEventListener('change', updateConfig);
+      document.getElementById('showGhost').addEventListener('change', updateConfig);
+      document.getElementById('octaveWrap').addEventListener('change', updateConfig);
+      document.getElementById('show12EDO').addEventListener('change', updateConfig);
+      document.getElementById('edoOffset').addEventListener('input', updateConfig);
+      document.getElementById('rulerPosition').addEventListener('input', updateConfig);
+      document.getElementById('smoothing').addEventListener('input', updateConfig);
+      document.getElementById('responsiveness').addEventListener('input', updateConfig);
+      document.getElementById('showIndicatorHz').addEventListener('change', updateConfig);
+      document.getElementById('showIndicatorDeviation').addEventListener('change', updateConfig);
+      document.getElementById('showIndicatorRatio').addEventListener('change', updateConfig);
+      
+      // Canvas click for drone toggle
+      document.getElementById('rulerCanvas').addEventListener('click', handleCanvasClick);
+      
+      // Stop all drones button
+      document.getElementById('stopDronesBtn').addEventListener('click', stopAllDrones);
+      
+      document.getElementById('audioFile').addEventListener('change', (e) => {
+        if (e.target.files[0]) {
+          handleFileUpload(e.target.files[0]);
+        }
+      });
+      
+      document.getElementById('playPauseBtn').addEventListener('click', toggleFilePlayback);
+      
+      document.getElementById('seekBar').addEventListener('input', (e) => {
+        seekTo(parseFloat(e.target.value));
+      });
+      
+      document.getElementById('clearFileBtn').addEventListener('click', clearFile);
+      
+      document.querySelectorAll('#presets button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.getElementById('ratios').value = btn.dataset.ratios.replace(/ /g, '\n');
+          updateConfig();
+        });
+      });
+      
+      window.addEventListener('resize', () => {
+        // Force canvas resize on window resize
+        lastCanvasWidth = 0;
+        lastCanvasHeight = 0;
+        draw();
+      });
+      
+      updateConfig();
+    }
+    
+    init();
+  </script>
+</body>
+</html>
