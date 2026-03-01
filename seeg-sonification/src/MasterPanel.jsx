@@ -296,34 +296,35 @@ export function MasterPanel({
         onViewChange(viewStart, Math.min(1, Math.max(viewStart + 0.005, x2)));
       }
     };
+    
+const handleMouseUp = (e2) => {
+  const state = interactionRef.current;
 
-    const handleMouseUp = (e2) => {
-      const state = interactionRef.current;
-      
-      if (state && state.type === 'pending' && !state.moved) {
-        onSeek(state.startX);
-      }
-      
-      if (state && state.type === 'drag-select') {
-        const x2 = getX(e2);
-        const left = Math.min(state.startX, x2);
-        const right = Math.max(state.startX, x2);
-        if (right - left < 0.005) {
-          onSeek(state.startX);
-          onViewChange(0, 1);
-        }
-      }
+  if (state && state.type === 'pending' && !state.moved) {
+    onSeek(state.startX);
+  }
 
-      interactionRef.current = null;
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
+  if (state && state.type === 'drag-select') {
+    const x2 = getX(e2);
+    const left = Math.min(state.startX, x2);
+    const right = Math.max(state.startX, x2);
+    if (right - left < 0.005) {
+      onSeek(state.startX);
+      onViewChange(0, 1);
+    } else {
+      onSeek(left);
+    }
+  }
 
+  interactionRef.current = null;
+  window.removeEventListener('mousemove', handleMouseMove);
+  window.removeEventListener('mouseup', handleMouseUp);
+};
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
   }, [viewStart, viewEnd, onViewChange, onSeek]);
 
-  const handleWheel = useCallback((e) => {
+ const handleWheel = useCallback((e) => {
     e.preventDefault();
     const mouseX = getX(e);
     const zoomFactor = e.deltaY > 0 ? 1.15 : 0.85;

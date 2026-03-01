@@ -4,6 +4,11 @@ import { BANDS, computeBandEnvelopes } from './dsp.js';
 import { SonificationEngine, parseRatio, VOICE_MODES, DEFAULT_VOICE_MODE } from './audio.js';
 import { MasterPanel } from './MasterPanel.jsx';
 import { WaveformCanvas } from './WaveformCanvas.jsx';
+import {
+  getShaftColor, getShaftPairColors,
+  setContactColorMap, resetFallbackAssignments,
+} from './atlas-colors.js';
+import { buildContactColorMap } from './electrode-localization.js';
 
 const FONT = "'JetBrains Mono', 'IBM Plex Mono', 'Fira Code', monospace";
 const VOICE_KEYS = Object.keys(VOICE_MODES);
@@ -27,35 +32,173 @@ export default function App() {
   const [isLooping, setIsLooping] = useState(false);
   const [verticalZoom, setVerticalZoom] = useState(1.0);
   const [scaleMode, setScaleMode] = useState('fit');
-  const [voiceModes, setVoiceModes] = useState({});      // { label: 'sine' | ... }
+  const [voiceModes, setVoiceModes] = useState({});
   const [globalVoiceMode, setGlobalVoiceMode] = useState(DEFAULT_VOICE_MODE);
+  const [hasCoordinates, setHasCoordinates] = useState(false);
+  const [showTsvPrompt, setShowTsvPrompt] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [colorVersion, setColorVersion] = useState(0); // bump to force re-render on color change
 
   const engineRef = useRef(new SonificationEngine());
 
-  // ─── Load EDF ─────────────────────────────────────────────
+  // ─── Process loaded files ─────────────────────────────────
+  const processEDF = useCallback((arrayBuffer, name) => {
+    setFileName(name);
+    const edf = parseEDF(arrayBuffer);
+    setEdfData(edf);
+
+    const map = identifyShafts(edf.signals);
+    setShaftMap(map);
+
+    const shaftNames = Object.keys(map).sort();
+    setAvailableShafts(shaftNames);
+
+    // Reset colors for new dataset
+    resetFallbackAssignments();
+    setContactColorMap(null);
+    setHasCoordinates(false);
+
+    if (shaftNames.length > 0) {
+      doSelectShaft(shaftNames[0], map);
+    }
+  }, []);
+
+  const processTSV = useCallback((text) => {
+    const colorMap = buildContactColorMap(text);
+    if (colorMap.size > 0) {
+      setContactColorMap(colorMap);
+      setHasCoordinates(true);
+      setColorVersion((v) => v + 1); // trigger re-render
+    }
+    setShowTsvPrompt(false);
+  }, []);
+
+  // ─── Folder drop handler ──────────────────────────────────
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+
+    const items = e.dataTransfer.items;
+    if (!items || items.length === 0) return;
+
+    // Collect all files from the drop (works with folders in Chrome/Edge)
+    const filePromises = [];
+
+    const traverseEntry = (entry) => {
+      return new Promise((resolve) => {
+        if (entry.isFile) {
+          entry.file((file) => {
+            filePromises.push(Promise.resolve(file));
+            resolve();
+          });
+        } else if (entry.isDirectory) {
+          const reader = entry.createReader();
+          reader.readEntries((entries) => {
+            Promise.all(entries.map(traverseEntry)).then(resolve);
+          });
+        } else {
+          resolve();
+        }
+      });
+    };
+
+    const entries = [];
+    for (let i = 0; i < items.length; i++) {
+      const entry = items[i].webkitGetAsEntry?.();
+      if (entry) {
+        entries.push(traverseEntry(entry));
+      } else {
+        // Fallback: just grab the file directly
+        const file = items[i].getAsFile();
+        if (file) filePromises.push(Promise.resolve(file));
+      }
+    }
+
+    Promise.all(entries).then(() => {
+      Promise.all(filePromises).then((files) => {
+        processDroppedFiles(files);
+      });
+    });
+  }, []);
+
+  const processDroppedFiles = useCallback((files) => {
+    let edfFile = null;
+    let tsvFile = null;
+
+    for (const file of files) {
+      const name = file.name.toLowerCase();
+      if (name.endsWith('.edf') && !edfFile) {
+        edfFile = file;
+      }
+      if (name.includes('electrodes') && name.endsWith('.tsv')) {
+        tsvFile = file;
+      }
+    }
+
+    if (!edfFile) {
+      // Maybe they dropped a single EDF file, not a folder
+      for (const file of files) {
+        if (file.name.toLowerCase().endsWith('.edf')) {
+          edfFile = file;
+          break;
+        }
+      }
+    }
+
+    if (!edfFile) return;
+
+    // Read EDF
+    const edfReader = new FileReader();
+    edfReader.onload = (ev) => {
+      processEDF(ev.target.result, edfFile.name);
+
+      // Read TSV if found
+      if (tsvFile) {
+        const tsvReader = new FileReader();
+        tsvReader.onload = (ev2) => processTSV(ev2.target.result);
+        tsvReader.readAsText(tsvFile);
+      } else {
+        // No TSV found — prompt user
+        setShowTsvPrompt(true);
+      }
+    };
+    edfReader.readAsArrayBuffer(edfFile);
+  }, [processEDF, processTSV]);
+
+  // ─── Legacy single-file handler (LOAD EDF button) ─────────
   const handleFile = useCallback((e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setFileName(file.name);
 
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const edf = parseEDF(ev.target.result);
-      setEdfData(edf);
-
-      const map = identifyShafts(edf.signals);
-      setShaftMap(map);
-
-      const shaftNames = Object.keys(map).sort();
-      setAvailableShafts(shaftNames);
-
-      if (shaftNames.length > 0) {
-        doSelectShaft(shaftNames[0], map);
-      }
+      processEDF(ev.target.result, file.name);
+      setShowTsvPrompt(true);
     };
     reader.readAsArrayBuffer(file);
+  }, [processEDF]);
+
+  // ─── Manual TSV loader ────────────────────────────────────
+  const handleTsvFile = useCallback((e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => processTSV(ev.target.result);
+    reader.readAsText(file);
+  }, [processTSV]);
+
+  // ─── Drag events ──────────────────────────────────────────
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+    setIsDragOver(true);
   }, []);
 
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  // ─── Select shaft ─────────────────────────────────────────
   const doSelectShaft = useCallback((name, mapOverride) => {
     const map = mapOverride || shaftMap;
     const contacts = map[name];
@@ -78,7 +221,6 @@ export default function App() {
     setVoiceModes(modes);
   }, [shaftMap, globalVoiceMode]);
 
-  // When global voice mode changes, update all channels
   const handleGlobalVoiceModeChange = useCallback((mode) => {
     setGlobalVoiceMode(mode);
     setVoiceModes((prev) => {
@@ -134,6 +276,16 @@ export default function App() {
     }
   }, [isPlaying]);
 
+  // Keep AudioContext warm
+  useEffect(() => {
+    const warmUp = () => {
+      engineRef.current.init();
+      window.removeEventListener('click', warmUp);
+    };
+    window.addEventListener('click', warmUp);
+    return () => window.removeEventListener('click', warmUp);
+  }, []);
+
   // ─── Master sum ───────────────────────────────────────────
   const masterSum = useMemo(() => {
     if (!shaftChannels.length) return null;
@@ -185,6 +337,18 @@ export default function App() {
     return () => engineRef.current.dispose();
   }, []);
 
+  // ─── Spacebar ─────────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.code === 'Space' && e.target.tagName !== 'INPUT') {
+        e.preventDefault();
+        togglePlayback();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePlayback]);
+
   // ─── Vertical zoom with Ctrl+wheel ────────────────────────
   const handleTrackWheel = useCallback((e) => {
     e.preventDefault();
@@ -234,15 +398,91 @@ export default function App() {
     ? Math.max(48, Math.min(90, 320 / shaftChannels.length))
     : 70;
 
+  // ─── Per-pair colors (recompute when shaft, channels, or colors change) ──
+  const pairLabels = shaftChannels.map((ch) => ch.label);
+  const pairColors = useMemo(() => {
+    return getShaftPairColors(selectedShaft, shaftChannels.length, pairLabels);
+  }, [selectedShaft, shaftChannels.length, pairLabels.join(','), colorVersion]);
+
+  const shaftInfo = useMemo(() => {
+    return getShaftColor(selectedShaft);
+  }, [selectedShaft, colorVersion]);
+
   // ═════════════════════════════════════════════════════════════
   // RENDER
   // ═════════════════════════════════════════════════════════════
   return (
-    <div style={{
-      background: '#07070b', color: '#d4d4d8',
-      fontFamily: FONT, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      display: 'flex', flexDirection: 'column',
-    }}>
+    <div
+      style={{
+        background: '#07070b', color: '#d4d4d8',
+        fontFamily: FONT, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        display: 'flex', flexDirection: 'column',
+      }}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+    >
+
+      {/* ═══ DRAG OVERLAY ═══ */}
+      {isDragOver && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: '#cc002020', border: '3px dashed #cc0020',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999, pointerEvents: 'none',
+        }}>
+          <div style={{
+            fontSize: 16, color: '#cc0020', letterSpacing: 3,
+            textTransform: 'uppercase', fontFamily: FONT,
+          }}>
+            DROP FOLDER OR EDF FILE
+          </div>
+        </div>
+      )}
+
+      {/* ═══ TSV PROMPT OVERLAY ═══ */}
+      {showTsvPrompt && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: '#00000080', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', zIndex: 9998,
+        }}>
+          <div style={{
+            background: '#0e0e16', border: '1px solid #27272a',
+            borderRadius: 4, padding: '24px 32px', maxWidth: 400,
+            textAlign: 'center', fontFamily: FONT,
+          }}>
+            <div style={{ fontSize: 11, color: '#a1a1aa', marginBottom: 12 }}>
+              No electrode coordinates found.
+            </div>
+            <div style={{ fontSize: 9, color: '#52525b', marginBottom: 16, lineHeight: 1.6 }}>
+              Load an electrodes.tsv file to assign atlas colors,
+              or skip to use auto-assigned colors.
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <label style={{
+                background: '#1a1a24', border: '1px solid #cc002060',
+                padding: '6px 16px', fontSize: 9, color: '#cc0020',
+                cursor: 'pointer', borderRadius: 2, letterSpacing: 1,
+              }}>
+                LOAD TSV
+                <input type="file" accept=".tsv" onChange={handleTsvFile} style={{ display: 'none' }} />
+              </label>
+              <button
+                onClick={() => setShowTsvPrompt(false)}
+                style={{
+                  background: '#1a1a24', border: '1px solid #27272a',
+                  padding: '6px 16px', fontSize: 9, color: '#52525b',
+                  cursor: 'pointer', borderRadius: 2, letterSpacing: 1,
+                  fontFamily: FONT,
+                }}
+              >
+                SKIP
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══ TOP SECTION — MASTER PANEL ═══ */}
       <div style={{
@@ -274,7 +514,9 @@ export default function App() {
             <div style={{ fontSize: 12, color: '#1c1c24', letterSpacing: 2 }}>
               SEEG SONIFICATION ENGINE
             </div>
-            <div style={{ fontSize: 9, color: '#27272a' }}>Load an EDF file to begin</div>
+            <div style={{ fontSize: 9, color: '#27272a' }}>
+              Drop a folder or EDF file to begin
+            </div>
           </div>
         )}
       </div>
@@ -306,8 +548,23 @@ export default function App() {
               fontFamily: FONT, borderRadius: 2,
             }}
           >
-            {availableShafts.map((s) => <option key={s} value={s}>{s}</option>)}
+            {availableShafts.map((s) => {
+              const info = getShaftColor(s);
+              return <option key={s} value={s}>{s}</option>;
+            })}
           </select>
+        )}
+
+        {/* Coordinate status indicator */}
+        {edfData && (
+          <span style={{
+            fontSize: 7, padding: '2px 5px', borderRadius: 2,
+            background: hasCoordinates ? '#00760020' : '#27272a20',
+            color: hasCoordinates ? '#00c040' : '#3f3f46',
+            letterSpacing: 0.5,
+          }}>
+            {hasCoordinates ? 'XYZ' : '?'}
+          </span>
         )}
 
         <Divider />
@@ -469,15 +726,15 @@ export default function App() {
           }}>
             <div style={{ fontSize: 13 }}>SEEG SONIFICATION ENGINE</div>
             <div style={{ fontSize: 9, color: '#27272a', maxWidth: 400, textAlign: 'center', lineHeight: 1.7 }}>
-              Load an EDF file to begin. Select a voice mode in the transport bar,
-              or click the mode badge on individual tracks to experiment.
+              Drop a folder containing EDF + electrodes.tsv, or click LOAD EDF.
+              Atlas colors are assigned automatically when coordinates are available.
             </div>
             <div style={{ fontSize: 8, color: '#1c1c24', marginTop: 8 }}>
               Scroll = horizontal zoom · Ctrl+Scroll = vertical zoom · Click = seek
             </div>
           </div>
         ) : (
-          shaftChannels.map((ch) => {
+          shaftChannels.map((ch, i) => {
             const isActive = channelStates[ch.label];
             const ratioStr = customRatios[ch.label] || '1/1';
             const ratioVal = parseRatio(ratioStr);
@@ -485,6 +742,7 @@ export default function App() {
             const cents = (1200 * Math.log2(ratioVal)).toFixed(0);
             const mode = voiceModes[ch.label] || DEFAULT_VOICE_MODE;
             const modeInfo = VOICE_MODES[mode];
+            const trackColor = pairColors[i];
 
             return (
               <div
@@ -507,7 +765,7 @@ export default function App() {
                       onClick={() => toggleChannel(ch.label)}
                       style={{
                         width: 12, height: 12, borderRadius: 2,
-                        background: isActive ? '#cc0020' : '#27272a',
+                        background: isActive ? trackColor.hex : '#27272a',
                         border: 'none', cursor: 'pointer', flexShrink: 0,
                       }}
                     />
@@ -517,7 +775,16 @@ export default function App() {
                     }}>
                       {selectedShaft}{ch.label}
                     </span>
-                    {/* Per-track voice mode badge — click to cycle */}
+                    {/* Region badge — shows atlas region or ? */}
+                    {trackColor.source !== 'fallback' && (
+                      <span style={{
+                        fontSize: 6, color: trackColor.hex, opacity: 0.6,
+                        letterSpacing: 0.3, maxWidth: 60, overflow: 'hidden',
+                        textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {trackColor.region}
+                      </span>
+                    )}
                     <button
                       onClick={() => cycleVoiceMode(ch.label)}
                       title={`${modeInfo.name}: ${modeInfo.description}\nClick to cycle`}
@@ -568,7 +835,7 @@ export default function App() {
                     verticalZoom={verticalZoom}
                     scaleMode={scaleMode}
                     sharedScale={scaleMode === 'shared' ? sharedPeak : null}
-                    color={isActive ? '#cc0020' : '#3f3f46'}
+                    color={isActive ? trackColor.hex : '#3f3f46'}
                     height={trackHeight}
                     playheadPct={playheadPct}
                     isActive={isActive}
@@ -589,6 +856,12 @@ export default function App() {
             {selectedShaft} · {shaftChannels.length} bipolar pairs · {shaftChannels[0]?.fs} Hz ·
             {' '}{duration.toFixed(1)}s · Ratios × {fundamentalHz} Hz ·
             {' '}Voice: {VOICE_MODES[globalVoiceMode]?.name}
+            {shaftInfo.region !== 'unknown' && (
+              <span style={{ color: shaftInfo.hex }}> · {shaftInfo.region} ({shaftInfo.hemisphere})</span>
+            )}
+            {shaftInfo.source === 'fallback' && (
+              <span style={{ color: '#3f3f46' }}> · no coordinates</span>
+            )}
             {isLooping && <span style={{ color: '#cc0020' }}> · LOOP {(viewStart * duration).toFixed(1)}s–{(viewEnd * duration).toFixed(1)}s</span>}
           </div>
         )}
