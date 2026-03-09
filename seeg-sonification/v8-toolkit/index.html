@@ -578,6 +578,19 @@
     }
     #zoom-info.visible { opacity: 1; }
 
+    /* Marquee zoom overlay */
+    #marquee-overlay {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      background: rgba(124, 127, 250, 0.10);
+      border-left: 1px solid rgba(124, 127, 250, 0.5);
+      border-right: 1px solid rgba(124, 127, 250, 0.5);
+      pointer-events: none;
+      z-index: 4;
+      display: none;
+    }
+
     /* Toolbar fader section */
     #toolbar {
       flex-shrink: 0;
@@ -767,6 +780,10 @@
     .tcp-solo.active             { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
     .tcp-solo.active:hover       { opacity: 0.8; }
 
+    /* Selected channel row */
+    .track-row.selected .track-tcp { background: var(--accent-bg); }
+    .track-row.selected            { outline: 1px solid rgba(124,127,250,0.3); outline-offset: -1px; }
+
     .tcp-pitch {
       width: 38px;
       background: transparent;
@@ -895,6 +912,10 @@
         <button class="transport-btn" id="btn-play"  title="Play / Pause (Space)">&#x25B6;</button>
         <button class="transport-btn" id="btn-loop"  title="Loop visible window (L)">&#x27F3;</button>
         <button class="transport-btn" id="btn-autoscale" title="Auto-scale amplitude (A)">A</button>
+        <div style="width:1px;height:18px;background:var(--border);flex-shrink:0"></div>
+        <button class="transport-btn" id="btn-zoom-fit" title="Zoom to fit (Shift+Z)" style="font-size:10px">&#x2922;</button>
+        <button class="transport-btn" id="btn-zoom-sel" title="Zoom to loop selection (Z)" style="font-size:10px">&#x2194;</button>
+        <button class="transport-btn" id="btn-zoom-ch" title="Show only selected channels (V)" style="font-size:10px">&#x2195;</button>
         <div class="transport-seek">
           <span class="transport-time cur" id="transport-cur">0:00</span>
           <input type="range" id="seek-bar" min="0" max="1" value="0" step="0.001">
@@ -1017,6 +1038,7 @@
           Drop file to begin
         </div>
         <!-- track rows populated by renderWorkspace() -->
+        <div id="marquee-overlay"></div>
       </div>
 
       <!-- Overlays (positioned relative to workspace-body) -->
@@ -1562,6 +1584,17 @@
   let loopActive  = false;
   let rulerDragStart = null;
 
+  // Channel selection state
+  const selectedChannels = new Set();
+  let lastClickedChannel = null;    // for shift-click range selection
+  let channelIsolateMode = false;   // true = only selected channels visible
+
+  // Marquee zoom state (right-drag on waveform area)
+  let marqueeActive  = false;
+  let marqueeStartX  = 0;   // clientX at mousedown
+  let marqueeStartT  = 0;   // time (sec) at mousedown
+  let marqueeEl      = null; // overlay div
+
   function initView() {
     if (!preprocessed) return;
     const channels = preprocessed.channels;
@@ -1585,9 +1618,11 @@
     const trackArea = document.getElementById('track-area');
     if (!trackArea || !preprocessed) return 32;
 
-    const visibleRows = trackArea.querySelectorAll('.track-row');
+    const allRows = trackArea.querySelectorAll('.track-row');
     let visibleCount = 0;
-    for (const row of visibleRows) {
+    for (const row of allRows) {
+      // Skip rows hidden by isolate mode
+      if (row.style.display === 'none') continue;
       // Skip rows inside collapsed shaft groups
       const parent = row.parentElement;
       if (parent && parent.classList.contains('shaft-group') && parent.style.display === 'none') continue;
@@ -1606,7 +1641,9 @@
   function applyTrackHeights() {
     const h = computeTrackHeight();
     const rows = document.querySelectorAll('#track-area .track-row');
-    for (const row of rows) row.style.height = h + 'px';
+    for (const row of rows) {
+      if (row.style.display !== 'none') row.style.height = h + 'px';
+    }
   }
 
   function viewDuration() { return viewEndSec - viewStartSec; }
@@ -2070,14 +2107,100 @@
           }
         } else {
           loopActive = true;
+          document.getElementById('btn-loop')?.classList.add('active');
         }
         rulerDragStart = null;
         drawRuler();
       });
     }
   }
-  // Seek on waveform click
-  document.getElementById('track-area')?.addEventListener('click', timelineSeek);
+  // Seek on waveform left-click
+  document.getElementById('track-area')?.addEventListener('click', (e) => {
+    if (e.button !== 0 || marqueeActive) return;
+    timelineSeek(e);
+  });
+
+  // ── Marquee zoom (right-drag on track area) ──────────────────────────────
+  // Also supports Alt+left-drag for trackpad users.
+  {
+    const trackArea = document.getElementById('track-area');
+    marqueeEl = document.getElementById('marquee-overlay');
+
+    function _waveXToTime(clientX) {
+      const rect = trackArea.getBoundingClientRect();
+      const tcpW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tcp-w')) || 264;
+      const waveLeft = rect.left + tcpW;
+      const waveW = rect.width - tcpW;
+      const fraction = Math.max(0, Math.min(1, (clientX - waveLeft) / waveW));
+      return viewStartSec + fraction * viewDuration();
+    }
+
+    function _timeToTrackX(timeSec) {
+      const rect = trackArea.getBoundingClientRect();
+      const tcpW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tcp-w')) || 264;
+      const waveW = rect.width - tcpW;
+      const fraction = (timeSec - viewStartSec) / viewDuration();
+      return tcpW + fraction * waveW;
+    }
+
+    trackArea.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    trackArea.addEventListener('mousedown', (e) => {
+      const isRightDrag = e.button === 2;
+      const isAltDrag   = e.button === 0 && e.altKey;
+      if (!isRightDrag && !isAltDrag) return;
+      if (!preprocessed || totalDuration <= 0) return;
+      if (e.target.closest('.track-tcp') || e.target.closest('.shaft-header')) return;
+
+      e.preventDefault();
+      marqueeActive = true;
+      marqueeStartX = e.clientX;
+      marqueeStartT = _waveXToTime(e.clientX);
+      marqueeEl.style.display = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!marqueeActive) return;
+      const dx = Math.abs(e.clientX - marqueeStartX);
+      if (dx < 5) { marqueeEl.style.display = 'none'; return; }
+
+      const curT = _waveXToTime(e.clientX);
+      const t0 = Math.min(marqueeStartT, curT);
+      const t1 = Math.max(marqueeStartT, curT);
+      const x0 = _timeToTrackX(t0);
+      const x1 = _timeToTrackX(t1);
+
+      marqueeEl.style.display = '';
+      marqueeEl.style.left  = x0 + 'px';
+      marqueeEl.style.width = Math.max(1, x1 - x0) + 'px';
+    });
+
+    document.addEventListener('mouseup', (e) => {
+      if (!marqueeActive) return;
+      marqueeActive = false;
+      marqueeEl.style.display = 'none';
+
+      const dx = Math.abs(e.clientX - marqueeStartX);
+      if (dx < 5) return; // too small, ignore
+
+      const curT = _waveXToTime(e.clientX);
+      let t0 = Math.max(0, Math.min(marqueeStartT, curT));
+      let t1 = Math.min(totalDuration, Math.max(marqueeStartT, curT));
+      if (t1 - t0 < MIN_VIEW_SEC) return;
+
+      viewStartSec = t0;
+      viewEndSec   = t1;
+      scheduleRedraw();
+      showZoomInfo();
+    });
+  }
+
+  // ── Double-click ruler to clear loop ──────────────────────────────────────
+  document.getElementById('ruler')?.addEventListener('dblclick', () => {
+    loopStart = null; loopEnd = null; loopActive = false;
+    document.getElementById('btn-loop')?.classList.remove('active');
+    drawRuler();
+  });
 
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
   document.addEventListener('keydown', (e) => {
@@ -2113,10 +2236,49 @@
         loopStart = viewStartSec; loopEnd = viewEndSec; loopActive = true;
       }
       drawRuler();
+    } else if (e.code === 'KeyZ' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      // Z — zoom to loop selection (if active)
+      e.preventDefault();
+      if (loopActive && loopStart !== null && loopEnd !== null && loopEnd - loopStart >= MIN_VIEW_SEC) {
+        viewStartSec = loopStart;
+        viewEndSec   = loopEnd;
+        scheduleRedraw();
+        showZoomInfo();
+      }
+    } else if (e.code === 'KeyZ' && e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      // Shift+Z — zoom to full
+      e.preventDefault();
+      if (totalDuration > 0) {
+        viewStartSec = 0;
+        viewEndSec   = totalDuration;
+        scheduleRedraw();
+        showZoomInfo();
+      }
+    } else if (e.code === 'KeyV' && !e.ctrlKey && !e.metaKey) {
+      // V — toggle channel isolate (show only selected channels)
+      e.preventDefault();
+      toggleChannelIsolate();
     } else if (e.code === 'KeyA') {
       e.preventDefault();
       autoScaleEnabled = !autoScaleEnabled;
       scheduleRedraw();
+    } else if (e.code === 'Escape') {
+      // Escape — deselect all channels, exit isolate mode
+      if (selectedChannels.size > 0 || channelIsolateMode) {
+        e.preventDefault();
+        selectedChannels.clear();
+        if (channelIsolateMode) {
+          channelIsolateMode = false;
+          document.getElementById('btn-zoom-ch')?.classList.remove('active');
+          const rows = document.querySelectorAll('#track-area .track-row');
+          for (const row of rows) row.style.display = '';
+          const hdrs = document.querySelectorAll('#track-area .shaft-header');
+          for (const h of hdrs) h.style.display = '';
+          applyTrackHeights();
+          scheduleRedraw();
+        }
+        _applySelectionUI();
+      }
     }
   });
 
@@ -2212,6 +2374,35 @@
     tcp.appendChild(muteBtn);
     tcp.appendChild(soloBtn);
 
+    // Channel selection on TCP click
+    tcp.addEventListener('click', (e) => {
+      // Don't select when clicking buttons or inputs
+      if (e.target.closest('button') || e.target.closest('input')) return;
+
+      if (e.shiftKey && lastClickedChannel) {
+        // Range select: select all channels between last clicked and this one
+        const allRows = [...document.querySelectorAll('#track-area .track-row')];
+        const labels = allRows.map(r => r.dataset.label);
+        const from = labels.indexOf(lastClickedChannel);
+        const to   = labels.indexOf(ch.label);
+        if (from >= 0 && to >= 0) {
+          if (!e.ctrlKey && !e.metaKey) selectedChannels.clear();
+          const lo = Math.min(from, to), hi = Math.max(from, to);
+          for (let i = lo; i <= hi; i++) selectedChannels.add(labels[i]);
+        }
+      } else if (e.ctrlKey || e.metaKey) {
+        // Toggle this channel
+        if (selectedChannels.has(ch.label)) selectedChannels.delete(ch.label);
+        else selectedChannels.add(ch.label);
+      } else {
+        // Exclusive select
+        selectedChannels.clear();
+        selectedChannels.add(ch.label);
+      }
+      lastClickedChannel = ch.label;
+      _applySelectionUI();
+    });
+
     // Right: waveform canvas
     const wave = document.createElement('div');
     wave.className = 'track-wave';
@@ -2222,6 +2413,45 @@
     row.appendChild(tcp);
     row.appendChild(wave);
     container.appendChild(row);
+  }
+
+  // ── Channel selection UI ───────────────────────────────────────────────────
+  function _applySelectionUI() {
+    const rows = document.querySelectorAll('#track-area .track-row');
+    for (const row of rows) {
+      row.classList.toggle('selected', selectedChannels.has(row.dataset.label));
+    }
+  }
+
+  function toggleChannelIsolate() {
+    if (selectedChannels.size === 0) return;
+
+    channelIsolateMode = !channelIsolateMode;
+    document.getElementById('btn-zoom-ch')?.classList.toggle('active', channelIsolateMode);
+
+    const rows = document.querySelectorAll('#track-area .track-row');
+    const shaftGroups = document.querySelectorAll('#track-area .shaft-header');
+
+    if (channelIsolateMode) {
+      // Hide unselected rows
+      for (const row of rows) {
+        row.style.display = selectedChannels.has(row.dataset.label) ? '' : 'none';
+      }
+      // Hide shaft headers that have no visible channels
+      for (const hdr of shaftGroups) {
+        const group = hdr.nextElementSibling;
+        if (!group || !group.classList.contains('shaft-group')) continue;
+        const visibleInGroup = group.querySelectorAll('.track-row:not([style*="display: none"])');
+        hdr.style.display = visibleInGroup.length > 0 ? '' : 'none';
+      }
+    } else {
+      // Show all rows
+      for (const row of rows) row.style.display = '';
+      for (const hdr of shaftGroups) hdr.style.display = '';
+    }
+
+    applyTrackHeights();
+    scheduleRedraw();
   }
 
   // ── Shaft selection count ─────────────────────────────────────────────────
@@ -2319,6 +2549,29 @@
     scheduleRedraw();
   });
 
+  // Zoom buttons
+  document.getElementById('btn-zoom-fit').addEventListener('click', () => {
+    if (totalDuration > 0) {
+      viewStartSec = 0;
+      viewEndSec   = totalDuration;
+      scheduleRedraw();
+      showZoomInfo();
+    }
+  });
+
+  document.getElementById('btn-zoom-sel').addEventListener('click', () => {
+    if (loopActive && loopStart !== null && loopEnd !== null && loopEnd - loopStart >= MIN_VIEW_SEC) {
+      viewStartSec = loopStart;
+      viewEndSec   = loopEnd;
+      scheduleRedraw();
+      showZoomInfo();
+    }
+  });
+
+  document.getElementById('btn-zoom-ch').addEventListener('click', () => {
+    toggleChannelIsolate();
+  });
+
   // Seek bar
   const seekBar = document.getElementById('seek-bar');
   seekBar.addEventListener('mousedown',  () => { seekDragging = true; });
@@ -2327,6 +2580,7 @@
     if (!engine || engine.durationSec <= 0) return;
     const t = parseFloat(seekBar.value) * engine.durationSec;
     document.getElementById('transport-cur').textContent = fmtTime(t);
+    updatePlayhead(t);
   });
   seekBar.addEventListener('change', async () => {
     seekDragging = false;
@@ -2334,6 +2588,7 @@
     const t = parseFloat(seekBar.value) * engine.durationSec;
     const wasPlaying = engine.isPlaying;
     await engine.seek(t, wasPlaying);
+    updatePlayhead(t);
     if (wasPlaying) {
       document.getElementById('btn-play').textContent = '\u23F8';
       document.getElementById('btn-play').classList.add('active');

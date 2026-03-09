@@ -1,15 +1,14 @@
 /**
- * engine.js — Playback Engine (Four-Layer Model)
+ * engine.js — Playback Engine (Four-Layer Model, v8.3)
  *
  * Orchestrates all audio for the entire recording. Owns the AudioContext,
- * voice graphs, templates, and scheduling.
+ * voice graphs, per-channel templates, and scheduling.
  *
- * Changes from Phase 1 engine:
- *   - Five automation curves per voice (rootAmp, over, under, fmIndex, fmAmp)
- *     instead of two (amp, bright)
- *   - Voice graphs have 8 oscillators per channel (not 1 sawtooth)
- *   - Layer mix controls (setLayerGains)
- *   - Summed curve export for mix bus display (getSummedCurve)
+ * v8.3 changes:
+ *   - Per-channel pitched templates (clicks match channel fundamental)
+ *   - Templates stored on voice objects, not shared globally
+ *   - synthesis.js provides prerenderTemplates(audioCtx, pitchHz)
+ *   - trimGain + channelBus + end-of-chain waveshaper (via synthesis.js)
  *
  * Unchanged from Phase 1:
  *   - Transient look-ahead scheduler
@@ -46,7 +45,6 @@ export class Engine {
   // ── Private state ─────────────────────────────────────────────────────────
   #audioCtx        = null;
   #masterGain      = null;
-  #templates       = null;
   #voices          = [];
   #durationSec     = 0;
   #isPlaying       = false;
@@ -165,7 +163,6 @@ export class Engine {
     this.#masterGain.gain.value = vol / Math.sqrt(n);
     this.#masterGain.connect(this.#audioCtx.destination);
 
-    this.#templates = prerenderTemplates(this.#audioCtx);
     this.#activateVoices();
     this.#applyLayerGains();
 
@@ -196,7 +193,6 @@ export class Engine {
   destroy() {
     this.#stopInternal();
     this.#voices    = [];
-    this.#templates = null;
     this.#prepared  = false;
   }
 
@@ -428,6 +424,9 @@ export class Engine {
       const graph = createVoiceGraph(ctx, this.#masterGain, voice.pitchHz, voice.pan, voice.distortionCurve);
       voice.graph = graph;
 
+      // Per-channel pitched templates (clicks match channel's fundamental)
+      voice.templates = prerenderTemplates(ctx, voice.pitchHz);
+
       if (voice.muted) graph.setMuted(true);
 
       const frameOffset = Math.floor(this.#offsetSec * AUTOMATION_RATE);
@@ -519,7 +518,7 @@ export class Engine {
         }
 
         const key      = `${ev.type}-${ev.salience}`;
-        const template = this.#templates?.get(key);
+        const template = voice.templates?.get(key);
         if (template) {
           const source = ctx.createBufferSource();
           source.buffer = template;
@@ -574,10 +573,9 @@ export class Engine {
       try { this.#audioCtx.close(); } catch (_) {}
       this.#audioCtx   = null;
       this.#masterGain = null;
-      this.#templates  = null;
     }
 
-    for (const v of this.#voices) v.graph = null;
+    for (const v of this.#voices) { v.graph = null; v.templates = null; }
   }
 }
 
