@@ -1,17 +1,5019 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SEEG Sonification Engine</title>
-    <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { background: #07070b; overflow: hidden; }
-      @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
-    </style>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <title>SEEG Sonification Toolkit</title>
+  <style>
+    /* ── Tokens ──────────────────────────────────────────────────────────── */
+    :root {
+      --bg:        #0d0d0f;
+      --bg2:       #111114;
+      --surface:   #18181c;
+      --surface2:  #1e1e23;
+      --border:    #27272d;
+      --border2:   #313138;
+      --text:      #e2e2e6;
+      --muted:     #6b6b75;
+      --dim:       #3d3d45;
+      --accent:    #7c7ffa;
+      --accent-bg: rgba(124,127,250,0.08);
+      --good:      #4ade80;
+      --warn:      #fbbf24;
+      --bad:       #f87171;
+      --good-bg:   rgba(74,222,128,0.08);
+      --warn-bg:   rgba(251,191,36,0.08);
+      --bad-bg:    rgba(248,113,113,0.08);
+      --header-h:  42px;
+      --tcp-w:     310px;
+      --status-h:  26px;
+      --mono: 'JetBrains Mono', 'Fira Mono', ui-monospace, monospace;
+    }
+
+    /* ── Reset ───────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.5;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header (always visible) ─────────────────────────────────────────── */
+    #header {
+      height: var(--header-h);
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 14px;
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    #header .logo {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    #header .logo .v { color: var(--muted); font-weight: 400; }
+
+    #header .file-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 11px;
+      overflow: hidden;
+      flex: 1;
+      min-width: 0;
+    }
+
+    #header .file-info .fname {
+      color: var(--text);
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #header .file-info .pill {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 6px;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    #header .pill.seeg  { border-color: var(--accent); color: var(--accent); }
+    #header .pill.eeg   { border-color: var(--good);   color: var(--good); }
+    #header .pill.hybrid{ border-color: var(--warn);   color: var(--warn); }
+
+    #header .spacer { flex: 1; }
+
+    #header .header-action {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    #header .header-action:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Protocol warning ────────────────────────────────────────────────── */
+    #protocol-warning {
+      background: var(--warn-bg);
+      border-bottom: 1px solid var(--warn);
+      color: var(--warn);
+      padding: 9px 16px;
+      font-size: 11px;
+      line-height: 1.7;
+      flex-shrink: 0;
+    }
+
+    #protocol-warning code {
+      background: rgba(0,0,0,0.3);
+      padding: 1px 6px;
+      border-radius: 3px;
+    }
+
+    /* ── Main content area ───────────────────────────────────────────────── */
+    #main {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ─── SCREEN: Welcome ──────────────────────────────────────────────── */
+    #screen-welcome {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      padding: 40px;
+    }
+
+    #drop-zone {
+      width: 100%;
+      max-width: 520px;
+      background: var(--surface);
+      border: 1.5px dashed var(--border2);
+      border-radius: 8px;
+      padding: 56px 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    #drop-zone:hover, #drop-zone.drag-over {
+      border-color: var(--accent);
+      background: var(--accent-bg);
+    }
+
+    #drop-zone .dz-title {
+      font-size: 14px;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    #drop-zone .dz-sub {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.8;
+    }
+    #drop-zone .dz-ext {
+      display: inline-block;
+      margin-top: 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 2px 8px;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    #file-input { display: none; }
+
+    /* ─── SCREEN: Import review ─────────────────────────────────────────── */
+    #screen-import {
+      height: 100%;
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 28px 32px;
+      overflow-y: auto;
+    }
+
+    .import-card {
+      width: 100%;
+      max-width: 820px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .import-card-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .import-card-header .fname-display {
+      color: var(--text);
+      font-size: 12px;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .import-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+
+    @media (max-width: 600px) {
+      .import-grid { grid-template-columns: 1fr; }
+    }
+
+    .import-section {
+      padding: 18px 20px;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .import-section:nth-child(even) { border-right: none; }
+    .import-section:nth-last-child(-n+2) { border-bottom: none; }
+
+    .import-section-title {
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    /* KV table in import */
+    .kv { display: flex; flex-direction: column; gap: 3px; }
+    .kv-row { display: flex; justify-content: space-between; gap: 8px; }
+    .kv-row .k { color: var(--muted); }
+    .kv-row .v { color: var(--text); text-align: right; }
+    .kv-row .v.accent { color: var(--accent); }
+
+    /* Shaft list */
+    .shaft-list { display: flex; flex-direction: column; gap: 0; max-height: 220px; overflow-y: auto; }
+
+    .shaft-select-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 0 6px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 3px;
+    }
+    .btn-shaft-sel {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .btn-shaft-sel:hover { border-color: var(--text); color: var(--text); }
+    #shaft-count-display { color: var(--muted); font-size: 10px; margin-left: auto; }
+
+    .shaft-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 2px;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+    .shaft-row:hover { background: var(--surface2); }
+    .shaft-row input[type="checkbox"] { accent-color: var(--accent); width: 12px; height: 12px; flex-shrink: 0; margin: 0; cursor: pointer; }
+    .shaft-row .shaft-name { color: var(--accent); flex: 1; }
+    .shaft-row .shaft-detail { color: var(--muted); font-size: 11px; white-space: nowrap; }
+
+    /* Options in import */
+    .option-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 4px 0;
+    }
+    .option-row .opt-label { color: var(--muted); }
+    .option-row .opt-value { color: var(--good); font-size: 11px; }
+    .option-row select {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      padding: 3px 6px;
+      font-family: var(--mono);
+      font-size: 11px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .option-row select:focus { outline: none; border-color: var(--accent); }
+
+    /* Band tags */
+    .band-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+    .band-tag {
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+    }
+    .band-tag.on  { border-color: var(--good);  color: var(--good); }
+    .band-tag.off { border-color: var(--dim);   color: var(--dim); }
+
+    /* Line noise ambiguity warning */
+    .line-ambig {
+      font-size: 11px;
+      color: var(--warn);
+      background: var(--warn-bg);
+      border: 1px solid var(--warn);
+      border-radius: 3px;
+      padding: 6px 10px;
+      margin-top: 6px;
+    }
+
+    /* Import footer */
+    .import-card-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 6px 14px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .btn-ghost:hover { border-color: var(--text); color: var(--text); }
+
+    .btn-primary {
+      background: var(--accent);
+      border: none;
+      color: #fff;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 7px 18px;
+      border-radius: 3px;
+      cursor: pointer;
+      letter-spacing: 0.06em;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-primary:disabled { opacity: 0.4; cursor: default; }
+
+    /* ─── SCREEN: Workspace ─────────────────────────────────────────────── */
+    #screen-workspace {
+      height: 100%;
+      display: none;
+      flex-direction: column;
+    }
+
+    .workspace-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ─── Workspace header (ruler + column labels, non-scrolling) ──────── */
+    .workspace-header {
+      display: flex;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+
+    .workspace-header .tcp-stub {
+      width: var(--tcp-w);
+      flex-shrink: 0;
+      display: grid;
+      grid-template-columns: 20px 1fr 40px 42px 22px 22px;
+      align-items: center;
+      padding: 0 10px;
+      gap: 0;
+      border-right: 1px solid var(--border);
+    }
+    .workspace-header .tcp-stub span {
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+
+    .ruler-wrap {
+      flex: 1;
+      position: relative;
+      height: 22px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .ruler-wrap canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ─── Scrollbar theming ──────────────────────────────────────────────── */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--border2) transparent;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+    /* ─── Horizontal time scrollbar ──────────────────────────────────────── */
+    #h-scroll {
+      height: 8px;
+      flex-shrink: 0;
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      position: relative;
+      cursor: pointer;
+    }
+    #h-scroll-thumb {
+      position: absolute;
+      top: 1px;
+      height: 6px;
+      background: var(--border2);
+      border-radius: 3px;
+      min-width: 12px;
+      cursor: grab;
+      transition: background 0.1s;
+    }
+    #h-scroll-thumb:hover { background: var(--muted); }
+    #h-scroll-thumb:active { cursor: grabbing; background: var(--muted); }
+
+    /* ─── Track area (single scrollable container) ──────────────────────── */
+    #track-area {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    .shaft-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      user-select: none;
+    }
+    .shaft-header:hover { background: var(--surface2); }
+    .shaft-header .shaft-title {
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      cursor: pointer;
+    }
+    .shaft-header .shaft-meta {
+      font-size: 10px;
+      color: var(--muted);
+      margin-left: auto;
+    }
+    .shaft-mute, .shaft-solo {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--dim);
+      font-family: var(--mono);
+      font-size: 9px;
+      padding: 1px 6px;
+      border-radius: 2px;
+      cursor: pointer;
+      white-space: nowrap;
+      line-height: 1.4;
+    }
+    .shaft-mute:hover, .shaft-solo:hover { border-color: var(--text); color: var(--text); }
+    .shaft-mute.muted { background: var(--warn-bg); border-color: var(--warn); color: var(--warn); }
+    .shaft-solo.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+
+    .track-row {
+      display: flex;
+      height: 32px;   /* overridden dynamically by applyTrackHeights() */
+      border-bottom: 1px solid rgba(39,39,45,0.5);
+    }
+
+    .track-tcp {
+      width: var(--tcp-w);
+      flex-shrink: 0;
+      display: grid;
+      grid-template-columns: 20px 1fr 40px 42px 22px 22px;
+      align-items: center;
+      padding: 0 10px;
+      gap: 2px;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+    }
+    .track-tcp:hover { background: var(--surface2); }
+
+    .tcp-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .tcp-dot.good { background: var(--good); }
+    .tcp-dot.warn { background: var(--warn); }
+    .tcp-dot.bad  { background: var(--bad);  }
+
+    .tcp-label {
+      font-size: 11px;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tcp-val {
+      font-size: 10px;
+      color: var(--muted);
+      text-align: right;
+      white-space: nowrap;
+    }
+    .tcp-val.warn { color: var(--warn); }
+    .tcp-val.bad  { color: var(--bad); }
+
+    .track-wave {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+    .track-wave canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Playhead — spans from ruler through track area */
+    #playhead {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: var(--accent);
+      box-shadow: 0 0 4px rgba(124,127,250,0.5);
+      pointer-events: none;
+      z-index: 5;
+      left: 0;
+    }
+
+    .loop-edge-line {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      border-left: 1px dashed rgba(124,127,250,0.45);
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    .timeline-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--dim);
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      z-index: 1;
+    }
+
+    /* Zoom info badge */
+    #zoom-info {
+      position: absolute;
+      top: 4px;
+      right: 8px;
+      font-size: 9px;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 5px;
+      z-index: 4;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    #zoom-info.visible { opacity: 1; }
+
+    /* Synth section */
+    .synth-section {
+      flex-shrink: 0;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Status bar */
+    #statusbar {
+      height: var(--status-h);
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 18px;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
+    }
+
+    #statusbar .stat-item { white-space: nowrap; }
+    #statusbar .stat-item .val { color: var(--text); }
+    #statusbar .stat-good { color: var(--good); }
+    #statusbar .stat-warn { color: var(--warn); }
+    #statusbar .stat-bad  { color: var(--bad); }
+    #statusbar .spacer    { flex: 1; }
+
+    /* Spinner */
+    #processing-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(13,13,15,0.82);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 14px;
+      z-index: 100;
+    }
+    #processing-overlay .proc-label {
+      color: var(--text);
+      font-size: 12px;
+    }
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── Transport bar ─────────────────────────────────────────────────── */
+    #transport-bar {
+      flex-shrink: 0;
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      padding: 7px 14px 5px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .transport-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .transport-btn {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 14px;
+      width: 30px;
+      height: 26px;
+      border-radius: 3px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+    .transport-btn:hover       { border-color: var(--accent); color: var(--accent); }
+    .transport-btn.active      { border-color: var(--accent); color: var(--accent); }
+    .transport-btn:disabled    { opacity: 0.35; cursor: default; }
+    .transport-btn:disabled:hover { border-color: var(--border2); color: var(--text); }
+
+    .transport-seek {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .transport-time {
+      color: var(--muted);
+      font-size: 10px;
+      white-space: nowrap;
+      min-width: 36px;
+      font-variant-numeric: tabular-nums;
+    }
+    .transport-time.cur { color: var(--text); }
+
+    #seek-bar {
+      flex: 1;
+      accent-color: var(--accent);
+      cursor: pointer;
+      height: 2px;
+      position: relative;
+      z-index: 2;
+    }
+
+    #seek-sum-canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    #seek-viewport {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      background: rgba(124, 127, 250, 0.12);
+      border-left: 1px solid rgba(124, 127, 250, 0.5);
+      border-right: 1px solid rgba(124, 127, 250, 0.5);
+      border-radius: 0;
+      cursor: grab;
+      pointer-events: auto;
+      z-index: 3;
+      min-width: 4px;
+      transition: background 0.1s;
+    }
+    #seek-viewport:hover {
+      background: rgba(124, 127, 250, 0.2);
+      border-left-color: rgba(124, 127, 250, 0.7);
+      border-right-color: rgba(124, 127, 250, 0.7);
+    }
+    #seek-viewport:active { cursor: grabbing; }
+    #seek-viewport.full { display: none; }
+
+    /* ══════════════════════════════════════════════════════════════════
+       SYNTH SECTION — header/body architecture
+       ══════════════════════════════════════════════════════════════════ */
+
+    /* ── HEADER: always visible ────────────────────────────────────── */
+    /* ── HEADER: match body column proportions ─────────────────── */
+    .synth-header {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      padding: 4px 0;
+      background: var(--surface);
+      min-height: 28px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .synth-toggle {
+      font-size: 13px;
+      color: var(--dim);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0 4px;
+      width: 18px;
+      user-select: none;
+      line-height: 1;
+    }
+    .synth-toggle:hover { color: var(--text); }
+
+    /* Toggle + pills container: same width as source column */
+    .synth-header-source {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex: 0 0 170px;
+      padding: 0 8px;
+      border-right: 1px solid var(--border);
+    }
+
+    .synth-header-source .syn-pill {
+      font-size: 8px;
+      padding: 2px 4px;
+    }
+
+    .synth-header-source .syn-bands {
+      display: flex;
+      gap: 3px;
+      flex-shrink: 0;
+    }
+
+    /* Module level labels: match their body column flex values */
+    .syn-mod-level {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 12px;
+      min-width: 0;
+      border-right: 1px solid transparent;
+    }
+
+    /* Match body column flex values exactly */
+    .syn-mod-level[data-mod="amplitude"]  { flex: 1; }
+    .syn-mod-level[data-mod="morphology"] { flex: 1; }
+    .syn-mod-level[data-mod="frequency"]  { flex: 1; }
+    .syn-mod-level[data-mod="detection"]  { flex: 1.2; }
+    .syn-mod-level[data-mod="output"]     { flex: 0 0 130px; }
+
+    .syn-mod-level:last-child { border-right: none; }
+
+    .syn-mod-level span {
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--mc);
+      white-space: nowrap;
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .syn-mod-level input[type="range"] {
+      flex: 1;
+      height: 3px;
+      min-width: 30px;
+      accent-color: var(--mc);
+    }
+
+    /* ── BODY: collapsible ─────────────────────────────────────────── */
+    .synth-body {
+      overflow: hidden;
+      max-height: 600px;
+      transition: max-height 0.25s ease-out, opacity 0.2s ease-out;
+      opacity: 1;
+    }
+    .synth-body.collapsed {
+      max-height: 0;
+      opacity: 0;
+    }
+
+    .synth-panel {
+      display: flex;
+      gap: 0;
+      align-items: stretch;
+    }
+
+    /* ── Columns ────────────────────────────────────────────────────── */
+    .synth-col {
+      display: flex;
+      flex-direction: column;
+      padding: 8px 12px 6px;
+      border-right: 1px solid var(--border);
+      gap: 4px;
+      position: relative;
+      min-width: 0;
+    }
+    .synth-col:last-child { border-right: none; }
+
+    /* Colored accent stripe connecting column to its header label */
+    .synth-col::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      opacity: 0.5;
+    }
+    .synth-col[data-col="amplitude"]::before  { background: #f0a030; }
+    .synth-col[data-col="morphology"]::before { background: #38bdf8; }
+    .synth-col[data-col="frequency"]::before  { background: #4ade80; }
+    .synth-col[data-col="detection"]::before  { background: #f87171; }
+    .synth-col[data-col="output"]::before     { background: #8888a0; }
+
+    .synth-col[data-col="source"]    { flex: 0 0 170px; }
+    .synth-col[data-col="amplitude"] { flex: 1; }
+    .synth-col[data-col="morphology"]{ flex: 1; }
+    .synth-col[data-col="frequency"] { flex: 1; }
+    .synth-col[data-col="detection"] { flex: 1.2; }
+    .synth-col[data-col="output"]    { flex: 0 0 130px; }
+
+    /* ── Faders ─────────────────────────────────────────────────────── */
+    .syn-fader {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .syn-label {
+      display: flex;
+      flex-direction: column;
+      min-width: 72px;
+      text-align: right;
+      gap: 0;
+    }
+
+    .syn-label-main {
+      font-size: 9px;
+      letter-spacing: 0.04em;
+      color: var(--text);
+      text-transform: uppercase;
+      white-space: nowrap;
+      user-select: none;
+      line-height: 1.2;
+    }
+
+    .syn-label-sub {
+      font-size: 7px;
+      color: var(--dim);
+      white-space: nowrap;
+      user-select: none;
+      line-height: 1.2;
+      font-style: italic;
+    }
+
+    .syn-range {
+      flex: 1;
+      cursor: pointer;
+      min-width: 50px;
+      height: 4px;
+    }
+
+    /* Body fader accent colors — match column accent stripes */
+    .synth-col[data-col="amplitude"]  .syn-range { accent-color: #f0a030; }
+    .synth-col[data-col="morphology"] .syn-range { accent-color: #38bdf8; }
+    .synth-col[data-col="frequency"]  .syn-range { accent-color: #4ade80; }
+    .synth-col[data-col="detection"]  .syn-range { accent-color: #f87171; }
+    .synth-col[data-col="output"]     .syn-range { accent-color: #8888a0; }
+
+    .syn-sub {
+      padding-left: 14px;
+      border-left: 2px solid color-mix(in srgb, var(--text) 20%, transparent);
+      margin-left: 8px;
+      opacity: 0.85;
+    }
+    .syn-sub .syn-label { min-width: 58px; }
+    .syn-sub .syn-label-main { font-size: 8px; }
+
+    .syn-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 3px 0;
+    }
+
+    .syn-pair-row {
+      display: flex;
+      gap: 6px;
+    }
+    .syn-pair-row .syn-fader { flex: 1; }
+    .syn-pair-row .syn-label { min-width: auto; }
+    .syn-pair-row .syn-label-main { font-size: 8px; }
+    .syn-pair-row .syn-range { min-width: 30px; }
+
+    /* ── Band pills ─────────────────────────────────────────────────── */
+    .syn-bands { display: flex; gap: 3px; }
+    .syn-pill {
+      font-size: 9px;
+      padding: 3px 6px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      color: var(--dim);
+      cursor: pointer;
+      font-family: var(--mono);
+      line-height: 1.2;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+      user-select: none;
+    }
+    .syn-pill:hover { border-color: var(--text); color: var(--text); }
+    .syn-pill.active {
+      border-color: var(--bc, var(--accent));
+      color: var(--bc, var(--accent));
+      background: color-mix(in srgb, var(--bc, var(--accent)) 12%, transparent);
+      font-weight: 700;
+    }
+    .syn-pill[data-band="auto"] {
+      border-color: var(--good);
+      color: var(--good);
+      background: var(--good-bg);
+      letter-spacing: 0.06em;
+    }
+
+    /* ── Band barometer ─────────────────────────────────────────────── */
+    .baro-stack { display: flex; flex-direction: column; gap: 2px; margin: 4px 0; }
+    .baro-row { display: flex; align-items: center; gap: 4px; height: 10px; }
+    .baro-row-label {
+      font-size: 7px; font-family: var(--mono); color: var(--dim);
+      min-width: 14px; text-align: right; user-select: none;
+      transition: color 0.3s, font-weight 0.3s;
+    }
+    .baro-row.dominant .baro-row-label { color: var(--bc); font-weight: 700; }
+    .baro-row-track {
+      flex: 1; height: 4px; background: var(--surface);
+      border-radius: 2px; overflow: hidden; position: relative;
+    }
+    .baro-row-fill {
+      position: absolute; top: 0; bottom: 0; left: 0; width: 0%;
+      background: var(--bc); border-radius: 2px;
+      transition: width 0.5s ease-out; opacity: 0.7;
+    }
+    .baro-row.dominant .baro-row-fill { opacity: 1.0; }
+
+    .syn-tune {
+      display: flex; align-items: center; gap: 4px;
+      margin-top: auto; padding-top: 4px; border-top: 1px solid var(--border);
+    }
+
+    /* ── PPAF display ───────────────────────────────────────────────── */
+    .ppaf-display {
+      height: 44px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 2px;
+    }
+    .ppaf-display canvas { display: block; width: 100%; height: 100%; }
+    .ppaf-display-label {
+      position: absolute; top: 2px; left: 4px;
+      font-size: 7px; color: var(--dim);
+      letter-spacing: 0.1em; text-transform: uppercase; user-select: none;
+    }
+
+    /* ── Advanced collapsible ───────────────────────────────────────── */
+    .syn-advanced { margin-top: 4px; }
+    .syn-advanced summary {
+      font-size: 8px; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--dim);
+      cursor: pointer; user-select: none; padding: 2px 0;
+    }
+    .syn-advanced summary:hover { color: var(--text); }
+    .syn-advanced[open] summary { margin-bottom: 4px; }
+
+    /* ─── Mute button in TCP ────────────────────────────────────────────── */
+    .tcp-mute {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--dim);
+      font-family: var(--mono);
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 2px;
+      cursor: pointer;
+      white-space: nowrap;
+      line-height: 1.4;
+    }
+    .tcp-mute:hover              { border-color: var(--text); color: var(--text); }
+    .tcp-mute.muted              { background: var(--warn-bg); border-color: var(--warn); color: var(--warn); }
+    .tcp-mute.muted:hover        { opacity: 0.8; }
+    .tcp-solo                    { background: transparent; border: 1px solid var(--border); color: var(--dim); font-family: var(--mono); font-size: 9px; padding: 1px 5px; border-radius: 2px; cursor: pointer; white-space: nowrap; line-height: 1.4; }
+    .tcp-solo:hover              { border-color: var(--text); color: var(--text); }
+    .tcp-solo.active             { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+    .tcp-solo.active:hover       { opacity: 0.8; }
+
+    /* Selected track */
+    .track-row.selected .track-tcp {
+      background: var(--accent-bg);
+      border-left: 2px solid var(--accent);
+      padding-left: 8px;
+    }
+    .track-row.selected .track-wave canvas {
+      opacity: 1;
+    }
+    .track-row:not(.selected).dimmed .track-wave canvas {
+      opacity: 0.5;
+    }
+
+    /* Cursor crosshair */
+    #cursor-v, #cursor-h {
+      position: absolute;
+      pointer-events: none;
+      z-index: 3;
+      display: none;
+    }
+    #cursor-v {
+      top: 0; bottom: 0; width: 1px;
+      background: rgba(255,255,255,0.15);
+    }
+    #cursor-h {
+      left: 0; right: 0; height: 1px;
+      background: rgba(255,255,255,0.15);
+    }
+
+    /* Scale label */
+    .scale-label {
+      position: absolute;
+      top: 2px;
+      right: 4px;
+      font-size: 8px;
+      color: var(--dim);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* (band pills now use .syn-pill — see synth panel section above) */
+
+    /* ─── VU ruler (playhead ticks, appended to #track-area) ─────── */
+    .vu-tick {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      pointer-events: none;
+      transform: translateY(-50%);
+      z-index: 10;
+    }
+    .vu-tick-line {
+      width: 18px;
+      height: 1px;
+      background: rgba(124,127,250,0.6);
+      flex-shrink: 0;
+    }
+    .vu-tick-label {
+      font-size: 10px;
+      color: rgba(200,200,230,0.85);
+      white-space: nowrap;
+      font-family: var(--mono);
+      margin-left: 5px;
+      text-shadow: 0 0 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.7);
+    }
+    /* Range ticks (top/bottom): bold, shows ± value */
+    .vu-tick.range .vu-tick-line {
+      width: 22px;
+      height: 1.5px;
+      background: rgba(124,127,250,0.7);
+    }
+    .vu-tick.range .vu-tick-label {
+      font-weight: 600;
+      font-size: 10px;
+    }
+    /* Major intermediate ticks */
+    .vu-tick.major .vu-tick-line {
+      width: 16px;
+      height: 1px;
+      background: rgba(124,127,250,0.5);
+    }
+    .vu-tick.major .vu-tick-label {
+      font-size: 9px;
+      color: rgba(200,200,230,0.6);
+    }
+    /* Minor ticks: short line, no label */
+    .vu-tick.minor .vu-tick-line {
+      width: 8px;
+      height: 1px;
+      background: rgba(124,127,250,0.2);
+    }
+    /* Zero tick (middle): subtle, just a thin line */
+    .vu-tick.zero .vu-tick-line {
+      width: 12px;
+      height: 1px;
+      background: rgba(124,127,250,0.25);
+    }
+    .vu-tick.zero .vu-tick-label {
+      display: none;
+    }
+
+    /* RMS edge labels (shown at loop boundaries) */
+    .rms-edge {
+      z-index: 11;
+      pointer-events: none;
+    }
+    .rms-edge-text {
+      font-size: 8px;
+      font-family: var(--mono);
+      white-space: nowrap;
+      text-shadow: 0 0 3px rgba(0,0,0,0.95), 0 0 6px rgba(0,0,0,0.8);
+      font-weight: 600;
+      opacity: 0.85;
+    }
+
+    /* ─── Markers (pin style) ─────────────────────────────────────────── */
+    .marker-line {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      pointer-events: auto;
+      cursor: pointer;
+      z-index: 4;
+      opacity: 0.5;
+    }
+    .marker-line:hover { width: 2px; opacity: 0.9; }
+    .marker-pin {
+      position: absolute;
+      top: -2px;
+      transform: translateX(-50%);
+      pointer-events: auto;
+      cursor: pointer;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .marker-pin-head {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
+      font-weight: 700;
+      color: #000;
+      font-family: var(--mono);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+      transition: transform 0.1s;
+    }
+    .marker-pin-stem {
+      width: 2px;
+      height: 8px;
+      opacity: 0.5;
+    }
+    .marker-pin:hover .marker-pin-head {
+      transform: scale(1.2);
+    }
+    .marker-pin-label {
+      position: absolute;
+      top: -16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      font-family: var(--mono);
+      white-space: nowrap;
+      color: var(--text);
+      text-shadow: 0 0 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.6);
+      pointer-events: none;
+      display: none;
+    }
+    .marker-pin:hover .marker-pin-label { display: block; }
+    .marker-pin.selected .marker-pin-label { display: block; }
+    .marker-pin.selected .marker-pin-head {
+      box-shadow: 0 0 0 3px rgba(255,255,255,0.3), 0 1px 4px rgba(0,0,0,0.4);
+    }
+    .marker-pip {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: auto;
+      cursor: pointer;
+      z-index: 2;
+      box-shadow: 0 0 3px rgba(0,0,0,0.5);
+      border: 1.5px solid rgba(0,0,0,0.3);
+      transition: transform 0.1s;
+    }
+    .marker-pip:hover { transform: translate(-50%, -50%) scale(1.4); }
+    .marker-pip.selected { transform: translate(-50%, -50%) scale(1.3); box-shadow: 0 0 0 2px rgba(255,255,255,0.3); }
+
+    /* Marker VU ticks (on marker lines, colored by marker) */
+    .marker-vu-tick {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      pointer-events: none;
+      transform: translateY(-50%);
+      z-index: 4;
+    }
+    .marker-vu-line {
+      height: 1px;
+      flex-shrink: 0;
+    }
+
+    /* Marker comparison panel */
+    .marker-compare {
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed var(--border);
+      font-size: 9px;
+      font-family: var(--mono);
+    }
+    .marker-compare-header {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .marker-compare td { padding: 1px 4px; }
+    .delta-up { color: #f87171; }
+    .delta-down { color: #4ade80; }
+
+    /* Inspector panel */
+    #inspector {
+      flex-shrink: 0;
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      padding: 6px 14px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 11px;
+      min-height: 32px;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    #inspector .insp-label { color: var(--muted); }
+    #inspector .insp-val   { color: var(--text); }
+    #inspector .insp-dim   { color: var(--dim); }
+
+    .tcp-pitch {
+      width: 38px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 9px;
+      text-align: right;
+      padding: 0 2px;
+      border-radius: 2px;
+      outline: none;
+    }
+    .tcp-pitch:hover  { border-color: var(--border); color: var(--text); }
+    .tcp-pitch:focus  { border-color: var(--accent); color: var(--text); background: var(--surface); }
+  </style>
+</head>
+<body>
+
+<!-- ── Header (always visible) ────────────────────────────────────────────── -->
+<div id="header">
+  <div class="logo">SEEG SONIFICATION <span class="v">v8</span></div>
+  <div class="file-info" id="header-file-info" style="display:none"></div>
+  <button class="header-action" id="btn-reopen" style="display:none;margin-left:auto">Open file…</button>
+</div>
+
+<!-- ── Main area ──────────────────────────────────────────────────────────── -->
+<div id="main">
+
+  <!-- Processing overlay (shown during preprocess computation) -->
+  <div id="processing-overlay">
+    <div class="spinner"></div>
+    <div class="proc-label" id="proc-label">Preprocessing…</div>
+  </div>
+
+  <!-- ── Screen: Welcome ────────────────────────────────────────────────── -->
+  <div id="screen-welcome">
+    <div id="protocol-warning" style="display:none">
+      <strong>HTTP server required.</strong><br>
+      ES modules cannot load over <code>file://</code>. Serve this directory:<br>
+      <code>python -m http.server 8080</code> &nbsp;→&nbsp; open <code>http://localhost:8080</code><br>
+      Or use VS Code's Live Server extension (right-click index.html → Open with Live Server).
+    </div>
+
+    <div id="drop-zone">
+      <div class="dz-title">Drop EDF file here</div>
+      <div class="dz-sub">
+        or click to browse<br>
+        EDF and EDF+ (with annotations) supported
+      </div>
+      <span class="dz-ext">.edf &nbsp;·&nbsp; .edf+</span>
+    </div>
+    <input type="file" id="file-input" accept=".edf">
+  </div>
+
+  <!-- ── Screen: Import review ──────────────────────────────────────────── -->
+  <div id="screen-import">
+    <div class="import-card">
+      <div class="import-card-header">
+        Import summary &nbsp;—&nbsp; <span class="fname-display" id="import-fname"></span>
+      </div>
+
+      <div class="import-grid">
+
+        <!-- File summary -->
+        <div class="import-section">
+          <div class="import-section-title">File</div>
+          <div class="kv" id="import-kv-file"></div>
+        </div>
+
+        <!-- Channel structure -->
+        <div class="import-section">
+          <div class="import-section-title">Channel Structure</div>
+          <div class="shaft-list" id="import-shaft-list"></div>
+        </div>
+
+        <!-- Preprocessing options -->
+        <div class="import-section">
+          <div class="import-section-title">Preprocessing</div>
+          <div class="option-row">
+            <span class="opt-label">DC removal</span>
+            <span class="opt-value">✓ Mean subtraction</span>
+          </div>
+          <div class="option-row">
+            <span class="opt-label">Notch filter</span>
+            <select id="opt-line-freq">
+              <option value="60">60 Hz + harmonics (US)</option>
+              <option value="50">50 Hz + harmonics (EU)</option>
+            </select>
+          </div>
+          <div class="option-row">
+            <span class="opt-label">Re-reference</span>
+            <select id="opt-reference">
+              <option value="bipolar">Bipolar (adjacent contacts)</option>
+              <option value="car">Common Average (CAR)</option>
+              <option value="none">None (monopolar)</option>
+            </select>
+          </div>
+          <div id="line-ambig-warning" class="line-ambig" style="display:none"></div>
+          <div id="prebipolar-note" class="line-ambig" style="display:none;border-color:var(--accent);color:var(--accent);background:var(--accent-bg)"></div>
+        </div>
+
+        <!-- Available bands -->
+        <div class="import-section">
+          <div class="import-section-title">Available Frequency Bands</div>
+          <div class="band-tags" id="import-band-tags"></div>
+          <div style="margin-top:10px; color:var(--muted); font-size:10px; line-height:1.7" id="band-note"></div>
+        </div>
+
+      </div><!-- /import-grid -->
+
+      <div class="import-card-footer">
+        <button class="btn-ghost" id="btn-import-back">← Change file</button>
+        <button class="btn-primary" id="btn-preprocess">Import &amp; Preprocess</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen: Workspace ──────────────────────────────────────────────── -->
+  <div id="screen-workspace">
+
+    <!-- Toolbar: transport + collapsible faders -->
+    <div id="transport-bar" style="display:none">
+      <div class="transport-row">
+        <button class="transport-btn" id="btn-stop"  title="Stop (Home)">&#x25A0;</button>
+        <button class="transport-btn" id="btn-play"  title="Play / Pause (Space)">&#x25B6;</button>
+        <button class="transport-btn" id="btn-loop"  title="Loop visible window (L)">&#x27F3;</button>
+        <button class="transport-btn" id="btn-autoscale" title="Auto-scale amplitude (A)">A</button>
+        <button class="transport-btn" id="btn-vu-ruler" title="VU ruler (V)">V</button>
+        <button class="transport-btn" id="btn-zoom-sel" title="Zoom to selected channels (Z)">Z</button>
+        <button class="transport-btn" id="btn-zoom-reset" title="Reset zoom (Esc)" style="font-size:11px">⟲</button>
+        <button class="transport-btn" id="btn-add-marker" title="Add marker at playhead (N)" style="font-size:11px">⚑</button>
+        <div class="transport-seek">
+          <span class="transport-time cur" id="transport-cur">0:00</span>
+          <div id="seek-wrap" style="position:relative;flex:1;display:flex;align-items:center;height:28px">
+            <canvas id="seek-sum-canvas"></canvas>
+            <input type="range" id="seek-bar" min="0" max="1" value="0" step="0.001" style="flex:1">
+            <div id="seek-viewport"></div>
+          </div>
+          <span class="transport-time" id="transport-dur">—:——</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="synth-section">
+
+      <!-- ═══ HEADER — always visible ═══════════════════════════════════ -->
+      <div class="synth-header" id="synth-header">
+
+        <!-- Source: toggle + band pills — fixed width matching source column -->
+        <div class="synth-header-source">
+          <button class="synth-toggle" id="synth-toggle" title="Toggle synthesis panel">&#x25BE;</button>
+          <div class="syn-bands" id="band-pills">
+            <span class="syn-pill active" data-band="full">Full</span>
+            <span class="syn-pill" data-band="delta"     style="--bc:#6366f1">&#x03B4;</span>
+            <span class="syn-pill" data-band="theta"     style="--bc:#06b6d4">&#x03B8;</span>
+            <span class="syn-pill" data-band="alpha"     style="--bc:#22c55e">&#x03B1;</span>
+            <span class="syn-pill" data-band="beta"      style="--bc:#eab308">&#x03B2;</span>
+            <span class="syn-pill" data-band="lowGamma"  style="--bc:#f97316">&#x03B3;</span>
+            <span class="syn-pill" data-band="highGamma" style="--bc:#ef4444">h&#x03B3;</span>
+            <span class="syn-pill" data-band="auto">Auto</span>
+          </div>
+        </div>
+
+        <!-- Module levels: each matches its body column flex -->
+        <label class="syn-mod-level" data-mod="amplitude" style="--mc:#f0a030">
+          <span>Amplitude</span>
+          <input type="range" class="syn-range" id="fader-ampLevel" min="0" max="1" step="0.01" value="1">
+        </label>
+
+        <label class="syn-mod-level" data-mod="morphology" style="--mc:#38bdf8">
+          <span>Morphology</span>
+          <input type="range" class="syn-range" id="fader-morphLevel" min="0" max="1" step="0.01" value="1">
+        </label>
+
+        <label class="syn-mod-level" data-mod="frequency" style="--mc:#4ade80">
+          <span>Frequency</span>
+          <input type="range" class="syn-range" id="fader-freqLevel" min="0" max="1" step="0.01" value="1">
+        </label>
+
+        <label class="syn-mod-level" data-mod="detection" style="--mc:#f87171">
+          <span>Detection</span>
+          <input type="range" class="syn-range" id="fader-detLevel" min="0" max="1" step="0.01" value="0.7">
+        </label>
+
+        <label class="syn-mod-level" data-mod="output" style="--mc:#8888a0">
+          <span>Output</span>
+          <input type="range" class="syn-range" id="fader-masterVolume" min="0" max="1" step="0.01" value="0.7">
+        </label>
+
+      </div>
+
+      <!-- ═══ BODY — collapsible, columns under header labels ═══════════ -->
+      <div class="synth-body" id="synth-body">
+        <div class="synth-panel">
+
+          <!-- Under band pills -->
+          <div class="synth-col" data-col="source">
+            <div class="baro-stack" id="band-barometer">
+              <div class="baro-row" data-band="delta"     style="--bc:#6366f1"><span class="baro-row-label">&#x03B4;</span><div class="baro-row-track"><div class="baro-row-fill"></div></div></div>
+              <div class="baro-row" data-band="theta"     style="--bc:#06b6d4"><span class="baro-row-label">&#x03B8;</span><div class="baro-row-track"><div class="baro-row-fill"></div></div></div>
+              <div class="baro-row" data-band="alpha"     style="--bc:#22c55e"><span class="baro-row-label">&#x03B1;</span><div class="baro-row-track"><div class="baro-row-fill"></div></div></div>
+              <div class="baro-row" data-band="beta"      style="--bc:#eab308"><span class="baro-row-label">&#x03B2;</span><div class="baro-row-track"><div class="baro-row-fill"></div></div></div>
+              <div class="baro-row" data-band="lowGamma"  style="--bc:#f97316"><span class="baro-row-label">&#x03B3;</span><div class="baro-row-track"><div class="baro-row-fill"></div></div></div>
+              <div class="baro-row" data-band="highGamma" style="--bc:#ef4444"><span class="baro-row-label">h&#x03B3;</span><div class="baro-row-track"><div class="baro-row-fill"></div></div></div>
+            </div>
+            <div class="syn-tune">
+              <span style="font-size:9px;color:var(--muted)">1/1 =</span>
+              <input type="number" id="master-tune" min="20" max="2000" step="1" value="130"
+                class="tcp-pitch" style="width:44px;text-align:center">
+              <span style="font-size:9px;color:var(--muted)">Hz</span>
+            </div>
+          </div>
+
+          <!-- Under "Amplitude" -->
+          <div class="synth-col" data-col="amplitude">
+            <label class="syn-fader" data-feature="fastRMS">
+              <span class="syn-label"><span class="syn-label-main">RMS 50ms</span><span class="syn-label-sub">fast bursts</span></span>
+              <input type="range" class="syn-range" id="fader-rmsFast" min="0" max="1" step="0.01" value="0">
+            </label>
+            <label class="syn-fader" data-feature="midRMS">
+              <span class="syn-label"><span class="syn-label-main">RMS 250ms</span><span class="syn-label-sub">oscillatory energy</span></span>
+              <input type="range" class="syn-range" id="fader-rmsMid" min="0" max="1" step="0.01" value="0">
+            </label>
+            <label class="syn-fader" data-feature="slowRMS">
+              <span class="syn-label"><span class="syn-label-main">RMS 1.5s</span><span class="syn-label-sub">slow contour</span></span>
+              <input type="range" class="syn-range" id="fader-rmsSlow" min="0" max="1" step="0.01" value="0.5">
+            </label>
+            <label class="syn-fader" data-feature="adaptiveRMS">
+              <span class="syn-label"><span class="syn-label-main">Adaptive</span><span class="syn-label-sub">band-driven blend</span></span>
+              <input type="range" class="syn-range" id="fader-rmsAdaptive" min="0" max="1" step="0.01" value="0.5">
+            </label>
+            <div class="syn-divider"></div>
+            <label class="syn-fader" data-feature="envelope">
+              <span class="syn-label"><span class="syn-label-main">Hilbert Env</span><span class="syn-label-sub">&#x2192; amplitude modulation</span></span>
+              <input type="range" class="syn-range" id="fader-hilbertAM" min="0" max="1" step="0.01" value="0.3">
+            </label>
+            <label class="syn-fader">
+              <span class="syn-label"><span class="syn-label-main">Dyn. Range</span><span class="syn-label-sub">floor / ceiling</span></span>
+              <input type="range" class="syn-range" id="fader-dynRange" min="0" max="1" step="0.01" value="0.6">
+            </label>
+          </div>
+
+          <!-- Under "Morphology" -->
+          <div class="synth-col" data-col="morphology">
+            <label class="syn-fader" data-feature="slopeAsymmetry">
+              <span class="syn-label"><span class="syn-label-main">Harmonic Range</span><span class="syn-label-sub">overtone extent</span></span>
+              <input type="range" class="syn-range" id="fader-range" min="0" max="1" step="0.01" value="0.5">
+            </label>
+            <label class="syn-fader syn-sub">
+              <span class="syn-label"><span class="syn-label-main">Slope</span><span class="syn-label-sub">rise/fall &#x2192; directional bias</span></span>
+              <input type="range" class="syn-range" id="fader-slopeDepth" min="0" max="1" step="0.01" value="0.4">
+            </label>
+            <label class="syn-fader" data-feature="phase-coloring">
+              <span class="syn-label"><span class="syn-label-main">Sensitivity</span><span class="syn-label-sub">crossfade steepness</span></span>
+              <input type="range" class="syn-range" id="fader-sensitivity" min="0" max="1" step="0.01" value="0.4">
+            </label>
+            <label class="syn-fader syn-sub" data-feature="complexity">
+              <span class="syn-label"><span class="syn-label-main">Complexity</span><span class="syn-label-sub">predictable&#x2192;narrow / chaotic&#x2192;wide</span></span>
+              <input type="range" class="syn-range" id="fader-complexityDepth" min="0" max="1" step="0.01" value="0.5">
+            </label>
+          </div>
+
+          <!-- Under "Frequency" -->
+          <div class="synth-col" data-col="frequency">
+            <label class="syn-fader" data-feature="centroid">
+              <span class="syn-label"><span class="syn-label-main">Focus</span><span class="syn-label-sub">centroid &#x2194; band power</span></span>
+              <input type="range" class="syn-range" id="fader-focus" min="0" max="1" step="0.01" value="0.5">
+            </label>
+            <label class="syn-fader syn-sub" data-feature="mobility">
+              <span class="syn-label"><span class="syn-label-main">Mobility</span><span class="syn-label-sub">slew rate of FM changes</span></span>
+              <input type="range" class="syn-range" id="fader-mobility" min="0" max="1" step="0.01" value="0.3">
+            </label>
+            <label class="syn-fader" data-feature="spectralBandwidth">
+              <span class="syn-label"><span class="syn-label-main">Spectral Bandwidth</span><span class="syn-label-sub">&#x2192; harmonic spread</span></span>
+              <input type="range" class="syn-range" id="fader-bandwidth" min="0" max="1" step="0.01" value="0.0">
+            </label>
+            <label class="syn-fader syn-sub" data-feature="permEntropy">
+              <span class="syn-label"><span class="syn-label-main">Perm. Entropy</span><span class="syn-label-sub">certainty &#x2192; narrow / wide</span></span>
+              <input type="range" class="syn-range" id="fader-entropy" min="0" max="1" step="0.01" value="0.0">
+            </label>
+          </div>
+
+          <!-- Under "Detection" -->
+          <div class="synth-col" data-col="detection">
+            <div class="ppaf-display">
+              <span class="ppaf-display-label">PPAF</span>
+              <canvas id="ppaf-canvas"></canvas>
+            </div>
+            <label class="syn-fader" data-feature="ppaf">
+              <span class="syn-label"><span class="syn-label-main">PPAF Threshold</span><span class="syn-label-sub" id="ppaf-uv-display">150 µV</span></span>
+              <input type="range" class="syn-range" id="fader-ppafThreshold" min="0" max="1" step="0.01" value="0.5">
+            </label>
+            <div class="syn-pair-row">
+              <label class="syn-fader">
+                <span class="syn-label"><span class="syn-label-main">Saturation</span></span>
+                <input type="range" class="syn-range" id="fader-saturation" min="0" max="1" step="0.01" value="0.5">
+              </label>
+              <label class="syn-fader">
+                <span class="syn-label"><span class="syn-label-main">Noise</span></span>
+                <input type="range" class="syn-range" id="fader-noise" min="0" max="1" step="0.01" value="0.4">
+              </label>
+            </div>
+            <div class="syn-pair-row">
+              <label class="syn-fader">
+                <span class="syn-label"><span class="syn-label-main">Attack</span></span>
+                <input type="range" class="syn-range" id="fader-noiseAttack" min="2" max="30" step="1" value="15">
+              </label>
+              <label class="syn-fader">
+                <span class="syn-label"><span class="syn-label-main">Decay</span></span>
+                <input type="range" class="syn-range" id="fader-noiseDecay" min="15" max="200" step="5" value="80">
+              </label>
+            </div>
+            <details class="syn-advanced">
+              <summary>Advanced</summary>
+              <label class="syn-fader" data-feature="spectralFlux">
+                <span class="syn-label"><span class="syn-label-main">Spectral Flux</span><span class="syn-label-sub">directional onset detect</span></span>
+                <input type="range" class="syn-range" id="fader-flux" min="0" max="1" step="0.01" value="0.0">
+              </label>
+              <label class="syn-fader">
+                <span class="syn-label"><span class="syn-label-main">Refractory</span><span class="syn-label-sub">min inter-event gap</span></span>
+                <input type="range" class="syn-range" id="fader-refractory" min="10" max="200" step="5" value="40">
+              </label>
+            </details>
+          </div>
+
+          <!-- Under "Output" -->
+          <div class="synth-col" data-col="output">
+            <label class="syn-fader" data-feature="lineLength">
+              <span class="syn-label"><span class="syn-label-main">Activity Gate</span><span class="syn-label-sub">line-length silence gate</span></span>
+              <input type="range" class="syn-range" id="fader-activityGate" min="0" max="1" step="0.01" value="0.3">
+            </label>
+            <label class="syn-fader">
+              <span class="syn-label"><span class="syn-label-main">Drive</span><span class="syn-label-sub">tissue saturation character</span></span>
+              <input type="range" class="syn-range" id="fader-drive" min="0" max="1" step="0.01" value="0.0">
+            </label>
+            <label class="syn-fader">
+              <span class="syn-label"><span class="syn-label-main">Intensity</span><span class="syn-label-sub">normalized &#x2194; absolute µV</span></span>
+              <input type="range" class="syn-range" id="fader-intensity" min="0" max="1" step="0.01" value="0.0">
+            </label>
+          </div>
+
+        </div><!-- /synth-panel -->
+      </div><!-- /synth-body -->
+
+    </div><!-- /synth-section -->
+
+    <div class="workspace-body">
+
+      <!-- Fixed header: column labels + ruler -->
+      <div class="workspace-header">
+        <div class="tcp-stub">
+          <span></span><span>Channel</span><span>RMS</span><span style="color:var(--dim)">Ratio</span><span style="color:var(--dim)">M</span><span style="color:var(--dim)">S</span>
+        </div>
+        <div class="ruler-wrap" id="ruler"><canvas id="ruler-canvas"></canvas></div>
+      </div>
+
+      <!-- Scrollable track rows (TCP + waveform in each row) -->
+      <div id="track-area">
+        <div class="timeline-placeholder" id="timeline-placeholder">
+          Drop file to begin
+        </div>
+        <!-- track rows populated by renderWorkspace() -->
+      </div>
+
+      <!-- Horizontal time scrollbar -->
+      <div id="h-scroll"><div id="h-scroll-thumb"></div></div>
+
+      <!-- Overlays (positioned relative to workspace-body) -->
+      <div id="playhead"></div>
+      <div id="loop-edge-left" class="loop-edge-line" style="display:none"></div>
+      <div id="loop-edge-right" class="loop-edge-line" style="display:none"></div>
+      <div id="zoom-info"></div>
+      <div id="cursor-v"></div>
+      <div id="cursor-h"></div>
+
+    </div>
+
+    <!-- Inspector panel -->
+    <div id="inspector">
+      <span id="inspector-content" style="color:var(--muted)">Select a channel to inspect</span>
+    </div>
+
+    <!-- Status bar -->
+    <div id="statusbar">
+      <span class="stat-item">DC removed</span>
+      <span class="stat-item">Notch <span class="val" id="stat-notch">—</span></span>
+      <span class="stat-item"><span class="val" id="stat-ref">—</span></span>
+      <span class="stat-item"><span class="val" id="stat-ch">—</span> channels</span>
+      <span class="spacer"></span>
+      <span class="stat-good" id="stat-good"></span>
+      <span class="stat-warn" id="stat-warn"></span>
+      <span class="stat-bad"  id="stat-bad"></span>
+      <span class="stat-item" id="stat-time" style="color:var(--dim)"></span>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- ────────────────────────────────────────────────────────────────────────────
+     Application logic — regular script (NOT type=module) so the UI responds
+     to clicks immediately, even before module imports complete.
+     Module code is loaded lazily via dynamic import() when a file is selected.
+──────────────────────────────────────────────────────────────────────────── -->
+<script>
+  'use strict';
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  let edfResult      = null;
+  let importResult   = null;
+  let preprocessed   = null;
+  let currentFile    = null;
+  let selectedShafts = new Set();  // shaft names selected for processing
+
+  // Engine state
+  let engine  = null;
+  let controls = {
+    // AMPLITUDE
+    rmsFast: 0, rmsMid: 0, rmsSlow: 0, rmsAdaptive: 1,
+    amDepth: 0.3, range: 0.6,
+    // MORPHOLOGY
+    harmonicRange: 0.5, sensitivity: 0.4, slopeDepth: 0.4, complexityDepth: 0.5,
+    // FREQUENCY
+    focus: 0.5, mobilityDepth: 0.3, bandwidthSpread: 0.0, entropyDepth: 0.0,
+    // DETECTION
+    ppafThreshold: 0.5, fluxSensitivity: 0.0, refractoryMs: 40, detectionLevel: 0.7,
+    saturation: 0.5, noiseMix: 0.4, noiseAttackMs: 15, noiseDecayMs: 80,
+    // OUTPUT
+    activityGate: 0.3, drive: 0.0, intensity: 0.0, masterVolume: 0.7,
+  };
+  let layerMix = { root: 1, phase: 1, fm: 1, transient: 1 };
+  let pitchMap = null;           // Map<label, {ratio, ratioLabel, hz, pan}>
+  let ratioOverrides = new Map(); // label → ratio (user edits)
+  let masterTune = 130;          // Hz — global tuning reference
+  let seekDragging = false;
+
+  // Channel selection state
+  let selectedChannels = new Set();
+  let lastClickedChannel = null;
+  let channelZoomed = false;  // true when zoomed into selected channels
+
+  // Voltage cursor state
+  let cursorInfo = { time: 0, voltage: 0, channel: null, visible: false };
+
+  // Feature overlay state
+  let featureOverlay = { label: null, feature: '', color: '', phaseColoring: false };
+
+  // Per-channel gain trim storage (label → dB)
+  let gainTrimMap = new Map();
+
+  // Band mode: 'full' | band name | 'auto'
+  let activeBand = 'full';
+
+  // VU ruler state
+  let vuRulerVisible = false;
+
+  // Waveform marquee drag state (for loop selection from channel area)
+  let waveformDragStart = null;
+  let waveformDragging = false;
+
+  // Markers — colored vertical lines with labels
+  let markers = [];  // [{ id, timeSec, color, label, snapshot }]
+  let nextMarkerId = 1;
+  let selectedMarkerId = null;    // currently selected pin
+  let compareMarkerId = null;     // second pin for comparison
+  let draggingMarker = null;      // marker being dragged
+  const MARKER_COLORS = [
+    '#f87171', '#fb923c', '#fbbf24', '#4ade80',
+    '#22d3ee', '#818cf8', '#c084fc', '#f472b6',
+  ];
+
+  // ── Protocol check ────────────────────────────────────────────────────────
+  // ES modules (dynamic import) are blocked by CORS on file:// — show warning
+  if (location.protocol === 'file:') {
+    document.getElementById('protocol-warning').style.display = 'block';
+  }
+
+  // ── Screen management ─────────────────────────────────────────────────────
+  function showScreen(name) {
+    document.getElementById('screen-welcome').style.display   = name === 'welcome'   ? 'flex'   : 'none';
+    document.getElementById('screen-import').style.display    = name === 'import'    ? 'flex'   : 'none';
+    document.getElementById('screen-workspace').style.display = name === 'workspace' ? 'flex'   : 'none';
+  }
+
+  // ── File input ────────────────────────────────────────────────────────────
+  const dropZone  = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+
+  dropZone.addEventListener('click', () => fileInput.click());
+
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+
+  fileInput.addEventListener('change', e => {
+    if (e.target.files[0]) handleFile(e.target.files[0]);
+    fileInput.value = '';   // allow re-selecting the same file
+  });
+
+  document.getElementById('btn-import-back').addEventListener('click', () => {
+    showScreen('welcome');
+    fileInput.click();      // immediately open file dialog
+  });
+
+  document.getElementById('btn-reopen').addEventListener('click', () => {
+    fileInput.click();
+  });
+
+  // ── Auto-load demo file ──────────────────────────────────────────────────
+  (async function autoLoadDemo() {
+    const DEMO = 'demo/sub-HUP082_ses-presurgery_task-ictal_acq-ecog_run-01_ieeg.edf';
+    try {
+      const res = await fetch('./' + DEMO);
+      if (!res.ok) return;
+      const buf = await res.arrayBuffer();
+      const name = DEMO.split('/').pop();
+      const file = new File([buf], name, { type: 'application/octet-stream' });
+      handleFile(file);
+    } catch (_) { /* demo file not available — silent fallback to drop zone */ }
+  })();
+
+  // ── File handling ─────────────────────────────────────────────────────────
+  async function handleFile(file) {
+    // git-annex pointer files (BIDS/OpenNeuro datasets) are tiny text files,
+    // not actual EDF data. A real EDF is always at least several KB.
+    if (file.size < 4096) {
+      alert(
+        '"' + file.name + '" is only ' + file.size + ' bytes — too small to be a valid EDF file.\n\n' +
+        'If this file is from a BIDS dataset (e.g. OpenNeuro), it may be a git-annex pointer.\n' +
+        'Download the actual data first:\n\n' +
+        '  git annex get <path/to/file.edf>\n' +
+        '  datalad get <path/to/file.edf>'
+      );
+      return;
+    }
+
+    currentFile = file;
+    showProcessing('Parsing ' + file.name + '…');
+
+    try {
+      // Dynamic import — requires HTTP server
+      const [{ parseEDF }, { analyzeImport }] = await Promise.all([
+        import('./lib/edf-parser.js'),
+        import('./src/import.js'),
+      ]);
+
+      const buffer  = await file.arrayBuffer();
+      edfResult     = parseEDF(buffer);
+      importResult  = analyzeImport(edfResult);
+
+      hideProcessing();
+      renderImportScreen(file.name);
+
+    } catch (err) {
+      hideProcessing();
+      if (location.protocol === 'file:') {
+        // The CORS error is already explained in the protocol-warning banner
+        console.error('Module import failed (file:// protocol):', err);
+      } else {
+        alert('Parse error: ' + err.message);
+        console.error(err);
+      }
+    }
+  }
+
+  // ── Import screen ─────────────────────────────────────────────────────────
+  function renderImportScreen(fileName) {
+    const s  = importResult.summary;
+    const ir = importResult;
+
+    document.getElementById('import-fname').textContent = fileName;
+
+    // File KV
+    const fileRows = [
+      ['Duration',    s.duration],
+      ['Sample rate', s.fs + ' Hz'],
+      ['Type',        s.type],
+      ['Annotations', s.annotations > 0 ? s.annotations + ' marker' + (s.annotations > 1 ? 's' : '') : 'none'],
+    ];
+    document.getElementById('import-kv-file').innerHTML =
+      fileRows.map(([k, v]) =>
+        `<div class="kv-row"><span class="k">${esc(k)}</span><span class="v">${esc(String(v))}</span></div>`
+      ).join('');
+
+    // Shaft / channel structure — checkboxes for shaft selection
+    const shaftEl = document.getElementById('import-shaft-list');
+    shaftEl.innerHTML = '';
+    selectedShafts = new Set();
+
+    const shaftNames = Object.keys(ir.shaftSummary);
+    if (shaftNames.length > 0) {
+      // Header: All / None buttons + count
+      const hdr = document.createElement('div');
+      hdr.className = 'shaft-select-header';
+      hdr.innerHTML =
+        '<button class="btn-shaft-sel" id="btn-shafts-all">All</button>' +
+        '<button class="btn-shaft-sel" id="btn-shafts-none">None</button>' +
+        '<span id="shaft-count-display"></span>';
+      shaftEl.appendChild(hdr);
+
+      for (const [name, shaft] of Object.entries(ir.shaftSummary)) {
+        selectedShafts.add(name);
+        const detail = shaft.preBipolar
+          ? shaft.contacts + ' ch'
+          : shaft.contacts + ' contacts → ' + shaft.bipolarPairs + ' pairs';
+        const row = document.createElement('label');
+        row.className = 'shaft-row';
+        row.innerHTML =
+          `<input type="checkbox" class="shaft-cb" data-shaft="${esc(name)}" checked>` +
+          `<span class="shaft-name">${esc(name)}</span>` +
+          `<span class="shaft-detail">${esc(detail)}</span>`;
+        shaftEl.appendChild(row);
+      }
+
+      // Checkbox change
+      shaftEl.addEventListener('change', e => {
+        if (!e.target.classList.contains('shaft-cb')) return;
+        const shaft = e.target.dataset.shaft;
+        if (e.target.checked) selectedShafts.add(shaft);
+        else                  selectedShafts.delete(shaft);
+        updateShaftCount();
+      });
+
+      document.getElementById('btn-shafts-all').addEventListener('click', () => {
+        shaftEl.querySelectorAll('.shaft-cb').forEach(cb => {
+          cb.checked = true;
+          selectedShafts.add(cb.dataset.shaft);
+        });
+        updateShaftCount();
+      });
+      document.getElementById('btn-shafts-none').addEventListener('click', () => {
+        shaftEl.querySelectorAll('.shaft-cb').forEach(cb => {
+          cb.checked = false;
+          selectedShafts.delete(cb.dataset.shaft);
+        });
+        updateShaftCount();
+      });
+
+      updateShaftCount();
+    }
+    if (ir.scalp.length > 0) {
+      const row = document.createElement('label');
+      row.className = 'shaft-row';
+      row.innerHTML = `<span class="shaft-name" style="color:var(--good)">Scalp</span>` +
+        `<span class="shaft-detail">${ir.scalp.length} channels</span>`;
+      shaftEl.appendChild(row);
+    }
+    if (ir.auxiliary.length > 0) {
+      const row = document.createElement('div');
+      row.className = 'shaft-row';
+      row.innerHTML = `<span class="shaft-name" style="color:var(--dim)">Excluded</span>` +
+        `<span class="shaft-detail" style="color:var(--dim)">${ir.auxiliary.map(s => s.label).join(', ')}</span>`;
+      shaftEl.appendChild(row);
+    }
+
+    // Line noise
+    const lfSel = document.getElementById('opt-line-freq');
+    if (ir.lineFreq) lfSel.value = String(ir.lineFreq);
+
+    const ambigEl = document.getElementById('line-ambig-warning');
+    if (ir.lineAmbiguous) {
+      ambigEl.style.display = '';
+      ambigEl.textContent =
+        'Line noise ambiguous — auto-detection inconclusive. ' +
+        'Select manually above. (50 Hz ratio: ' + ir.linePower50.toExponential(2) +
+        ', 60 Hz: ' + ir.linePower60.toExponential(2) + ')';
+    } else {
+      ambigEl.style.display = 'none';
+    }
+
+    // Re-reference default
+    const refSel = document.getElementById('opt-reference');
+    if (ir.preBipolar) {
+      refSel.value = 'none';
+      const note = document.getElementById('prebipolar-note');
+      note.style.display = '';
+      note.textContent = 'Pre-bipolar detected — channels are already re-referenced. "None" selected by default.';
+    } else {
+      document.getElementById('prebipolar-note').style.display = 'none';
+      refSel.value = s.type === 'EEG' ? 'car' : 'bipolar';
+    }
+
+    // Bands
+    const bandEl = document.getElementById('import-band-tags');
+    bandEl.innerHTML = '';
+    for (const b of ir.bands) {
+      const tag = document.createElement('span');
+      tag.className = 'band-tag ' + (b.available ? 'on' : 'off');
+      tag.textContent = b.name;
+      tag.title = b.note + (b.available ? '' : ` (requires fs ≥ ${Math.ceil(b.hi * 2)} Hz)`);
+      bandEl.appendChild(tag);
+    }
+
+    // Band note
+    let noteText = `fs = ${s.fs} Hz → Nyquist ${Math.floor(s.fs / 2)} Hz`;
+    if (!ir.bands.find(b => b.name === 'hfoRipple')?.available) {
+      noteText += '\n HFO detection requires fs ≥ 2048 Hz';
+    }
+    document.getElementById('band-note').textContent = noteText;
+
+    showScreen('import');
+  }
+
+  // ── Preprocessing ─────────────────────────────────────────────────────────
+  document.getElementById('btn-preprocess').addEventListener('click', runPreprocess);
+
+  async function runPreprocess() {
+    if (!importResult) return;
+
+    const lineFreq      = parseInt(document.getElementById('opt-line-freq').value, 10);
+    const referenceMode = document.getElementById('opt-reference').value;
+
+    showProcessing('Preprocessing… (DC removal · notch · re-reference)');
+
+    // Yield so the overlay renders before the blocking computation
+    await new Promise(r => setTimeout(r, 30));
+
+    try {
+      const [{ preprocessRecording }, { extractFeatures }] = await Promise.all([
+        import('./src/preprocess.js'),
+        import('./src/dsp.js'),
+      ]);
+
+      const includeShafts = selectedShafts.size > 0
+        ? Array.from(selectedShafts)
+        : null;
+
+      showProcessing('Preprocessing: DC removal + notch + re-reference…');
+      await new Promise(r => setTimeout(r, 30));
+
+      const t0  = performance.now();
+      preprocessed = preprocessRecording(edfResult, importResult, {
+        lineFreq, referenceMode, includeShafts,
+      });
+      const tPreprocess = performance.now() - t0;
+
+      // Feature extraction — per channel with progress + UI yield
+      const total  = preprocessed.channels.length;
+      const tFeat0 = performance.now();
+      for (let i = 0; i < total; i++) {
+        const ch = preprocessed.channels[i];
+        showProcessing(
+          `Feature extraction: ${i + 1} / ${total}  —  ${ch.label}`
+        );
+        await new Promise(r => setTimeout(r, 0));   // yield to UI thread
+        ch.features = extractFeatures(ch.data, ch.fs);
+      }
+      const tFeatures = performance.now() - tFeat0;
+
+      const ms = (tPreprocess + tFeatures).toFixed(0);
+      console.log(
+        `Pipeline complete: preprocess ${tPreprocess.toFixed(0)}ms + ` +
+        `features ${tFeatures.toFixed(0)}ms = ${ms}ms total`
+      );
+      // Expose for console inspection
+      window._preprocessed = preprocessed;
+      console.log(
+        `Inspect: window._preprocessed.channels[0].features — ` +
+        `keys: ${Object.keys(preprocessed.channels[0]?.features ?? {}).join(', ')}`
+      );
+
+      hideProcessing();
+      await renderWorkspace(lineFreq, referenceMode, ms);
+
+    } catch (err) {
+      hideProcessing();
+      alert('Preprocessing error: ' + err.message);
+      console.error(err);
+    }
+  }
+
+  // ── Workspace / channel list ───────────────────────────────────────────────
+  async function renderWorkspace(lineFreq, referenceMode, ms) {
+    const channels = preprocessed.channels;
+
+    // Compute pitch map for TCP display
+    const { assignPitches } = await import('./src/mapping.js');
+    pitchMap = assignPitches(channels, masterTune, ratioOverrides.size > 0 ? ratioOverrides : null);
+
+    // Header file info
+    const s  = importResult.summary;
+    const pi = document.getElementById('header-file-info');
+    const typeClass = s.type.toLowerCase();
+    pi.style.display = '';
+    pi.innerHTML =
+      `<span class="fname">${esc(currentFile.name)}</span>` +
+      `<span class="pill ${typeClass}">${esc(s.type)}</span>` +
+      `<span class="pill">${esc(s.duration)}</span>` +
+      `<span class="pill">${esc(s.fs + ' Hz')}</span>`;
+
+    document.getElementById('btn-reopen').style.display = '';
+
+    // Status bar
+    const good = channels.filter(c => c.quality?.status === 'good').length;
+    const warn = channels.filter(c => c.quality?.status === 'warn').length;
+    const bad  = channels.filter(c => c.quality?.status === 'bad').length;
+
+    document.getElementById('stat-notch').textContent = lineFreq + ' Hz';
+    document.getElementById('stat-ref').textContent   = referenceMode;
+    document.getElementById('stat-ch').textContent    = channels.length;
+    document.getElementById('stat-good').textContent  = good + ' good';
+    document.getElementById('stat-warn').textContent  = warn > 0 ? warn + ' warn' : '';
+    document.getElementById('stat-bad').textContent   = bad  > 0 ? bad  + ' bad'  : '';
+    document.getElementById('stat-time').textContent  = ms + ' ms';
+
+    // Track area — unified rows (TCP + waveform in each row)
+    const trackArea = document.getElementById('track-area');
+    const placeholder = document.getElementById('timeline-placeholder');
+    trackArea.innerHTML = '';
+    trackArea.appendChild(placeholder);
+
+    // Draw EEG sum in the seek bar
+    drawSeekSum();
+
+    if (referenceMode === 'bipolar') {
+      // Group by shaft
+      const byShaft = {};
+      for (const ch of channels) {
+        const key = ch.shaft || '(other)';
+        if (!byShaft[key]) byShaft[key] = [];
+        byShaft[key].push(ch);
+      }
+
+      for (const [shaftName, chs] of Object.entries(byShaft)) {
+        const gHdr = document.createElement('div');
+        gHdr.className = 'shaft-header';
+        const gWarn = chs.filter(c => c.quality?.status === 'warn').length;
+        const gBad  = chs.filter(c => c.quality?.status === 'bad').length;
+        const badge = gBad > 0
+          ? `<span style="color:var(--bad)">${gBad} bad</span>`
+          : gWarn > 0
+          ? `<span style="color:var(--warn)">${gWarn} warn</span>`
+          : `<span style="color:var(--good)">${chs.length} ok</span>`;
+
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'shaft-title';
+        titleSpan.textContent = '\u25BC ' + shaftName;
+
+        const metaSpan = document.createElement('span');
+        metaSpan.className = 'shaft-meta';
+        metaSpan.innerHTML = badge;
+
+        // Shaft mute button
+        const shaftMuteBtn = document.createElement('button');
+        shaftMuteBtn.className = 'shaft-mute';
+        shaftMuteBtn.textContent = 'M';
+        shaftMuteBtn.title = 'Mute shaft ' + shaftName;
+        shaftMuteBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          const nowMuted = !shaftMuteBtn.classList.contains('muted');
+          shaftMuteBtn.classList.toggle('muted', nowMuted);
+          // Toggle all channel mute buttons in this shaft
+          for (const ch of chs) {
+            const row = document.querySelector(`.track-row[data-label="${CSS.escape(ch.label)}"]`);
+            if (!row) continue;
+            const btn = row.querySelector('.tcp-mute');
+            if (!btn) continue;
+            btn.classList.toggle('muted', nowMuted);
+          }
+          // Apply via solo logic or direct mute
+          if (soloedChannels.size > 0) {
+            applySoloState();
+          } else {
+            for (const ch of chs) {
+              if (engine) engine.setChannelMute(ch.label, nowMuted);
+            }
+          }
+          scheduleRedraw();
+        });
+
+        // Shaft solo button
+        const shaftSoloBtn = document.createElement('button');
+        shaftSoloBtn.className = 'shaft-solo';
+        shaftSoloBtn.textContent = 'S';
+        shaftSoloBtn.title = 'Solo shaft ' + shaftName;
+        shaftSoloBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          const nowSoloed = !shaftSoloBtn.classList.contains('active');
+          shaftSoloBtn.classList.toggle('active', nowSoloed);
+          // Toggle solo on all channels in this shaft + their individual S buttons
+          for (const ch of chs) {
+            if (nowSoloed) {
+              soloedChannels.add(ch.label);
+            } else {
+              soloedChannels.delete(ch.label);
+            }
+            const row = document.querySelector(`.track-row[data-label="${CSS.escape(ch.label)}"]`);
+            if (row) {
+              const btn = row.querySelector('.tcp-solo');
+              if (btn) btn.classList.toggle('active', nowSoloed);
+            }
+          }
+          applySoloState();
+        });
+
+        gHdr.appendChild(titleSpan);
+        gHdr.appendChild(shaftMuteBtn);
+        gHdr.appendChild(shaftSoloBtn);
+        gHdr.appendChild(metaSpan);
+        trackArea.appendChild(gHdr);
+
+        // Channel rows in a collapsible container
+        const shaftGroup = document.createElement('div');
+        shaftGroup.className = 'shaft-group';
+        for (const ch of chs) appendTrackRow(shaftGroup, ch);
+        trackArea.appendChild(shaftGroup);
+
+        // Click header to collapse/expand, or select shaft channels
+        titleSpan.addEventListener('click', e => {
+          if (e.altKey) {
+            // Alt+click shaft header: select all channels in shaft
+            selectShaftChannels(shaftName);
+            return;
+          }
+          const collapsed = shaftGroup.style.display === 'none';
+          shaftGroup.style.display = collapsed ? '' : 'none';
+          titleSpan.textContent = (collapsed ? '\u25BC' : '\u25B6') + ' ' + shaftName;
+          scheduleRedraw();
+        });
+      }
+    } else {
+      for (const ch of channels) appendTrackRow(trackArea, ch);
+    }
+
+    // Show transport bar and init engine
+    document.getElementById('transport-bar').style.display = '';
+    document.getElementById('transport-dur').textContent =
+      fmtTime(preprocessed.channels.reduce((mx, ch) => Math.max(mx, ch.data.length / ch.fs), 0));
+    document.getElementById('btn-autoscale').classList.toggle('active', autoScaleEnabled);
+
+    showScreen('workspace');
+    initView();
+    initEngine();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // VIEW STATE & WAVEFORM RENDERING
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const MIN_TRACK_HEIGHT = 24;
+  const MAX_TRACK_HEIGHT = 400;
+  const SUM_ROW_HEIGHT   = 40;
+  const RULER_HEIGHT     = 22;
+  const MIN_VIEW_SEC     = 1.0;
+  let   trackHeightOverride = null; // null = auto-fit, number = manual px height
+
+  // View state
+  let viewStartSec   = 0;
+  let viewEndSec     = 0;
+  let totalDuration   = 0;
+  let shaftHues       = {};
+  let _rafId          = null;
+  let _zoomInfoTimer  = null;
+  let autoScaleEnabled = true;
+
+  // Loop state
+  let loopStart   = null;
+  let loopEnd     = null;
+  let loopActive  = false;
+  let rulerDragStart = null;
+  let loopEdgeDrag   = null;   // 'start' | 'end' | null — which edge is being dragged
+
+  /** Activate a new loop region */
+  function activateLoop(start, end) {
+    loopStart = start;
+    loopEnd = end;
+    loopActive = true;
+    document.getElementById('btn-loop')?.classList.add('active');
+    drawRuler();
+    if (vuRulerVisible) updateVURulerTicks();
+  }
+
+  /** Clear loop region */
+  function clearLoop() {
+    loopStart = null;
+    loopEnd = null;
+    loopActive = false;
+    document.getElementById('btn-loop')?.classList.remove('active');
+    drawRuler();
+    if (vuRulerVisible) updateVURulerTicks();
+  }
+
+  /** Handle a seek-click: keep loop if inside, clear if outside */
+  function seekAndManageLoop(t) {
+    if (loopActive && loopStart !== null && loopEnd !== null) {
+      if (t < loopStart || t > loopEnd) clearLoop();
+    }
+    if (!engine || totalDuration <= 0) return;
+    t = Math.max(0, Math.min(t, totalDuration));
+    const wasPlaying = engine.isPlaying;
+    engine.seek(t, wasPlaying);
+    updatePlayhead(t);
+    document.getElementById('transport-cur').textContent = fmtTime(t);
+    if (totalDuration > 0) document.getElementById('seek-bar').value = t / totalDuration;
+    if (wasPlaying) {
+      document.getElementById('btn-play').textContent = '\u23F8';
+      document.getElementById('btn-play').classList.add('active');
+    }
+  }
+
+  function initView() {
+    if (!preprocessed) return;
+    const channels = preprocessed.channels;
+    totalDuration = channels.reduce((mx, ch) => Math.max(mx, ch.data.length / ch.fs), 0);
+    viewStartSec = 0;
+    viewEndSec   = totalDuration;
+
+    // Shaft color palette
+    const shaftNames = [...new Set(channels.map(c => c.shaft || c.label))];
+    shaftHues = {};
+    shaftNames.forEach((name, i) => {
+      shaftHues[name] = (i / shaftNames.length) * 360;
+    });
+
+    document.getElementById('timeline-placeholder').style.display = 'none';
+    applyTrackHeights();
+    scheduleRedraw();
+  }
+
+  function computeTrackHeight() {
+    // Manual override from vertical zoom
+    if (trackHeightOverride !== null) {
+      return Math.max(MIN_TRACK_HEIGHT, Math.min(MAX_TRACK_HEIGHT, trackHeightOverride));
+    }
+
+    const trackArea = document.getElementById('track-area');
+    if (!trackArea || !preprocessed) return 32;
+
+    const allRows = trackArea.querySelectorAll('.track-row');
+    let visibleCount = 0;
+    for (const row of allRows) {
+      // Skip individually hidden rows (channel zoom) or rows inside collapsed shaft groups
+      if (row.style.display === 'none') continue;
+      const parent = row.parentElement;
+      if (parent && parent.classList.contains('shaft-group') && parent.style.display === 'none') continue;
+      visibleCount++;
+    }
+    if (visibleCount <= 0) return 32;
+
+    const available = trackArea.clientHeight;
+    let visibleHeaderCount = 0;
+    trackArea.querySelectorAll('.shaft-header').forEach(h => {
+      if (h.style.display !== 'none') visibleHeaderCount++;
+    });
+    const usable = available - visibleHeaderCount * 28;
+
+    return Math.max(MIN_TRACK_HEIGHT, Math.min(MAX_TRACK_HEIGHT, Math.floor(usable / visibleCount)));
+  }
+
+  function applyTrackHeights() {
+    const h = computeTrackHeight();
+    const rows = document.querySelectorAll('#track-area .track-row');
+    for (const row of rows) row.style.height = h + 'px';
+  }
+
+  function viewDuration() { return viewEndSec - viewStartSec; }
+
+  // ── Redraw scheduling (coalesce rapid events) ──────────────────────────────
+  function scheduleRedraw() {
+    if (_rafId) return;
+    _rafId = requestAnimationFrame(() => {
+      _rafId = null;
+      applyTrackHeights();
+      drawWaveforms();
+      drawSeekSum();
+      drawRuler();
+      updateScaleLabels();
+      updatePlayhead(engine ? engine.currentTimeSec : 0);
+      if (vuRulerVisible) updateVURulerTicks();
+      if (markers.length > 0) drawMarkers();
+      updateSeekViewport();
+      updateHScroll();
+    });
+  }
+
+  // ── Waveform drawing (per-channel canvases) ──────────────────────────────
+  function drawWaveforms() {
+    if (!preprocessed) return;
+    const channels = preprocessed.channels;
+    const dpr = window.devicePixelRatio || 1;
+
+    const vStart = viewStartSec;
+    const vDur   = viewDuration();
+
+    // Build a label→channel lookup
+    const chMap = {};
+    for (const ch of channels) chMap[ch.label] = ch;
+
+    // Draw each visible per-channel canvas
+    const canvases = document.querySelectorAll('#track-area .track-wave canvas');
+    for (const canvas of canvases) {
+      const label = canvas.dataset.label;
+      const ch = chMap[label];
+      if (!ch) continue;
+
+      const container = canvas.parentElement;
+      const width  = container.clientWidth;
+      const height = container.clientHeight;
+      if (width <= 0 || height <= 0) continue;
+
+      canvas.width  = width * dpr;
+      canvas.height = height * dpr;
+
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+
+      const data = ch.data;
+      const fs   = ch.fs;
+
+      const hue = shaftHues[ch.shaft || ch.label] ?? 200;
+      const lightness = ch.quality?.status === 'bad' ? 25 : 45;
+
+      ctx.strokeStyle = `hsl(${hue}, 55%, ${lightness}%)`;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+
+      const amp = autoScaleEnabled ? getVisibleScale(ch) : (ch.features?.calibration?.ampCeiling ?? 1);
+      const scale = amp > 0 ? (height * 0.4) / amp : 1;
+      const mid = height / 2;
+
+      const sStart = Math.floor(vStart * fs);
+      const sEnd   = Math.min(Math.ceil((vStart + vDur) * fs), data.length);
+      const samplesPerPx = ((sEnd - sStart) / width) || 1;
+
+      for (let px = 0; px < width; px++) {
+        const s0 = sStart + Math.floor(px * samplesPerPx);
+        const s1 = Math.min(sStart + Math.floor((px + 1) * samplesPerPx), data.length);
+
+        let mn = Infinity, mx = -Infinity;
+        const step = Math.max(1, Math.floor((s1 - s0) / 8));
+        for (let s = s0; s < s1; s += step) {
+          const v = data[s];
+          if (v < mn) mn = v;
+          if (v > mx) mx = v;
+        }
+        if (mn === Infinity) continue;
+
+        const yMin = mid - mx * scale;
+        const yMax = mid - mn * scale;
+
+        if (px === 0) ctx.moveTo(px, yMin);
+        ctx.lineTo(px, yMin);
+        ctx.lineTo(px, yMax);
+      }
+      ctx.stroke();
+
+      // Feature overlay
+      if (featureOverlay.label === label && ch.features) {
+        // Phase polarity coloring: tint positive voltage warm, negative cool
+        if (featureOverlay.phaseColoring) {
+          const warmColor = 'rgba(240, 160, 48, 0.4)';
+          const coolColor = 'rgba(100, 180, 255, 0.4)';
+          const sStart2 = Math.floor(vStart * fs);
+          const sEnd2   = Math.min(Math.ceil((vStart + vDur) * fs), data.length);
+          const spp = ((sEnd2 - sStart2) / width) || 1;
+          for (let px = 0; px < width; px++) {
+            const s0 = sStart2 + Math.floor(px * spp);
+            const s1 = Math.min(sStart2 + Math.floor((px + 1) * spp), data.length);
+            let sum = 0, cnt = 0;
+            const step = Math.max(1, Math.floor((s1 - s0) / 4));
+            for (let s = s0; s < s1; s += step) { sum += data[s]; cnt++; }
+            if (cnt === 0) continue;
+            const avg = sum / cnt;
+            ctx.fillStyle = avg >= 0 ? warmColor : coolColor;
+            const yTop = mid - Math.abs(avg) * scale;
+            const yH = Math.abs(avg) * scale;
+            ctx.fillRect(px, avg >= 0 ? yTop : mid, 1, Math.max(yH, 0.5));
+          }
+        }
+
+        // Standard feature trace overlay
+        if (featureOverlay.feature) {
+          const feat = ch.features[featureOverlay.feature];
+          if (feat && feat.length) {
+            let fMin = Infinity, fMax = -Infinity;
+            for (let i = 0; i < feat.length; i++) {
+              if (feat[i] < fMin) fMin = feat[i];
+              if (feat[i] > fMax) fMax = feat[i];
+            }
+            const fRange = fMax - fMin || 1;
+
+            ctx.strokeStyle = featureOverlay.color || 'rgba(124, 127, 250, 0.7)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+
+            const featPerSec = feat.length / (ch.data.length / ch.fs);
+            for (let px = 0; px < width; px++) {
+              const tAtPx = vStart + (px / width) * vDur;
+              const featIdx = Math.min(Math.floor(tAtPx * featPerSec), feat.length - 1);
+              if (featIdx < 0) continue;
+              const normalized = (feat[featIdx] - fMin) / fRange;
+              const y = height - normalized * height * 0.9 - height * 0.05;
+              if (px === 0) ctx.moveTo(px, y);
+              else ctx.lineTo(px, y);
+            }
+            ctx.stroke();
+          }
+        }
+      }
+    }
+  }
+
+  // ── Auto-scale: per-channel visible-window amplitude ──────────────────────
+  function getVisibleScale(ch) {
+    const fs = ch.fs;
+    const s0 = Math.floor(viewStartSec * fs);
+    const s1 = Math.min(Math.ceil(viewEndSec * fs), ch.data.length);
+    if (s1 <= s0) return ch.features?.calibration?.ampCeiling ?? 1;
+
+    const sampleStep = Math.max(1, Math.floor((s1 - s0) / 2000));
+    const samples = [];
+    for (let s = s0; s < s1; s += sampleStep) {
+      samples.push(Math.abs(ch.data[s]));
+    }
+    samples.sort((a, b) => a - b);
+    return samples[Math.floor(samples.length * 0.98)] || 1;
+  }
+
+  // ── Summed EEG display ────────────────────────────────────────────────────
+  function isChannelMuted(label) {
+    const btn = document.querySelector(`.track-row[data-label="${CSS.escape(label)}"] .tcp-mute`);
+    return btn ? btn.classList.contains('muted') : false;
+  }
+
+  // ── Solo logic ──────────────────────────────────────────────────────────────
+  let soloedChannels = new Set();
+
+  function toggleSolo(label, btn) {
+    if (soloedChannels.has(label)) {
+      // Un-solo: remove from set
+      soloedChannels.delete(label);
+      btn.classList.remove('active');
+    } else {
+      // Solo: add to set
+      soloedChannels.add(label);
+      btn.classList.add('active');
+    }
+    applySoloState();
+  }
+
+  function applySoloState() {
+    if (!engine || !preprocessed) return;
+    const hasSolo = soloedChannels.size > 0;
+    for (const ch of preprocessed.channels) {
+      const row = document.querySelector(`.track-row[data-label="${CSS.escape(ch.label)}"]`);
+      if (!row) continue;
+      const muteBtn = row.querySelector('.tcp-mute');
+      const isManuallyMuted = muteBtn?.classList.contains('muted') ?? false;
+
+      // If any channel is soloed: mute everything except soloed channels
+      // (unless the soloed channel is also manually muted)
+      let shouldMute;
+      if (hasSolo) {
+        shouldMute = !soloedChannels.has(ch.label) || isManuallyMuted;
+      } else {
+        shouldMute = isManuallyMuted;
+      }
+      engine.setChannelMute(ch.label, shouldMute);
+    }
+    scheduleRedraw();
+  }
+
+  /** Draw full-duration EEG sum waveform in the seek bar, per-shaft colors */
+  function drawSeekSum() {
+    const canvas = document.getElementById('seek-sum-canvas');
+    if (!canvas || !preprocessed) return;
+
+    const wrap = canvas.parentElement;
+    const width = wrap.clientWidth;
+    const height = wrap.clientHeight;
+    if (width <= 0 || height <= 0) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const channels = preprocessed.channels.filter(ch => !isChannelMuted(ch.label));
+    if (channels.length === 0) return;
+
+    // Group channels by shaft
+    const byShaft = {};
+    for (const ch of channels) {
+      const key = ch.shaft || ch.label;
+      if (!byShaft[key]) byShaft[key] = [];
+      byShaft[key].push(ch);
+    }
+    const shaftKeys = Object.keys(byShaft);
+
+    const fs = channels[0].fs;
+    const totalSamples = channels[0].data.length;
+    const samplesPerPx = (totalSamples / width) || 1;
+    const mid = height / 2;
+
+    // First pass: compute per-shaft min/max and find global max across all shafts
+    const shaftData = [];
+    let globalMax = 0;
+
+    for (const key of shaftKeys) {
+      const chs = byShaft[key];
+      const mins = new Float32Array(width);
+      const maxs = new Float32Array(width);
+
+      for (let px = 0; px < width; px++) {
+        const s0 = Math.floor(px * samplesPerPx);
+        const s1 = Math.min(Math.floor((px + 1) * samplesPerPx), totalSamples);
+        let mn = Infinity, mx = -Infinity;
+        const step = Math.max(1, Math.floor((s1 - s0) / 8));
+
+        for (let s = s0; s < s1; s += step) {
+          let sum = 0;
+          for (const ch of chs) {
+            if (s < ch.data.length) sum += ch.data[s];
+          }
+          if (sum < mn) mn = sum;
+          if (sum > mx) mx = sum;
+        }
+        if (mn === Infinity) { mn = 0; mx = 0; }
+        mins[px] = mn;
+        maxs[px] = mx;
+        const absMax = Math.max(Math.abs(mn), Math.abs(mx));
+        if (absMax > globalMax) globalMax = absMax;
+      }
+
+      shaftData.push({ key, mins, maxs });
+    }
+
+    if (globalMax === 0) return;
+    const scale = (height * 0.42) / globalMax;
+
+    // Draw each shaft as a filled + stroked layer
+    for (const { key, mins, maxs } of shaftData) {
+      const hue = shaftHues[key] ?? 200;
+
+      // Filled area
+      ctx.fillStyle = `hsla(${hue}, 55%, 45%, 0.12)`;
+      ctx.beginPath();
+      ctx.moveTo(0, mid);
+      for (let px = 0; px < width; px++) ctx.lineTo(px, mid - maxs[px] * scale);
+      for (let px = width - 1; px >= 0; px--) ctx.lineTo(px, mid - mins[px] * scale);
+      ctx.closePath();
+      ctx.fill();
+
+      // Stroke
+      ctx.strokeStyle = `hsla(${hue}, 55%, 45%, 0.4)`;
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      for (let px = 0; px < width; px++) {
+        const yMin = mid - maxs[px] * scale;
+        const yMax = mid - mins[px] * scale;
+        if (px === 0) ctx.moveTo(px, yMin);
+        ctx.lineTo(px, yMin);
+        ctx.lineTo(px, yMax);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // ── Ruler canvas ───────────────────────────────────────────────────────────
+  function drawRuler() {
+    const rulerCanvas = document.getElementById('ruler-canvas');
+    const ruler = document.querySelector('.ruler-wrap');
+    if (!rulerCanvas || !ruler) return;
+
+    const dpr   = window.devicePixelRatio || 1;
+    const width = ruler.clientWidth;
+    const height = RULER_HEIGHT;
+
+    rulerCanvas.width  = width * dpr;
+    rulerCanvas.height = height * dpr;
+
+    const ctx = rulerCanvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const vDur = viewDuration();
+    if (vDur <= 0) return;
+
+    // Choose tick interval: want ~60-150px between major ticks
+    const pxPerSec = width / vDur;
+    const intervals = [0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
+    let tickInterval = intervals[intervals.length - 1];
+    for (const iv of intervals) {
+      if (iv * pxPerSec >= 60) { tickInterval = iv; break; }
+    }
+
+    const firstTick = Math.ceil(viewStartSec / tickInterval) * tickInterval;
+
+    ctx.font = '9px JetBrains Mono, monospace';
+    ctx.textBaseline = 'top';
+
+    // Always draw 3 anchor ticks: start, middle, end
+    const midSec = (viewStartSec + viewEndSec) / 2;
+    const anchors = [
+      { t: viewStartSec, align: 'left',   xOff: 3 },
+      { t: midSec,       align: 'center', xOff: 0 },
+      { t: viewEndSec,   align: 'right',  xOff: -3 },
+    ];
+    for (const a of anchors) {
+      const x = ((a.t - viewStartSec) / vDur) * width;
+      // Tick mark
+      ctx.beginPath();
+      ctx.moveTo(x, height - 1);
+      ctx.lineTo(x, height - 6);
+      ctx.strokeStyle = '#5a5a62';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      // Label
+      ctx.fillStyle = '#6a6a72';
+      ctx.textAlign = a.align;
+      ctx.fillText(fmtTimeRuler(a.t), x + a.xOff, 3);
+    }
+    ctx.textAlign = 'start';
+    ctx.fillStyle = '#3d3d45';
+
+    // Additional ticks when zoomed in enough
+    for (let t = firstTick; t <= viewEndSec; t += tickInterval) {
+      const x = ((t - viewStartSec) / vDur) * width;
+      // Skip if too close to anchors (within 40px)
+      const tooClose = anchors.some(a => {
+        const ax = ((a.t - viewStartSec) / vDur) * width;
+        return Math.abs(x - ax) < 40;
+      });
+
+      // Major tick
+      ctx.beginPath();
+      ctx.moveTo(x, height - 1);
+      ctx.lineTo(x, height - 8);
+      ctx.strokeStyle = '#4a4a52';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Label (only if not overlapping anchors)
+      if (!tooClose) {
+        ctx.fillText(fmtTimeRuler(t), x + 3, 3);
+      }
+
+      // Minor ticks (4 subdivisions)
+      const minor = tickInterval / 4;
+      for (let m = 1; m < 4; m++) {
+        const mx = ((t + m * minor - viewStartSec) / vDur) * width;
+        if (mx < 0 || mx > width) continue;
+        ctx.beginPath();
+        ctx.moveTo(mx, height - 1);
+        ctx.lineTo(mx, height - 4);
+        ctx.strokeStyle = '#27272d';
+        ctx.stroke();
+      }
+    }
+
+    // Loop region highlight + draggable edge handles
+    if ((loopActive || rulerDragStart !== null) && loopStart !== null && loopEnd !== null) {
+      const x0 = ((loopStart - viewStartSec) / vDur) * width;
+      const x1 = ((loopEnd - viewStartSec) / vDur) * width;
+      const lx = Math.max(0, x0);
+      const rx = Math.min(width, x1);
+      if (rx > lx) {
+        // Fill
+        ctx.fillStyle = 'rgba(124, 127, 250, 0.15)';
+        ctx.fillRect(lx, 0, rx - lx, height);
+
+        // Top accent line — always visible when loop spans the view
+        ctx.fillStyle = '#7c7ffa';
+        ctx.fillRect(lx, 0, rx - lx, 2);
+
+        // Edge handles (solid bars when in view)
+        const HANDLE_W = 3;
+        if (x0 >= 0 && x0 <= width) {
+          ctx.fillStyle = '#7c7ffa';
+          ctx.fillRect(x0 - HANDLE_W / 2, 0, HANDLE_W, height);
+        } else if (x0 < 0) {
+          // Left edge off-screen: draw inward-pointing marker
+          ctx.fillStyle = 'rgba(124, 127, 250, 0.5)';
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(6, height / 2); ctx.lineTo(0, height); ctx.fill();
+        }
+        if (x1 >= 0 && x1 <= width) {
+          ctx.fillStyle = '#7c7ffa';
+          ctx.fillRect(x1 - HANDLE_W / 2, 0, HANDLE_W, height);
+        } else if (x1 > width) {
+          // Right edge off-screen: draw inward-pointing marker
+          ctx.fillStyle = 'rgba(124, 127, 250, 0.5)';
+          ctx.beginPath(); ctx.moveTo(width, 0); ctx.lineTo(width - 6, height / 2); ctx.lineTo(width, height); ctx.fill();
+        }
+      }
+    }
+
+    // Markers on ruler
+    if (markers.length > 0) drawRulerMarkers(ctx, width, height);
+
+    // Position loop edge lines in the workspace body
+    const edgeL = document.getElementById('loop-edge-left');
+    const edgeR = document.getElementById('loop-edge-right');
+    if (edgeL && edgeR) {
+      if ((loopActive || rulerDragStart !== null) && loopStart !== null && loopEnd !== null) {
+        const rulerWrap = document.querySelector('.ruler-wrap');
+        const body = edgeL.parentElement;
+        if (rulerWrap && body) {
+          const bodyRect = body.getBoundingClientRect();
+          const rulerRect = rulerWrap.getBoundingClientRect();
+          const waveLeft = rulerRect.left - bodyRect.left;
+          const waveW = rulerRect.width;
+
+          const lx = waveLeft + ((loopStart - viewStartSec) / vDur) * waveW;
+          const rx = waveLeft + ((loopEnd - viewStartSec) / vDur) * waveW;
+
+          edgeL.style.left = lx + 'px';
+          edgeL.style.display = (lx >= 0 && lx <= bodyRect.width) ? '' : 'none';
+          edgeR.style.left = rx + 'px';
+          edgeR.style.display = (rx >= 0 && rx <= bodyRect.width) ? '' : 'none';
+        }
+      } else {
+        edgeL.style.display = 'none';
+        edgeR.style.display = 'none';
+      }
+    }
+  }
+
+  function fmtTimeRuler(sec) {
+    if (sec < 60) return sec.toFixed(sec % 1 === 0 ? 0 : 1) + 's';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return m + ':' + String(s).padStart(2, '0');
+  }
+
+  // ── Playhead ───────────────────────────────────────────────────────────────
+  function updatePlayhead(timeSec) {
+    const playhead = document.getElementById('playhead');
+    if (!playhead) return;
+
+    const vDur = viewDuration();
+    if (vDur <= 0) return;
+
+    const fraction = (timeSec - viewStartSec) / vDur;
+
+    // Playhead is inside workspace-body; compute x relative to ruler-wrap
+    const rulerWrap = document.querySelector('.ruler-wrap');
+    if (!rulerWrap) return;
+    const bodyRect = playhead.parentElement.getBoundingClientRect();
+    const rulerRect = rulerWrap.getBoundingClientRect();
+    const waveLeft = rulerRect.left - bodyRect.left;
+    const waveW = rulerRect.width;
+    const x = waveLeft + fraction * waveW;
+    playhead.style.left = x + 'px';
+    playhead.style.display = (fraction >= -0.01 && fraction <= 1.01) ? '' : 'none';
+
+    // VU ruler ticks ride on the playhead
+    if (vuRulerVisible) updateVURulerTicks();
+  }
+
+  // ── Seek bar viewport window ──────────────────────────────────────────────
+  function updateSeekViewport() {
+    const vp = document.getElementById('seek-viewport');
+    const wrap = document.getElementById('seek-wrap');
+    if (!vp || !wrap || totalDuration <= 0) return;
+
+    const leftPct = (viewStartSec / totalDuration) * 100;
+    const widthPct = (viewDuration() / totalDuration) * 100;
+
+    if (widthPct >= 99.5) {
+      vp.classList.add('full');
+    } else {
+      vp.classList.remove('full');
+      vp.style.left = leftPct + '%';
+      vp.style.width = widthPct + '%';
+    }
+  }
+
+  // Viewport drag
+  {
+    let vpDragStart = null; // { mouseX, viewStart, viewEnd }
+    const vp = document.getElementById('seek-viewport');
+    if (vp) {
+      vp.addEventListener('mousedown', e => {
+        if (e.button !== 0 || totalDuration <= 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        vpDragStart = { mouseX: e.clientX, viewStart: viewStartSec, viewEnd: viewEndSec };
+        vp.style.cursor = 'grabbing';
+      });
+    }
+    document.addEventListener('mousemove', e => {
+      if (!vpDragStart) return;
+      const wrap = document.getElementById('seek-wrap');
+      if (!wrap) return;
+      const wrapW = wrap.getBoundingClientRect().width;
+      const dx = e.clientX - vpDragStart.mouseX;
+      const dtSec = (dx / wrapW) * totalDuration;
+      const dur = vpDragStart.viewEnd - vpDragStart.viewStart;
+
+      let newStart = vpDragStart.viewStart + dtSec;
+      // Clamp
+      if (newStart < 0) newStart = 0;
+      if (newStart + dur > totalDuration) newStart = totalDuration - dur;
+
+      viewStartSec = newStart;
+      viewEndSec = newStart + dur;
+      scheduleRedraw();
+    });
+    document.addEventListener('mouseup', () => {
+      if (vpDragStart) {
+        vpDragStart = null;
+        const vp = document.getElementById('seek-viewport');
+        if (vp) vp.style.cursor = '';
+      }
+    });
+  }
+
+  // ── Horizontal time scrollbar ───────────────────────────────────────────────
+  function updateHScroll() {
+    const bar = document.getElementById('h-scroll');
+    const thumb = document.getElementById('h-scroll-thumb');
+    if (!bar || !thumb || totalDuration <= 0) return;
+
+    const vDur = viewDuration();
+    const ratio = vDur / totalDuration;
+    if (ratio >= 0.995) {
+      thumb.style.display = 'none';
+      return;
+    }
+    thumb.style.display = '';
+    const barW = bar.clientWidth;
+    const thumbW = Math.max(12, ratio * barW);
+    const leftPx = (viewStartSec / totalDuration) * barW;
+    thumb.style.width = thumbW + 'px';
+    thumb.style.left = leftPx + 'px';
+  }
+
+  {
+    let hDragStart = null;
+    const hBar = document.getElementById('h-scroll');
+    const hThumb = document.getElementById('h-scroll-thumb');
+    if (hThumb) {
+      hThumb.addEventListener('mousedown', e => {
+        if (e.button !== 0 || totalDuration <= 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        hDragStart = { mouseX: e.clientX, viewStart: viewStartSec };
+      });
+    }
+    if (hBar) {
+      hBar.addEventListener('mousedown', e => {
+        if (e.target === hThumb || totalDuration <= 0) return;
+        // Click on track — jump to that position
+        const rect = hBar.getBoundingClientRect();
+        const frac = (e.clientX - rect.left) / rect.width;
+        const dur = viewDuration();
+        let newStart = frac * totalDuration - dur / 2;
+        newStart = Math.max(0, Math.min(totalDuration - dur, newStart));
+        viewStartSec = newStart;
+        viewEndSec = newStart + dur;
+        scheduleRedraw();
+      });
+    }
+    document.addEventListener('mousemove', e => {
+      if (!hDragStart) return;
+      const barW = hBar?.clientWidth || 1;
+      const dx = e.clientX - hDragStart.mouseX;
+      const dtSec = (dx / barW) * totalDuration;
+      const dur = viewDuration();
+      let newStart = hDragStart.viewStart + dtSec;
+      newStart = Math.max(0, Math.min(totalDuration - dur, newStart));
+      viewStartSec = newStart;
+      viewEndSec = newStart + dur;
+      scheduleRedraw();
+    });
+    document.addEventListener('mouseup', () => {
+      if (hDragStart) hDragStart = null;
+    });
+  }
+
+  // ── Horizontal zoom (Ctrl+scroll) ─────────────────────────────────────────
+  document.getElementById('track-area')?.addEventListener('wheel', (e) => {
+    if (!preprocessed || totalDuration <= 0) return;
+
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
+      // Vertical zoom — change track height
+      e.preventDefault();
+      const currentH = computeTrackHeight();
+      const factor = e.deltaY > 0 ? 0.8 : 1.25;
+      const newH = Math.round(currentH * factor);
+      trackHeightOverride = Math.max(MIN_TRACK_HEIGHT, Math.min(MAX_TRACK_HEIGHT, newH));
+      scheduleRedraw();
+      showZoomInfo();
+    } else if (e.ctrlKey || e.metaKey) {
+      // Horizontal zoom centered on cursor
+      e.preventDefault();
+      const rect = e.currentTarget.getBoundingClientRect();
+      const tcpW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tcp-w')) || 264;
+      const waveLeft = rect.left + tcpW;
+      const waveW = rect.width - tcpW;
+      const mouseX = Math.max(0, Math.min(1, (e.clientX - waveLeft) / waveW));
+      const cursorTime = viewStartSec + mouseX * viewDuration();
+
+      const zoomFactor = e.deltaY > 0 ? 1.25 : 0.8;
+      let newDur = viewDuration() * zoomFactor;
+      newDur = Math.max(MIN_VIEW_SEC, Math.min(totalDuration, newDur));
+
+      let newStart = cursorTime - mouseX * newDur;
+      newStart = Math.max(0, Math.min(totalDuration - newDur, newStart));
+
+      viewStartSec = newStart;
+      viewEndSec   = newStart + newDur;
+
+      scheduleRedraw();
+      showZoomInfo();
+    } else if (e.shiftKey) {
+      // Horizontal pan
+      e.preventDefault();
+      const panSec = viewDuration() * 0.15 * (e.deltaY > 0 ? 1 : -1);
+      let newStart = viewStartSec + panSec;
+      newStart = Math.max(0, Math.min(totalDuration - viewDuration(), newStart));
+      viewEndSec = newStart + viewDuration();
+      viewStartSec = newStart;
+      scheduleRedraw();
+    }
+    // Plain scroll → vertical (browser default, handled by track-area overflow)
+  }, { passive: false });
+
+  function showZoomInfo() {
+    const el = document.getElementById('zoom-info');
+    if (!el) return;
+    const dur = viewDuration();
+    const hPart = trackHeightOverride ? ` · ${computeTrackHeight()}px` : '';
+    el.textContent = (dur >= 60
+      ? (dur / 60).toFixed(1) + ' min visible'
+      : dur.toFixed(1) + 's visible') + hPart;
+    el.classList.add('visible');
+    clearTimeout(_zoomInfoTimer);
+    _zoomInfoTimer = setTimeout(() => el.classList.remove('visible'), 1500);
+  }
+
+  // Zoom on ruler too
+  document.querySelector('.ruler-wrap')?.addEventListener('wheel', (e) => {
+    if (!preprocessed || totalDuration <= 0) return;
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const rect = e.currentTarget.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left) / rect.width;
+      const cursorTime = viewStartSec + mouseX * viewDuration();
+      const zoomFactor = e.deltaY > 0 ? 1.25 : 0.8;
+      let newDur = viewDuration() * zoomFactor;
+      newDur = Math.max(MIN_VIEW_SEC, Math.min(totalDuration, newDur));
+      let newStart = cursorTime - mouseX * newDur;
+      newStart = Math.max(0, Math.min(totalDuration - newDur, newStart));
+      viewStartSec = newStart;
+      viewEndSec   = newStart + newDur;
+      scheduleRedraw();
+      showZoomInfo();
+    }
+  }, { passive: false });
+
+  // ── Click ruler or waveform to seek ────────────────────────────────────────
+  function timelineSeek(e) {
+    if (!engine || totalDuration <= 0) return;
+    if (e.target.closest('.track-tcp') || e.target.closest('.shaft-header') || e.target.tagName === 'BUTTON') return;
+
+    const trackArea = document.getElementById('track-area');
+    const rect = trackArea.getBoundingClientRect();
+    const tcpW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tcp-w')) || 264;
+    const waveLeft = rect.left + tcpW;
+    const waveW = rect.width - tcpW;
+    const fraction = (e.clientX - waveLeft) / waveW;
+    if (fraction < 0 || fraction > 1) return;
+
+    seekAndManageLoop(viewStartSec + fraction * viewDuration());
+  }
+
+  // Ruler: click to seek, drag to set loop region, drag edges to adjust
+  {
+    const rulerEl = document.getElementById('ruler');
+    if (rulerEl) {
+      const EDGE_PX = 8; // hit zone for edge handles
+      const MIN_HOLD_MS = 250; // mouse held 250ms+ = intentional drag
+      let rulerDownTime = 0;
+      let rulerSavedLoop = null; // save previous loop during tentative drag
+      let rulerDragCommitted = false;
+
+      // Helper: which loop edge (if any) is near pixel x?
+      function hitLoopEdge(clientX) {
+        if (!loopActive || loopStart === null || loopEnd === null) return null;
+        const rect = rulerEl.getBoundingClientRect();
+        const vDur = viewDuration();
+        const x0 = ((loopStart - viewStartSec) / vDur) * rect.width;
+        const x1 = ((loopEnd - viewStartSec) / vDur) * rect.width;
+        const mx = clientX - rect.left;
+        if (Math.abs(mx - x0) <= EDGE_PX) return 'start';
+        if (Math.abs(mx - x1) <= EDGE_PX) return 'end';
+        return null;
+      }
+
+      rulerEl.addEventListener('mousemove', (e) => {
+        if (rulerDragStart !== null) {
+          const holdMs = Date.now() - rulerDownTime;
+          if (holdMs < MIN_HOLD_MS) return; // don't start drawing until hold threshold passes
+
+          // Committed drag — show tentative loop
+          rulerDragCommitted = true;
+          const rect = rulerEl.getBoundingClientRect();
+          const fraction = (e.clientX - rect.left) / rect.width;
+          const t = viewStartSec + fraction * viewDuration();
+          loopStart = Math.min(rulerDragStart, t);
+          loopEnd = Math.max(rulerDragStart, t);
+          drawRuler();
+          return;
+        }
+        if (loopEdgeDrag) {
+          const rect = rulerEl.getBoundingClientRect();
+          const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+          const t = viewStartSec + fraction * viewDuration();
+          if (loopEdgeDrag === 'start') {
+            loopStart = Math.min(t, loopEnd - 0.05);
+          } else {
+            loopEnd = Math.max(t, loopStart + 0.05);
+          }
+          drawRuler();
+          return;
+        }
+        // Hover cursor
+        rulerEl.style.cursor = hitLoopEdge(e.clientX) ? 'ew-resize' : 'pointer';
+      });
+
+      rulerEl.addEventListener('mousedown', (e) => {
+        const rect = rulerEl.getBoundingClientRect();
+        const fraction = (e.clientX - rect.left) / rect.width;
+        const t = viewStartSec + fraction * viewDuration();
+
+        if (e.altKey) {
+          e.preventDefault();
+          addMarker(t);
+          return;
+        }
+
+        const edge = hitLoopEdge(e.clientX);
+        if (edge) {
+          loopEdgeDrag = edge;
+          e.preventDefault();
+          return;
+        }
+
+        // Save loop state before any drag
+        rulerSavedLoop = { start: loopStart, end: loopEnd, active: loopActive };
+        rulerDragCommitted = false;
+        rulerDragStart = t;
+        rulerDownTime = Date.now();
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (loopEdgeDrag) {
+          loopEdgeDrag = null;
+          rulerEl.style.cursor = 'pointer';
+          drawRuler();
+          if (vuRulerVisible) updateVURulerTicks();
+          return;
+        }
+
+        if (rulerDragStart === null) return;
+
+        if (rulerDragCommitted && loopEnd - loopStart >= 0.1) {
+          // Committed drag → new loop
+          activateLoop(loopStart, loopEnd);
+        } else {
+          // Restore previous loop, then seek
+          if (rulerSavedLoop) {
+            loopStart = rulerSavedLoop.start;
+            loopEnd = rulerSavedLoop.end;
+            loopActive = rulerSavedLoop.active;
+          }
+          seekAndManageLoop(rulerDragStart);
+        }
+        rulerSavedLoop = null;
+        rulerDragStart = null;
+        drawRuler();
+      });
+
+      // Double-click on loop region = clear loop
+      rulerEl.addEventListener('dblclick', (e) => {
+        if (!loopActive || loopStart === null || loopEnd === null) return;
+        const rect = rulerEl.getBoundingClientRect();
+        const fraction = (e.clientX - rect.left) / rect.width;
+        const t = viewStartSec + fraction * viewDuration();
+        if (t >= loopStart && t <= loopEnd) clearLoop();
+      });
+    }
+  }
+  // Seek on waveform click
+  document.getElementById('track-area')?.addEventListener('click', timelineSeek);
+
+  // ── Keyboard shortcuts ─────────────────────────────────────────────────────
+  document.addEventListener('keydown', (e) => {
+    // Don't capture when typing in inputs
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+    if (e.code === 'Space') {
+      e.preventDefault();
+      document.getElementById('btn-play')?.click();
+    } else if (e.code === 'Home') {
+      e.preventDefault();
+      if (engine) {
+        engine.stop();
+        document.getElementById('btn-play').textContent = '\u25B6';
+        document.getElementById('btn-play').classList.remove('active');
+        document.getElementById('transport-cur').textContent = fmtTime(0);
+        document.getElementById('seek-bar').value = 0;
+        updatePlayhead(0);
+      }
+    } else if (e.code === 'End') {
+      e.preventDefault();
+      if (engine) {
+        engine.seek(totalDuration - 0.1, false);
+        updatePlayhead(totalDuration);
+        document.getElementById('transport-cur').textContent = fmtTime(totalDuration);
+        document.getElementById('seek-bar').value = 1;
+      }
+    } else if (e.code === 'KeyL') {
+      e.preventDefault();
+      if (loopActive && loopStart === viewStartSec && loopEnd === viewEndSec) {
+        clearLoop();
+      } else {
+        activateLoop(viewStartSec, viewEndSec);
+      }
+    } else if (e.code === 'KeyA' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      selectAllChannels();
+    } else if (e.code === 'KeyA') {
+      e.preventDefault();
+      autoScaleEnabled = !autoScaleEnabled;
+      document.getElementById('btn-autoscale')?.classList.toggle('active', autoScaleEnabled);
+      scheduleRedraw();
+    } else if (e.code === 'KeyD' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      clearSelection();
+    } else if (e.code === 'KeyS' && !e.ctrlKey && !e.metaKey) {
+      // Solo selected channels
+      if (selectedChannels.size > 0) {
+        e.preventDefault();
+        for (const label of selectedChannels) {
+          const btn = document.querySelector(`.track-row[data-label="${CSS.escape(label)}"] .tcp-solo`);
+          if (btn) {
+            btn.classList.toggle('active');
+            if (btn.classList.contains('active')) soloedChannels.add(label);
+            else soloedChannels.delete(label);
+          }
+        }
+        applySoloState();
+      }
+    } else if (e.code === 'KeyM' && !e.ctrlKey && !e.metaKey) {
+      // Mute selected channels
+      if (selectedChannels.size > 0) {
+        e.preventDefault();
+        for (const label of selectedChannels) {
+          const btn = document.querySelector(`.track-row[data-label="${CSS.escape(label)}"] .tcp-mute`);
+          if (btn) btn.click();
+        }
+      }
+    } else if (e.code === 'ArrowUp') {
+      e.preventDefault();
+      moveSelection(-1);
+    } else if (e.code === 'ArrowDown') {
+      e.preventDefault();
+      moveSelection(1);
+    } else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+      if (!engine || totalDuration <= 0) return;
+      e.preventDefault();
+      const dir = e.code === 'ArrowRight' ? 1 : -1;
+      const fs = preprocessed?.channels?.[0]?.fs || 1024;
+      const step = (e.ctrlKey || e.metaKey) ? 1.0 : e.shiftKey ? 0.1 : (1 / fs);
+      const t = Math.max(0, Math.min(totalDuration, (engine.currentTimeSec || 0) + dir * step));
+      const wasPlaying = engine.isPlaying;
+      engine.seek(t, wasPlaying);
+      updatePlayhead(t);
+      document.getElementById('transport-cur').textContent = fmtTime(t);
+      if (totalDuration > 0) document.getElementById('seek-bar').value = t / totalDuration;
+    } else if (e.code === 'KeyV' && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      toggleVURuler();
+    } else if (e.code === 'KeyZ' && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      toggleZoomToSelection();
+    } else if (e.code === 'KeyN' && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      const t = engine ? engine.currentTimeSec : 0;
+      addMarker(t);
+    } else if (e.code === 'Escape') {
+      e.preventDefault();
+      clearLoop();
+      unzoomChannels();
+      clearSelection();
+      scheduleRedraw();
+    }
+  });
+
+  // ── Synth panel toggle ─────────────────────────────────────────────────────
+  document.getElementById('synth-toggle')?.addEventListener('click', () => {
+    const body = document.getElementById('synth-body');
+    const btn  = document.getElementById('synth-toggle');
+    const isCollapsed = body.classList.toggle('collapsed');
+    btn.textContent = isCollapsed ? '\u25B8' : '\u25BE';
+  });
+
+  // ── Resize handler ─────────────────────────────────────────────────────────
+  window.addEventListener('resize', () => scheduleRedraw());
+
+  // ── Track area scroll → update VU ruler ticks ─────────────────────────────
+  document.getElementById('track-area')?.addEventListener('scroll', () => {
+    if (vuRulerVisible) updateVURulerTicks();
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CHANNEL SELECTION
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function selectChannel(label, e) {
+    if (!preprocessed) return;
+    const allLabels = preprocessed.channels.map(c => c.label);
+
+    if (e && e.shiftKey && lastClickedChannel) {
+      // Range select
+      const i0 = allLabels.indexOf(lastClickedChannel);
+      const i1 = allLabels.indexOf(label);
+      if (i0 >= 0 && i1 >= 0) {
+        const lo = Math.min(i0, i1), hi = Math.max(i0, i1);
+        for (let i = lo; i <= hi; i++) selectedChannels.add(allLabels[i]);
+      }
+    } else if (e && (e.ctrlKey || e.metaKey)) {
+      // Toggle
+      if (selectedChannels.has(label)) selectedChannels.delete(label);
+      else selectedChannels.add(label);
+    } else {
+      // Single select
+      selectedChannels.clear();
+      selectedChannels.add(label);
+    }
+    lastClickedChannel = label;
+    applySelectionVisuals();
+    updateInspector();
+  }
+
+  function selectShaftChannels(shaftName) {
+    if (!preprocessed) return;
+    for (const ch of preprocessed.channels) {
+      if ((ch.shaft || ch.label) === shaftName) selectedChannels.add(ch.label);
+    }
+    applySelectionVisuals();
+    updateInspector();
+  }
+
+  function clearSelection() {
+    selectedChannels.clear();
+    lastClickedChannel = null;
+    applySelectionVisuals();
+    updateInspector();
+  }
+
+  function selectAllChannels() {
+    if (!preprocessed) return;
+    for (const ch of preprocessed.channels) selectedChannels.add(ch.label);
+    applySelectionVisuals();
+    updateInspector();
+  }
+
+  function moveSelection(direction) {
+    if (!preprocessed) return;
+    const allLabels = preprocessed.channels.map(c => c.label);
+    if (allLabels.length === 0) return;
+
+    if (selectedChannels.size === 0) {
+      selectedChannels.add(allLabels[0]);
+    } else {
+      const current = [...selectedChannels];
+      const lastLabel = current[current.length - 1];
+      const idx = allLabels.indexOf(lastLabel);
+      const newIdx = Math.max(0, Math.min(allLabels.length - 1, idx + direction));
+      selectedChannels.clear();
+      selectedChannels.add(allLabels[newIdx]);
+      lastClickedChannel = allLabels[newIdx];
+      // Scroll into view
+      const row = document.querySelector(`.track-row[data-label="${CSS.escape(allLabels[newIdx])}"]`);
+      if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+    applySelectionVisuals();
+    updateInspector();
+  }
+
+  function zoomToSelection() {
+    if (!preprocessed || selectedChannels.size === 0) return;
+
+    // Hide individual track rows that aren't selected
+    const trackArea = document.getElementById('track-area');
+    const allRows = trackArea?.querySelectorAll('.track-row') ?? [];
+    for (const row of allRows) {
+      const label = row.dataset.label;
+      row.style.display = selectedChannels.has(label) ? '' : 'none';
+    }
+
+    // Hide shaft headers that have no visible children, show those that do
+    const shaftHeaders = document.querySelectorAll('.shaft-header');
+    for (const hdr of shaftHeaders) {
+      const group = hdr.nextElementSibling;
+      if (!group?.classList.contains('shaft-group')) continue;
+      group.style.display = '';  // ensure group itself is visible
+      const titleSpan = hdr.querySelector('.shaft-title');
+      if (titleSpan) {
+        const name = titleSpan.textContent.replace(/^[▶▼]\s*/, '');
+        titleSpan.textContent = '\u25BC ' + name;
+      }
+      const hasVisible = [...group.querySelectorAll('.track-row')].some(r => r.style.display !== 'none');
+      hdr.style.display = hasVisible ? '' : 'none';
+      if (!hasVisible) group.style.display = 'none';
+    }
+
+    // Set track height to fill available space with just the selected channels
+    if (trackArea) {
+      const available = trackArea.clientHeight;
+      const visibleHeaderCount = [...shaftHeaders].filter(h => h.style.display !== 'none').length;
+      const usable = available - visibleHeaderCount * 28;
+      const h = Math.floor(usable / selectedChannels.size);
+      trackHeightOverride = Math.max(MIN_TRACK_HEIGHT, Math.min(MAX_TRACK_HEIGHT, h));
+    }
+
+    channelZoomed = true;
+    document.getElementById('btn-zoom-sel')?.classList.add('active');
+    scheduleRedraw();
+
+    // Scroll the first selected channel into view
+    requestAnimationFrame(() => {
+      const firstLabel = [...selectedChannels][0];
+      const firstRow = document.querySelector(`.track-row[data-label="${CSS.escape(firstLabel)}"]`);
+      if (firstRow) firstRow.scrollIntoView({ block: 'start', behavior: 'instant' });
+    });
+  }
+
+  function unzoomChannels() {
+    channelZoomed = false;
+    document.getElementById('btn-zoom-sel')?.classList.remove('active');
+    trackHeightOverride = null;
+    // Show all track rows
+    const allRows = document.querySelectorAll('#track-area .track-row');
+    for (const row of allRows) row.style.display = '';
+    // Show all shaft headers and groups
+    document.querySelectorAll('.shaft-header').forEach(h => h.style.display = '');
+    document.querySelectorAll('.shaft-group').forEach(g => g.style.display = '');
+    document.querySelectorAll('.shaft-header .shaft-title').forEach(t => {
+      const name = t.textContent.replace(/^[▶▼]\s*/, '');
+      t.textContent = '\u25BC ' + name;
+    });
+    scheduleRedraw();
+  }
+
+  function toggleZoomToSelection() {
+    if (channelZoomed) {
+      unzoomChannels();
+    } else {
+      zoomToSelection();
+    }
+  }
+
+  function applySelectionVisuals() {
+    const rows = document.querySelectorAll('#track-area .track-row');
+    const anySelected = selectedChannels.size > 0;
+    for (const row of rows) {
+      const label = row.dataset.label;
+      const sel = selectedChannels.has(label);
+      row.classList.toggle('selected', sel);
+      row.classList.toggle('dimmed', anySelected && !sel);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // INSPECTOR PANEL
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function updateInspector() {
+    const el = document.getElementById('inspector-content');
+    if (!el) return;
+
+    if (selectedChannels.size === 0) {
+      const name = currentFile?.name ?? 'No file';
+      const nCh = preprocessed?.channels?.length ?? 0;
+      el.innerHTML =
+        `<span class="insp-dim">${esc(name)}</span>` +
+        (nCh > 0 ? `<span class="insp-dim">${nCh} channels</span>` : '') +
+        `<span class="insp-dim" style="margin-left:auto">Thomas Listens · 2026</span>`;
+      return;
+    }
+
+    if (selectedChannels.size === 1) {
+      const label = [...selectedChannels][0];
+      const ch = preprocessed?.channels.find(c => c.label === label);
+      if (!ch) return;
+
+      const pm = pitchMap?.get(label);
+      const pitch = pm?.hz?.toFixed(1) ?? '—';
+      const ratio = pm?.ratioLabel ?? '—';
+      const q = ch.quality ?? {};
+      const statusColor = q.status === 'good' ? 'good' : q.status === 'warn' ? 'warn' : 'bad';
+      const trimDB = gainTrimMap.get(label) ?? 0;
+
+      el.innerHTML =
+        `<strong class="insp-val">${esc(label)}</strong>` +
+        `<span class="insp-label">Shaft: <span class="insp-val">${esc(ch.shaft || '—')}</span></span>` +
+        `<span class="insp-val">${pitch} Hz</span>` +
+        `<span class="insp-val">${esc(ratio)}</span>` +
+        `<span class="insp-label">fs: <span class="insp-val">${ch.fs}</span></span>` +
+        `<span style="color:var(--${statusColor})">${q.status ?? '—'}</span>` +
+        `<span class="insp-label">RMS: <span class="insp-val">${q.rms?.toFixed(1) ?? '—'} µV</span></span>` +
+        `<span style="display:inline-flex;align-items:center;gap:4px">` +
+          `<span class="insp-label">Gain</span>` +
+          `<input type="range" id="inspector-gain" min="-20" max="12" step="0.5" value="${trimDB}"` +
+          ` style="width:80px;accent-color:var(--accent)">` +
+          `<span id="inspector-gain-val" style="font-size:10px;color:var(--muted);min-width:45px">` +
+          `${trimDB >= 0 ? '+' : ''}${trimDB.toFixed(1)} dB</span>` +
+        `</span>` +
+        `<span style="display:inline-flex;align-items:center;gap:4px">` +
+          `<span class="insp-label">Feature</span>` +
+          `<select id="inspector-feature" style="background:var(--surface2);border:1px solid var(--border2);` +
+          `color:var(--text);padding:2px 6px;font-family:var(--mono);font-size:10px;border-radius:3px">` +
+            `<option value="">None</option>` +
+            `<option value="envelope"${featureOverlay.feature==='envelope'?' selected':''}>Envelope</option>` +
+            `<option value="centroid"${featureOverlay.feature==='centroid'?' selected':''}>Centroid</option>` +
+            `<option value="lineLength"${featureOverlay.feature==='lineLength'?' selected':''}>Line Length</option>` +
+            `<option value="mobility"${featureOverlay.feature==='mobility'?' selected':''}>Mobility</option>` +
+            `<option value="permEntropy"${featureOverlay.feature==='permEntropy'?' selected':''}>Entropy</option>` +
+            `<option value="ppaf"${featureOverlay.feature==='ppaf'?' selected':''}>PPAF</option>` +
+            `<option value="slowRMS"${featureOverlay.feature==='slowRMS'?' selected':''}>Slow RMS</option>` +
+            `<option value="spectralFlux"${featureOverlay.feature==='spectralFlux'?' selected':''}>Spectral Flux</option>` +
+          `</select>` +
+        `</span>` +
+        `<span id="inspector-cursor" class="insp-dim"></span>`;
+
+      // Wire gain trim fader
+      document.getElementById('inspector-gain')?.addEventListener('input', onInspGainInput);
+      // Wire feature overlay select
+      document.getElementById('inspector-feature')?.addEventListener('change', onInspFeatureChange);
+      return;
+    }
+
+    // Multiple selection
+    const shafts = new Set();
+    for (const lbl of selectedChannels) {
+      const ch = preprocessed?.channels.find(c => c.label === lbl);
+      if (ch) shafts.add(ch.shaft || '—');
+    }
+    const shaftStr = shafts.size === 1 ? ` · Shaft: ${[...shafts][0]}` : '';
+    el.innerHTML =
+      `<span class="insp-val">${selectedChannels.size} channels selected${shaftStr}</span>` +
+      `<span style="display:inline-flex;align-items:center;gap:4px">` +
+        `<span class="insp-label">Gain</span>` +
+        `<input type="range" id="inspector-gain" min="-20" max="12" step="0.5" value="0"` +
+        ` style="width:80px;accent-color:var(--accent)">` +
+        `<span id="inspector-gain-val" style="font-size:10px;color:var(--muted);min-width:45px">+0.0 dB</span>` +
+      `</span>` +
+      `<span id="inspector-cursor" class="insp-dim"></span>`;
+
+    document.getElementById('inspector-gain')?.addEventListener('input', onInspGainInput);
+  }
+
+  function onInspGainInput(e) {
+    const dB = parseFloat(e.target.value);
+    document.getElementById('inspector-gain-val').textContent =
+      (dB >= 0 ? '+' : '') + dB.toFixed(1) + ' dB';
+    for (const label of selectedChannels) {
+      gainTrimMap.set(label, dB);
+      if (engine) engine.setChannelGainTrim(label, dB);
+    }
+  }
+
+  function onInspFeatureChange(e) {
+    featureOverlay.feature = e.target.value;
+    featureOverlay.label = selectedChannels.size === 1 ? [...selectedChannels][0] : null;
+    scheduleRedraw();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // VOLTAGE CURSOR + CROSSHAIR
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  document.getElementById('track-area')?.addEventListener('mousemove', e => {
+    if (!preprocessed) return;
+
+    const trackRow = e.target.closest('.track-row');
+    const cursorV = document.getElementById('cursor-v');
+    const cursorH = document.getElementById('cursor-h');
+    if (!trackRow) {
+      cursorInfo.visible = false;
+      if (cursorV) cursorV.style.display = 'none';
+      if (cursorH) cursorH.style.display = 'none';
+      updateCursorDisplay();
+      return;
+    }
+
+    const label = trackRow.dataset.label;
+    const ch = preprocessed.channels.find(c => c.label === label);
+    if (!ch) return;
+
+    const waveEl = trackRow.querySelector('.track-wave');
+    if (!waveEl) return;
+    const rect = waveEl.getBoundingClientRect();
+    const xFrac = (e.clientX - rect.left) / rect.width;
+    const time = viewStartSec + xFrac * viewDuration();
+
+    const sampleIdx = Math.floor(time * ch.fs);
+    const voltage = (sampleIdx >= 0 && sampleIdx < ch.data.length) ? ch.data[sampleIdx] : 0;
+    cursorInfo = { time, voltage, channel: label, visible: true };
+    updateCursorDisplay();
+
+    // Position crosshair overlays
+    const bodyEl = document.querySelector('.workspace-body');
+    if (bodyEl && cursorV && cursorH) {
+      const bodyRect = bodyEl.getBoundingClientRect();
+      cursorV.style.display = '';
+      cursorV.style.left = (e.clientX - bodyRect.left) + 'px';
+
+      const rowRect = trackRow.getBoundingClientRect();
+      cursorH.style.display = '';
+      cursorH.style.top = (e.clientY - bodyRect.top) + 'px';
+      cursorH.style.left = (rect.left - bodyRect.left) + 'px';
+      cursorH.style.width = rect.width + 'px';
+    }
+  });
+
+  document.getElementById('track-area')?.addEventListener('mouseleave', () => {
+    cursorInfo.visible = false;
+    const cursorV = document.getElementById('cursor-v');
+    const cursorH = document.getElementById('cursor-h');
+    if (cursorV) cursorV.style.display = 'none';
+    if (cursorH) cursorH.style.display = 'none';
+    updateCursorDisplay();
+  });
+
+  function updateCursorDisplay() {
+    const el = document.getElementById('inspector-cursor');
+    if (!el) return;
+    if (cursorInfo.visible && cursorInfo.channel) {
+      const t = cursorInfo.time;
+      const m = Math.floor(t / 60);
+      const s = (t % 60).toFixed(3);
+      const vStr = Math.abs(cursorInfo.voltage) >= 1000
+        ? (cursorInfo.voltage / 1000).toFixed(2) + ' mV'
+        : cursorInfo.voltage.toFixed(1) + ' µV';
+      el.textContent = `${m}:${s.padStart(6, '0')}  │  ${vStr}`;
+      el.style.color = 'var(--text)';
+    } else {
+      el.textContent = '';
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Y-AXIS SCALE LABELS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function updateScaleLabels() {
+    if (!preprocessed) return;
+    const rows = document.querySelectorAll('#track-area .track-row');
+    for (const row of rows) {
+      const label = row.dataset.label;
+      const ch = preprocessed.channels.find(c => c.label === label);
+      if (!ch) continue;
+
+      const waveEl = row.querySelector('.track-wave');
+      if (!waveEl) continue;
+
+      let sl = waveEl.querySelector('.scale-label');
+      if (!sl) {
+        sl = document.createElement('div');
+        sl.className = 'scale-label';
+        waveEl.appendChild(sl);
+      }
+
+      const amp = autoScaleEnabled ? getVisibleScale(ch) : (ch.features?.calibration?.ampCeiling ?? 100);
+      sl.textContent = '±' + (amp >= 1000
+        ? (amp / 1000).toFixed(1) + ' mV'
+        : amp.toFixed(0) + ' µV');
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // BAND SELECTOR
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  document.getElementById('band-pills')?.addEventListener('click', async e => {
+    const pill = e.target.closest('.syn-pill');
+    if (!pill) return;
+
+    const band = pill.dataset.band;
+    if (band === activeBand) return; // already active
+
+    // Deactivate all pills, activate clicked
+    for (const p of document.querySelectorAll('#band-pills .syn-pill')) {
+      p.classList.remove('active');
+    }
+    pill.classList.add('active');
+    activeBand = band;
+
+    // Rebuild curves with new band envelope
+    if (engine && preprocessed) {
+      const wasPlaying = engine.isPlaying;
+      const t = engine.currentTimeSec;
+      engine.setBandMode(activeBand);
+      await engine.seek(t, wasPlaying);
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // VU RULER
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function toggleVURuler() {
+    vuRulerVisible = !vuRulerVisible;
+    document.getElementById('btn-vu-ruler')?.classList.toggle('active', vuRulerVisible);
+    updateVURulerTicks();
+    if (markers.length > 0) drawMarkers();
+  }
+
+  /**
+   * Draw VU ruler ticks on the playhead, one set per visible track row.
+   * Called from updatePlayhead() so ticks move with it automatically.
+   */
+  function updateVURulerTicks() {
+    const trackArea = document.getElementById('track-area');
+    if (!trackArea) return;
+
+    // Remove existing VU ticks
+    trackArea.querySelectorAll('.vu-tick').forEach(t => t.remove());
+
+    if (!vuRulerVisible || !preprocessed) return;
+
+    const playhead = document.getElementById('playhead');
+    if (!playhead || playhead.style.display === 'none') return;
+
+    const areaRect = trackArea.getBoundingClientRect();
+    const phRect = playhead.getBoundingClientRect();
+    const phX = phRect.left - areaRect.left;
+
+    const rows = trackArea.querySelectorAll('.track-row');
+
+    for (const row of rows) {
+      const parent = row.parentElement;
+      if (parent?.classList.contains('shaft-group') && parent.style.display === 'none') continue;
+
+      const chLabel = row.dataset.label;
+      const ch = preprocessed.channels.find(c => c.label === chLabel);
+      if (!ch) continue;
+
+      const waveEl = row.querySelector('.track-wave');
+      if (!waveEl) continue;
+
+      const waveRect = waveEl.getBoundingClientRect();
+      const trackH = waveRect.height;
+      if (trackH < 12) continue;
+
+      const trackTopY = waveRect.top - areaRect.top + trackArea.scrollTop;
+      const trackMidY = trackTopY + trackH / 2;
+
+      const amp = autoScaleEnabled ? getVisibleScale(ch) : (ch.features?.calibration?.ampCeiling ?? 100);
+      if (amp <= 0) continue;
+
+      const fmtUV = (v) => {
+        const a = Math.abs(v);
+        if (a >= 10000) return (v > 0 ? '+' : '-') + Math.round(a / 1000) + 'mV';
+        if (a >= 1000) return (v > 0 ? '+' : '-') + (a / 1000).toFixed(1) + 'mV';
+        return (v > 0 ? '+' : '-') + Math.round(a) + 'µV';
+      };
+      const rangeStr = `±${fmtUV(amp).slice(1)}`;
+      const pxPerUV = (trackH * 0.4) / amp;
+      const PAD = 4;
+
+      // ── Playhead VU ticks ─────────────────────────────────────────────
+      const makeTick = (y, cls, inner) => {
+        if (y < trackTopY + PAD || y > trackTopY + trackH - PAD) return;
+        const div = document.createElement('div');
+        div.className = 'vu-tick ' + cls;
+        div.style.top = y + 'px';
+        div.style.left = phX + 'px';
+        div.innerHTML = inner;
+        trackArea.appendChild(div);
+      };
+
+      if (trackH >= 40) {
+        const steps = [5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000];
+        let stepUV = steps[steps.length - 1];
+        for (const s of steps) {
+          if (s * pxPerUV >= 22) { stepUV = s; break; }
+        }
+
+        let visCount = 0;
+        for (let i = -20; i <= 20; i++) {
+          if (i === 0) continue;
+          const y = trackMidY - i * stepUV * pxPerUV;
+          if (y >= trackTopY + PAD && y <= trackTopY + trackH - PAD) visCount++;
+        }
+
+        if (visCount === 0) {
+          makeTick(trackMidY, 'range', `<span class="vu-tick-label">${rangeStr}</span>`);
+        } else {
+          const labelEvery = visCount <= 6 ? 1 : 2;
+          for (let i = -20; i <= 20; i++) {
+            const uv = i * stepUV;
+            const y = trackMidY - uv * pxPerUV;
+            if (i === 0) {
+              makeTick(y, 'zero', `<div class="vu-tick-line"></div>`);
+            } else if (Math.abs(i) % labelEvery === 0) {
+              makeTick(y, 'major', `<div class="vu-tick-line"></div><span class="vu-tick-label">${fmtUV(uv)}</span>`);
+            } else {
+              makeTick(y, 'minor', `<div class="vu-tick-line"></div>`);
+            }
+          }
+        }
+      } else {
+        makeTick(trackMidY, 'range', `<span class="vu-tick-label">${rangeStr}</span>`);
+      }
+
+      // ── Loop RMS edge labels ──────────────────────────────────────────
+      if (loopActive && loopStart !== null && loopEnd !== null && ch.data && trackH >= 30) {
+        const fs = ch.fs;
+        const data = ch.data;
+
+        // Compute RMS for left half and right half of loop region
+        const midT = (loopStart + loopEnd) / 2;
+        const s0 = Math.max(0, Math.floor(loopStart * fs));
+        const sMid = Math.floor(midT * fs);
+        const s1 = Math.min(data.length, Math.ceil(loopEnd * fs));
+
+        if (s1 - s0 > 10) {
+          let sum1 = 0, sum2 = 0;
+          const step = Math.max(1, Math.floor((sMid - s0) / 500));
+          let n1 = 0;
+          for (let s = s0; s < sMid; s += step) { sum1 += data[s] * data[s]; n1++; }
+          const step2 = Math.max(1, Math.floor((s1 - sMid) / 500));
+          let n2 = 0;
+          for (let s = sMid; s < s1; s += step2) { sum2 += data[s] * data[s]; n2++; }
+
+          const rms1 = n1 > 0 ? Math.sqrt(sum1 / n1) : 0;
+          const rms2 = n2 > 0 ? Math.sqrt(sum2 / n2) : 0;
+
+          const fmtRMS = (v) => {
+            if (v >= 1000) return (v / 1000).toFixed(1) + 'mV';
+            if (v >= 10) return Math.round(v) + 'µV';
+            return v.toFixed(1) + 'µV';
+          };
+
+          const rulerWrap = document.querySelector('.ruler-wrap');
+          if (rulerWrap) {
+            const rulerRect = rulerWrap.getBoundingClientRect();
+            const vDur = viewDuration();
+            const waveLeft = rulerRect.left - areaRect.left;
+            const waveW = rulerRect.width;
+            const lx = waveLeft + ((loopStart - viewStartSec) / vDur) * waveW;
+            const rx = waveLeft + ((loopEnd - viewStartSec) / vDur) * waveW;
+
+            // Left edge label — anchored just inside the left loop boundary
+            if (lx > 0 && lx < areaRect.width) {
+              const el = document.createElement('div');
+              el.className = 'vu-tick rms-edge';
+              el.style.top = (trackTopY + 6) + 'px';
+              el.style.left = (lx + 3) + 'px';
+              el.style.color = '#aaa';
+              el.innerHTML = `<span class="rms-edge-text">${fmtRMS(rms1)}</span>`;
+              trackArea.appendChild(el);
+            }
+
+            // Right edge label — anchored just inside the right loop boundary
+            if (rx > 0 && rx < areaRect.width) {
+              const el = document.createElement('div');
+              el.className = 'vu-tick rms-edge';
+              el.style.top = (trackTopY + 6) + 'px';
+              el.style.left = rx + 'px';
+              el.style.transform = 'translateX(calc(-100% - 3px))';
+              el.style.color = '#aaa';
+              el.innerHTML = `<span class="rms-edge-text">${fmtRMS(rms2)}</span>`;
+              trackArea.appendChild(el);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  document.getElementById('btn-vu-ruler')?.addEventListener('click', toggleVURuler);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ZOOM RESET
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function resetZoom() {
+    // Reset horizontal zoom to full duration
+    if (totalDuration > 0) {
+      viewStartSec = 0;
+      viewEndSec = totalDuration;
+    }
+    unzoomChannels();
+  }
+
+  document.getElementById('btn-zoom-reset')?.addEventListener('click', resetZoom);
+  document.getElementById('btn-zoom-sel')?.addEventListener('click', toggleZoomToSelection);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MARKERS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function captureMarkerSnapshot(timeSec) {
+    if (!preprocessed || !preprocessed.channels || preprocessed.channels.length === 0) return null;
+    const snap = { channels: [] };
+    for (const ch of preprocessed.channels) {
+      const f = ch.features;
+      if (!f) { snap.channels.push({ label: ch.label }); continue; }
+      const idx = Math.round(timeSec * ch.fs);
+      const safeIdx = Math.max(0, Math.min(idx, ch.data.length - 1));
+
+      // Sample index into feature arrays (sample-aligned, same length as signal)
+      const fi = safeIdx;
+
+      // RMS — prefer adaptiveRMS, fall back to slowRMS
+      const rmsArr = f.adaptiveRMS || f.slowRMS;
+      const rms = rmsArr ? (rmsArr[Math.min(fi, rmsArr.length - 1)] ?? 0) : 0;
+
+      // Dominant band at this point
+      let domBand = null, domPower = -1;
+      if (f.bandPowers) {
+        for (const bName of Object.keys(f.bandPowers)) {
+          const env = f.bandPowers[bName];
+          if (!env) continue;
+          const val = env[Math.min(fi, env.length - 1)] ?? 0;
+          if (val > domPower) { domPower = val; domBand = bName; }
+        }
+      }
+
+      // Instantaneous voltage
+      const voltage = ch.data[safeIdx] ?? 0;
+
+      snap.channels.push({ label: ch.label, rms, domBand, domPower, voltage });
+    }
+    return snap;
+  }
+
+  function addMarker(timeSec, label) {
+    const color = MARKER_COLORS[(markers.length) % MARKER_COLORS.length];
+    const id = nextMarkerId++;
+    const m = {
+      id,
+      timeSec: Math.max(0, Math.min(timeSec, totalDuration)),
+      color,
+      label: label || fmtTimeMs(timeSec),
+      snapshot: captureMarkerSnapshot(timeSec),
+    };
+    markers.push(m);
+    drawMarkers();
+    drawRuler();
+    return m;
+  }
+
+  function removeMarker(id) {
+    markers = markers.filter(m => m.id !== id);
+    drawMarkers();
+    drawRuler();
+  }
+
+  function fmtTimeMs(sec) {
+    const m = Math.floor(sec / 60);
+    const s = (sec % 60).toFixed(1);
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  /**
+   * Draw marker pin elements in workspace-body, VU ticks on selected marker
+   * lines, and pips on the seek bar (always visible).
+   */
+  function drawMarkers() {
+    const body = document.querySelector('.workspace-body');
+    if (!body) return;
+
+    // Remove old marker elements (all types)
+    body.querySelectorAll('.marker-line, .marker-flag, .marker-pin, .marker-vu-tick').forEach(el => el.remove());
+    document.querySelectorAll('.marker-pip').forEach(el => el.remove());
+
+    // Always draw seek bar pips (even if no markers are in current view)
+    const seekBar = document.getElementById('seek-bar');
+    for (const m of markers) {
+      if (seekBar && totalDuration > 0) {
+        const pip = document.createElement('div');
+        pip.className = 'marker-pip' + (m.id === selectedMarkerId ? ' selected' : '');
+        pip.style.background = m.color;
+        pip.style.left = ((m.timeSec / totalDuration) * 100) + '%';
+        pip.title = `#${m.id}: ${m.label}`;
+        pip.addEventListener('click', e => {
+          e.stopPropagation();
+          selectMarker(m.id);
+        });
+        pip.addEventListener('contextmenu', e => {
+          e.preventDefault();
+          removeMarker(m.id);
+        });
+        seekBar.parentElement.style.position = 'relative';
+        seekBar.parentElement.appendChild(pip);
+      }
+    }
+
+    if (markers.length === 0) return;
+
+    const rulerWrap = document.querySelector('.ruler-wrap');
+    if (!rulerWrap) return;
+    const bodyRect = body.getBoundingClientRect();
+    const rulerRect = rulerWrap.getBoundingClientRect();
+    const waveLeft = rulerRect.left - bodyRect.left;
+    const waveW = rulerRect.width;
+    const vDur = viewDuration();
+    if (vDur <= 0) return;
+
+    for (const m of markers) {
+      const fraction = (m.timeSec - viewStartSec) / vDur;
+      if (fraction < -0.01 || fraction > 1.01) continue;
+      const x = waveLeft + fraction * waveW;
+      const isSelected = m.id === selectedMarkerId;
+      const isCompare = m.id === compareMarkerId;
+
+      // Vertical line spanning workspace body
+      const line = document.createElement('div');
+      line.className = 'marker-line';
+      line.style.left = x + 'px';
+      line.style.background = m.color;
+      line.style.opacity = isSelected ? '0.8' : (isCompare ? '0.6' : '0.35');
+      line.style.width = isSelected ? '2px' : '1px';
+      line.dataset.markerId = m.id;
+      line.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        removeMarker(m.id);
+      });
+      body.appendChild(line);
+
+      // Pin element at top of line
+      const pin = document.createElement('div');
+      pin.className = 'marker-pin' + (isSelected ? ' selected' : '');
+      pin.style.left = x + 'px';
+      pin.dataset.markerId = m.id;
+
+      const head = document.createElement('div');
+      head.className = 'marker-pin-head';
+      head.style.background = m.color;
+      head.textContent = String(m.id);
+      pin.appendChild(head);
+
+      const stem = document.createElement('div');
+      stem.className = 'marker-pin-stem';
+      stem.style.background = m.color;
+      pin.appendChild(stem);
+
+      const label = document.createElement('div');
+      label.className = 'marker-pin-label';
+      label.textContent = m.label;
+      pin.appendChild(label);
+
+      // Right-click to delete
+      pin.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        removeMarker(m.id);
+      });
+
+      // Click to select
+      pin.addEventListener('click', e => {
+        e.stopPropagation();
+        selectMarker(m.id);
+      });
+
+      // Double-click to rename
+      pin.addEventListener('dblclick', e => {
+        e.stopPropagation();
+        const newLabel = prompt('Marker label:', m.label);
+        if (newLabel !== null) {
+          m.label = newLabel;
+          drawMarkers();
+        }
+      });
+
+      // Drag to reposition
+      pin.addEventListener('mousedown', e => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        draggingMarker = m;
+      });
+
+      body.appendChild(pin);
+
+      // VU ruler ticks on marker lines (only when VU ruler is on)
+      if (vuRulerVisible && preprocessed) {
+        drawMarkerVURuler(body, bodyRect, x, m);
+      }
+    }
+  }
+
+  /** Draw VU ruler ticks along a marker line — mirrors playhead ruler logic */
+  function drawMarkerVURuler(body, bodyRect, x, m) {
+    const trackArea = document.getElementById('track-area');
+    if (!trackArea) return;
+
+    const fmtUV = (v) => {
+      const a = Math.abs(v);
+      if (a >= 10000) return (v > 0 ? '+' : '-') + Math.round(a / 1000) + 'mV';
+      if (a >= 1000) return (v > 0 ? '+' : '-') + (a / 1000).toFixed(1) + 'mV';
+      return (v > 0 ? '+' : '-') + Math.round(a) + 'µV';
+    };
+    const fmtRange = (v) => {
+      if (Math.abs(v) >= 10000) return Math.round(v / 1000) + 'mV';
+      if (Math.abs(v) >= 1000) return (v / 1000).toFixed(1) + 'mV';
+      return Math.round(v) + 'µV';
+    };
+    const color = m.color;
+    const colorDim = m.color + '99'; // with alpha
+
+    const rows = trackArea.querySelectorAll('.track-row');
+    for (const row of rows) {
+      const parent = row.parentElement;
+      if (parent?.classList.contains('shaft-group') && parent.style.display === 'none') continue;
+
+      const chLabel = row.dataset.label;
+      const ch = preprocessed.channels.find(c => c.label === chLabel);
+      if (!ch) continue;
+
+      const waveEl = row.querySelector('.track-wave');
+      if (!waveEl) continue;
+      const waveRect = waveEl.getBoundingClientRect();
+      const trackH = waveRect.height;
+      if (trackH < 12) continue;
+
+      const trackTopY = waveRect.top - bodyRect.top;
+      const trackMidY = trackTopY + trackH / 2;
+
+      const amp = autoScaleEnabled ? getVisibleScale(ch) : (ch.features?.calibration?.ampCeiling ?? 100);
+      if (amp <= 0) continue;
+      const pxPerUV = (trackH * 0.4) / amp;
+      const rangeStr = `±${fmtRange(amp)}`;
+
+      const makeTick = (y, lineW, labelText, labelColor, opacity) => {
+        if (y < trackTopY + 8 || y > trackTopY + trackH - 8) return;
+        const tick = document.createElement('div');
+        tick.className = 'marker-vu-tick';
+        tick.style.top = y + 'px';
+        tick.style.left = (x + 2) + 'px';
+        let inner = `<div class="marker-vu-line" style="width:${lineW}px;background:${color};opacity:${opacity}"></div>`;
+        if (labelText) {
+          inner += `<span style="font-size:9px;font-family:var(--mono);color:${labelColor};margin-left:3px;white-space:nowrap;text-shadow:0 0 4px rgba(0,0,0,0.9)">${labelText}</span>`;
+        }
+        tick.innerHTML = inner;
+        body.appendChild(tick);
+      };
+
+      if (trackH >= 40) {
+        // Graduated ruler — same logic as playhead
+        const steps = [5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000];
+        let stepUV = steps[steps.length - 1];
+        for (const s of steps) {
+          if (s * pxPerUV >= 22) { stepUV = s; break; }
+        }
+        for (let i = -20; i <= 20; i++) {
+          const uv = i * stepUV;
+          const y = trackMidY - uv * pxPerUV;
+          if (i === 0) {
+            makeTick(y, 10, null, null, 0.2);
+          } else if (i % 2 === 0) {
+            makeTick(y, 14, fmtUV(uv), colorDim, 0.5);
+          } else {
+            makeTick(y, 6, null, null, 0.15);
+          }
+        }
+      } else {
+        // Compact: single centered range label
+        makeTick(trackMidY, 0, rangeStr, colorDim, 0);
+      }
+    }
+  }
+
+  /** Marker drag: mousemove + mouseup on document */
+  document.addEventListener('mousemove', e => {
+    if (!draggingMarker) return;
+    const rulerWrap = document.querySelector('.ruler-wrap');
+    if (!rulerWrap) return;
+    const rect = rulerWrap.getBoundingClientRect();
+    const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const vDur = viewDuration();
+    draggingMarker.timeSec = Math.max(0, Math.min(totalDuration, viewStartSec + fraction * vDur));
+    // Recapture snapshot at new position
+    draggingMarker.snapshot = captureMarkerSnapshot(draggingMarker.timeSec);
+    draggingMarker.label = fmtTimeMs(draggingMarker.timeSec);
+    drawMarkers();
+    showMarkerPanel();
+  });
+  document.addEventListener('mouseup', () => {
+    if (draggingMarker) {
+      draggingMarker = null;
+      drawRuler();
+    }
+  });
+
+  /** Select/deselect a marker */
+  function selectMarker(id) {
+    if (selectedMarkerId === id) {
+      selectedMarkerId = null;
+    } else {
+      selectedMarkerId = id;
+    }
+    compareMarkerId = null;
+    drawMarkers();
+    showMarkerPanel();
+  }
+
+  /** Show all markers left-to-right in inspector, selected one highlighted */
+  function showMarkerPanel() {
+    const insp = document.getElementById('inspector');
+    if (!insp) return;
+
+    insp.querySelectorAll('.marker-snap-info').forEach(el => el.remove());
+    if (markers.length === 0) return;
+
+    // Sort by time (left to right)
+    const sorted = [...markers].sort((a, b) => a.timeSec - b.timeSec);
+
+    const firstSnap = sorted.find(m => m.snapshot)?.snapshot;
+    if (!firstSnap) return;
+
+    const n = sorted.length;
+    const hasDelta = n >= 2;
+    const bandAbbr = { delta:'dlt', theta:'tht', alpha:'alp', beta:'bet',
+      lowGamma:'lGm', highGamma:'hGm', hfoRipple:'hRp', hfoFast:'hFt' };
+    const shortBand = (b) => bandAbbr[b] || (b ? b.slice(0,3) : '-');
+    const fmtV = (v) => Math.abs(v) >= 1000
+      ? (v / 1000).toFixed(1) + 'mV'
+      : Math.round(v) + 'µV';
+
+    let html = `<div class="marker-snap-info" style="margin-top:8px;border-top:1px solid var(--border);padding-top:4px;overflow-x:auto">`;
+    html += `<table style="font-size:9px;font-family:var(--mono);border-collapse:collapse;border-spacing:0">`;
+
+    // Header: Ch | #1 | #2 | ... | delta
+    html += `<tr>`;
+    html += `<th style="padding:1px 4px;text-align:left">Ch</th>`;
+    for (const m of sorted) {
+      const isSel = m.id === selectedMarkerId;
+      html += `<th data-marker-pill="${m.id}" style="padding:1px 4px;text-align:right;cursor:pointer;color:${m.color};border-bottom:2px solid ${m.color}${isSel ? '' : '44'};font-weight:${isSel ? '700' : '400'}">#${m.id}</th>`;
+    }
+    if (hasDelta) html += `<th style="padding:1px 4px;text-align:right">&Delta;</th>`;
+    html += `</tr>`;
+
+    // Time row
+    html += `<tr style="color:var(--text-dim)"><td></td>`;
+    for (const m of sorted) {
+      html += `<td style="padding:1px 4px;text-align:right">${m.label}</td>`;
+    }
+    if (hasDelta) {
+      const dt = (sorted[n-1].timeSec - sorted[0].timeSec).toFixed(1);
+      html += `<td style="padding:1px 4px;text-align:right">${dt}s</td>`;
+    }
+    html += `</tr>`;
+
+    // Channel rows: each cell = "band rms µV" stacked in one cell
+    for (let ci = 0; ci < firstSnap.channels.length; ci++) {
+      if (!firstSnap.channels[ci].domBand) continue;
+      const chLabel = firstSnap.channels[ci].label;
+      const rmsVals = sorted.map(m => m.snapshot?.channels[ci]?.rms ?? null);
+
+      html += `<tr><td style="padding:1px 4px;text-align:left;border-top:1px solid rgba(255,255,255,0.04)">${chLabel}</td>`;
+      for (let mi = 0; mi < n; mi++) {
+        const c = sorted[mi].snapshot?.channels[ci];
+        if (!c?.domBand) { html += `<td style="padding:1px 4px;text-align:right;border-top:1px solid rgba(255,255,255,0.04)">-</td>`; continue; }
+        const isSel = sorted[mi].id === selectedMarkerId;
+        const op = isSel ? '1' : '0.5';
+
+        // Background tint for change from previous
+        let bg = '';
+        if (mi > 0 && rmsVals[mi - 1] != null && rmsVals[mi] != null) {
+          const d = rmsVals[mi] - rmsVals[mi - 1];
+          if (Math.abs(d) > 0.01) {
+            bg = d > 0 ? 'background:rgba(248,113,113,0.1)' : 'background:rgba(74,222,128,0.1)';
+          }
+        }
+
+        // Compact: "band rms µV" on one line
+        html += `<td style="padding:1px 4px;text-align:right;opacity:${op};border-top:1px solid rgba(255,255,255,0.04);${bg}" title="${c.domBand} | RMS ${c.rms.toFixed(2)} | ${fmtV(c.voltage)}">`;
+        html += `<span style="color:var(--text-dim)">${shortBand(c.domBand)}</span> ${c.rms.toFixed(2)} <span style="color:var(--muted)">${fmtV(c.voltage)}</span>`;
+        html += `</td>`;
+      }
+      // Net delta
+      if (hasDelta) {
+        const first = rmsVals[0];
+        const last = rmsVals[n - 1];
+        if (first != null && last != null) {
+          const d = last - first;
+          const cls = d > 0 ? 'delta-up' : 'delta-down';
+          html += `<td style="padding:1px 4px;text-align:right;border-top:1px solid rgba(255,255,255,0.04)" class="${cls}">${d >= 0 ? '+' : ''}${d.toFixed(2)}</td>`;
+        } else {
+          html += `<td style="padding:1px 4px;text-align:right;border-top:1px solid rgba(255,255,255,0.04)">-</td>`;
+        }
+      }
+      html += `</tr>`;
+    }
+
+    html += `</table></div>`;
+    const content = insp.querySelector('#inspector-content') || insp;
+    content.insertAdjacentHTML('beforeend', html);
+
+    // Wire header clicks to select marker
+    content.querySelectorAll('[data-marker-pill]').forEach(th => {
+      th.addEventListener('click', () => {
+        selectMarker(parseInt(th.dataset.markerPill));
+      });
+    });
+  }
+
+  // Draw markers in ruler canvas (called from drawRuler)
+  function drawRulerMarkers(ctx, width, height) {
+    const vDur = viewDuration();
+    if (vDur <= 0) return;
+
+    for (const m of markers) {
+      const fraction = (m.timeSec - viewStartSec) / vDur;
+      if (fraction < 0 || fraction > 1) continue;
+      const x = fraction * width;
+
+      ctx.strokeStyle = m.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+
+      // Small triangle at top
+      ctx.fillStyle = m.color;
+      ctx.beginPath();
+      ctx.moveTo(x - 4, 0);
+      ctx.lineTo(x + 4, 0);
+      ctx.lineTo(x, 6);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  document.getElementById('btn-add-marker')?.addEventListener('click', () => {
+    const t = engine ? engine.currentTimeSec : 0;
+    addMarker(t);
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // WAVEFORM MARQUEE (loop selection from channel area)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  {
+    const trackArea = document.getElementById('track-area');
+    let savedLoop = null; // preserve previous loop during tentative drag
+
+    if (trackArea) {
+      trackArea.addEventListener('mousedown', e => {
+        if (!preprocessed || totalDuration <= 0) return;
+        if (e.target.closest('.track-tcp') || e.target.closest('.shaft-header') || e.target.tagName === 'BUTTON') return;
+        if (e.button !== 0) return;
+
+        const rect = trackArea.getBoundingClientRect();
+        const tcpW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tcp-w')) || 264;
+        const waveLeft = rect.left + tcpW;
+        const waveW = rect.width - tcpW;
+        const fraction = (e.clientX - waveLeft) / waveW;
+        if (fraction < 0 || fraction > 1) return;
+
+        // Save current loop state so we can restore if drag doesn't commit
+        savedLoop = { start: loopStart, end: loopEnd, active: loopActive };
+        waveformDragStart = viewStartSec + fraction * viewDuration();
+        waveformDragging = false;
+      });
+
+      trackArea.addEventListener('mousemove', e => {
+        if (waveformDragStart === null) return;
+
+        const rect = trackArea.getBoundingClientRect();
+        const tcpW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tcp-w')) || 264;
+        const waveLeft = rect.left + tcpW;
+        const waveW = rect.width - tcpW;
+        const fraction = Math.max(0, Math.min(1, (e.clientX - waveLeft) / waveW));
+        const t = viewStartSec + fraction * viewDuration();
+
+        const dist = Math.abs(t - waveformDragStart);
+        if (dist > 0.15) {
+          waveformDragging = true;
+          loopStart = Math.min(waveformDragStart, t);
+          loopEnd = Math.max(waveformDragStart, t);
+          drawRuler();
+        }
+      });
+
+      // Override the existing click handler — only seek if not a marquee drag
+      trackArea.removeEventListener('click', timelineSeek);
+      trackArea.addEventListener('click', e => {
+        if (waveformDragging) return; // was a drag, not a click
+        timelineSeek(e);
+      });
+    }
+
+    document.addEventListener('mouseup', () => {
+      if (waveformDragStart === null) return;
+
+      if (waveformDragging && loopEnd - loopStart >= 0.15) {
+        // Drag committed → activate loop
+        activateLoop(loopStart, loopEnd);
+      } else {
+        // Drag didn't commit → restore previous loop state
+        if (savedLoop) {
+          loopStart = savedLoop.start;
+          loopEnd = savedLoop.end;
+          loopActive = savedLoop.active;
+        }
+      }
+      savedLoop = null;
+      waveformDragStart = null;
+      waveformDragging = false;
+      drawRuler();
+    });
+  }
+
+  function appendTrackRow(container, ch) {
+    const q      = ch.quality ?? {};
+    const status = q.status ?? 'good';
+    const rms    = q.rms    != null ? q.rms.toFixed(1) : '—';
+    const chPitch = pitchMap?.get(ch.label);
+    const ratioLabel = chPitch?.ratioLabel ?? '1/1';
+
+    const row = document.createElement('div');
+    row.className = 'track-row';
+    row.title = (q.issues ?? []).join(' | ') || (chPitch ? `${chPitch.hz.toFixed(1)} Hz` : '');
+    row.dataset.label = ch.label;
+
+    // Left: TCP info
+    const tcp = document.createElement('div');
+    tcp.className = 'track-tcp';
+
+    const muteBtn = document.createElement('button');
+    muteBtn.className = 'tcp-mute';
+    muteBtn.textContent = 'M';
+    muteBtn.title = 'Mute ' + ch.label;
+    muteBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      muteBtn.classList.toggle('muted');
+      if (soloedChannels.size > 0) {
+        applySoloState();
+      } else {
+        const isMuted = muteBtn.classList.contains('muted');
+        if (engine) engine.setChannelMute(ch.label, isMuted);
+      }
+    });
+
+    const soloBtn = document.createElement('button');
+    soloBtn.className = 'tcp-solo';
+    soloBtn.textContent = 'S';
+    soloBtn.title = 'Solo ' + ch.label;
+    soloBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      toggleSolo(ch.label, soloBtn);
+    });
+
+    const ratioInput = document.createElement('input');
+    ratioInput.className = 'tcp-pitch';
+    ratioInput.type = 'text';
+    ratioInput.value = ratioLabel;
+    ratioInput.title = `Ratio for ${ch.label} — e.g. 3/2, 5/4, 2/1 (Enter to apply)`;
+    ratioInput.addEventListener('click', e => e.stopPropagation());
+    ratioInput.addEventListener('change', async e => {
+      e.stopPropagation();
+      const newRatio = parseRatio(e.target.value);
+      if (newRatio == null || newRatio <= 0 || newRatio > 32) {
+        e.target.value = ratioLabel;
+        return;
+      }
+      ratioOverrides.set(ch.label, newRatio);
+      const newHz = masterTune * newRatio;
+      if (pitchMap) {
+        const entry = pitchMap.get(ch.label);
+        if (entry) { entry.ratio = newRatio; entry.hz = newHz; }
+      }
+      row.title = `${newHz.toFixed(1)} Hz`;
+      if (engine) {
+        engine.setChannelPitch(ch.label, newHz);
+        const wasPlaying = engine.isPlaying;
+        const t = engine.currentTimeSec;
+        await engine.seek(t, wasPlaying);
+      }
+    });
+    ratioInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') ratioInput.blur();
+      e.stopPropagation();
+    });
+
+    tcp.innerHTML =
+      `<div style="display:flex;align-items:center;justify-content:center">` +
+        `<div class="tcp-dot ${status}" title="${esc(status)}"></div></div>` +
+      `<div class="tcp-label">${esc(ch.label)}</div>` +
+      `<div class="tcp-val ${status !== 'good' ? status : ''}">${esc(rms)}</div>`;
+    tcp.appendChild(ratioInput);
+    tcp.appendChild(muteBtn);
+    tcp.appendChild(soloBtn);
+
+    // Right: waveform canvas
+    const wave = document.createElement('div');
+    wave.className = 'track-wave';
+    const canvas = document.createElement('canvas');
+    canvas.dataset.label = ch.label;
+    wave.appendChild(canvas);
+
+    // Click row to select channel
+    tcp.addEventListener('click', e => {
+      if (e.target.closest('button') || e.target.closest('input')) return;
+      selectChannel(ch.label, e);
+    });
+
+    row.appendChild(tcp);
+    row.appendChild(wave);
+    container.appendChild(row);
+  }
+
+  // ── Shaft selection count ─────────────────────────────────────────────────
+  function updateShaftCount() {
+    const el = document.getElementById('shaft-count-display');
+    if (!el || !importResult) return;
+    const total = Object.keys(importResult.shaftSummary).length;
+    el.textContent = selectedShafts.size + ' / ' + total + ' shafts';
+    // Warn if nothing selected
+    const btn = document.getElementById('btn-preprocess');
+    if (btn) btn.disabled = selectedShafts.size === 0 && total > 0;
+  }
+
+  // ── Engine ────────────────────────────────────────────────────────────────
+  async function initEngine() {
+    if (engine) { engine.destroy(); engine = null; }
+
+    try {
+      const { Engine } = await import('./src/engine.js');
+      engine = new Engine();
+
+      showProcessing('Preparing audio engine…');
+      await engine.prepare(preprocessed, controls, {
+        masterTune,
+        ratioOverrides: ratioOverrides.size > 0 ? ratioOverrides : null,
+      });
+      hideProcessing();
+
+      engine.on('timeupdate', t => {
+        // Loop check
+        if (loopActive && loopEnd !== null && t >= loopEnd) {
+          engine.seek(loopStart, true);
+          return;
+        }
+        if (!seekDragging) {
+          document.getElementById('transport-cur').textContent = fmtTime(t);
+          const dur = engine.durationSec;
+          if (dur > 0) document.getElementById('seek-bar').value = t / dur;
+        }
+        updatePlayhead(t);
+        updateBarometer(t);
+        drawPPAFDisplay(t);
+      });
+
+      engine.on('ended', () => {
+        document.getElementById('btn-play').textContent = '\u25B6';
+        document.getElementById('btn-play').classList.remove('active');
+        document.getElementById('transport-cur').textContent = fmtTime(0);
+        document.getElementById('seek-bar').value = 0;
+      });
+
+      console.log('[UI] Engine ready. Press Play to listen.');
+    } catch (err) {
+      hideProcessing();
+      console.error('[Engine] init failed:', err);
+      alert('Engine error: ' + err.message);
+    }
+  }
+
+  // ── Transport controls ─────────────────────────────────────────────────────
+  document.getElementById('btn-play').addEventListener('click', async () => {
+    if (!engine) return;
+    if (engine.isPlaying) {
+      await engine.pause();
+      document.getElementById('btn-play').textContent = '\u25B6';
+      document.getElementById('btn-play').classList.remove('active');
+    } else {
+      await engine.play();
+      document.getElementById('btn-play').textContent = '\u23F8';
+      document.getElementById('btn-play').classList.add('active');
+    }
+  });
+
+  document.getElementById('btn-stop').addEventListener('click', () => {
+    if (!engine) return;
+    engine.stop();
+    document.getElementById('btn-play').textContent = '\u25B6';
+    document.getElementById('btn-play').classList.remove('active');
+    document.getElementById('transport-cur').textContent = fmtTime(0);
+    document.getElementById('seek-bar').value = 0;
+  });
+
+  document.getElementById('btn-loop').addEventListener('click', () => {
+    if (loopActive) {
+      clearLoop();
+    } else {
+      activateLoop(viewStartSec, viewEndSec);
+    }
+  });
+
+  document.getElementById('btn-autoscale').addEventListener('click', () => {
+    autoScaleEnabled = !autoScaleEnabled;
+    document.getElementById('btn-autoscale').classList.toggle('active', autoScaleEnabled);
+    scheduleRedraw();
+  });
+
+  // Seek bar
+  const seekBar = document.getElementById('seek-bar');
+  seekBar.addEventListener('mousedown',  () => { seekDragging = true; });
+  seekBar.addEventListener('touchstart', () => { seekDragging = true; });
+  seekBar.addEventListener('input', () => {
+    if (!engine || engine.durationSec <= 0) return;
+    const t = parseFloat(seekBar.value) * engine.durationSec;
+    document.getElementById('transport-cur').textContent = fmtTime(t);
+  });
+  seekBar.addEventListener('change', async () => {
+    seekDragging = false;
+    if (!engine || engine.durationSec <= 0) return;
+    const t = parseFloat(seekBar.value) * engine.durationSec;
+    const wasPlaying = engine.isPlaying;
+    await engine.seek(t, wasPlaying);
+    if (wasPlaying) {
+      document.getElementById('btn-play').textContent = '\u23F8';
+      document.getElementById('btn-play').classList.add('active');
+    }
+  });
+
+  // ── Synthesis faders — generic FADER_MAP wiring ─────────────────────────────
+  const FADER_MAP = {
+    // HEADER — layer levels
+    'fader-ampLevel':        { layer: 'root' },
+    'fader-morphLevel':      { layer: 'phase' },
+    'fader-freqLevel':       { layer: 'fm' },
+    'fader-detLevel':        { key: 'detectionLevel',   live: true },
+    'fader-masterVolume':    { special: 'masterVolume' },
+
+    // AMPLITUDE column
+    'fader-rmsFast':         { key: 'rmsFast',          rebuild: true },
+    'fader-rmsMid':          { key: 'rmsMid',           rebuild: true },
+    'fader-rmsSlow':         { key: 'rmsSlow',          rebuild: true },
+    'fader-rmsAdaptive':     { key: 'rmsAdaptive',      rebuild: true },
+    'fader-hilbertAM':       { key: 'amDepth',          rebuild: true },
+    'fader-dynRange':        { key: 'range',            rebuild: true },
+
+    // MORPHOLOGY column
+    'fader-range':           { key: 'harmonicRange',    rebuild: true },
+    'fader-slopeDepth':      { key: 'slopeDepth',       rebuild: true },
+    'fader-sensitivity':     { key: 'sensitivity',      rebuild: true },
+    'fader-complexityDepth': { key: 'complexityDepth',  rebuild: true },
+
+    // FREQUENCY column
+    'fader-focus':           { key: 'focus',            rebuild: true },
+    'fader-mobility':        { key: 'mobilityDepth',    rebuild: true },
+    'fader-bandwidth':       { key: 'bandwidthSpread',  rebuild: true },
+    'fader-entropy':         { key: 'entropyDepth',     rebuild: true },
+
+    // DETECTION column
+    'fader-ppafThreshold':   { key: 'ppafThreshold',    rebuild: true },
+    'fader-saturation':      { key: 'saturation',       rebuild: true },
+    'fader-noise':           { key: 'noiseMix',         live: true },
+    'fader-noiseAttack':     { key: 'noiseAttackMs',    live: true },
+    'fader-noiseDecay':      { key: 'noiseDecayMs',     live: true },
+    'fader-flux':            { key: 'fluxSensitivity',  rebuild: true },
+    'fader-refractory':      { key: 'refractoryMs',     rebuild: true },
+
+    // OUTPUT column
+    'fader-activityGate':    { key: 'activityGate',     rebuild: true },
+    'fader-drive':           { key: 'drive',            rebuild: true },
+    'fader-intensity':       { key: 'intensity',        rebuild: true },
+  };
+
+  for (const [id, cfg] of Object.entries(FADER_MAP)) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+
+    if (cfg.special === 'masterVolume') {
+      // Master volume — live via setMasterGain (handled separately)
+      el.addEventListener('input', e => {
+        controls.masterVolume = parseFloat(e.target.value);
+        if (engine) engine.setMasterGain(controls.masterVolume);
+      });
+    } else if (cfg.layer) {
+      // Level faders → layerMix (always live)
+      el.addEventListener('input', e => {
+        layerMix[cfg.layer] = parseFloat(e.target.value);
+        if (engine) engine.setLayerGains(layerMix);
+      });
+    } else if (cfg.live) {
+      // Live faders → update immediately
+      el.addEventListener('input', e => {
+        controls[cfg.key] = parseFloat(e.target.value);
+        if (engine) engine.setControls(preprocessed, controls, false);
+      });
+    } else if (cfg.rebuild) {
+      // Rebuild faders → track on input, rebuild on change
+      el.addEventListener('input', e => {
+        controls[cfg.key] = parseFloat(e.target.value);
+      });
+      el.addEventListener('change', async e => {
+        controls[cfg.key] = parseFloat(e.target.value);
+        if (engine) await engine.setControls(preprocessed, controls, true);
+      });
+    }
+  }
+
+  // PPAF threshold µV display — update live as fader moves
+  const ppafFader  = document.getElementById('fader-ppafThreshold');
+  const ppafUVDisp = document.getElementById('ppaf-uv-display');
+  const updatePpafUV = () => {
+    if (!ppafFader || !ppafUVDisp) return;
+    const uv = Math.round(20 * Math.pow(25, parseFloat(ppafFader.value)));
+    ppafUVDisp.textContent = `${uv} µV`;
+  };
+  ppafFader?.addEventListener('input', updatePpafUV);
+  updatePpafUV();  // set initial display
+
+  // ── Master tune ──────────────────────────────────────────────────────────
+  document.getElementById('master-tune')?.addEventListener('change', async e => {
+    const newTune = parseFloat(e.target.value);
+    if (isNaN(newTune) || newTune < 20 || newTune > 2000) {
+      e.target.value = masterTune;
+      return;
+    }
+    masterTune = newTune;
+    // Update pitchMap
+    if (pitchMap && preprocessed) {
+      const { assignPitches } = await import('./src/mapping.js');
+      pitchMap = assignPitches(preprocessed.channels, masterTune, ratioOverrides.size > 0 ? ratioOverrides : null);
+      // Update TCP row tooltips with new Hz values
+      for (const [label, entry] of pitchMap) {
+        const row = document.querySelector(`.track-row[data-label="${CSS.escape(label)}"]`);
+        if (row) row.title = `${entry.hz.toFixed(1)} Hz`;
+      }
+    }
+    if (engine) {
+      engine.setMasterTune(masterTune, ratioOverrides.size > 0 ? ratioOverrides : null);
+      const wasPlaying = engine.isPlaying;
+      const t = engine.currentTimeSec;
+      await engine.seek(t, wasPlaying);
+    }
+  });
+  document.getElementById('master-tune')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') e.target.blur();
+    e.stopPropagation();
+  });
+
+  // ── Band barometer (stacked bars in Source module) ──────────────────────
+  function updateBarometer(timeSec) {
+    if (!preprocessed) return;
+    const rows = document.querySelectorAll('#band-barometer .baro-row');
+    if (rows.length === 0) return;
+
+    const bandNames = ['delta', 'theta', 'alpha', 'beta', 'lowGamma', 'highGamma'];
+    const powers = {};
+    let total = 0, chCount = 0;
+    for (const name of bandNames) powers[name] = 0;
+
+    for (const ch of preprocessed.channels) {
+      if (isChannelMuted(ch.label)) continue;
+      if (!ch.features?.bandPowers) continue;
+      const idx = Math.floor(timeSec * ch.fs);
+      for (const name of bandNames) {
+        const bp = ch.features.bandPowers[name];
+        if (bp && idx < bp.length) powers[name] += bp[idx];
+      }
+      chCount++;
+    }
+    if (chCount === 0) return;
+
+    let maxName = 'alpha', maxVal = 0;
+    for (const name of bandNames) {
+      powers[name] /= chCount;
+      total += powers[name];
+      if (powers[name] > maxVal) { maxVal = powers[name]; maxName = name; }
+    }
+
+    rows.forEach(row => {
+      const band = row.dataset.band;
+      const pct = total > 0 ? (powers[band] ?? 0) / total * 100 : 0;
+      const fill = row.querySelector('.baro-row-fill');
+      if (fill) fill.style.width = Math.min(100, pct) + '%';
+      row.classList.toggle('dominant', band === maxName);
+    });
+  }
+
+  // ── Feature overlay on fader hover ──────────────────────────────────────
+  // Derive overlay color from the module's --mod-color CSS variable
+  function hexToRgba(hex, alpha) {
+    const h = hex.replace('#', '');
+    const r = parseInt(h.slice(0,2), 16), g = parseInt(h.slice(2,4), 16), b = parseInt(h.slice(4,6), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  document.querySelectorAll('.syn-fader[data-feature]').forEach(fader => {
+    const feature = fader.dataset.feature;
+    const mod = fader.closest('.synth-mod');
+    const modColorMap = {
+      'amplitude': '#f0a030', 'morphology': '#38bdf8',
+      'frequency': '#4ade80', 'detection': '#f87171',
+    };
+    const modName = mod?.dataset.mod || '';
+    const overlayColor = hexToRgba(modColorMap[modName] || '#7c7ffa', 0.6);
+
+    fader.addEventListener('mouseenter', () => {
+      if (selectedChannels.size !== 1) return;
+      featureOverlay.feature = feature === 'phase-coloring' ? '' : feature;
+      featureOverlay.label = [...selectedChannels][0];
+      featureOverlay.color = overlayColor;
+      featureOverlay.phaseColoring = (feature === 'phase-coloring');
+      scheduleRedraw();
+    });
+
+    fader.addEventListener('mouseleave', () => {
+      setTimeout(() => {
+        if (featureOverlay.feature === feature || (feature === 'phase-coloring' && featureOverlay.phaseColoring)) {
+          featureOverlay.feature = '';
+          featureOverlay.phaseColoring = false;
+          scheduleRedraw();
+        }
+      }, 2000);
+    });
+  });
+
+  // ── PPAF mini-display ─────────────────────────────────────────────────────
+  function drawPPAFDisplay(timeSec) {
+    const canvas = document.getElementById('ppaf-canvas');
+    if (!canvas || selectedChannels.size !== 1) return;
+    const label = [...selectedChannels][0];
+    const ch = preprocessed?.channels.find(c => c.label === label);
+    // Use raw µV values so threshold line is in the same units as display
+    const ppafRaw = ch.features.ppafRaw ?? ch.features.ppaf;
+    if (!ppafRaw) return;
+
+    const container = canvas.parentElement;
+    const dpr = window.devicePixelRatio || 1;
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    if (w <= 0 || h <= 0) return;
+
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const fs = ch.fs;
+
+    // Show ±5 seconds around current time
+    const windowSec = 5;
+    const tStart = Math.max(0, timeSec - windowSec);
+    const tEnd = Math.min(ch.data.length / fs, timeSec + windowSec);
+    const s0 = Math.floor(tStart * fs);
+    const s1 = Math.min(Math.floor(tEnd * fs), ppafRaw.length);
+
+    // y-axis: LOG scale so threshold line moves meaningfully at all fader positions.
+    // 30 µV and 300 µV are equidistant from 100 µV on log scale.
+    let peakUV = 5;
+    for (let i = s0; i < s1; i++) { if (ppafRaw[i] > peakUV) peakUV = ppafRaw[i]; }
+    const yMin = 5;
+    const yMax = Math.max(200, peakUV * 1.2);
+
+    const logMin = Math.log10(yMin);
+    const logMax = Math.log10(yMax);
+    const toY = uv => {
+      const clamped = Math.max(yMin, uv);
+      return h - ((Math.log10(clamped) - logMin) / (logMax - logMin)) * h * 0.9 - h * 0.05;
+    };
+
+    // Threshold in µV (same formula as mapControls)
+    const threshUV = 20 * Math.pow(25, controls.ppafThreshold ?? 0.5);
+    const threshY  = toY(threshUV);
+
+    // ── Fill exceedance regions with magnitude-graduated color ────────────
+    // Opacity ∝ how far above threshold (in log space = ratio)
+    let inExceed = false;
+    let peakAbove = 0;
+
+    const flushFill = (endPx) => {
+      if (!inExceed) return;
+      ctx.lineTo(endPx, threshY);
+      ctx.closePath();
+      // Opacity from ratio above threshold: barely above = dim, 10× above = bright
+      const ratio = peakAbove > 0 ? Math.log10(1 + peakAbove / threshUV) / Math.log10(11) : 0;
+      const opacity = Math.min(0.8, 0.12 + ratio * 0.68);
+      ctx.fillStyle = `rgba(248, 113, 113, ${opacity.toFixed(2)})`;
+      ctx.fill();
+      inExceed = false;
+      peakAbove = 0;
+    };
+
+    for (let px = 0; px < w; px++) {
+      const sIdx = s0 + Math.floor((px / w) * (s1 - s0));
+      if (sIdx >= ppafRaw.length) { flushFill(px); break; }
+      const val = ppafRaw[sIdx];
+      if (val > threshUV) {
+        const above = val - threshUV;
+        if (!inExceed) {
+          ctx.beginPath();
+          ctx.moveTo(px, threshY);
+          inExceed = true;
+        }
+        ctx.lineTo(px, toY(val));
+        if (above > peakAbove) peakAbove = above;
+      } else {
+        flushFill(px);
+      }
+    }
+    flushFill(w);
+
+    // ── Raw PPAF trace (thin line on top of fill) ─────────────────────────
+    ctx.strokeStyle = 'rgba(248, 113, 113, 0.55)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let px = 0; px < w; px++) {
+      const sIdx = s0 + Math.floor((px / w) * (s1 - s0));
+      if (sIdx >= ppafRaw.length) break;
+      const y = toY(ppafRaw[sIdx]);
+      if (px === 0) ctx.moveTo(px, y); else ctx.lineTo(px, y);
+    }
+    ctx.stroke();
+
+    // ── Threshold line ─────────────────────────────────────────────────────
+    if (threshY > 2 && threshY < h - 2) {
+      ctx.strokeStyle = 'rgba(248, 113, 113, 0.7)';
+      ctx.lineWidth = 0.75;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(0, threshY); ctx.lineTo(w, threshY); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(248, 113, 113, 0.8)';
+      ctx.font = '7px monospace';
+      ctx.fillText(`${Math.round(threshUV)} µV`, 3, threshY - 2);
+    }
+
+    // ── Playhead ───────────────────────────────────────────────────────────
+    const phX = ((timeSec - tStart) / (tEnd - tStart)) * w;
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(phX, 0); ctx.lineTo(phX, h); ctx.stroke();
+  }
+
+  // ── Ratio parser ──────────────────────────────────────────────────────────
+  function parseRatio(str) {
+    str = str.trim();
+    // Try fraction: "3/2", "15/8"
+    const parts = str.split('/');
+    if (parts.length === 2) {
+      const num = parseFloat(parts[0]);
+      const den = parseFloat(parts[1]);
+      if (!isNaN(num) && !isNaN(den) && den !== 0) return num / den;
+    }
+    // Try decimal: "1.5"
+    const val = parseFloat(str);
+    return isNaN(val) ? null : val;
+  }
+
+  // ── Time formatter ─────────────────────────────────────────────────────────
+  function fmtTime(sec) {
+    const s = Math.floor(sec);
+    const m = Math.floor(s / 60);
+    return m + ':' + String(s % 60).padStart(2, '0');
+  }
+
+  // ── Processing overlay ────────────────────────────────────────────────────
+  function showProcessing(msg) {
+    document.getElementById('proc-label').textContent = msg;
+    document.getElementById('processing-overlay').style.display = 'flex';
+  }
+  function hideProcessing() {
+    document.getElementById('processing-overlay').style.display = 'none';
+  }
+
+  // ── Utilities ─────────────────────────────────────────────────────────────
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  showScreen('welcome');
+</script>
+
+</body>
 </html>
