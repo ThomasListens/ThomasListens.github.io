@@ -24,7 +24,7 @@
       --warn-bg:   rgba(251,191,36,0.08);
       --bad-bg:    rgba(248,113,113,0.08);
       --header-h:  42px;
-      --tcp-w:     310px;
+      --tcp-w:     min(280px, 25vw);
       --status-h:  26px;
       --mono: 'JetBrains Mono', 'Fira Mono', ui-monospace, monospace;
     }
@@ -536,10 +536,14 @@
       height: 7px;
       border-radius: 50%;
       flex-shrink: 0;
+      background: #e2e2e6;
+      opacity: 0.15;
+      transition: opacity 0.08s ease-out, box-shadow 0.08s ease-out;
     }
-    .tcp-dot.good { background: var(--good); }
-    .tcp-dot.warn { background: var(--warn); }
-    .tcp-dot.bad  { background: var(--bad);  }
+    .track-row[data-quality="bad"] .tcp-dot {
+      opacity: 0.08 !important;
+      box-shadow: none !important;
+    }
 
     .tcp-label {
       font-size: 11px;
@@ -555,8 +559,11 @@
       text-align: right;
       white-space: nowrap;
     }
-    .tcp-val.warn { color: var(--warn); }
-    .tcp-val.bad  { color: var(--bad); }
+
+    /* Bad channels: dimmed row + auto-muted on load */
+    .track-row[data-quality="bad"] {
+      opacity: 0.35;
+    }
 
     .track-wave {
       flex: 1;
@@ -646,9 +653,7 @@
 
     #statusbar .stat-item { white-space: nowrap; }
     #statusbar .stat-item .val { color: var(--text); }
-    #statusbar .stat-good { color: var(--good); }
-    #statusbar .stat-warn { color: var(--warn); }
-    #statusbar .stat-bad  { color: var(--bad); }
+    #statusbar .stat-flagged { color: var(--muted); }
     #statusbar .spacer    { flex: 1; }
 
     /* Spinner */
@@ -785,39 +790,70 @@
       background: var(--surface);
       min-height: 28px;
       border-bottom: 1px solid var(--border);
+      overflow: hidden;
     }
 
     .synth-toggle {
-      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
       color: var(--dim);
       background: none;
       border: none;
       cursor: pointer;
-      padding: 0 4px;
-      width: 18px;
+      padding: 0 2px;
       user-select: none;
       line-height: 1;
+      flex-shrink: 0;
     }
     .synth-toggle:hover { color: var(--text); }
+    .synth-toggle:hover .synth-title { color: var(--text); }
+
+    .synth-toggle-arrow {
+      font-size: 13px;
+    }
+
+    .synth-title {
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 70px;
+    }
+
+    .syn-bands-sep {
+      font-size: 14px;
+      color: var(--dim);
+      opacity: 0.5;
+      margin-left: auto;       /* push f + pills to right edge */
+      margin-right: 3px;
+      user-select: none;
+      flex-shrink: 0;
+    }
 
     /* Toggle + pills container: same width as source column */
     .synth-header-source {
       display: flex;
       align-items: center;
       gap: 4px;
-      flex: 0 0 170px;
-      padding: 0 8px;
+      flex: 0 0 311px;
+      padding: 0 10px;
       border-right: 1px solid var(--border);
+      box-sizing: border-box;
     }
 
     .synth-header-source .syn-pill {
-      font-size: 8px;
-      padding: 2px 4px;
+      font-size: 9px;
+      padding: 3px 5px;
     }
 
     .synth-header-source .syn-bands {
       display: flex;
-      gap: 3px;
+      gap: 4px;
       flex-shrink: 0;
     }
 
@@ -826,17 +862,18 @@
       display: flex;
       align-items: center;
       gap: 5px;
-      padding: 0 12px;
+      padding: 0 10px;
       min-width: 0;
       border-right: 1px solid transparent;
+      box-sizing: border-box;
     }
 
-    /* Match body column flex values exactly */
+    /* Match body column flex values exactly — 4 main cols equal */
     .syn-mod-level[data-mod="amplitude"]  { flex: 1; }
     .syn-mod-level[data-mod="morphology"] { flex: 1; }
     .syn-mod-level[data-mod="frequency"]  { flex: 1; }
-    .syn-mod-level[data-mod="detection"]  { flex: 1.2; }
-    .syn-mod-level[data-mod="output"]     { flex: 0 0 130px; }
+    .syn-mod-level[data-mod="detection"]  { flex: 1; }
+    .syn-mod-level[data-mod="output"]     { flex: 0 0 120px; box-sizing: border-box; }
 
     .syn-mod-level:last-child { border-right: none; }
 
@@ -848,7 +885,9 @@
       color: var(--mc);
       white-space: nowrap;
       user-select: none;
-      flex-shrink: 0;
+      flex-shrink: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .syn-mod-level input[type="range"] {
       flex: 1;
@@ -873,17 +912,19 @@
       display: flex;
       gap: 0;
       align-items: stretch;
+      overflow: hidden;
     }
 
     /* ── Columns ────────────────────────────────────────────────────── */
     .synth-col {
       display: flex;
       flex-direction: column;
-      padding: 8px 12px 6px;
+      padding: 6px 10px 6px;
       border-right: 1px solid var(--border);
-      gap: 4px;
+      gap: 2px;
       position: relative;
       min-width: 0;
+      box-sizing: border-box;
     }
     .synth-col:last-child { border-right: none; }
 
@@ -892,8 +933,8 @@
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0;
-      height: 2px;
-      opacity: 0.5;
+      height: 3px;
+      opacity: 0.7;
     }
     .synth-col[data-col="amplitude"]::before  { background: #f0a030; }
     .synth-col[data-col="morphology"]::before { background: #38bdf8; }
@@ -901,26 +942,32 @@
     .synth-col[data-col="detection"]::before  { background: #f87171; }
     .synth-col[data-col="output"]::before     { background: #8888a0; }
 
-    .synth-col[data-col="source"]    { flex: 0 0 170px; }
-    .synth-col[data-col="amplitude"] { flex: 1; }
-    .synth-col[data-col="morphology"]{ flex: 1; }
-    .synth-col[data-col="frequency"] { flex: 1; }
-    .synth-col[data-col="detection"] { flex: 1.2; }
-    .synth-col[data-col="output"]    { flex: 0 0 130px; }
+    .synth-col[data-col="source"]    { flex: 0 0 311px; }
+    .synth-col[data-col="amplitude"] { flex: 1; background: rgba(240, 160, 48, 0.015); }
+    .synth-col[data-col="morphology"]{ flex: 1; background: rgba(56, 189, 248, 0.015); }
+    .synth-col[data-col="frequency"] { flex: 1; background: rgba(74, 222, 128, 0.015); }
+    .synth-col[data-col="detection"] { flex: 1; background: rgba(248, 113, 113, 0.015); }
+    .synth-col[data-col="output"]    { flex: 0 0 120px; background: rgba(136, 136, 160, 0.015); }
 
     /* ── Faders ─────────────────────────────────────────────────────── */
     .syn-fader {
       display: flex;
       align-items: center;
       gap: 8px;
+      height: 22px;          /* uniform row height → cross-column alignment */
+      flex-shrink: 0;
     }
 
     .syn-label {
       display: flex;
       flex-direction: column;
-      min-width: 72px;
+      width: 76px;
+      min-width: 0;
+      flex-shrink: 1;
       text-align: right;
       gap: 0;
+      justify-content: center;
+      overflow: hidden;
     }
 
     .syn-label-main {
@@ -931,6 +978,8 @@
       white-space: nowrap;
       user-select: none;
       line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .syn-label-sub {
@@ -938,14 +987,18 @@
       color: var(--dim);
       white-space: nowrap;
       user-select: none;
-      line-height: 1.2;
+      line-height: 1.1;
       font-style: italic;
+      opacity: 0;
+      transition: opacity 0.15s;
     }
+    /* Show sub-label only on hover — reduces clutter */
+    .syn-fader:hover .syn-label-sub { opacity: 1; }
 
     .syn-range {
       flex: 1;
       cursor: pointer;
-      min-width: 50px;
+      min-width: 40px;
       height: 4px;
     }
 
@@ -956,29 +1009,101 @@
     .synth-col[data-col="detection"]  .syn-range { accent-color: #f87171; }
     .synth-col[data-col="output"]     .syn-range { accent-color: #8888a0; }
 
+    /* Sub-faders: clearly subordinate with └ connector */
     .syn-sub {
-      padding-left: 14px;
-      border-left: 2px solid color-mix(in srgb, var(--text) 20%, transparent);
+      position: relative;
+      padding-left: 16px;
       margin-left: 8px;
-      opacity: 0.85;
+      opacity: 0.8;
     }
-    .syn-sub .syn-label { min-width: 58px; }
-    .syn-sub .syn-label-main { font-size: 8px; }
+    .syn-sub::before {
+      content: '\2514';
+      position: absolute;
+      left: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 9px;
+      color: var(--dim);
+      opacity: 0.4;
+    }
+    .syn-sub:hover { opacity: 1; }
+    .syn-sub .syn-label-main { font-size: 8px; color: var(--muted); }
+    .syn-sub .syn-range { opacity: 0.7; }
+    .syn-sub:hover .syn-range { opacity: 1; }
 
     .syn-divider {
       height: 1px;
       background: var(--border);
-      margin: 3px 0;
+      margin: 1px 0;
     }
 
     .syn-pair-row {
       display: flex;
       gap: 6px;
+      height: 22px;
+      flex-shrink: 0;
+      min-width: 0;
+      overflow: hidden;
     }
-    .syn-pair-row .syn-fader { flex: 1; }
-    .syn-pair-row .syn-label { min-width: auto; }
+    .syn-pair-row .syn-fader { flex: 1; height: auto; min-width: 0; }
+    .syn-pair-row .syn-label { width: auto; min-width: 0; flex-shrink: 1; }
     .syn-pair-row .syn-label-main { font-size: 8px; }
-    .syn-pair-row .syn-range { min-width: 30px; }
+    .syn-pair-row .syn-range { min-width: 24px; flex: 1; }
+
+    /* Per-column label widths for optimal alignment */
+    .synth-col[data-col="detection"]  .syn-label { width: 76px; }
+    .synth-col[data-col="output"]     .syn-label { width: auto; max-width: none; min-width: 0; text-align: center; }
+
+    /* Output column: vertical stacking (label on top, slider below) */
+    .synth-col[data-col="output"] .syn-fader {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 2px;
+    }
+    .synth-col[data-col="output"] .syn-range {
+      width: 100%;
+    }
+
+    /* Source column fader: label above slider for narrow column */
+    .syn-source-fader {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 2px;
+      height: auto;
+    }
+    .syn-source-fader .syn-label {
+      text-align: center;
+      width: auto;
+    }
+    .syn-source-fader .syn-range {
+      width: 100%;
+    }
+    .syn-source-fader .syn-label-sub {
+      opacity: 1;   /* always visible — shows normalized/absolute state */
+    }
+
+    /* Range with endpoint labels (left ← slider → right) */
+    .syn-range-endpoints {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      height: 22px;
+    }
+    .syn-range-endpoints .syn-range {
+      flex: 1;
+      min-width: 40px;
+    }
+    .syn-endpoint {
+      font-size: 8px;
+      color: var(--dim);
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: color 0.15s, opacity 0.15s;
+    }
+    .syn-endpoint.active {
+      color: var(--text);
+      opacity: 1;
+    }
 
     /* ── Band pills ─────────────────────────────────────────────────── */
     .syn-bands { display: flex; gap: 3px; }
@@ -1002,40 +1127,83 @@
       font-weight: 700;
     }
     .syn-pill[data-band="auto"] {
+      letter-spacing: 0.06em;
+    }
+    .syn-pill[data-band="auto"].active {
       border-color: var(--good);
       color: var(--good);
       background: var(--good-bg);
-      letter-spacing: 0.06em;
     }
 
     /* ── Band barometer ─────────────────────────────────────────────── */
-    .baro-stack { display: flex; flex-direction: column; gap: 2px; margin: 4px 0; }
-    .baro-row { display: flex; align-items: center; gap: 4px; height: 10px; }
-    .baro-row-label {
-      font-size: 7px; font-family: var(--mono); color: var(--dim);
-      min-width: 14px; text-align: right; user-select: none;
-      transition: color 0.3s, font-weight 0.3s;
+    .baro-stack { display: flex; flex-direction: column; gap: 3px; margin: 4px 0; }
+    .baro-row {
+      display: flex; align-items: center; gap: 6px; height: 14px;
+      opacity: 0.45;
+      transition: opacity 0.25s;
     }
+    /* Full mode: all rows visible equally */
+    .baro-stack.band-full .baro-row { opacity: 1; }
+    /* Auto mode: all rows visible, softmax weights drive fill opacity */
+    .baro-stack.band-auto .baro-row { opacity: 1; }
+    /* Specific band selected: only that row is bright */
+    .baro-row.selected { opacity: 1; }
+    .baro-row.dominant { opacity: 1; }
+    .baro-row.selected.dominant { opacity: 1; }
+
+    .baro-row-label {
+      font-size: 11px; font-family: var(--mono); color: var(--bc);
+      min-width: 18px; text-align: right; user-select: none;
+      transition: opacity 0.3s;
+    }
+    .baro-row.selected .baro-row-label { color: var(--bc); font-weight: 700; }
     .baro-row.dominant .baro-row-label { color: var(--bc); font-weight: 700; }
     .baro-row-track {
-      flex: 1; height: 4px; background: var(--surface);
-      border-radius: 2px; overflow: hidden; position: relative;
+      flex: 1; height: 6px; background: color-mix(in srgb, var(--surface) 70%, var(--text));
+      border-radius: 3px; overflow: hidden; position: relative;
     }
     .baro-row-fill {
       position: absolute; top: 0; bottom: 0; left: 0; width: 0%;
-      background: var(--bc); border-radius: 2px;
-      transition: width 0.5s ease-out; opacity: 0.7;
+      background: var(--bc); border-radius: 3px;
+      transition: width 0.5s ease-out, background 0.3s; opacity: 0.85;
     }
-    .baro-row.dominant .baro-row-fill { opacity: 1.0; }
+    .baro-row.selected .baro-row-fill { opacity: 1.0; }
+    .baro-row.dominant .baro-row-fill { opacity: 1.0; box-shadow: 0 0 6px var(--bc); }
+    .baro-stack.band-auto .baro-row-fill { opacity: 1.0; }
 
     .syn-tune {
       display: flex; align-items: center; gap: 4px;
       margin-top: auto; padding-top: 4px; border-top: 1px solid var(--border);
     }
 
+    /* ── Output meter ──────────────────────────────────────────────── */
+    .output-meter {
+      height: 6px;
+      background: var(--surface);
+      border-radius: 3px;
+      position: relative;
+      overflow: hidden;
+      margin: 10px 0;
+      border: 1px solid var(--border);
+    }
+    .output-meter-fill {
+      height: 100%;
+      width: 0%;
+      background: #4ade80;
+      border-radius: 2px;
+      transition: width 0.08s ease-out, background 0.15s;
+    }
+    .output-meter-threshold {
+      position: absolute;
+      top: 0; bottom: 0;
+      right: 5%;
+      width: 1px;
+      background: rgba(248, 113, 113, 0.4);
+    }
+
     /* ── PPAF display ───────────────────────────────────────────────── */
     .ppaf-display {
-      height: 44px;
+      height: 38px;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 3px;
@@ -1341,6 +1509,19 @@
     }
     .tcp-pitch:hover  { border-color: var(--border); color: var(--text); }
     .tcp-pitch:focus  { border-color: var(--accent); color: var(--text); background: var(--surface); }
+
+    /* ── Responsive: narrow viewports ──────────────────────────────── */
+    @media (max-width: 900px) {
+      :root { --tcp-w: 120px; }
+      .track-tcp,
+      .workspace-header .tcp-stub {
+        grid-template-columns: 16px 1fr 36px;
+      }
+      .track-tcp .tcp-pitch,
+      .track-tcp .tcp-mute,
+      .track-tcp .tcp-solo { display: none; }
+      .tcp-stub span:nth-child(n+4) { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -1477,7 +1658,11 @@
 
         <!-- Source: toggle + band pills — fixed width matching source column -->
         <div class="synth-header-source">
-          <button class="synth-toggle" id="synth-toggle" title="Toggle synthesis panel">&#x25BE;</button>
+          <button class="synth-toggle" id="synth-toggle" title="Toggle synthesis panel">
+            <span class="synth-toggle-arrow">&#x25BE;</span>
+            <span class="synth-title">Synthesis</span>
+          </button>
+          <span class="syn-bands-sep" style="font-style:italic; font-family:serif">f</span>
           <div class="syn-bands" id="band-pills">
             <span class="syn-pill active" data-band="full">Full</span>
             <span class="syn-pill" data-band="delta"     style="--bc:#6366f1">&#x03B4;</span>
@@ -1524,7 +1709,7 @@
 
           <!-- Under band pills -->
           <div class="synth-col" data-col="source">
-            <div class="baro-stack" id="band-barometer">
+            <div class="baro-stack band-full" id="band-barometer">
               <div class="baro-row" data-band="delta"     style="--bc:#6366f1"><span class="baro-row-label">&#x03B4;</span><div class="baro-row-track"><div class="baro-row-fill"></div></div></div>
               <div class="baro-row" data-band="theta"     style="--bc:#06b6d4"><span class="baro-row-label">&#x03B8;</span><div class="baro-row-track"><div class="baro-row-fill"></div></div></div>
               <div class="baro-row" data-band="alpha"     style="--bc:#22c55e"><span class="baro-row-label">&#x03B1;</span><div class="baro-row-track"><div class="baro-row-fill"></div></div></div>
@@ -1532,6 +1717,15 @@
               <div class="baro-row" data-band="lowGamma"  style="--bc:#f97316"><span class="baro-row-label">&#x03B3;</span><div class="baro-row-track"><div class="baro-row-fill"></div></div></div>
               <div class="baro-row" data-band="highGamma" style="--bc:#ef4444"><span class="baro-row-label">h&#x03B3;</span><div class="baro-row-track"><div class="baro-row-fill"></div></div></div>
             </div>
+            <div class="syn-divider"></div>
+            <div class="syn-range-endpoints">
+              <span class="syn-endpoint" id="intensity-left">normalized</span>
+              <input type="range" class="syn-range" id="fader-intensity"
+                     min="0" max="1" step="0.01" value="0.0"
+                     style="accent-color: #6b8cff">
+              <span class="syn-endpoint" id="intensity-right">absolute</span>
+            </div>
+            <div class="syn-divider"></div>
             <div class="syn-tune">
               <span style="font-size:9px;color:var(--muted)">1/1 =</span>
               <input type="number" id="master-tune" min="20" max="2000" step="1" value="130"
@@ -1572,7 +1766,7 @@
           <!-- Under "Morphology" -->
           <div class="synth-col" data-col="morphology">
             <label class="syn-fader" data-feature="slopeAsymmetry">
-              <span class="syn-label"><span class="syn-label-main">Harmonic Range</span><span class="syn-label-sub">overtone extent</span></span>
+              <span class="syn-label"><span class="syn-label-main">Range</span><span class="syn-label-sub">overtone extent</span></span>
               <input type="range" class="syn-range" id="fader-range" min="0" max="1" step="0.01" value="0.5">
             </label>
             <label class="syn-fader syn-sub">
@@ -1600,11 +1794,11 @@
               <input type="range" class="syn-range" id="fader-mobility" min="0" max="1" step="0.01" value="0.3">
             </label>
             <label class="syn-fader" data-feature="spectralBandwidth">
-              <span class="syn-label"><span class="syn-label-main">Spectral Bandwidth</span><span class="syn-label-sub">&#x2192; harmonic spread</span></span>
+              <span class="syn-label"><span class="syn-label-main">Bandwidth</span><span class="syn-label-sub">harmonic spread</span></span>
               <input type="range" class="syn-range" id="fader-bandwidth" min="0" max="1" step="0.01" value="0.0">
             </label>
             <label class="syn-fader syn-sub" data-feature="permEntropy">
-              <span class="syn-label"><span class="syn-label-main">Perm. Entropy</span><span class="syn-label-sub">certainty &#x2192; narrow / wide</span></span>
+              <span class="syn-label"><span class="syn-label-main">Entropy</span><span class="syn-label-sub">certainty → narrow / wide</span></span>
               <input type="range" class="syn-range" id="fader-entropy" min="0" max="1" step="0.01" value="0.0">
             </label>
           </div>
@@ -1616,19 +1810,17 @@
               <canvas id="ppaf-canvas"></canvas>
             </div>
             <label class="syn-fader" data-feature="ppaf">
-              <span class="syn-label"><span class="syn-label-main">PPAF Threshold</span><span class="syn-label-sub" id="ppaf-uv-display">150 µV</span></span>
+              <span class="syn-label"><span class="syn-label-main">Threshold</span><span class="syn-label-sub" id="ppaf-uv-display">150 µV</span></span>
               <input type="range" class="syn-range" id="fader-ppafThreshold" min="0" max="1" step="0.01" value="0.5">
             </label>
-            <div class="syn-pair-row">
-              <label class="syn-fader">
-                <span class="syn-label"><span class="syn-label-main">Saturation</span></span>
-                <input type="range" class="syn-range" id="fader-saturation" min="0" max="1" step="0.01" value="0.5">
-              </label>
-              <label class="syn-fader">
-                <span class="syn-label"><span class="syn-label-main">Noise</span></span>
-                <input type="range" class="syn-range" id="fader-noise" min="0" max="1" step="0.01" value="0.4">
-              </label>
-            </div>
+            <label class="syn-fader">
+              <span class="syn-label"><span class="syn-label-main">Saturation</span></span>
+              <input type="range" class="syn-range" id="fader-saturation" min="0" max="1" step="0.01" value="0.5">
+            </label>
+            <label class="syn-fader">
+              <span class="syn-label"><span class="syn-label-main">Noise</span></span>
+              <input type="range" class="syn-range" id="fader-noise" min="0" max="1" step="0.01" value="0.4">
+            </label>
             <div class="syn-pair-row">
               <label class="syn-fader">
                 <span class="syn-label"><span class="syn-label-main">Attack</span></span>
@@ -1639,33 +1831,33 @@
                 <input type="range" class="syn-range" id="fader-noiseDecay" min="15" max="200" step="5" value="80">
               </label>
             </div>
-            <details class="syn-advanced">
-              <summary>Advanced</summary>
+            <div class="syn-divider"></div>
+            <div class="syn-pair-row">
               <label class="syn-fader" data-feature="spectralFlux">
-                <span class="syn-label"><span class="syn-label-main">Spectral Flux</span><span class="syn-label-sub">directional onset detect</span></span>
+                <span class="syn-label"><span class="syn-label-main">Flux</span></span>
                 <input type="range" class="syn-range" id="fader-flux" min="0" max="1" step="0.01" value="0.0">
               </label>
               <label class="syn-fader">
-                <span class="syn-label"><span class="syn-label-main">Refractory</span><span class="syn-label-sub">min inter-event gap</span></span>
+                <span class="syn-label"><span class="syn-label-main">Refractory</span></span>
                 <input type="range" class="syn-range" id="fader-refractory" min="10" max="200" step="5" value="40">
               </label>
-            </details>
+            </div>
           </div>
 
           <!-- Under "Output" -->
           <div class="synth-col" data-col="output">
             <label class="syn-fader" data-feature="lineLength">
-              <span class="syn-label"><span class="syn-label-main">Activity Gate</span><span class="syn-label-sub">line-length silence gate</span></span>
+              <span class="syn-label"><span class="syn-label-main">Gate(Line Length)</span></span>
               <input type="range" class="syn-range" id="fader-activityGate" min="0" max="1" step="0.01" value="0.3">
             </label>
             <label class="syn-fader">
-              <span class="syn-label"><span class="syn-label-main">Drive</span><span class="syn-label-sub">tissue saturation character</span></span>
+              <span class="syn-label"><span class="syn-label-main">Drive</span></span>
               <input type="range" class="syn-range" id="fader-drive" min="0" max="1" step="0.01" value="0.0">
             </label>
-            <label class="syn-fader">
-              <span class="syn-label"><span class="syn-label-main">Intensity</span><span class="syn-label-sub">normalized &#x2194; absolute µV</span></span>
-              <input type="range" class="syn-range" id="fader-intensity" min="0" max="1" step="0.01" value="0.0">
-            </label>
+            <div class="output-meter">
+              <div class="output-meter-fill" id="output-meter-fill"></div>
+              <div class="output-meter-threshold"></div>
+            </div>
           </div>
 
         </div><!-- /synth-panel -->
@@ -1716,9 +1908,7 @@
       <span class="stat-item"><span class="val" id="stat-ref">—</span></span>
       <span class="stat-item"><span class="val" id="stat-ch">—</span> channels</span>
       <span class="spacer"></span>
-      <span class="stat-good" id="stat-good"></span>
-      <span class="stat-warn" id="stat-warn"></span>
-      <span class="stat-bad"  id="stat-bad"></span>
+      <span class="stat-flagged" id="stat-flagged"></span>
       <span class="stat-item" id="stat-time" style="color:var(--dim)"></span>
     </div>
   </div>
@@ -1742,6 +1932,7 @@
 
   // Engine state
   let engine  = null;
+  let _rebuildPending = false;
   let controls = {
     // AMPLITUDE
     rmsFast: 0, rmsMid: 0, rmsSlow: 0, rmsAdaptive: 1,
@@ -1767,11 +1958,141 @@
   let lastClickedChannel = null;
   let channelZoomed = false;  // true when zoomed into selected channels
 
+  // ── Demo config export/apply ──────────────────────────────────────────────
+  window.exportDemoConfig = function() {
+    const faders = {};
+    document.querySelectorAll('.syn-range').forEach(r => {
+      if (r.id) faders[r.id] = parseFloat(r.value);
+    });
+    const mutedChannels = [];
+    document.querySelectorAll('.tcp-mute.muted').forEach(btn => {
+      const row = btn.closest('.track-row');
+      if (row) mutedChannels.push(row.dataset.label);
+    });
+    const cfg = {
+      controls: { ...controls },
+      layerMix: { ...layerMix },
+      faders,
+      masterTune,
+      viewStart: viewStartSec,
+      viewEnd: viewEndSec,
+      loop: loopActive ? { start: loopStart, end: loopEnd } : null,
+      mutedChannels,
+      activeBand: document.querySelector('.syn-pill.active')?.dataset.band || 'full',
+    };
+    const json = JSON.stringify(cfg, null, 2);
+    console.log('%c── DEMO_CONFIG ──', 'color: #4ade80; font-weight: bold');
+    console.log(json);
+    navigator.clipboard?.writeText(json).then(
+      () => console.log('Copied to clipboard!'),
+      () => console.log('Copy the JSON above manually.')
+    );
+    return cfg;
+  };
+
+  // ── Demo auto-config (applied after engine init on demo file load) ──────
+  const DEMO_CONFIG = {
+    controls: {
+      rmsFast: 0.22, rmsMid: 0.44, rmsSlow: 0.3, rmsAdaptive: 1,
+      amDepth: 0.44, range: 0.6,
+      harmonicRange: 0.38, sensitivity: 0.31, slopeDepth: 0.4, complexityDepth: 0.76,
+      focus: 0.41, mobilityDepth: 0.55, bandwidthSpread: 0.16, entropyDepth: 0,
+      ppafThreshold: 0.5, fluxSensitivity: 0, refractoryMs: 80,
+      detectionLevel: 0.7, saturation: 0.5, noiseMix: 0.4,
+      noiseAttackMs: 15, noiseDecayMs: 155,
+      activityGate: 0.3, drive: 0.38, intensity: 0, masterVolume: 0.7,
+    },
+    faders: {
+      "fader-ampLevel": 1, "fader-morphLevel": 1, "fader-freqLevel": 1,
+      "fader-detLevel": 0.7, "fader-masterVolume": 0.7, "fader-intensity": 0,
+      "fader-rmsFast": 0.22, "fader-rmsMid": 0.44, "fader-rmsSlow": 0.3,
+      "fader-rmsAdaptive": 0.5, "fader-hilbertAM": 0.44, "fader-dynRange": 0.6,
+      "fader-range": 0.38, "fader-slopeDepth": 0.4, "fader-sensitivity": 0.31,
+      "fader-complexityDepth": 0.76, "fader-focus": 0.41, "fader-mobility": 0.55,
+      "fader-bandwidth": 0.16, "fader-entropy": 0, "fader-ppafThreshold": 0.5,
+      "fader-saturation": 0.5, "fader-noise": 0.4, "fader-noiseAttack": 15,
+      "fader-noiseDecay": 155, "fader-flux": 0, "fader-refractory": 80,
+      "fader-activityGate": 0.3, "fader-drive": 0.38,
+    },
+    masterTune: 130,
+    viewStart: 119.30658719775587,
+    viewEnd: 201.88194719775595,
+    loop: { start: 126.51316407048316, end: 197.1660428387097 },
+    activeBand: "full",
+    shafts: ["LAT", "LFP", "LP", "RFP", "RP"],
+  };
+
+  let _isDemoFile = false;
+
+  function applyDemoConfig() {
+    if (!DEMO_CONFIG) return;
+    const cfg = DEMO_CONFIG;
+
+    // Apply controls
+    Object.assign(controls, cfg.controls);
+
+    // Apply fader UI values
+    for (const [id, val] of Object.entries(cfg.faders)) {
+      const el = document.getElementById(id);
+      if (el) { el.value = val; el.dispatchEvent(new Event('input')); }
+    }
+
+    // View window
+    if (cfg.viewStart != null && cfg.viewEnd != null) {
+      viewStartSec = cfg.viewStart;
+      viewEndSec   = cfg.viewEnd;
+      scheduleRedraw();
+    }
+
+    // Loop
+    if (cfg.loop) {
+      loopStart  = cfg.loop.start;
+      loopEnd    = cfg.loop.end;
+      loopActive = true;
+      const loopBtn = document.getElementById('btn-loop');
+      if (loopBtn) loopBtn.classList.add('active');
+    }
+
+    // Band mode
+    if (cfg.activeBand && cfg.activeBand !== 'full') {
+      const pill = document.querySelector(`.syn-pill[data-band="${cfg.activeBand}"]`);
+      if (pill) pill.click();
+    }
+
+    // Rebuild engine with new controls + seek to loop start
+    if (engine) {
+      engine.setControls(preprocessed, controls, true);
+      if (cfg.loop) engine.seek(cfg.loop.start, false);
+    }
+  }
+
   // Voltage cursor state
   let cursorInfo = { time: 0, voltage: 0, channel: null, visible: false };
 
   // Feature overlay state
   let featureOverlay = { label: null, feature: '', color: '', phaseColoring: false };
+
+  // Synthesis curve overlay — shows the actual curve the last-touched fader modifies
+  let curveOverlay = { curve: 'rootAmpCurve', color: '#f0a030', label: 'Amplitude' };
+  const FADER_CURVE_MAP = {
+    'fader-rmsFast':         { curve: 'rootAmpCurve',   color: '#f0a030', label: 'Amplitude' },
+    'fader-rmsMid':          { curve: 'rootAmpCurve',   color: '#f0a030', label: 'Amplitude' },
+    'fader-rmsSlow':         { curve: 'rootAmpCurve',   color: '#f0a030', label: 'Amplitude' },
+    'fader-rmsAdaptive':     { curve: 'rootAmpCurve',   color: '#f0a030', label: 'Amplitude' },
+    'fader-hilbertAM':       { curve: 'rootAmpCurve',   color: '#f0a030', label: 'Amplitude' },
+    'fader-dynRange':        { curve: 'rootAmpCurve',   color: '#f0a030', label: 'Amplitude' },
+    'fader-range':           { curve: 'morphOvertones', color: '#38bdf8', label: 'Overtones' },
+    'fader-slopeDepth':      { curve: 'morphBalance',   color: '#38bdf8', label: 'Polarity' },
+    'fader-sensitivity':     { curve: 'morphBalance',   color: '#38bdf8', label: 'Polarity' },
+    'fader-complexityDepth': { curve: 'morphOvertones', color: '#38bdf8', label: 'Overtones' },
+    'fader-focus':           { curve: 'fmIndexCurve',   color: '#4ade80', label: 'FM Index' },
+    'fader-mobility':        { curve: 'fmIndexCurve',   color: '#4ade80', label: 'FM Index' },
+    'fader-bandwidth':       { curve: 'fmIndexCurve',   color: '#4ade80', label: 'FM Index' },
+    'fader-entropy':         { curve: 'fmIndexCurve',   color: '#4ade80', label: 'FM Index' },
+    'fader-ppafThreshold':   { curve: 'events',         color: '#f87171', label: 'Events' },
+    'fader-saturation':      { curve: 'events',         color: '#f87171', label: 'Events' },
+    'fader-noise':           { curve: 'events',         color: '#f87171', label: 'Events' },
+  };
 
   // Per-channel gain trim storage (label → dB)
   let gainTrimMap = new Map();
@@ -1844,13 +2165,14 @@
 
   // ── Auto-load demo file ──────────────────────────────────────────────────
   (async function autoLoadDemo() {
-    const DEMO = 'demo/sub-HUP082_ses-presurgery_task-ictal_acq-ecog_run-01_ieeg.edf';
+    const DEMO = 'demo/sub-HUP114_ses-presurgery_task-ictal_acq-ecog_run-04_ieeg.edf';
     try {
       const res = await fetch('./' + DEMO);
       if (!res.ok) return;
       const buf = await res.arrayBuffer();
       const name = DEMO.split('/').pop();
       const file = new File([buf], name, { type: 'application/octet-stream' });
+      _isDemoFile = true;
       handleFile(file);
     } catch (_) { /* demo file not available — silent fallback to drop zone */ }
   })();
@@ -1886,6 +2208,25 @@
 
       hideProcessing();
       renderImportScreen(file.name);
+
+      // Demo auto-config: select specific shafts and auto-run preprocess
+      if (_isDemoFile && DEMO_CONFIG?.shafts) {
+        const demoShafts = new Set(DEMO_CONFIG.shafts);
+        selectedShafts.clear();
+        document.querySelectorAll('.shaft-cb').forEach(cb => {
+          const shaft = cb.dataset.shaft;
+          if (demoShafts.has(shaft)) {
+            cb.checked = true;
+            selectedShafts.add(shaft);
+          } else {
+            cb.checked = false;
+          }
+        });
+        updateShaftCount();
+        // Auto-click preprocess after a brief yield
+        await new Promise(r => setTimeout(r, 50));
+        runPreprocess();
+      }
 
     } catch (err) {
       hideProcessing();
@@ -2127,16 +2468,12 @@
     document.getElementById('btn-reopen').style.display = '';
 
     // Status bar
-    const good = channels.filter(c => c.quality?.status === 'good').length;
-    const warn = channels.filter(c => c.quality?.status === 'warn').length;
-    const bad  = channels.filter(c => c.quality?.status === 'bad').length;
+    const flagged = channels.filter(c => c.quality?.status === 'bad').length;
 
-    document.getElementById('stat-notch').textContent = lineFreq + ' Hz';
-    document.getElementById('stat-ref').textContent   = referenceMode;
-    document.getElementById('stat-ch').textContent    = channels.length;
-    document.getElementById('stat-good').textContent  = good + ' good';
-    document.getElementById('stat-warn').textContent  = warn > 0 ? warn + ' warn' : '';
-    document.getElementById('stat-bad').textContent   = bad  > 0 ? bad  + ' bad'  : '';
+    document.getElementById('stat-notch').textContent   = lineFreq + ' Hz';
+    document.getElementById('stat-ref').textContent     = referenceMode;
+    document.getElementById('stat-ch').textContent      = channels.length;
+    document.getElementById('stat-flagged').textContent = flagged > 0 ? `· ${flagged} flagged` : '';
     document.getElementById('stat-time').textContent  = ms + ' ms';
 
     // Track area — unified rows (TCP + waveform in each row)
@@ -2147,6 +2484,12 @@
 
     // Draw EEG sum in the seek bar
     drawSeekSum();
+
+    // Compute RMS percentiles for subtle heat tint on tcp-val
+    const _rmsVals = channels.map(c => c.quality?.rms).filter(v => v != null).sort((a, b) => a - b);
+    const _rmsP05 = _rmsVals[Math.floor(_rmsVals.length * 0.05)] ?? 0;
+    const _rmsP95 = _rmsVals[Math.floor(_rmsVals.length * 0.95)] ?? 1;
+    window._rmsHeatRange = { lo: _rmsP05, hi: _rmsP95 };
 
     if (referenceMode === 'bipolar') {
       // Group by shaft
@@ -2160,13 +2503,10 @@
       for (const [shaftName, chs] of Object.entries(byShaft)) {
         const gHdr = document.createElement('div');
         gHdr.className = 'shaft-header';
-        const gWarn = chs.filter(c => c.quality?.status === 'warn').length;
         const gBad  = chs.filter(c => c.quality?.status === 'bad').length;
         const badge = gBad > 0
-          ? `<span style="color:var(--bad)">${gBad} bad</span>`
-          : gWarn > 0
-          ? `<span style="color:var(--warn)">${gWarn} warn</span>`
-          : `<span style="color:var(--good)">${chs.length} ok</span>`;
+          ? `<span style="color:var(--muted)">${chs.length} ch · ${gBad} flagged</span>`
+          : `<span style="color:var(--muted)">${chs.length} ch</span>`;
 
         const titleSpan = document.createElement('span');
         titleSpan.className = 'shaft-title';
@@ -2266,7 +2606,12 @@
 
     showScreen('workspace');
     initView();
-    initEngine();
+    initEngine().then(() => {
+      if (_isDemoFile) {
+        applyDemoConfig();
+        _isDemoFile = false;
+      }
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -2443,6 +2788,11 @@
       const data = ch.data;
       const fs   = ch.fs;
 
+      // ── Synthesis curve overlay (disabled — re-enable when curve data is verified) ──
+      // if (engine && selectedChannels.has(label)) {
+      //   drawCurveOverlay(ctx, label, vStart, vDur, width, height);
+      // }
+
       const hue = shaftHues[ch.shaft || ch.label] ?? 200;
       const lightness = ch.quality?.status === 'bad' ? 25 : 45;
 
@@ -2596,6 +2946,153 @@
     scheduleRedraw();
   }
 
+  // ── Curve overlay helpers ─────────────────────────────────────────────────
+
+  function _drawSingleCurve(ctx, curve, vStart, vDur, w, h, color, fillAlpha) {
+    if (!curve || curve.length < 2) return;
+    const fps = 60, n = curve.length;
+    const fStart = Math.max(0, Math.floor(vStart * fps));
+    const fEnd = Math.min(Math.ceil((vStart + vDur) * fps), n);
+    let cMin = Infinity, cMax = -Infinity;
+    for (let f = fStart; f < fEnd; f++) {
+      if (curve[f] < cMin) cMin = curve[f];
+      if (curve[f] > cMax) cMax = curve[f];
+    }
+    const cRange = cMax - cMin || 1;
+
+    const hex = color.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+
+    // Filled area from bottom
+    ctx.fillStyle = `rgba(${r},${g},${b},${fillAlpha})`;
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    for (let px = 0; px < w; px++) {
+      const t = vStart + (px / w) * vDur;
+      const frame = Math.min(Math.max(0, Math.floor(t * fps)), n - 1);
+      const norm = (curve[frame] - cMin) / cRange;
+      ctx.lineTo(px, h - norm * h * 0.8 - h * 0.05);
+    }
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fill();
+
+    // Stroke top edge
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.2;
+    ctx.globalAlpha = 0.7;
+    ctx.beginPath();
+    for (let px = 0; px < w; px++) {
+      const t = vStart + (px / w) * vDur;
+      const frame = Math.min(Math.max(0, Math.floor(t * fps)), n - 1);
+      const norm = (curve[frame] - cMin) / cRange;
+      const y = h - norm * h * 0.8 - h * 0.05;
+      if (px === 0) ctx.moveTo(px, y); else ctx.lineTo(px, y);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1.0;
+  }
+
+  function _drawBipolarCurve(ctx, curve, vStart, vDur, w, h, alpha) {
+    if (!curve || curve.length < 2) return;
+    const fps = 60, n = curve.length, mid = h / 2;
+    const fStart = Math.max(0, Math.floor(vStart * fps));
+    const fEnd = Math.min(Math.ceil((vStart + vDur) * fps), n);
+    let maxAbs = 0;
+    for (let f = fStart; f < fEnd; f++) {
+      const a = Math.abs(curve[f]);
+      if (a > maxAbs) maxAbs = a;
+    }
+    if (maxAbs < 0.001) return;
+    const scale = (h * 0.35) / maxAbs;
+
+    for (let px = 0; px < w; px++) {
+      const t = vStart + (px / w) * vDur;
+      const frame = Math.min(Math.max(0, Math.floor(t * fps)), n - 1);
+      const val = curve[frame];
+      const y = mid - val * scale;
+      if (val > 0) {
+        ctx.fillStyle = `rgba(240, 180, 80, ${alpha})`;
+        ctx.fillRect(px, y, 1, mid - y);
+      } else {
+        ctx.fillStyle = `rgba(80, 160, 240, ${alpha})`;
+        ctx.fillRect(px, mid, 1, y - mid);
+      }
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(0, mid);
+    ctx.lineTo(w, mid);
+    ctx.stroke();
+  }
+
+  function _drawEventMarkers(ctx, events, vStart, vDur, w, h) {
+    if (!events) return;
+    const vEnd = vStart + vDur;
+    ctx.fillStyle = 'rgba(248, 113, 113, 0.50)';
+    for (const ev of events) {
+      if (ev.timeSec < vStart || ev.timeSec > vEnd) continue;
+      const px = ((ev.timeSec - vStart) / vDur) * w;
+      const markerH = h * 0.08 + h * 0.15 * (ev.excitation ?? 0.5);
+      ctx.beginPath();
+      ctx.moveTo(px - 2, 0);
+      ctx.lineTo(px, markerH);
+      ctx.lineTo(px + 2, 0);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  /**
+   * Draw the synthesis curve that the last-touched fader actually modifies.
+   * Shows the REAL curve the engine uses, not an energy summary.
+   */
+  function drawCurveOverlay(ctx, label, vStart, vDur, w, h) {
+    const curves = engine?.getVoiceCurves(label);
+    if (!curves || !curves.rootAmpCurve || curves.rootAmpCurve.length < 2) return;
+
+    const nFrames = curves.rootAmpCurve.length;
+    const c = curveOverlay;
+
+    if (c.curve === 'rootAmpCurve') {
+      _drawSingleCurve(ctx, curves.rootAmpCurve, vStart, vDur, w, h, c.color, 0.25);
+
+    } else if (c.curve === 'morphOvertones') {
+      const m = curves.morphology;
+      _drawSingleCurve(ctx, m.over2,   vStart, vDur, w, h, '#38bdf8', 0.30);
+      _drawSingleCurve(ctx, m.over3,   vStart, vDur, w, h, '#60c8f8', 0.22);
+      _drawSingleCurve(ctx, m.over4,   vStart, vDur, w, h, '#90d8ff', 0.15);
+      _drawSingleCurve(ctx, m.under05, vStart, vDur, w, h, '#2090c0', 0.22);
+      _drawSingleCurve(ctx, m.under23, vStart, vDur, w, h, '#3098c8', 0.15);
+
+    } else if (c.curve === 'morphBalance') {
+      const m = curves.morphology;
+      const balance = new Float32Array(nFrames);
+      for (let i = 0; i < nFrames; i++) {
+        const overSum  = (m.over2[i] ?? 0) + (m.over3[i] ?? 0) + (m.over4[i] ?? 0);
+        const underSum = (m.under05[i] ?? 0) + (m.under23[i] ?? 0);
+        balance[i] = overSum - underSum;
+      }
+      _drawBipolarCurve(ctx, balance, vStart, vDur, w, h, 0.25);
+
+    } else if (c.curve === 'fmIndexCurve') {
+      _drawSingleCurve(ctx, curves.fmIndexCurve, vStart, vDur, w, h, c.color, 0.25);
+
+    } else if (c.curve === 'events') {
+      _drawEventMarkers(ctx, curves.events, vStart, vDur, w, h);
+    }
+
+    // Label in bottom-left corner
+    ctx.fillStyle = c.color;
+    ctx.globalAlpha = 0.5;
+    ctx.font = '8px monospace';
+    ctx.fillText(c.label, 4, h - 4);
+    ctx.globalAlpha = 1.0;
+  }
+
   /** Draw full-duration EEG sum waveform in the seek bar, per-shaft colors */
   function drawSeekSum() {
     const canvas = document.getElementById('seek-sum-canvas');
@@ -2612,6 +3109,10 @@
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
 
+    // ── Synthesis bands (disabled — re-enable when curve data is verified) ──
+    // if (engine) { ... getSummedLayers / getAggregateEvents ... }
+
+    // ── Shaft-colored EEG sum ──
     const channels = preprocessed.channels.filter(ch => !isChannelMuted(ch.label));
     if (channels.length === 0) return;
 
@@ -3232,12 +3733,15 @@
     } else if (e.code === 'Home') {
       e.preventDefault();
       if (engine) {
+        const t = loopActive && loopStart != null ? loopStart : 0;
         engine.stop();
         document.getElementById('btn-play').textContent = '\u25B6';
         document.getElementById('btn-play').classList.remove('active');
-        document.getElementById('transport-cur').textContent = fmtTime(0);
-        document.getElementById('seek-bar').value = 0;
-        updatePlayhead(0);
+        document.getElementById('transport-cur').textContent = fmtTime(t);
+        const dur = engine.durationSec || 1;
+        document.getElementById('seek-bar').value = t / dur;
+        if (t > 0) engine.seek(t, false);
+        updatePlayhead(t);
       }
     } else if (e.code === 'End') {
       e.preventDefault();
@@ -3328,9 +3832,9 @@
   // ── Synth panel toggle ─────────────────────────────────────────────────────
   document.getElementById('synth-toggle')?.addEventListener('click', () => {
     const body = document.getElementById('synth-body');
-    const btn  = document.getElementById('synth-toggle');
+    const arrow = document.querySelector('.synth-toggle-arrow');
     const isCollapsed = body.classList.toggle('collapsed');
-    btn.textContent = isCollapsed ? '\u25B8' : '\u25BE';
+    if (arrow) arrow.textContent = isCollapsed ? '\u25B8' : '\u25BE';
   });
 
   // ── Resize handler ─────────────────────────────────────────────────────────
@@ -3726,6 +4230,16 @@
     }
     pill.classList.add('active');
     activeBand = band;
+
+    // Sync barometer highlight with selected band
+    const stack = document.getElementById('band-barometer');
+    if (stack) {
+      stack.classList.toggle('band-full', band === 'full');
+      stack.classList.toggle('band-auto', band === 'auto');
+      for (const row of stack.querySelectorAll('.baro-row')) {
+        row.classList.toggle('selected', row.dataset.band === band);
+      }
+    }
 
     // Rebuild curves with new band envelope
     if (engine && preprocessed) {
@@ -4455,8 +4969,15 @@
 
     const row = document.createElement('div');
     row.className = 'track-row';
-    row.title = (q.issues ?? []).join(' | ') || (chPitch ? `${chPitch.hz.toFixed(1)} Hz` : '');
     row.dataset.label = ch.label;
+    row.dataset.quality = status;
+    // Tooltip: quality detail on hover, pitch info otherwise
+    if (status === 'bad')
+      row.title = `${ch.label} — flagged: ${(q.issues ?? []).join(', ') || 'high RMS (likely artifact)'}`;
+    else if (status === 'warn')
+      row.title = `${ch.label} — elevated RMS`;
+    else
+      row.title = chPitch ? `${ch.label} — ${chPitch.hz.toFixed(1)} Hz` : ch.label;
 
     // Left: TCP info
     const tcp = document.createElement('div');
@@ -4518,11 +5039,20 @@
       e.stopPropagation();
     });
 
+    // Subtle heat tint: cool gray → faint amber based on RMS percentile
+    const hr = window._rmsHeatRange ?? { lo: 0, hi: 1 };
+    const rmsNum = q.rms ?? 0;
+    const t = hr.hi > hr.lo ? Math.max(0, Math.min(1, (rmsNum - hr.lo) / (hr.hi - hr.lo))) : 0;
+    // hsl: 210 (cool blue-gray) at 0 → 35 (warm amber) at 1, saturation 0%→25%, lightness stays muted
+    const hue = Math.round(210 - t * 175);
+    const sat = Math.round(t * 25);
+    const rmsColor = t < 0.1 ? 'var(--muted)' : `hsl(${hue}, ${sat}%, 55%)`;
+
     tcp.innerHTML =
       `<div style="display:flex;align-items:center;justify-content:center">` +
-        `<div class="tcp-dot ${status}" title="${esc(status)}"></div></div>` +
+        `<div class="tcp-dot"></div></div>` +
       `<div class="tcp-label">${esc(ch.label)}</div>` +
-      `<div class="tcp-val ${status !== 'good' ? status : ''}">${esc(rms)}</div>`;
+      `<div class="tcp-val" style="color:${rmsColor}">${esc(rms)}</div>`;
     tcp.appendChild(ratioInput);
     tcp.appendChild(muteBtn);
     tcp.appendChild(soloBtn);
@@ -4543,6 +5073,11 @@
     row.appendChild(tcp);
     row.appendChild(wave);
     container.appendChild(row);
+
+    // Auto-mute bad channels on load
+    if (status === 'bad') {
+      muteBtn.classList.add('muted');
+    }
   }
 
   // ── Shaft selection count ─────────────────────────────────────────────────
@@ -4571,6 +5106,12 @@
       });
       hideProcessing();
 
+      // Apply auto-muted bad channels to engine
+      document.querySelectorAll('.tcp-mute.muted').forEach(btn => {
+        const row = btn.closest('.track-row');
+        if (row) engine.setChannelMute(row.dataset.label, true);
+      });
+
       engine.on('timeupdate', t => {
         // Loop check
         if (loopActive && loopEnd !== null && t >= loopEnd) {
@@ -4585,6 +5126,8 @@
         updatePlayhead(t);
         updateBarometer(t);
         drawPPAFDisplay(t);
+        updateOutputMeter();
+        updateChannelMeters();
       });
 
       engine.on('ended', () => {
@@ -4592,7 +5135,12 @@
         document.getElementById('btn-play').classList.remove('active');
         document.getElementById('transport-cur').textContent = fmtTime(0);
         document.getElementById('seek-bar').value = 0;
+        resetOutputMeter();
+        resetChannelMeters();
       });
+
+      // Redraw with synthesis overlay now that curves are available
+      scheduleRedraw();
 
       console.log('[UI] Engine ready. Press Play to listen.');
     } catch (err) {
@@ -4618,11 +5166,17 @@
 
   document.getElementById('btn-stop').addEventListener('click', () => {
     if (!engine) return;
+    const t = loopActive && loopStart != null ? loopStart : 0;
     engine.stop();
     document.getElementById('btn-play').textContent = '\u25B6';
     document.getElementById('btn-play').classList.remove('active');
-    document.getElementById('transport-cur').textContent = fmtTime(0);
-    document.getElementById('seek-bar').value = 0;
+    document.getElementById('transport-cur').textContent = fmtTime(t);
+    const dur = engine.durationSec || 1;
+    document.getElementById('seek-bar').value = t / dur;
+    if (t > 0) engine.seek(t, false);
+    updatePlayhead(t);
+    resetOutputMeter();
+    resetChannelMeters();
   });
 
   document.getElementById('btn-loop').addEventListener('click', () => {
@@ -4727,16 +5281,48 @@
         if (engine) engine.setControls(preprocessed, controls, false);
       });
     } else if (cfg.rebuild) {
-      // Rebuild faders → track on input, rebuild on change
+      // Rebuild faders → throttled continuous hot-swap (one rebuild per frame)
       el.addEventListener('input', e => {
         controls[cfg.key] = parseFloat(e.target.value);
-      });
-      el.addEventListener('change', async e => {
-        controls[cfg.key] = parseFloat(e.target.value);
-        if (engine) await engine.setControls(preprocessed, controls, true);
+        if (!_rebuildPending && engine) {
+          _rebuildPending = true;
+          requestAnimationFrame(async () => {
+            _rebuildPending = false;
+            await engine.setControls(preprocessed, controls, true);
+          });
+        }
       });
     }
   }
+
+  // ── Curve overlay (disabled — re-enable when curve data is verified) ──
+  // for (const [id, mapping] of Object.entries(FADER_CURVE_MAP)) {
+  //   const el = document.getElementById(id);
+  //   if (!el) continue;
+  //   el.addEventListener('input', () => {
+  //     curveOverlay = { ...mapping };
+  //     scheduleRedraw();
+  //   });
+  // }
+
+  // ── Double-click any fader to reset to default ────────────────────────────
+  // Store defaults from HTML value attributes
+  const _faderDefaults = {};
+  document.querySelectorAll('.syn-range').forEach(r => {
+    _faderDefaults[r.id] = r.defaultValue;
+  });
+  // Inspector gain default
+  _faderDefaults['inspector-gain'] = '0';
+
+  document.addEventListener('dblclick', e => {
+    const input = e.target.closest('input[type="range"]');
+    if (!input) return;
+    const def = _faderDefaults[input.id];
+    if (def == null) return;
+    input.value = def;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
 
   // PPAF threshold µV display — update live as fader moves
   const ppafFader  = document.getElementById('fader-ppafThreshold');
@@ -4748,6 +5334,22 @@
   };
   ppafFader?.addEventListener('input', updatePpafUV);
   updatePpafUV();  // set initial display
+
+  // ── Intensity endpoint highlights ─────────────────────────────────────────
+  const _intLeft  = document.getElementById('intensity-left');
+  const _intRight = document.getElementById('intensity-right');
+  function updateIntensityEndpoints(val) {
+    if (!_intLeft || !_intRight) return;
+    // Left (normalized) brighter when val low, right (absolute) brighter when val high
+    _intLeft.style.opacity  = (1 - val * 0.6).toFixed(2);
+    _intRight.style.opacity = (0.4 + val * 0.6).toFixed(2);
+    _intLeft.classList.toggle('active', val < 0.3);
+    _intRight.classList.toggle('active', val > 0.7);
+  }
+  document.getElementById('fader-intensity')?.addEventListener('input', e => {
+    updateIntensityEndpoints(parseFloat(e.target.value));
+  });
+  updateIntensityEndpoints(0); // initial state
 
   // ── Master tune ──────────────────────────────────────────────────────────
   document.getElementById('master-tune')?.addEventListener('change', async e => {
@@ -4790,8 +5392,10 @@
     let total = 0, chCount = 0;
     for (const name of bandNames) powers[name] = 0;
 
+    const hasSolo = soloedChannels.size > 0;
     for (const ch of preprocessed.channels) {
       if (isChannelMuted(ch.label)) continue;
+      if (hasSolo && !soloedChannels.has(ch.label)) continue;
       if (!ch.features?.bandPowers) continue;
       const idx = Math.floor(timeSec * ch.fs);
       for (const name of bandNames) {
@@ -4809,12 +5413,92 @@
       if (powers[name] > maxVal) { maxVal = powers[name]; maxName = name; }
     }
 
+    // Compute softmax weights for Auto mode visualization
+    const SOFTMAX_TEMP = 6.0;
+    let softmaxWeights = null;
+    const isAuto = activeBand === 'auto';
+    if (isAuto && total > 0) {
+      softmaxWeights = {};
+      let sumExp = 0;
+      const maxP = Math.max(...bandNames.map(n => powers[n]));
+      for (const name of bandNames) {
+        softmaxWeights[name] = Math.exp((powers[name] - maxP) * SOFTMAX_TEMP);
+        sumExp += softmaxWeights[name];
+      }
+      for (const name of bandNames) {
+        softmaxWeights[name] /= sumExp;
+      }
+    }
+
+    // Find min/max weight for normalizing brightness gradient
+    let minW = 1, maxW = 0;
+    if (softmaxWeights) {
+      for (const name of bandNames) {
+        const w = softmaxWeights[name] ?? 0;
+        if (w < minW) minW = w;
+        if (w > maxW) maxW = w;
+      }
+    }
+    const wRange = maxW - minW;
+
     rows.forEach(row => {
       const band = row.dataset.band;
-      const pct = total > 0 ? (powers[band] ?? 0) / total * 100 : 0;
       const fill = row.querySelector('.baro-row-fill');
-      if (fill) fill.style.width = Math.min(100, pct) + '%';
-      row.classList.toggle('dominant', band === maxName);
+      const label = row.querySelector('.baro-row-label');
+
+      if (fill) {
+        if (softmaxWeights) {
+          // AUTO MODE: bar width = softmax weight
+          const weight = softmaxWeights[band] ?? 0;
+          fill.style.width = (weight * 100).toFixed(1) + '%';
+
+          // Brightness gradient: lowest weight → 0.15, highest → 1.0
+          const t = wRange > 0 ? (weight - minW) / wRange : 1;
+          const brightness = 0.15 + t * 0.85;
+          fill.style.opacity = brightness.toFixed(2);
+          if (label) {
+            label.style.opacity = brightness.toFixed(2);
+            label.style.color = '';
+            label.style.fontWeight = '';
+          }
+        } else {
+          // Full / specific band: bar width = power share, zoomed 2.5x
+          const pct = total > 0 ? (powers[band] ?? 0) / total * 100 : 0;
+          fill.style.width = Math.min(100, pct * 2.5) + '%';
+          fill.style.opacity = '';
+          if (label) {
+            label.style.opacity = '';
+            label.style.color = '';
+            label.style.fontWeight = '';
+          }
+        }
+      }
+      row.classList.toggle('dominant', isAuto && band === maxName);
+    });
+
+    // ── Mirror softmax weights onto band pills (mini barometer when collapsed) ──
+    const pills = document.querySelectorAll('#band-pills .syn-pill[data-band]');
+    pills.forEach(pill => {
+      const band = pill.dataset.band;
+      if (band === 'full' || band === 'auto') return;
+
+      if (softmaxWeights) {
+        const weight = softmaxWeights[band] ?? 0;
+        const t = wRange > 0 ? (weight - minW) / wRange : 1;
+        const brightness = 0.1 + t * 0.9;
+        const bc = getComputedStyle(pill).getPropertyValue('--bc').trim();
+        // Match .syn-pill.active style: tinted bg, colored text + border
+        const bgAlpha = Math.round(brightness * 35);  // 3.5% to 35% tint
+        pill.style.background = `color-mix(in srgb, ${bc} ${bgAlpha}%, transparent)`;
+        pill.style.color = bc;
+        pill.style.borderColor = bc;
+        pill.style.opacity = brightness.toFixed(2);
+      } else {
+        pill.style.background = '';
+        pill.style.opacity = '';
+        pill.style.color = '';
+        pill.style.borderColor = '';
+      }
     });
   }
 
@@ -4855,6 +5539,62 @@
       }, 2000);
     });
   });
+
+  // ── Output meter ──────────────────────────────────────────────────────────
+  const _meterBuf = new Float32Array(128);
+  function updateOutputMeter() {
+    if (!engine || !engine.analyser) return;
+    const an = engine.analyser;
+    an.getFloatTimeDomainData(_meterBuf);
+    let peak = 0;
+    for (let i = 0; i < _meterBuf.length; i++) {
+      const abs = Math.abs(_meterBuf[i]);
+      if (abs > peak) peak = abs;
+    }
+    // Convert to dBFS, clamp to -60..0
+    const dB = peak > 0 ? 20 * Math.log10(peak) : -60;
+    const pct = Math.max(0, Math.min(100, ((dB + 60) / 60) * 100));
+    const fill = document.getElementById('output-meter-fill');
+    if (!fill) return;
+    fill.style.width = pct + '%';
+    // Color: green < -6dB, yellow -6..-1, red > -1
+    if (dB > -1) fill.style.background = '#f87171';
+    else if (dB > -6) fill.style.background = '#facc15';
+    else fill.style.background = '#4ade80';
+  }
+  function resetOutputMeter() {
+    const fill = document.getElementById('output-meter-fill');
+    if (fill) { fill.style.width = '0%'; fill.style.background = '#4ade80'; }
+  }
+
+  // ── Per-channel activity dots ───────────────────────────────────────────────
+  function updateChannelMeters() {
+    if (!engine) return;
+    const levels = engine.getChannelLevels();
+    if (levels.size === 0) return;
+    const dots = document.querySelectorAll('#track-area .tcp-dot');
+    for (const dot of dots) {
+      const row = dot.closest('.track-row');
+      if (!row) continue;
+      const amp = levels.get(row.dataset.label) ?? 0;
+      // 0.15 (silent) → 1.0 (loud); amp typically 0–0.3
+      const opacity = 0.15 + Math.min(0.85, amp * 3.5);
+      dot.style.opacity = opacity.toFixed(2);
+      if (amp > 0.12) {
+        const sz = amp * 16;
+        const a = Math.min(1, amp * 2).toFixed(2);
+        dot.style.boxShadow = `0 0 ${sz}px rgba(255,255,255,${a})`;
+      } else {
+        dot.style.boxShadow = 'none';
+      }
+    }
+  }
+  function resetChannelMeters() {
+    document.querySelectorAll('#track-area .tcp-dot').forEach(dot => {
+      dot.style.opacity = '0.15';
+      dot.style.boxShadow = 'none';
+    });
+  }
 
   // ── PPAF mini-display ─────────────────────────────────────────────────────
   function drawPPAFDisplay(timeSec) {

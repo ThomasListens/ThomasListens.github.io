@@ -62,6 +62,24 @@
 const RECOMPUTE_INTERVAL = 8192;
 const RECOMPUTE_MASK     = RECOMPUTE_INTERVAL - 1;
 
+// Downsample rate for band-specific RMS (matches AUTOMATION_RATE in mapping.js)
+const DOWNSAMPLE_RATE = 60;
+
+// ── Shared FFT buffers (reused across channels to avoid GC churn) ────────
+// For 88 channels at 262K FFT size, this eliminates ~352MB of allocation churn.
+let _sharedFFTRe = null;
+let _sharedFFTIm = null;
+let _sharedFFTN  = 0;
+
+function _getSharedFFTBuffers(N) {
+  if (N > _sharedFFTN) {
+    _sharedFFTRe = new Float64Array(N);
+    _sharedFFTIm = new Float64Array(N);
+    _sharedFFTN  = N;
+  }
+  return { re: _sharedFFTRe, im: _sharedFFTIm };
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FFT — in-place radix-2 Cooley-Tukey
@@ -120,15 +138,18 @@ function fft(re, im, inverse = false) {
 export function hilbertAnalytic(data) {
   const origLen = data.length;
   const N  = nextPow2(origLen);
-  const re = new Float64Array(N);
-  const im = new Float64Array(N);
-  for (let i = 0; i < origLen; i++) re[i] = data[i];
+  const { re, im } = _getSharedFFTBuffers(N);
+
+  // Zero the buffers and copy signal in
+  for (let i = 0; i < origLen; i++) { re[i] = data[i]; im[i] = 0; }
+  for (let i = origLen; i < N; i++) { re[i] = 0; im[i] = 0; }
 
   fft(re, im, false);
   for (let i = 1; i < N / 2; i++) { re[i] *= 2; im[i] *= 2; }
   for (let i = N / 2 + 1; i < N; i++) { re[i] = 0; im[i] = 0; }
   fft(re, im, true);
 
+  // Copy results OUT before the buffers get reused
   const envelope = new Float32Array(origLen);
   const phase    = new Float32Array(origLen);
   for (let i = 0; i < origLen; i++) {
@@ -394,6 +415,41 @@ export function rmsEnvelope(data, windowSamples) {
     }
     if (sum < 0) sum = 0;
     env[i] = Math.sqrt(sum / Math.min(i + 1, windowSamples));
+  }
+  return env;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RMS ENVELOPE — downsampled output (for band-specific RMS)
+//
+// Runs the same drift-safe sliding window at full sample rate but only
+// stores output every `skip` samples. Same accuracy, ~17× less memory.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function rmsEnvelopeDownsampled(data, windowSamples, skip) {
+  const n = data.length;
+  const outLen = Math.ceil(n / skip);
+  const env = new Float32Array(outLen);
+  let sum = 0;
+  let outIdx = 0;
+
+  for (let i = 0; i < n; i++) {
+    sum += data[i] * data[i];
+    if (i >= windowSamples) sum -= data[i - windowSamples] * data[i - windowSamples];
+
+    // Periodic recomputation for drift safety
+    if ((i & RECOMPUTE_MASK) === 0 && i > 0) {
+      sum = 0;
+      const lo = Math.max(0, i - windowSamples + 1);
+      for (let j = lo; j <= i; j++) sum += data[j] * data[j];
+    }
+    if (sum < 0) sum = 0;
+
+    // Only store at the downsampled rate
+    if (i % skip === 0) {
+      env[outIdx++] = Math.sqrt(sum / Math.min(i + 1, windowSamples));
+    }
   }
   return env;
 }
@@ -800,26 +856,34 @@ function _biquadBandpassCoeffs(fc, Q, fs) {
   };
 }
 
-function _applyBandpassBiquad(data, c) {
-  const out = new Float32Array(data.length);
-  let x1=0, x2=0, y1=0, y2=0;
+function _applyBandpassBiquad(data, c, out) {
+  if (!out) out = new Float32Array(data.length);
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
   for (let i = 0; i < data.length; i++) {
     const x0 = data[i];
-    const y0 = c.b0*x0 + c.b1*x1 + c.b2*x2 - c.a1*y1 - c.a2*y2;
+    const y0 = c.b0 * x0 + c.b1 * x1 + c.b2 * x2 - c.a1 * y1 - c.a2 * y2;
     out[i] = y0;
-    x2=x1; x1=x0; y2=y1; y1=y0;
+    x2 = x1; x1 = x0; y2 = y1; y1 = y0;
   }
   return out;
 }
 
 export function bandpass(data, lo, hi, fs, passes = 2) {
-  if (lo >= hi || lo >= fs/2) return new Float32Array(data.length);
+  if (lo >= hi || lo >= fs / 2) return new Float32Array(data.length);
   const fc = Math.sqrt(lo * hi);
   const Q = Math.max(fc / (hi - lo), 0.5);
   const coeffs = _biquadBandpassCoeffs(fc, Q, fs);
-  let result = data;
-  for (let p = 0; p < passes; p++) result = _applyBandpassBiquad(result, coeffs);
-  return result;
+
+  // Ping-pong between two buffers to avoid intermediate allocations
+  const buf1 = new Float32Array(data.length);
+  const buf2 = new Float32Array(data.length);
+
+  _applyBandpassBiquad(data, coeffs, buf1);
+  if (passes >= 2) {
+    _applyBandpassBiquad(buf1, coeffs, buf2);
+    return buf2;
+  }
+  return buf1;
 }
 
 export const BANDS = [
@@ -964,6 +1028,32 @@ export function extractFeatures(signal, fs) {
     bandPowersRaw[availBands[b].name] = _interpolate(bandPowFrames[b], bpHop, n);
   }
 
+  // ── 9b. Band-specific RMS at all 3 time scales (downsampled to 60 Hz) ──
+  // Runs sliding window at full sample rate for accuracy, but only stores
+  // one output per automation frame. Memory: ~900KB per channel vs ~20MB.
+  // Reusable bandpass buffers avoid 12 allocations per band.
+  const bandRMS = {};
+  const rmsSkip = Math.max(1, Math.floor(fs / DOWNSAMPLE_RATE));
+
+  const _bpBuf1 = new Float32Array(n);
+  const _bpBuf2 = new Float32Array(n);
+
+  for (let b = 0; b < availBands.length; b++) {
+    const band = availBands[b];
+    const fc = Math.sqrt(band.lo * band.hi);
+    const Q = Math.max(fc / (band.hi - band.lo), 0.5);
+    const coeffs = _biquadBandpassCoeffs(fc, Q, fs);
+
+    _applyBandpassBiquad(signal, coeffs, _bpBuf1);   // pass 1
+    _applyBandpassBiquad(_bpBuf1, coeffs, _bpBuf2);  // pass 2
+
+    bandRMS[band.name] = {
+      fast: rmsEnvelopeDownsampled(_bpBuf2, fastWin, rmsSkip),
+      mid:  rmsEnvelopeDownsampled(_bpBuf2, midWin, rmsSkip),
+      slow: rmsEnvelopeDownsampled(_bpBuf2, slowWin, rmsSkip),
+    };
+  }
+
   // ── 10. Adaptive RMS (blends fast/mid/slow using dominant band) ────────────
   const rawAdaptive = _adaptiveRMS(
     rawFast, rawMid, rawSlow,
@@ -1022,6 +1112,9 @@ export function extractFeatures(signal, fs) {
 
     // ── Band powers ──────────────────────────────────────────────────────────
     bandPowers,
+
+    // ── Band-specific RMS (3 time scales per band, RAW not normalized) ─────
+    bandRMS,
 
     // ── Scalars ──────────────────────────────────────────────────────────────
     signalStats: { skewness: signalSkewness, kurtosis: signalKurtosis },

@@ -21,6 +21,7 @@ import { AUTOMATION_RATE, DEFAULT_MASTER_TUNE, assignPitches, mapControls,
          buildFMIndexCurve, buildFMAmpCurve, computeDistortionCurve,
          detectEvents, injectTransientExcitation } from './mapping.js';
 import { createVoiceGraph } from './synthesis.js';
+import { normalizePct } from './dsp.js';
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -56,6 +57,8 @@ export class Engine {
   #preprocessed    = null;
   #layerGains      = { root: 1, phase: 1, fm: 1, transient: 1 };
   #bandMode        = 'full'; // 'full' | band name | 'auto'
+  #limiter         = null;
+  #analyser        = null;
 
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -192,6 +195,19 @@ export class Engine {
     this.#audioCtx   = new AudioContext();
     this.#masterGain = this.#audioCtx.createGain();
 
+    // ── Master bus limiter (brick wall at -1dB) ──────────────────────
+    this.#limiter = this.#audioCtx.createDynamicsCompressor();
+    this.#limiter.threshold.value = -1;
+    this.#limiter.knee.value      = 0;
+    this.#limiter.ratio.value     = 20;
+    this.#limiter.attack.value    = 0.002;
+    this.#limiter.release.value   = 0.050;
+
+    // ── Analyser for output meter ────────────────────────────────────
+    this.#analyser = this.#audioCtx.createAnalyser();
+    this.#analyser.fftSize = 256;
+    this.#analyser.smoothingTimeConstant = 0.8;
+
     // Scale by masterVolume / sqrt(N) to prevent clipping
     const n = this.#voices.filter(v => !v.muted).length || 1;
     const vol = this.#synthParams.masterVolume ?? 0.7;
@@ -200,7 +216,11 @@ export class Engine {
     // Fade in over 30ms to avoid onset click
     this.#masterGain.gain.value = 0;
     this.#masterGain.gain.setTargetAtTime(targetGain, this.#audioCtx.currentTime, 0.010);
-    this.#masterGain.connect(this.#audioCtx.destination);
+
+    // Chain: masterGain → limiter → analyser → destination
+    this.#masterGain.connect(this.#limiter);
+    this.#limiter.connect(this.#analyser);
+    this.#analyser.connect(this.#audioCtx.destination);
 
     this.#activateVoices();
     this.#applyLayerGains();
@@ -247,11 +267,95 @@ export class Engine {
 
   get isPlaying()   { return this.#isPlaying; }
   get durationSec() { return this.#durationSec; }
+  get analyser()    { return this.#analyser; }
 
   get currentTimeSec() {
     if (!this.#audioCtx || !this.#isPlaying) return this.#offsetSec;
     const elapsed = this.#audioCtx.currentTime - this.#t0;
     return Math.min(this.#offsetSec + elapsed, this.#durationSec);
+  }
+
+  /**
+   * Current amplitude for each channel at playhead position.
+   * Reads from pre-built rootAmpCurve — no audio analysis needed.
+   * @returns {Map<string, number>} label → amplitude [0–1]
+   */
+  getChannelLevels() {
+    const levels = new Map();
+    if (!this.#isPlaying) return levels;
+    const t = this.currentTimeSec;
+    for (const voice of this.#voices) {
+      if (!voice.rootAmpCurve) continue;
+      const frame = Math.floor(t * AUTOMATION_RATE);
+      const idx = Math.min(Math.max(0, frame), voice.rootAmpCurve.length - 1);
+      levels.set(voice.label, voice.rootAmpCurve[idx] ?? 0);
+    }
+    return levels;
+  }
+
+  /**
+   * Synthesis curves for a single channel (per-channel overlay).
+   * Returns references — no copies.
+   */
+  getVoiceCurves(label) {
+    const voice = this.#voices.find(v => v.label === label);
+    if (!voice) return null;
+    return {
+      rootAmpCurve: voice.rootAmpCurve,
+      morphology:   voice.morphology,
+      fmAmpCurve:   voice.fmAmpCurve,
+      fmIndexCurve: voice.fmIndexCurve,
+      events:       voice.events,
+    };
+  }
+
+  /**
+   * Per-layer summed energy across all unmuted voices.
+   * Pre-multiplied by current layer gain faders.
+   */
+  getSummedLayers() {
+    if (!this.#voices.length) return null;
+    const first = this.#voices.find(v => v.rootAmpCurve);
+    if (!first) return null;
+
+    const nFrames = first.rootAmpCurve.length;
+    const amp   = new Float32Array(nFrames);
+    const morph = new Float32Array(nFrames);
+    const fm    = new Float32Array(nFrames);
+
+    const rG = this.#layerGains.root  ?? 1;
+    const pG = this.#layerGains.phase ?? 1;
+    const fG = this.#layerGains.fm    ?? 1;
+
+    for (const voice of this.#voices) {
+      if (voice.muted) continue;
+      const ra = voice.rootAmpCurve;
+      const m  = voice.morphology;
+      const fa = voice.fmAmpCurve;
+      if (!ra) continue;
+
+      for (let i = 0; i < nFrames; i++) {
+        amp[i]   += (ra[i] ?? 0) * rG;
+        morph[i] += ((m.over2[i] ?? 0) + (m.over3[i] ?? 0) + (m.over4[i] ?? 0)
+                   + (m.under05[i] ?? 0) + (m.under23[i] ?? 0)) * pG;
+        fm[i]    += (fa[i] ?? 0) * fG;
+      }
+    }
+
+    return { amp, morph, fm, nFrames };
+  }
+
+  /**
+   * Merged event list across all unmuted voices, sorted by time.
+   */
+  getAggregateEvents() {
+    const all = [];
+    for (const voice of this.#voices) {
+      if (voice.muted || !voice.events) continue;
+      all.push(...voice.events);
+    }
+    all.sort((a, b) => a.timeSec - b.timeSec);
+    return all;
   }
 
 
@@ -262,6 +366,7 @@ export class Engine {
     if (!voice) return;
     voice.muted = muted;
     if (voice.graph) voice.graph.setMuted(muted);
+    this.#updateMasterGainForChannelCount();
   }
 
   /**
@@ -284,17 +389,33 @@ export class Engine {
    * 'full' = full-spectrum slowRMS (default)
    * band name = use that band's power envelope
    * 'auto' = use the most energetic band at each time point
-   * Requires seek() after to take effect.
+   * Takes effect immediately via hot-swap during playback.
    */
   setBandMode(mode) {
     this.#bandMode = mode;
     this.#rebuildCurves(this.#synthParams);
+
+    if (this.#audioCtx && this.#isPlaying) {
+      this.#hotSwapCurves();
+    }
   }
 
   setMasterGain(gain) {
-    if (!this.#masterGain) return;
+    if (!this.#masterGain || !this.#audioCtx) return;
     const n = this.#voices.filter(v => !v.muted).length || 1;
-    this.#masterGain.gain.value = gain / Math.sqrt(n);
+    this.#masterGain.gain.setTargetAtTime(gain / Math.sqrt(n), this.#audioCtx.currentTime, 0.03);
+  }
+
+  /**
+   * Recompute master gain for current number of active voices.
+   * Smooth 100ms ramp to avoid clicks on mute/solo changes.
+   */
+  #updateMasterGainForChannelCount() {
+    if (!this.#masterGain || !this.#audioCtx) return;
+    const n = this.#voices.filter(v => !v.muted).length || 1;
+    const vol = this.#synthParams.masterVolume ?? 0.7;
+    const target = vol / Math.sqrt(n);
+    this.#masterGain.gain.setTargetAtTime(target, this.#audioCtx.currentTime, 0.03);
   }
 
   /**
@@ -397,20 +518,21 @@ export class Engine {
   /**
    * Live-update perceptual controls during playback.
    *
-   * Sensitivity + Transient Clarity → immediate.
-   * Dynamic Range + Spectral Detail → rebuild curves + restart.
+   * fullRemap=true: rebuild curves + hot-swap (smooth, no gap)
+   * fullRemap=false: update synthParams only (for live faders like noise)
    */
   async setControls(_preprocessed, controls, fullRemap = false) {
     const newParams = mapControls(controls);
     this.#synthParams = newParams;
 
     if (fullRemap) {
-      const wasPlaying = this.#isPlaying;
-      const currentSec = this.currentTimeSec;
       this.#rebuildCurves(newParams);
-      if (this.#audioCtx) {
-        await this.seek(currentSec, wasPlaying);
+
+      if (this.#audioCtx && this.#isPlaying) {
+        // Hot-swap: smooth transition, no audio gap
+        this.#hotSwapCurves();
       }
+      // If not playing, curves are ready for next play()
     }
   }
 
@@ -449,42 +571,175 @@ export class Engine {
   }
 
   /**
-   * Return a features object with slowRMS replaced based on band mode.
+   * Interpolate a downsampled array (at ~60 Hz) back to the full
+   * sample-rate length needed by the feature arrays.
+   */
+  #interpolateBandRMS(downsampled, targetLen) {
+    if (!downsampled || downsampled.length === 0) return null;
+
+    const out = new Float32Array(targetLen);
+    const ratio = (downsampled.length - 1) / (targetLen - 1 || 1);
+
+    for (let i = 0; i < targetLen; i++) {
+      const pos = i * ratio;
+      const lo = Math.floor(pos);
+      const hi = Math.min(lo + 1, downsampled.length - 1);
+      const t = pos - lo;
+      out[i] = downsampled[lo] * (1 - t) + downsampled[hi] * t;
+    }
+    return out;
+  }
+
+  /**
+   * Return a features object with ALL amplitude sources replaced based on band mode.
+   *
    * 'full'    → original features (no change)
-   * band name → use bandPowers[name] as slowRMS
-   * 'auto'    → softmax-weighted blend of all band powers
+   * band name → replace fastRMS/midRMS/slowRMS/adaptiveRMS/envelope with
+   *             band-filtered versions at all 3 time scales
+   * 'auto'    → softmax-weighted blend of all bands' RMS at each time scale
    */
   #applyBandMode(features) {
     if (this.#bandMode === 'full' || !features.bandPowers) return features;
+
     if (this.#bandMode === 'auto') {
+      return this.#applyAutoBandMode(features);
+    }
+
+    // ── Specific band selected ────────────────────────────────────
+    const bandName = this.#bandMode;
+    const br = features.bandRMS?.[bandName];
+
+    if (!br) {
+      // Fallback: bandRMS not precomputed — old behavior
+      const bandEnv = features.bandPowers[bandName];
+      if (!bandEnv) return features;
+      return { ...features, slowRMS: bandEnv };
+    }
+
+    // bandRMS arrays are downsampled to ~60 Hz — interpolate to sample rate
+    const targetLen = features.fastRMS?.length ?? 0;
+    if (targetLen === 0) return features;
+
+    const interpFast = this.#interpolateBandRMS(br.fast, targetLen);
+    const interpMid  = this.#interpolateBandRMS(br.mid, targetLen);
+    const interpSlow = this.#interpolateBandRMS(br.slow, targetLen);
+
+    return {
+      ...features,
+      fastRMS:     normalizePct(interpFast),
+      midRMS:      normalizePct(interpMid),
+      slowRMS:     normalizePct(interpSlow),
+      adaptiveRMS: normalizePct(interpMid),     // default to mid for adaptive in single-band mode
+      envelope:    normalizePct(interpFast),     // Hilbert proxy: band-specific fast RMS
+    };
+  }
+
+  /**
+   * Auto mode: softmax-weighted blend of ALL bands' RMS at each time scale.
+   * The blend changes per-sample based on which band dominates.
+   */
+  #applyAutoBandMode(features) {
+    if (!features.bandRMS || !features.bandPowers) {
+      // Fallback to old softmax blend on bandPowers only
       const autoEnv = this.#softmaxBandBlend(features);
       return autoEnv ? { ...features, slowRMS: autoEnv } : features;
     }
-    const bandEnv = features.bandPowers[this.#bandMode];
-    if (!bandEnv) return features;
-    return { ...features, slowRMS: bandEnv };
+
+    const bandNames = Object.keys(features.bandRMS);
+    if (bandNames.length === 0) return features;
+
+    const targetLen = features.fastRMS?.length ?? 0;
+    if (targetLen === 0) return features;
+
+    // Interpolate downsampled bandRMS to sample rate, then normalize
+    const bandFastArrays = bandNames.map(name => {
+      const interp = this.#interpolateBandRMS(features.bandRMS[name]?.fast, targetLen);
+      return interp ? normalizePct(interp) : null;
+    });
+    const bandMidArrays = bandNames.map(name => {
+      const interp = this.#interpolateBandRMS(features.bandRMS[name]?.mid, targetLen);
+      return interp ? normalizePct(interp) : null;
+    });
+    const bandSlowArrays = bandNames.map(name => {
+      const interp = this.#interpolateBandRMS(features.bandRMS[name]?.slow, targetLen);
+      return interp ? normalizePct(interp) : null;
+    });
+
+    const SOFTMAX_TEMP = 6.0;
+    const blendFast = new Float32Array(targetLen);
+    const blendMid  = new Float32Array(targetLen);
+    const blendSlow = new Float32Array(targetLen);
+
+    const bandPowArrays = bandNames.map(name => features.bandPowers[name]);
+    const nBands = bandNames.length;
+    const weights = new Float64Array(nBands);
+
+    for (let i = 0; i < targetLen; i++) {
+      let maxVal = -Infinity;
+      for (let b = 0; b < nBands; b++) {
+        const v = bandPowArrays[b]?.[i] ?? 0;
+        if (v > maxVal) maxVal = v;
+      }
+
+      let sumExp = 0;
+      for (let b = 0; b < nBands; b++) {
+        weights[b] = Math.exp(((bandPowArrays[b]?.[i] ?? 0) - maxVal) * SOFTMAX_TEMP);
+        sumExp += weights[b];
+      }
+
+      if (sumExp < 1e-12) {
+        blendFast[i] = features.fastRMS[i] ?? 0;
+        blendMid[i]  = features.midRMS[i] ?? 0;
+        blendSlow[i] = features.slowRMS[i] ?? 0;
+        continue;
+      }
+
+      let fast = 0, mid = 0, slow = 0;
+      for (let b = 0; b < nBands; b++) {
+        const w = weights[b] / sumExp;
+        fast += w * (bandFastArrays[b]?.[i] ?? 0);
+        mid  += w * (bandMidArrays[b]?.[i] ?? 0);
+        slow += w * (bandSlowArrays[b]?.[i] ?? 0);
+      }
+
+      blendFast[i] = fast;
+      blendMid[i]  = mid;
+      blendSlow[i] = slow;
+    }
+
+    return {
+      ...features,
+      fastRMS:     normalizePct(blendFast),
+      midRMS:      normalizePct(blendMid),
+      slowRMS:     normalizePct(blendSlow),
+      adaptiveRMS: normalizePct(blendMid),
+      envelope:    normalizePct(blendFast),
+    };
   }
 
   /**
    * Compute the selectedBandPower for the FM Focus blend.
    * Full mode → overall energy (adaptiveRMS or slowRMS)
-   * Auto mode → softmax-weighted dominant band
-   * Specific band → that band's power envelope
+   * Auto mode → softmax-weighted mid RMS as spectral drive
+   * Specific band → that band's mid RMS (normalized)
    */
   #computeSelectedBandPower(features) {
     if (this.#bandMode === 'full' || !features.bandPowers) {
       return features.adaptiveRMS ?? features.slowRMS;
     }
     if (this.#bandMode === 'auto') {
-      return this.#softmaxBandBlend(features) ?? features.adaptiveRMS ?? features.slowRMS;
+      const autoFeatures = this.#applyAutoBandMode(features);
+      return autoFeatures.midRMS ?? features.adaptiveRMS ?? features.slowRMS;
     }
+    // Specific band: use that band's mid RMS (normalized)
+    const br = features.bandRMS?.[this.#bandMode];
+    if (br?.mid) return normalizePct(br.mid);
     return features.bandPowers[this.#bandMode] ?? features.adaptiveRMS ?? features.slowRMS;
   }
 
   /**
    * Softmax-weighted blend of all band powers (temperature=6).
-   * Strongest band dominates but transitions stay continuous.
-   * Returns null if no bandPowers or empty.
+   * Kept as fallback for when bandRMS is not available.
    */
   #softmaxBandBlend(features) {
     const bands = Object.values(features.bandPowers ?? {});
@@ -655,6 +910,133 @@ export class Engine {
   }
 
 
+  // ── Private: hot-swap automation ─────────────────────────────────────────
+
+  /**
+   * Cancel current automation on a parameter and schedule a new curve
+   * with smooth splice. Blends from current parameter value into the
+   * new curve over ~8 frames to prevent clicks at the transition.
+   */
+  #spliceAutomation(param, newCurve, startTime, duration) {
+    if (!newCurve || newCurve.length < 2) return;
+
+    const now = this.#audioCtx.currentTime;
+    const currentVal = param.value;
+
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(currentVal, now);
+
+    // If the jump is small enough, schedule directly (no copy needed)
+    if (Math.abs(currentVal - newCurve[0]) < 0.005) {
+      try {
+        param.setValueCurveAtTime(newCurve, startTime, duration);
+      } catch (e) {
+        param.linearRampToValueAtTime(newCurve[0], startTime + 0.01);
+      }
+      return;
+    }
+
+    // Blend first 8 frames from current value → new curve
+    const BLEND_FRAMES = 8;
+    const spliced = new Float32Array(newCurve.length);
+    spliced.set(newCurve);
+    const len = Math.min(BLEND_FRAMES, spliced.length);
+    for (let i = 0; i < len; i++) {
+      const t = (i + 1) / (len + 1);
+      spliced[i] = currentVal + (spliced[i] - currentVal) * t;
+    }
+
+    try {
+      param.setValueCurveAtTime(spliced, startTime, duration);
+    } catch (e) {
+      param.linearRampToValueAtTime(spliced[0], startTime + 0.01);
+    }
+  }
+
+  /**
+   * Hot-swap automation curves on all active voices WITHOUT tearing down
+   * the AudioContext or voice graphs. Oscillators keep running. The listener
+   * hears a smooth transition into the new curve shape.
+   *
+   * Used for all "rebuild" fader changes during playback.
+   * NOT used for: pitch changes or transport (need new oscillators/t0).
+   */
+  #hotSwapCurves() {
+    if (!this.#audioCtx || !this.#isPlaying) return;
+
+    const ctx = this.#audioCtx;
+    const now = ctx.currentTime;
+    const elapsed = now - this.#t0;
+    const currentSec = this.#offsetSec + elapsed;
+
+    // Schedule 5ms from now (WebAudio can't schedule at exactly "now")
+    const SPLICE_DELAY = 0.005;
+    const t = now + SPLICE_DELAY;
+
+    // Account for the splice delay: curve data must start from the
+    // FUTURE position (currentSec + 5ms), not the current position.
+    // Without this, 5ms of audio gets replayed → cumulative drift.
+    const spliceSec = currentSec + SPLICE_DELAY;
+
+    for (const voice of this.#voices) {
+      if (!voice.graph || voice.muted) continue;
+
+      const remaining = voice.durationSec - spliceSec;
+      if (remaining <= 0.1) continue;
+
+      const dur = remaining;
+      if (dur < 0.05) continue;
+
+      const frameOffset = Math.floor(spliceSec * AUTOMATION_RATE);
+      const g = voice.graph;
+      const morph = voice.morphology;
+
+      // Root amplitude
+      this.#spliceAutomation(
+        g.rootGain.gain,
+        voice.rootAmpCurve.subarray(frameOffset),
+        t, dur
+      );
+
+      // Morphology (5 per-overtone curves)
+      this.#spliceAutomation(g.overGains[0].gain,
+        morph.over2.subarray(frameOffset), t, dur);
+      this.#spliceAutomation(g.overGains[1].gain,
+        morph.over3.subarray(frameOffset), t, dur);
+      this.#spliceAutomation(g.overGains[2].gain,
+        morph.over4.subarray(frameOffset), t, dur);
+      this.#spliceAutomation(g.underGains[0].gain,
+        morph.under05.subarray(frameOffset), t, dur);
+      this.#spliceAutomation(g.underGains[1].gain,
+        morph.under23.subarray(frameOffset), t, dur);
+
+      // FM index + amplitude
+      this.#spliceAutomation(
+        g.fmModGain.gain,
+        voice.fmIndexCurve.subarray(frameOffset),
+        t, dur
+      );
+      this.#spliceAutomation(
+        g.fmAmpGain.gain,
+        voice.fmAmpCurve.subarray(frameOffset),
+        t, dur
+      );
+
+      // Waveshaper curve (can be swapped in-place, no scheduling needed)
+      if (voice.distortionCurve && g.waveshaper) {
+        g.waveshaper.curve = voice.distortionCurve;
+      }
+    }
+
+    // Reset transient scheduler to splice position (avoids re-firing events)
+    for (let vi = 0; vi < this.#voices.length; vi++) {
+      this.#nextIdx[vi] = _lowerBound(
+        this.#voices[vi].events, spliceSec
+      );
+    }
+  }
+
+
   // ── Private: transient scheduler ──────────────────────────────────────────
 
   #schedulerTick() {
@@ -763,6 +1145,8 @@ export class Engine {
       try { this.#audioCtx.close(); } catch (_) {}
       this.#audioCtx   = null;
       this.#masterGain = null;
+      this.#limiter    = null;
+      this.#analyser   = null;
     }
 
     for (const v of this.#voices) { v.graph = null; }
