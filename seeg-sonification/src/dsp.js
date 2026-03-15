@@ -932,6 +932,63 @@ function _amplitudeCalibration(signal) {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
+// WAVETABLE PRECOMPUTATION
+//
+// Extracts Fourier coefficients from sliding windows of the EEG signal.
+// Each snapshot captures the harmonic shape of the waveform at that moment.
+// During playback, the engine applies these via setPeriodicWave() so the
+// oscillator's timbre IS the brain signal's shape.
+//
+// Memory: 32 harmonics × 2 arrays × 4 bytes × 10 fps × 240s ≈ 614 KB/ch.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const WAVETABLE_RATE = 10;   // snapshots per second
+const WT_WINDOW      = 256;  // FFT window size (samples)
+const WT_HARMONICS   = 32;   // harmonics to extract
+
+export function precomputeWavetables(signal, fs, numHarmonics = WT_HARMONICS) {
+  const durSec  = signal.length / fs;
+  const nSnaps  = Math.max(2, Math.ceil(durSec * WAVETABLE_RATE));
+  const snapshots = new Array(nSnaps);
+  const halfWin = Math.floor(WT_WINDOW / 2);
+
+  const hann = new Float32Array(WT_WINDOW);
+  for (let i = 0; i < WT_WINDOW; i++) {
+    hann[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (WT_WINDOW - 1)));
+  }
+
+  for (let si = 0; si < nSnaps; si++) {
+    const timeSec = si / WAVETABLE_RATE;
+    const center  = Math.floor(timeSec * fs);
+    const start   = Math.max(0, center - halfWin);
+
+    const real = new Float32Array(numHarmonics + 1);
+    const imag = new Float32Array(numHarmonics + 1);
+
+    // Partial DFT — only first numHarmonics (not full FFT)
+    for (let k = 1; k <= numHarmonics; k++) {
+      let re = 0, im = 0;
+      const freqStep = 2 * Math.PI * k / WT_WINDOW;
+      for (let i = 0; i < WT_WINDOW; i++) {
+        const idx = start + i;
+        const sample = idx < signal.length ? signal[idx] : 0;
+        const windowed = sample * hann[i];
+        const angle = freqStep * i;
+        re += windowed * Math.cos(angle);
+        im -= windowed * Math.sin(angle);
+      }
+      real[k] = re / WT_WINDOW;
+      imag[k] = im / WT_WINDOW;
+    }
+
+    snapshots[si] = { real, imag };
+  }
+
+  return { rate: WAVETABLE_RATE, snapshots };
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MAIN ENTRY POINT
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1118,6 +1175,9 @@ export function extractFeatures(signal, fs) {
 
     // ── Scalars ──────────────────────────────────────────────────────────────
     signalStats: { skewness: signalSkewness, kurtosis: signalKurtosis },
+
+    // ── Wavetable (precomputed harmonic snapshots) ─────────────────────────
+    wavetable: precomputeWavetables(signal, fs),
 
     // ── Calibration ──────────────────────────────────────────────────────────
     calibration: { ampFloor, ampCeiling, fs },

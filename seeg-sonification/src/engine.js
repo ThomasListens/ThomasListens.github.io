@@ -57,6 +57,12 @@ export class Engine {
   #preprocessed    = null;
   #layerGains      = { root: 1, phase: 1, fm: 1, transient: 1 };
   #bandMode        = 'full'; // 'full' | band name | 'auto'
+  #stereoWidth     = 1.0;    // 0=mono, 1=atlas, 2=exaggerated
+  #wavetableBlend  = 0;      // 0=sine, 0.33=tri, 0.66=saw, 1=EEG
+  #wtUpdateCounter = 0;
+  #tuningMode      = 'rank'; // 'rank' | 'consonance'
+  #octaveCap       = 4;
+  #primeLimit      = null;  // null=unlimited, or 3/5/7/11/13
   #limiter         = null;
   #analyser        = null;
 
@@ -67,12 +73,16 @@ export class Engine {
    * Prepare all mapping and pre-computation from preprocessed data.
    * Builds automation curves per channel + detects transients.
    */
-  async prepare(preprocessed, controls = {}, { masterTune, ratioOverrides } = {}) {
+  async prepare(preprocessed, controls = {}, { masterTune, ratioOverrides, tuningMode, octaveCap, primeLimit } = {}) {
     this.#stopInternal();
+
+    if (tuningMode != null)  this.#tuningMode  = tuningMode;
+    if (octaveCap != null)   this.#octaveCap   = octaveCap;
+    if (primeLimit !== undefined) this.#primeLimit = primeLimit;
 
     const { channels } = preprocessed;
     const synthParams  = mapControls(controls);
-    const pitchMap     = assignPitches(channels, masterTune ?? DEFAULT_MASTER_TUNE, ratioOverrides);
+    const pitchMap     = assignPitches(channels, masterTune ?? DEFAULT_MASTER_TUNE, ratioOverrides, this.#tuningMode, this.#octaveCap, this.#primeLimit);
 
     const durationSec = channels.reduce((mx, ch) => {
       const d = ch.data.length / ch.fs;
@@ -149,7 +159,8 @@ export class Engine {
       voices.push({
         label:       ch.label,
         pitchHz:     pitch.hz,
-        pan:         pitch.pan,
+        basePan:     pitch.pan,
+        pan:         Math.max(-1, Math.min(1, pitch.pan * this.#stereoWidth)),
         durationSec: durCh,
         rootAmpCurve,
         morphology,
@@ -157,6 +168,8 @@ export class Engine {
         fmAmpCurve,
         events,
         distortionCurve,
+        wavetableSnapshots: ch.features.wavetable?.snapshots || null,
+        wavetableRate:      ch.features.wavetable?.rate || 10,
         graph:       null,
         muted:       false,
       });
@@ -294,6 +307,20 @@ export class Engine {
   }
 
   /**
+   * Static voice properties (pitch, pan, duration, mute state).
+   */
+  getVoiceInfo(label) {
+    const voice = this.#voices.find(v => v.label === label);
+    if (!voice) return null;
+    return {
+      pitchHz:     voice.pitchHz,
+      pan:         voice.pan,
+      durationSec: voice.durationSec,
+      muted:       voice.muted,
+    };
+  }
+
+  /**
    * Synthesis curves for a single channel (per-channel overlay).
    * Returns references — no copies.
    */
@@ -400,6 +427,30 @@ export class Engine {
     }
   }
 
+  /**
+   * Scale all channel pan values by a width multiplier.
+   * 0 = mono (all center), 1 = nominal (atlas), 2 = exaggerated.
+   * Clamps to [-1, +1].
+   */
+  setStereoWidth(width) {
+    this.#stereoWidth = width;
+    for (const voice of this.#voices) {
+      if (!voice.graph?.panner) continue;
+      const scaled = Math.max(-1, Math.min(1, voice.basePan * width));
+      voice.pan = scaled;
+      voice.graph.panner.pan.setTargetAtTime(scaled, this.#audioCtx.currentTime, 0.05);
+    }
+  }
+
+  /**
+   * Change tuning mode and/or octave cap. Requires seek() after to take effect.
+   */
+  setTuningMode(mode, octaveCap, primeLimit) {
+    if (mode != null) this.#tuningMode = mode;
+    if (octaveCap != null) this.#octaveCap = octaveCap;
+    if (primeLimit !== undefined) this.#primeLimit = primeLimit;
+  }
+
   setMasterGain(gain) {
     if (!this.#masterGain || !this.#audioCtx) return;
     const n = this.#voices.filter(v => !v.muted).length || 1;
@@ -441,12 +492,17 @@ export class Engine {
     const pitchMap = assignPitches(
       this.#preprocessed?.channels ?? [],
       masterTune,
-      ratioOverrides
+      ratioOverrides,
+      this.#tuningMode,
+      this.#octaveCap,
+      this.#primeLimit
     );
     for (const voice of this.#voices) {
       const entry = pitchMap.get(voice.label);
       if (!entry) continue;
       voice.pitchHz = entry.hz;
+      voice.basePan = entry.pan;
+      voice.pan = Math.max(-1, Math.min(1, entry.pan * this.#stereoWidth));
       if (this.#preprocessed) {
         const ch = this.#preprocessed.channels.find(c => c.label === voice.label);
         if (ch?.features) {
@@ -769,6 +825,101 @@ export class Engine {
       out[i] = val;
     }
     return out;
+  }
+
+
+  // ── Wavetable ───────────────────────────────────────────────────────────
+
+  /**
+   * Set wavetable blend. 0=sine, ~0.33=triangle, ~0.66=saw, 1.0=EEG.
+   */
+  setWavetableBlend(value) {
+    // 0 = saw, 0.5 = sine (default), 1 = EEG wavetable
+    this.#wavetableBlend = value;
+
+    if (!this.#audioCtx) return;
+
+    // At dead center (sine), use built-in type for efficiency
+    if (Math.abs(value - 0.5) < 0.01) {
+      for (const v of this.#voices) {
+        if (v.graph?.rootOsc) v.graph.rootOsc.type = 'sine';
+      }
+      return;
+    }
+
+    // Left or right of center: PeriodicWave applied in updateWavetables()
+  }
+
+  /**
+   * Called from the timeupdate handler. Updates wavetable oscillators at ~8Hz.
+   */
+  updateWavetables(currentTimeSec) {
+    // Skip when at dead-center sine
+    if (Math.abs(this.#wavetableBlend - 0.5) < 0.01 || !this.#audioCtx) return;
+
+    this.#wtUpdateCounter++;
+    if (this.#wtUpdateCounter % 12 !== 0) return; // ~8Hz from 100ms timer
+
+    const blend = this.#wavetableBlend;
+
+    for (const voice of this.#voices) {
+      if (!voice.graph?.rootOsc || voice.muted) continue;
+      if (!voice.wavetableSnapshots) continue;
+
+      const snaps = voice.wavetableSnapshots;
+      const rate  = voice.wavetableRate;
+      const snapIdx = currentTimeSec * rate;
+      const lo = Math.max(0, Math.floor(snapIdx));
+      const hi = Math.min(lo + 1, snaps.length - 1);
+      const t  = snapIdx - lo;
+
+      const snapLo = snaps[lo];
+      const snapHi = snaps[hi];
+      if (!snapLo || !snapHi) continue;
+
+      const numH = snapLo.real.length;
+      const real = new Float32Array(numH);
+      const imag = new Float32Array(numH);
+
+      if (blend < 0.5) {
+        // Left side: saw (0) → sine (0.5)
+        // At 0: pure saw. At 0.5: pure sine (k=1 only).
+        const sineT = blend / 0.5;  // 0→1 as blend goes 0→0.5
+        for (let k = 1; k < numH; k++) {
+          const saw = (1 / k) * ((k % 2 === 0) ? -1 : 1);
+          const sine = k === 1 ? 1 : 0;
+          real[k] = saw * (1 - sineT) + sine * sineT;
+        }
+      } else {
+        // Right side: sine (0.5) → EEG (1.0)
+        const eegT = (blend - 0.5) / 0.5;  // 0→1 as blend goes 0.5→1
+        for (let k = 1; k < numH; k++) {
+          const eegReal = snapLo.real[k] * (1 - t) + snapHi.real[k] * t;
+          const eegImag = snapLo.imag[k] * (1 - t) + snapHi.imag[k] * t;
+          const sine = k === 1 ? 1 : 0;
+          real[k] = sine * (1 - eegT) + eegReal * eegT;
+          imag[k] = eegImag * eegT;
+        }
+      }
+
+      const wave = this.#audioCtx.createPeriodicWave(real, imag, {
+        disableNormalization: false
+      });
+      voice.graph.rootOsc.setPeriodicWave(wave);
+    }
+  }
+
+  /**
+   * Get wavetable snapshots for a channel label (for UI visualization).
+   */
+  getWavetableSnapshots(label) {
+    const voice = this.#voices.find(v => v.label === label);
+    return voice?.wavetableSnapshots || null;
+  }
+
+  getWavetableRate(label) {
+    const voice = this.#voices.find(v => v.label === label);
+    return voice?.wavetableRate || 10;
   }
 
 
@@ -1117,6 +1268,7 @@ export class Engine {
 
     this.#timeupdateTimer = setInterval(() => {
       const t = this.currentTimeSec;
+      this.updateWavetables(t);
       this.#emit('timeupdate', t);
       if (t >= this.#durationSec - 0.1) {
         this.#stopInternal();

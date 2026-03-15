@@ -57,12 +57,202 @@ const SHAFT_RATIOS = [];
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// RATIO UTILITIES
+// ─────────────────────────────────────────────────────────────────────────────
+
+function _highestPrime(n) {
+  if (n <= 1) return 1;
+  let highest = 1, d = 2, temp = n;
+  while (d * d <= temp) {
+    while (temp % d === 0) { highest = d; temp = Math.floor(temp / d); }
+    d++;
+  }
+  if (temp > 1) highest = temp;
+  return highest;
+}
+
+function _ratiosPrimeLimit(n, d) {
+  return Math.max(_highestPrime(n), _highestPrime(d));
+}
+
+/**
+ * Core of a ratio: strip all powers of 2 from both n and d.
+ * This is the octave-independent identity.
+ * 5/1, 5/2, 5/4 all → core "5/1" (same sonic character).
+ * 3/2, 3/1 → core "3/1". 5/3 → core "5/3" (distinct).
+ */
+function _ratioCore(n, d) {
+  while (n % 2 === 0 && n > 0) n /= 2;
+  while (d % 2 === 0 && d > 0) d /= 2;
+  return `${n}/${d}`;
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PITCH ASSIGNMENT
+// RATIO GENERATOR
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function assignPitches(channels, masterTune = DEFAULT_MASTER_TUNE, ratioOverrides = null) {
+/**
+ * Generate ratios by ascending consonance (n×d product).
+ * Only ratios naturally within range.
+ *
+ * @param {number} count — how many ratios to generate
+ * @param {number} minValue — minimum ratio value (typically 1.0)
+ * @param {number} maxValue — maximum ratio value (typically 2^octaveCap)
+ * @param {number|null} maxPrimeLimit — null=unlimited, or 3/5/7/11/13
+ */
+function _generateByConsonance(count, minValue, maxValue, maxPrimeLimit = null) {
+  const results = [];
+  const seen = new Set();
+  let consonance = 1;
+  let stall = 0;                         // consecutive empty iterations
+
+  while (results.length < count && consonance < 500000) {
+    let foundAny = false;
+    for (let n = 1; n <= consonance; n++) {
+      if (consonance % n !== 0) continue;
+      const d = consonance / n;
+      if (_gcd(n, d) !== 1) continue;
+      const value = n / d;
+      if (value < minValue || value > maxValue) continue;
+      if (maxPrimeLimit !== null && _ratiosPrimeLimit(n, d) > maxPrimeLimit) continue;
+      const key = `${n}/${d}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      results.push({ n, d, ratio: value, label: key, consonance });
+      foundAny = true;
+      if (results.length >= count) break;
+    }
+    stall = foundAny ? 0 : stall + 1;
+    if (stall > 500) break;              // no more ratios available at this limit
+    consonance++;
+  }
+  return results;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ATLAS-BASED PANNING
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ATLAS_PAN = {
+  // ── Left hemisphere targets ──────────────────────────────────
+  'LAH': -0.55, 'LPH': -0.50, 'LAMY': -0.50, 'LA': -0.55, 'LH': -0.50,
+  'LEC': -0.50, 'LAT': -0.65, 'LMT': -0.60, 'LPT': -0.60, 'LST': -0.65,
+  'LIT': -0.65, 'LTP': -0.55,
+  'LFP': -0.55, 'LOF': -0.45, 'LMF': -0.50, 'LSF': -0.55, 'LIF': -0.60,
+  'LPF': -0.55, 'LDLPF': -0.60,
+  'LP': -0.55, 'LSP': -0.50, 'LIP': -0.60, 'LSMA': -0.35, 'LPC': -0.25,
+  'LINS': -0.40, 'LIN': -0.40, 'LAC': -0.25,
+  'LO': -0.55, 'LOC': -0.55,
+  // ── Right hemisphere (mirrors) ───────────────────────────────
+  'RAH': 0.55, 'RPH': 0.50, 'RAMY': 0.50, 'RA': 0.55, 'RH': 0.50,
+  'REC': 0.50, 'RAT': 0.65, 'RMT': 0.60, 'RPT': 0.60, 'RST': 0.65,
+  'RIT': 0.65, 'RTP': 0.55,
+  'RFP': 0.55, 'ROF': 0.45, 'RMF': 0.50, 'RSF': 0.55, 'RIF': 0.60,
+  'RPF': 0.55, 'RDLPF': 0.60,
+  'RP': 0.55, 'RSP': 0.50, 'RIP': 0.60, 'RSMA': 0.35, 'RPC': 0.25,
+  'RINS': 0.40, 'RIN': 0.40, 'RAC': 0.25,
+  'RO': 0.55, 'ROC': 0.55,
+};
+
+/**
+ * Assign pan value for a channel based on shaft name.
+ * Fallback chain: atlas exact → hemisphere prefix → shaft index spread.
+ */
+function _assignPan(shaftName, contactNum, totalContacts, shaftIndex, totalShafts) {
+  const upper = shaftName.toUpperCase();
+
+  if (ATLAS_PAN[upper] !== undefined) {
+    const basePan = ATLAS_PAN[upper];
+    if (totalContacts > 1) {
+      const sign = basePan >= 0 ? 1 : -1;
+      return Math.max(-1, Math.min(1, basePan + sign * ((contactNum - 1) / (totalContacts - 1) - 0.5) * 0.15));
+    }
+    return basePan;
+  }
+
+  if (/^L/i.test(upper)) {
+    const base = -0.5;
+    if (totalContacts > 1) return base + ((contactNum - 1) / (totalContacts - 1) - 0.5) * 0.2;
+    return base;
+  }
+  if (/^R/i.test(upper)) {
+    const base = 0.5;
+    if (totalContacts > 1) return base + ((contactNum - 1) / (totalContacts - 1) - 0.5) * 0.2;
+    return base;
+  }
+
+  if (totalShafts <= 1) return 0;
+  return -0.6 + (shaftIndex / (totalShafts - 1)) * 1.2;
+}
+
+/**
+ * Apply atlas-based panning to all entries in a pitchMap.
+ */
+function _applyAtlasPanning(channels, pitchMap) {
+  const shaftNames = [...new Set(channels.map(c => c.shaft || c.label))].sort();
+  const shaftCounts = {};
+  for (const ch of channels) {
+    const s = ch.shaft || ch.label;
+    shaftCounts[s] = (shaftCounts[s] || 0) + 1;
+  }
+  for (const ch of channels) {
+    const entry = pitchMap.get(ch.label);
+    if (!entry) continue;
+    const shaft = ch.shaft || ch.label;
+    entry.pan = _assignPan(
+      shaft, ch.contactNum || 1, shaftCounts[shaft] || 1,
+      shaftNames.indexOf(shaft), shaftNames.length
+    );
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PITCH ASSIGNMENT — Three Tuning Modes
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Unified entry point. Delegates to rank/consonance/prime mode,
+ * applies user ratio overrides, then atlas panning.
+ */
+export function assignPitches(channels, masterTune = DEFAULT_MASTER_TUNE, ratioOverrides = null, mode = 'rank', octaveCap = 4, primeLimit = null) {
+  let pitchMap;
+
+  switch (mode) {
+    case 'consonance':
+      pitchMap = _assignConsonancePitches(channels, masterTune, octaveCap, primeLimit);
+      break;
+    case 'rank':
+    default:
+      pitchMap = _assignRankPitches(channels, masterTune);
+      break;
+  }
+
+  // Apply user overrides (always take priority)
+  if (ratioOverrides?.size > 0) {
+    for (const [label, ratio] of ratioOverrides) {
+      const entry = pitchMap.get(label);
+      if (entry) {
+        entry.ratio = ratio;
+        entry.hz = masterTune * ratio;
+        entry.ratioLabel = _ratioToLabel(ratio);
+      }
+    }
+  }
+
+  // Atlas-based panning (all modes, after overrides)
+  _applyAtlasPanning(channels, pitchMap);
+
+  return pitchMap;
+}
+
+
+// ── Mode 1: RMS Rank (original behavior) ─────────────────────────────────────
+
+function _assignRankPitches(channels, masterTune) {
   const result = new Map();
   const shafts = new Map();
   for (const ch of channels) {
@@ -78,29 +268,111 @@ export function assignPitches(channels, masterTune = DEFAULT_MASTER_TUNE, ratioO
     const labels = shafts.get(name);
     const shaftMul = SHAFT_RATIOS[si % SHAFT_RATIOS.length];
 
-    const first = name.charAt(0).toUpperCase();
-    let pan = 0;
-    if (first === 'L') pan = -0.3 - (si * 0.05);
-    else if (first === 'R') pan = 0.3 + (si * 0.05);
-    pan = Math.max(-1, Math.min(1, pan));
-
     for (let ci = 0; ci < labels.length; ci++) {
       const ji = JI_TABLE[ci % JI_TABLE.length];
       const contactRatio = ji[0] / ji[1];
       const fullRatio = shaftMul * contactRatio;
-      const overrideRatio = ratioOverrides?.get(labels[ci]);
-      const ratio = overrideRatio ?? fullRatio;
 
       result.set(labels[ci], {
-        ratio,
-        ratioLabel: overrideRatio != null ? _ratioToLabel(ratio) : _buildLabel(shaftMul, ji),
-        hz: masterTune * ratio,
-        pan,
+        ratio: fullRatio,
+        ratioLabel: _buildLabel(shaftMul, ji),
+        hz: masterTune * fullRatio,
+        pan: 0,
       });
     }
   }
   return result;
 }
+
+
+// ── Mode 2: Consonance (n×d product walk, shaft-exclusive cores) ──────────────
+
+/**
+ * Consonance mode with shaft-exclusive cores.
+ *
+ * Each shaft claims exclusive ownership of its ratio cores (octave-stripped
+ * identities). Within a shaft, same-core octave transpositions are fine.
+ * Across shafts, no two shafts share a core — so each shaft occupies its
+ * own harmonic territory.
+ *
+ * Generates a large pool of consonant ratios, then assigns per-shaft
+ * greedily: most consonant ratios whose cores aren't claimed elsewhere.
+ */
+function _assignConsonancePitches(channels, masterTune, octaveCap = 4, primeLimit = null) {
+  const maxRatio = Math.pow(2, octaveCap);
+  const pitchMap = new Map();
+
+  // Group by shaft
+  const shafts = {};
+  for (const ch of channels) {
+    const key = ch.shaft || ch.label;
+    if (!shafts[key]) shafts[key] = [];
+    shafts[key].push(ch);
+  }
+  const shaftNames = Object.keys(shafts).sort();
+
+  // Generate a large pool ordered by consonance.
+  // Prime limit restricts the pool — 3-limit has fewer ratios per
+  // octave than unlimited, so generate more to compensate.
+  const poolMultiplier = primeLimit && primeLimit <= 5 ? 20 : 12;
+  const pool = _generateByConsonance(channels.length * poolMultiplier, 1.0, maxRatio, primeLimit);
+
+  // Track which cores are claimed by which shaft
+  const claimedCores = new Set();
+
+  for (const shaftName of shaftNames) {
+    const contacts = shafts[shaftName];
+    contacts.sort((a, b) => (a.contactNum || 0) - (b.contactNum || 0));
+
+    // Pick ratios for this shaft: most consonant available
+    // whose core hasn't been claimed by a previous shaft
+    const shaftRatios = [];
+    const shaftCores = new Set();
+
+    for (const r of pool) {
+      if (shaftRatios.length >= contacts.length) break;
+      const core = _ratioCore(r.n, r.d);
+      // Skip if another shaft already owns this core
+      if (claimedCores.has(core)) continue;
+      // Within a shaft, allow same core (octave spread is fine
+      // WITHIN a shaft — it's ACROSS shafts that it's confusing)
+      shaftRatios.push(r);
+      shaftCores.add(core);
+    }
+
+    // Claim all cores this shaft used
+    for (const core of shaftCores) claimedCores.add(core);
+
+    // Pass 2: fallback — if not enough exclusive cores, allow reuse
+    // (octave-displaced versions of previously claimed cores)
+    if (shaftRatios.length < contacts.length) {
+      for (const r of pool) {
+        if (shaftRatios.length >= contacts.length) break;
+        if (shaftRatios.some(sr => sr.label === r.label)) continue;
+        shaftRatios.push(r);
+      }
+    }
+
+    // Sort by pitch ascending
+    shaftRatios.sort((a, b) => a.ratio - b.ratio);
+
+    for (let ci = 0; ci < contacts.length; ci++) {
+      const ch = contacts[ci];
+      const r = shaftRatios[ci] || { ratio: 1, label: '1/1' };
+      pitchMap.set(ch.label, {
+        ratio: r.ratio,
+        ratioLabel: r.label,
+        hz: masterTune * r.ratio,
+        pan: 0,
+      });
+    }
+  }
+
+  return pitchMap;
+}
+
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function _buildLabel(shaftMul, ji) {
   if (shaftMul === 1) return `${ji[0]}/${ji[1]}`;

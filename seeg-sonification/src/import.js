@@ -45,8 +45,8 @@
  * @returns {string} normalised label (trimmed, prefix/suffix removed)
  */
 function _normalizeChannelLabel(label) {
-  // Strip leading modality prefix + mandatory trailing space
-  let norm = label.replace(/^(?:EEG|iEEG|SEEG|sEEG|ECoG|ecog|POL|BIP)\s+/i, '');
+  // Strip leading modality prefix + mandatory trailing space or underscore
+  let norm = label.replace(/^(?:EEG|iEEG|SEEG|sEEG|ECoG|ecog|POL|BIP|PSG|EMG|EOG|ECG|EKG)[\s_]+/i, '');
   // Strip trailing reference suffix (space or dash separator)
   norm = norm.replace(/[\s\-](?:Ref|LE|RE|CE|CAR|REREF|GND|Avg|AVG)$/i, '');
   return norm.trim();
@@ -90,7 +90,7 @@ const SCALP_10_20 = new Set([
  * These are physiological signals or system channels that should be
  * excluded from sonification by default.
  */
-const AUXILIARY_PATTERN = /^(ECG|EKG|EMG|EOG[LRH]?|VEOG|HEOG|DC\d*|STI\d*|Status|TRIG\d*|Resp|SpO2|SAO2|FLOW|Temp|Pleth|Misc|Ref)/i;
+const AUXILIARY_PATTERN = /^(ECG|EKG|EMG|EOG[LRH]?|VEOG|HEOG|DC\d*|STI\d*|Status|TRIG\d*|Resp|SpO2|SAO2|FLOW|Temp|Pleth|Misc|Ref|THOR|ABD|PULSE|BEAT|SNORE|PRES|CAN|CPAP|CHIN|LEG[LR]?|CHEST|AIRFLOW|EFFORT|POSITION|THER)/i;
 
 /**
  * Classify a single channel label.
@@ -118,9 +118,11 @@ export function classifyChannel(label) {
   if (/^[A-Za-z][A-Za-z0-9'.-]*?\d+$/.test(clean)) return 'seeg';
 
   // Retry after stripping clinical system prefixes / reference suffixes.
-  // Handles "EEG LA1" → "LA1", "LA1-Ref" → "LA1", "POL A1" → "A1", etc.
+  // Handles "EEG LA1" → "LA1", "LA1-Ref" → "LA1", "POL A1" → "A1",
+  // "PSG_O2" → "O2", "PSG_EMG" → "EMG", etc.
   const norm = _normalizeChannelLabel(clean);
   if (norm !== clean) {
+    if (AUXILIARY_PATTERN.test(norm)) return 'auxiliary';
     if (SCALP_10_20.has(norm.toUpperCase())) return 'scalp';
     if (/^[A-Za-z][A-Za-z0-9'.-]*?\d+$/.test(norm)) return 'seeg';
   }
@@ -465,6 +467,36 @@ export function analyzeImport(edfResult) {
       bipolarPairs: consecutivePairs,
       preBipolar:   isPre,
       signals:      contacts.map(c => c.signal),
+    };
+  }
+
+  // Step 7b: Fallback for unclassified channels.
+  // When unknown channels exist (e.g. non-standard labels, mixed-modality
+  // files), surface them as a virtual "Other" group so they appear in the
+  // import UI with checkboxes. The user can select or deselect them.
+  if (unknown.length > 0) {
+    shaftSummary['Other'] = {
+      contacts:     unknown.length,
+      contactRange: `1–${unknown.length}`,
+      bipolarPairs: 0,
+      preBipolar:   false,
+      signals:      unknown,
+      isVirtual:    true,   // flag so preprocess knows this isn't a real shaft
+    };
+  }
+
+  // Step 7c: For scalp EEG recordings with no shaft structure, surface
+  // scalp channels as a selectable "Scalp" group. Otherwise the user
+  // sees an empty channel list with no way to control which channels
+  // are processed.
+  if (scalp.length > 0 && Object.keys(shafts).length === 0) {
+    shaftSummary['Scalp'] = {
+      contacts:     scalp.length,
+      contactRange: `1–${scalp.length}`,
+      bipolarPairs: 0,
+      preBipolar:   false,
+      signals:      scalp,
+      isVirtual:    true,
     };
   }
 

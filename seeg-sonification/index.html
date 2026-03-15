@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>SEEG Sonification Toolkit</title>
+  <title>sEEG Sonification Toolkit</title>
   <style>
     /* ── Tokens ──────────────────────────────────────────────────────────── */
     :root {
@@ -66,6 +66,15 @@
     }
 
     #header .logo .v { color: var(--muted); font-weight: 400; }
+
+    #header .header-fname {
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
 
     #header .file-info {
       display: flex;
@@ -261,7 +270,7 @@
     .kv-row .v.accent { color: var(--accent); }
 
     /* Shaft list */
-    .shaft-list { display: flex; flex-direction: column; gap: 0; max-height: 220px; overflow-y: auto; }
+    .shaft-list { display: flex; flex-direction: column; gap: 0; max-height: 340px; overflow-y: auto; }
 
     .shaft-select-header {
       display: flex;
@@ -296,6 +305,30 @@
     .shaft-row input[type="checkbox"] { accent-color: var(--accent); width: 12px; height: 12px; flex-shrink: 0; margin: 0; cursor: pointer; }
     .shaft-row .shaft-name { color: var(--accent); flex: 1; }
     .shaft-row .shaft-detail { color: var(--muted); font-size: 11px; white-space: nowrap; }
+
+    /* Shaft expander chevron */
+    .shaft-chevron {
+      display: inline-block; width: 14px; text-align: center;
+      color: var(--muted); font-size: 10px; cursor: pointer;
+      transition: transform 0.15s; flex-shrink: 0; user-select: none;
+    }
+    .shaft-chevron.open { transform: rotate(90deg); }
+
+    /* Contact rows (children of shaft group) */
+    .contact-list { display: none; padding-left: 28px; }
+    .contact-list.open { display: flex; flex-direction: column; }
+    .contact-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 2px 2px; cursor: pointer; border-radius: 3px;
+      font-size: 11px;
+    }
+    .contact-row:hover { background: var(--surface2); }
+    .contact-row input[type="checkbox"] {
+      accent-color: var(--accent); width: 11px; height: 11px;
+      flex-shrink: 0; margin: 0; cursor: pointer;
+    }
+    .contact-row .contact-label { color: var(--text); flex: 1; }
+    .contact-row .contact-detail { color: var(--dim); font-size: 10px; white-space: nowrap; }
 
     /* Options in import */
     .option-row {
@@ -908,11 +941,128 @@
       opacity: 0;
     }
 
+    /* ── Wavetable strip — absolutely positioned over Polarity + Frequency ── */
+    .wavetable-strip {
+      position: absolute;
+      bottom: 0;
+      /* Source=311px, Output=120px, 4 equal cols share the rest.
+         Polarity starts after Source + Amplitude = 311px + 1 part.
+         Frequency ends before Detection + Output = 311px + 3 parts.
+         +2px for column borders to the left (source + amplitude). */
+      left: calc(311px + (100% - 431px) / 4 + 2px);
+      width: calc((100% - 431px) / 2 - 1px);
+      height: 62px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-top: 2px solid rgba(240, 160, 48, 0.35);
+      border-left: 2px solid rgba(240, 160, 48, 0.25);
+      background: rgba(240, 160, 48, 0.02);
+      z-index: 1;
+      pointer-events: auto;
+    }
+    .synth-body.collapsed .wavetable-strip { display: none; }
+
+    .wt-inner {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Left half = fader, centers under Polarity column */
+    .wt-fader-half {
+      width: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 10px;
+      gap: 0;
+    }
+
+    .wt-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 2px;
+    }
+    .wt-label .syn-label-main {
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .wt-label .syn-label-sub {
+      font-size: 8px;
+      color: var(--dim);
+      font-style: italic;
+      white-space: nowrap;
+    }
+
+    .wt-fader-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+    }
+    #fader-waveform { accent-color: #f0a030 !important; }
+    .wt-fader-row .syn-range {
+      flex: 1;
+      height: 4px;
+      min-width: 40px;
+    }
+
+    .wt-endpoint {
+      font-size: 8px;
+      color: var(--dim);
+      letter-spacing: 0.06em;
+      text-transform: lowercase;
+      white-space: nowrap;
+      min-width: 20px;
+      user-select: none;
+    }
+    .wt-endpoint:first-child { text-align: right; }
+    .wt-endpoint:last-child  { text-align: left; }
+
+    .wt-center-mark {
+      font-size: 7px;
+      color: var(--dim);
+      letter-spacing: 0.06em;
+      user-select: none;
+      opacity: 0.6;
+    }
+
+    /* Right half = canvases, centers under Frequency column */
+    .wt-visual-half {
+      width: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 10px;
+      gap: 3px;
+    }
+    #wt-wave {
+      width: 100%;
+      height: 28px;
+      border-radius: 2px;
+      display: block;
+    }
+    #wt-spectrum {
+      width: 100%;
+      height: 14px;
+      border-radius: 2px;
+      display: block;
+    }
+
     .synth-panel {
       display: flex;
       gap: 0;
       align-items: stretch;
       overflow: hidden;
+      position: relative;
     }
 
     /* ── Columns ────────────────────────────────────────────────────── */
@@ -961,7 +1111,7 @@
     .syn-label {
       display: flex;
       flex-direction: column;
-      width: 76px;
+      width: 100px;
       min-width: 0;
       flex-shrink: 1;
       text-align: right;
@@ -983,17 +1133,16 @@
     }
 
     .syn-label-sub {
-      font-size: 7px;
-      color: var(--dim);
+      font-size: 8px;
+      color: var(--muted);
       white-space: nowrap;
       user-select: none;
       line-height: 1.1;
       font-style: italic;
-      opacity: 0;
+      opacity: 0.5;
       transition: opacity 0.15s;
     }
-    /* Show sub-label only on hover — reduces clutter */
-    .syn-fader:hover .syn-label-sub { opacity: 1; }
+    .syn-fader:hover .syn-label-sub { opacity: 0.8; }
 
     .syn-range {
       flex: 1;
@@ -1051,7 +1200,7 @@
     .syn-pair-row .syn-range { min-width: 24px; flex: 1; }
 
     /* Per-column label widths for optimal alignment */
-    .synth-col[data-col="detection"]  .syn-label { width: 76px; }
+    .synth-col[data-col="detection"]  .syn-label { width: 100px; }
     .synth-col[data-col="output"]     .syn-label { width: auto; max-width: none; min-width: 0; text-align: center; }
 
     /* Output column: vertical stacking (label on top, slider below) */
@@ -1059,6 +1208,7 @@
       flex-direction: column;
       align-items: stretch;
       gap: 2px;
+      margin-bottom: 6px;
     }
     .synth-col[data-col="output"] .syn-range {
       width: 100%;
@@ -1175,6 +1325,29 @@
       display: flex; align-items: center; gap: 4px;
       margin-top: auto; padding-top: 4px; border-top: 1px solid var(--border);
     }
+    .syn-tune-ref {
+      display: flex; align-items: center; gap: 0;
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: 3px; padding: 1px 5px; flex-shrink: 0;
+    }
+    .syn-tune-ref span { font-size: 9px; color: var(--muted); white-space: nowrap; }
+    .syn-tune-ref input {
+      width: 32px; background: transparent; border: none; outline: none;
+      color: var(--text); font-family: var(--mono); font-size: 10px;
+      text-align: center; padding: 0;
+      -moz-appearance: textfield; appearance: textfield;
+    }
+    .syn-tune-ref input::-webkit-inner-spin-button,
+    .syn-tune-ref input::-webkit-outer-spin-button { -webkit-appearance: none; appearance: none; margin: 0; }
+    .syn-tune-ref:hover { border-color: var(--accent-dim, #445); }
+    .syn-tune-ref:focus-within { border-color: var(--accent); }
+    .syn-tune-sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
+    .syn-tune-select {
+      background: var(--surface2); border: 1px solid var(--border2);
+      color: var(--text); font-family: var(--mono); font-size: 8px;
+      padding: 1px 2px; border-radius: 2px; cursor: pointer;
+    }
+    .syn-tune-select:focus { outline: none; border-color: var(--accent); }
 
     /* ── Output meter ──────────────────────────────────────────────── */
     .output-meter {
@@ -1477,23 +1650,142 @@
     .delta-up { color: #f87171; }
     .delta-down { color: #4ade80; }
 
-    /* Inspector panel */
-    #inspector {
-      flex-shrink: 0;
-      background: var(--bg2);
+    /* Feature strip — sub-track inspector + feature trace */
+    .feature-strip {
+      display: flex;
+      height: 38px;
       border-top: 1px solid var(--border);
-      padding: 6px 14px;
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .strip-tcp {
+      width: var(--tcp-w);
+      flex-shrink: 0;
       display: flex;
       align-items: center;
-      gap: 16px;
-      font-size: 11px;
-      min-height: 32px;
-      overflow-x: auto;
+      padding: 0 10px;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      gap: 10px;
+    }
+    .strip-tcp.empty .strip-info,
+    .strip-tcp.empty .strip-gain { display: none; }
+    .strip-tcp.empty .strip-channel-label { display: none; }
+    .strip-tcp.empty::after {
+      content: 'Click a channel to inspect';
+      color: var(--dim);
+      font-size: 9px;
+      letter-spacing: 0.04em;
+    }
+    .strip-channel-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 5px;
       white-space: nowrap;
     }
-    #inspector .insp-label { color: var(--muted); }
-    #inspector .insp-val   { color: var(--text); }
-    #inspector .insp-dim   { color: var(--dim); }
+    .strip-channel-label:empty { display: none; }
+    .strip-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+    .strip-info {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+    .strip-pitch {
+      color: var(--accent);
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .strip-ratio {
+      color: var(--muted);
+      font-size: 9px;
+    }
+    .strip-gain {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .strip-gain-label {
+      color: var(--dim);
+      font-size: 8px;
+      letter-spacing: 0.06em;
+    }
+    .strip-gain input[type="range"] {
+      width: 50px;
+      height: 3px;
+      accent-color: var(--accent);
+    }
+    .strip-gain span {
+      color: var(--muted);
+      font-size: 8px;
+      font-variant-numeric: tabular-nums;
+      min-width: 28px;
+    }
+    .strip-wave {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+    .strip-wave canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .strip-trace-label {
+      position: absolute;
+      top: 2px;
+      left: 4px;
+      font-size: 7px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      pointer-events: none;
+      user-select: none;
+      opacity: 0.6;
+    }
+    .strip-ghost-label {
+      top: 12px;
+      opacity: 0.3;
+      font-style: italic;
+    }
+    .strip-wave select {
+      position: absolute;
+      top: 2px;
+      right: 4px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 8px;
+      padding: 1px 4px;
+      border-radius: 2px;
+      z-index: 1;
+      cursor: pointer;
+    }
+    .strip-wave select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .strip-cursor {
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-size: 8px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-variant-numeric: tabular-nums;
+      pointer-events: none;
+    }
 
     .tcp-pitch {
       width: 38px;
@@ -1522,15 +1814,182 @@
       .track-tcp .tcp-solo { display: none; }
       .tcp-stub span:nth-child(n+4) { display: none; }
     }
+    /* ── About overlay ──────────────────────────────────────────────── */
+    #about-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(6, 6, 8, 0.92);
+      backdrop-filter: blur(8px);
+      overflow-y: auto;
+      display: flex;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+    .about-content {
+      max-width: 680px;
+      width: 100%;
+      position: relative;
+    }
+    .about-close {
+      position: fixed;
+      top: 16px;
+      right: 20px;
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 20px;
+      width: 32px;
+      height: 32px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 201;
+    }
+    .about-close:hover { border-color: var(--text); color: var(--text); }
+    .about-content h1 {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .about-version {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      margin-bottom: 24px;
+    }
+    .about-lead {
+      font-size: 12px;
+      color: var(--text);
+      line-height: 1.8;
+      margin-bottom: 32px;
+    }
+    .about-pipeline {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      margin-bottom: 36px;
+    }
+    .pipe-arrow {
+      font-size: 14px;
+      color: var(--dim);
+      line-height: 1;
+      padding: 6px 0;
+    }
+    .pipe-stage {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 12px 16px;
+    }
+    .pipe-stage.pipe-wide { padding: 14px 16px; }
+    .pipe-stage.pipe-end {
+      background: var(--accent-bg);
+      border-color: var(--accent);
+      text-align: center;
+      padding: 8px 16px;
+    }
+    .pipe-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+    .pipe-end .pipe-label { color: var(--accent); margin-bottom: 0; }
+    .pipe-desc {
+      font-size: 10px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .pipe-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .pipe-group-title {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 2px;
+    }
+    .pipe-group-items {
+      font-size: 9px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .pipe-mapping {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 8px;
+    }
+    .pipe-map {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+    }
+    .pipe-map-name {
+      color: var(--mc);
+      font-weight: 600;
+      min-width: 72px;
+    }
+    .pipe-map-arrow { color: var(--dim); }
+    .pipe-map-target { color: var(--muted); }
+    .about-section { margin-bottom: 20px; }
+    .about-section h2 {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 6px;
+    }
+    .about-section p {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+    .about-refs p {
+      font-size: 9px;
+      line-height: 2;
+    }
+    .about-refs em {
+      color: var(--text);
+      font-style: normal;
+    }
+    .about-footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      font-size: 9px;
+      color: var(--dim);
+      letter-spacing: 0.08em;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
 
 <!-- ── Header (always visible) ────────────────────────────────────────────── -->
 <div id="header">
-  <div class="logo">SEEG SONIFICATION <span class="v">v8</span></div>
+  <div class="logo">sEEG SONIFICATION <span class="v">(DEMO)</span></div>
+  <span class="header-fname" id="header-fname" style="display:none"></span>
   <div class="file-info" id="header-file-info" style="display:none"></div>
-  <button class="header-action" id="btn-reopen" style="display:none;margin-left:auto">Open file…</button>
+  <button class="header-action" id="btn-about" style="margin-left:auto">About</button>
+  <button class="header-action" id="btn-reopen" style="display:none">Open file…</button>
 </div>
 
 <!-- ── Main area ──────────────────────────────────────────────────────────── -->
@@ -1581,6 +2040,7 @@
         <div class="import-section">
           <div class="import-section-title">Channel Structure</div>
           <div class="shaft-list" id="import-shaft-list"></div>
+          <div id="channel-count-warning" class="line-ambig" style="display:none;margin-top:6px"></div>
         </div>
 
         <!-- Preprocessing options -->
@@ -1635,7 +2095,7 @@
         <button class="transport-btn" id="btn-play"  title="Play / Pause (Space)">&#x25B6;</button>
         <button class="transport-btn" id="btn-loop"  title="Loop visible window (L)">&#x27F3;</button>
         <button class="transport-btn" id="btn-autoscale" title="Auto-scale amplitude (A)">A</button>
-        <button class="transport-btn" id="btn-vu-ruler" title="VU ruler (V)">V</button>
+        <button class="transport-btn" id="btn-vu-ruler" title="Voltage scale (V)">V</button>
         <button class="transport-btn" id="btn-zoom-sel" title="Zoom to selected channels (Z)">Z</button>
         <button class="transport-btn" id="btn-zoom-reset" title="Reset zoom (Esc)" style="font-size:11px">⟲</button>
         <button class="transport-btn" id="btn-add-marker" title="Add marker at playhead (N)" style="font-size:11px">⚑</button>
@@ -1682,7 +2142,7 @@
         </label>
 
         <label class="syn-mod-level" data-mod="morphology" style="--mc:#38bdf8">
-          <span>Morphology</span>
+          <span>Polarity</span>
           <input type="range" class="syn-range" id="fader-morphLevel" min="0" max="1" step="0.01" value="1">
         </label>
 
@@ -1719,7 +2179,7 @@
             </div>
             <div class="syn-divider"></div>
             <div class="syn-range-endpoints">
-              <span class="syn-endpoint" id="intensity-left">normalized</span>
+              <span class="syn-endpoint" id="intensity-left">relative</span>
               <input type="range" class="syn-range" id="fader-intensity"
                      min="0" max="1" step="0.01" value="0.0"
                      style="accent-color: #6b8cff">
@@ -1727,17 +2187,37 @@
             </div>
             <div class="syn-divider"></div>
             <div class="syn-tune">
-              <span style="font-size:9px;color:var(--muted)">1/1 =</span>
-              <input type="number" id="master-tune" min="20" max="2000" step="1" value="130"
-                class="tcp-pitch" style="width:44px;text-align:center">
-              <span style="font-size:9px;color:var(--muted)">Hz</span>
+              <div class="syn-tune-ref" title="Fundamental pitch — click to edit">
+                <span>1/1=</span>
+                <input type="number" id="master-tune" min="20" max="2000" step="1" value="130">
+                <span>Hz</span>
+              </div>
+              <div class="syn-tune-sep"></div>
+              <select id="tuning-mode" class="syn-tune-select">
+                <option value="rank">Scale Shaft</option>
+                <option value="consonance">Consonance</option>
+              </select>
+              <select id="octave-cap" class="syn-tune-select consonance-opt" style="display:none">
+                <option value="2">2 oct</option>
+                <option value="3">3 oct</option>
+                <option value="4" selected>4 oct</option>
+                <option value="5">5 oct</option>
+              </select>
+              <select id="prime-limit" class="syn-tune-select consonance-opt" style="display:none">
+                <option value="3">3-lim</option>
+                <option value="5">5-lim</option>
+                <option value="7">7-lim</option>
+                <option value="11">11-lim</option>
+                <option value="13">13-lim</option>
+                <option value="0" selected>no limit</option>
+              </select>
             </div>
           </div>
 
           <!-- Under "Amplitude" -->
           <div class="synth-col" data-col="amplitude">
             <label class="syn-fader" data-feature="fastRMS">
-              <span class="syn-label"><span class="syn-label-main">RMS 50ms</span><span class="syn-label-sub">fast bursts</span></span>
+              <span class="syn-label"><span class="syn-label-main">RMS 50ms</span><span class="syn-label-sub">fast energy tracking</span></span>
               <input type="range" class="syn-range" id="fader-rmsFast" min="0" max="1" step="0.01" value="0">
             </label>
             <label class="syn-fader" data-feature="midRMS">
@@ -1749,36 +2229,36 @@
               <input type="range" class="syn-range" id="fader-rmsSlow" min="0" max="1" step="0.01" value="0.5">
             </label>
             <label class="syn-fader" data-feature="adaptiveRMS">
-              <span class="syn-label"><span class="syn-label-main">Adaptive</span><span class="syn-label-sub">band-driven blend</span></span>
+              <span class="syn-label"><span class="syn-label-main">Adaptive</span><span class="syn-label-sub">adapts to dominant band</span></span>
               <input type="range" class="syn-range" id="fader-rmsAdaptive" min="0" max="1" step="0.01" value="0.5">
             </label>
             <div class="syn-divider"></div>
             <label class="syn-fader" data-feature="envelope">
-              <span class="syn-label"><span class="syn-label-main">Hilbert Env</span><span class="syn-label-sub">&#x2192; amplitude modulation</span></span>
+              <span class="syn-label"><span class="syn-label-main">Envelope</span><span class="syn-label-sub">Hilbert analytic signal</span></span>
               <input type="range" class="syn-range" id="fader-hilbertAM" min="0" max="1" step="0.01" value="0.3">
             </label>
             <label class="syn-fader">
-              <span class="syn-label"><span class="syn-label-main">Dyn. Range</span><span class="syn-label-sub">floor / ceiling</span></span>
+              <span class="syn-label"><span class="syn-label-main">Contrast</span><span class="syn-label-sub">quiet ↔ loud range</span></span>
               <input type="range" class="syn-range" id="fader-dynRange" min="0" max="1" step="0.01" value="0.6">
             </label>
           </div>
 
-          <!-- Under "Morphology" -->
+          <!-- Under "Polarity" -->
           <div class="synth-col" data-col="morphology">
-            <label class="syn-fader" data-feature="slopeAsymmetry">
-              <span class="syn-label"><span class="syn-label-main">Range</span><span class="syn-label-sub">overtone extent</span></span>
+            <label class="syn-fader" data-feature="complexity">
+              <span class="syn-label"><span class="syn-label-main">Harmonic Range</span><span class="syn-label-sub">polarity → harmonic richness</span></span>
               <input type="range" class="syn-range" id="fader-range" min="0" max="1" step="0.01" value="0.5">
             </label>
-            <label class="syn-fader syn-sub">
-              <span class="syn-label"><span class="syn-label-main">Slope</span><span class="syn-label-sub">rise/fall &#x2192; directional bias</span></span>
+            <label class="syn-fader syn-sub" data-feature="slopeAsymmetry">
+              <span class="syn-label"><span class="syn-label-main">Slope</span><span class="syn-label-sub">waveform slope asymmetry</span></span>
               <input type="range" class="syn-range" id="fader-slopeDepth" min="0" max="1" step="0.01" value="0.4">
             </label>
-            <label class="syn-fader" data-feature="phase-coloring">
-              <span class="syn-label"><span class="syn-label-main">Sensitivity</span><span class="syn-label-sub">crossfade steepness</span></span>
+            <label class="syn-fader" data-feature="envelope" data-phase-coloring="true">
+              <span class="syn-label"><span class="syn-label-main">Polarity Depth</span><span class="syn-label-sub">voltage sign response</span></span>
               <input type="range" class="syn-range" id="fader-sensitivity" min="0" max="1" step="0.01" value="0.4">
             </label>
             <label class="syn-fader syn-sub" data-feature="complexity">
-              <span class="syn-label"><span class="syn-label-main">Complexity</span><span class="syn-label-sub">predictable&#x2192;narrow / chaotic&#x2192;wide</span></span>
+              <span class="syn-label"><span class="syn-label-main">Complexity</span><span class="syn-label-sub">signal regularity → spread</span></span>
               <input type="range" class="syn-range" id="fader-complexityDepth" min="0" max="1" step="0.01" value="0.5">
             </label>
           </div>
@@ -1786,19 +2266,19 @@
           <!-- Under "Frequency" -->
           <div class="synth-col" data-col="frequency">
             <label class="syn-fader" data-feature="centroid">
-              <span class="syn-label"><span class="syn-label-main">Focus</span><span class="syn-label-sub">centroid &#x2194; band power</span></span>
+              <span class="syn-label"><span class="syn-label-main">Spectral Focus</span><span class="syn-label-sub">centroid ↔ band power</span></span>
               <input type="range" class="syn-range" id="fader-focus" min="0" max="1" step="0.01" value="0.5">
             </label>
             <label class="syn-fader syn-sub" data-feature="mobility">
-              <span class="syn-label"><span class="syn-label-main">Mobility</span><span class="syn-label-sub">slew rate of FM changes</span></span>
+              <span class="syn-label"><span class="syn-label-main">Mobility</span><span class="syn-label-sub">rate of spectral change</span></span>
               <input type="range" class="syn-range" id="fader-mobility" min="0" max="1" step="0.01" value="0.3">
             </label>
             <label class="syn-fader" data-feature="spectralBandwidth">
-              <span class="syn-label"><span class="syn-label-main">Bandwidth</span><span class="syn-label-sub">harmonic spread</span></span>
+              <span class="syn-label"><span class="syn-label-main">Bandwidth</span><span class="syn-label-sub">spectral width → tonal spread</span></span>
               <input type="range" class="syn-range" id="fader-bandwidth" min="0" max="1" step="0.01" value="0.0">
             </label>
             <label class="syn-fader syn-sub" data-feature="permEntropy">
-              <span class="syn-label"><span class="syn-label-main">Entropy</span><span class="syn-label-sub">certainty → narrow / wide</span></span>
+              <span class="syn-label"><span class="syn-label-main">Entropy</span><span class="syn-label-sub">regularity → narrow / wide</span></span>
               <input type="range" class="syn-range" id="fader-entropy" min="0" max="1" step="0.01" value="0.0">
             </label>
           </div>
@@ -1814,31 +2294,31 @@
               <input type="range" class="syn-range" id="fader-ppafThreshold" min="0" max="1" step="0.01" value="0.5">
             </label>
             <label class="syn-fader">
-              <span class="syn-label"><span class="syn-label-main">Saturation</span></span>
+              <span class="syn-label"><span class="syn-label-main">Transient Intensity</span><span class="syn-label-sub">event emphasis strength</span></span>
               <input type="range" class="syn-range" id="fader-saturation" min="0" max="1" step="0.01" value="0.5">
             </label>
             <label class="syn-fader">
-              <span class="syn-label"><span class="syn-label-main">Noise</span></span>
+              <span class="syn-label"><span class="syn-label-main">Onset Texture</span><span class="syn-label-sub">transient attack character</span></span>
               <input type="range" class="syn-range" id="fader-noise" min="0" max="1" step="0.01" value="0.4">
             </label>
             <div class="syn-pair-row">
               <label class="syn-fader">
-                <span class="syn-label"><span class="syn-label-main">Attack</span></span>
+                <span class="syn-label"><span class="syn-label-main">Onset</span></span>
                 <input type="range" class="syn-range" id="fader-noiseAttack" min="2" max="30" step="1" value="15">
               </label>
               <label class="syn-fader">
-                <span class="syn-label"><span class="syn-label-main">Decay</span></span>
+                <span class="syn-label"><span class="syn-label-main">Release</span></span>
                 <input type="range" class="syn-range" id="fader-noiseDecay" min="15" max="200" step="5" value="80">
               </label>
             </div>
             <div class="syn-divider"></div>
             <div class="syn-pair-row">
               <label class="syn-fader" data-feature="spectralFlux">
-                <span class="syn-label"><span class="syn-label-main">Flux</span></span>
+                <span class="syn-label"><span class="syn-label-main">Spectral Flux</span><span class="syn-label-sub">spectral change detection</span></span>
                 <input type="range" class="syn-range" id="fader-flux" min="0" max="1" step="0.01" value="0.0">
               </label>
               <label class="syn-fader">
-                <span class="syn-label"><span class="syn-label-main">Refractory</span></span>
+                <span class="syn-label"><span class="syn-label-main">Refractory</span><span class="syn-label-sub">minimum event interval</span></span>
                 <input type="range" class="syn-range" id="fader-refractory" min="10" max="200" step="5" value="40">
               </label>
             </div>
@@ -1847,12 +2327,16 @@
           <!-- Under "Output" -->
           <div class="synth-col" data-col="output">
             <label class="syn-fader" data-feature="lineLength">
-              <span class="syn-label"><span class="syn-label-main">Gate(Line Length)</span></span>
+              <span class="syn-label"><span class="syn-label-main">Activity Gate</span><span class="syn-label-sub">line length threshold</span></span>
               <input type="range" class="syn-range" id="fader-activityGate" min="0" max="1" step="0.01" value="0.3">
             </label>
             <label class="syn-fader">
-              <span class="syn-label"><span class="syn-label-main">Drive</span></span>
+              <span class="syn-label"><span class="syn-label-main">Drive</span><span class="syn-label-sub">harmonic saturation</span></span>
               <input type="range" class="syn-range" id="fader-drive" min="0" max="1" step="0.01" value="0.0">
+            </label>
+            <label class="syn-fader">
+              <span class="syn-label"><span class="syn-label-main">Width</span><span class="syn-label-sub">stereo field</span></span>
+              <input type="range" class="syn-range" id="fader-width" min="0" max="2" step="0.01" value="1">
             </label>
             <div class="output-meter">
               <div class="output-meter-fill" id="output-meter-fill"></div>
@@ -1860,7 +2344,31 @@
             </div>
           </div>
 
+          <!-- Wavetable strip — absolutely positioned over bottom of Polarity + Frequency -->
+          <div class="wavetable-strip" id="wavetable-strip">
+            <div class="wt-inner">
+              <div class="wt-fader-half">
+                <div class="wt-label">
+                  <span class="syn-label-main">Waveform</span>
+                  <span class="syn-label-sub">source shape</span>
+                </div>
+                <div class="wt-fader-row">
+                  <span class="wt-endpoint">saw</span>
+                  <input type="range" class="syn-range" id="fader-waveform"
+                         min="0" max="1" step="0.01" value="0.5">
+                  <span class="wt-endpoint">eeg</span>
+                </div>
+                <div class="wt-center-mark">sine</div>
+              </div>
+              <div class="wt-visual-half">
+                <canvas id="wt-wave"></canvas>
+                <canvas id="wt-spectrum"></canvas>
+              </div>
+            </div>
+          </div>
+
         </div><!-- /synth-panel -->
+
       </div><!-- /synth-body -->
 
     </div><!-- /synth-section -->
@@ -1870,7 +2378,7 @@
       <!-- Fixed header: column labels + ruler -->
       <div class="workspace-header">
         <div class="tcp-stub">
-          <span></span><span>Channel</span><span>RMS</span><span style="color:var(--dim)">Ratio</span><span style="color:var(--dim)">M</span><span style="color:var(--dim)">S</span>
+          <span></span><span>Channel</span><span>RMS</span><span style="color:var(--dim)">Pitch</span><span style="color:var(--dim)">M</span><span style="color:var(--dim)">S</span>
         </div>
         <div class="ruler-wrap" id="ruler"><canvas id="ruler-canvas"></canvas></div>
       </div>
@@ -1881,6 +2389,7 @@
           Drop file to begin
         </div>
         <!-- track rows populated by renderWorkspace() -->
+
       </div>
 
       <!-- Horizontal time scrollbar -->
@@ -1896,9 +2405,46 @@
 
     </div>
 
-    <!-- Inspector panel -->
-    <div id="inspector">
-      <span id="inspector-content" style="color:var(--muted)">Select a channel to inspect</span>
+    <!-- Feature strip — fixed at bottom, replaces old inspector -->
+    <div class="feature-strip" id="feature-strip">
+      <div class="strip-tcp empty" id="strip-tcp">
+        <span class="strip-channel-label" id="strip-channel-label"></span>
+        <div class="strip-info">
+          <span class="strip-pitch" id="strip-pitch">— Hz</span>
+          <span class="strip-ratio" id="strip-ratio">—</span>
+        </div>
+        <div class="strip-gain">
+          <span class="strip-gain-label">Gain</span>
+          <input type="range" id="strip-gain-fader" min="-20" max="12" step="0.5" value="0">
+          <span id="strip-gain-val">+0.0</span>
+        </div>
+      </div>
+      <div class="strip-wave" id="strip-wave">
+        <canvas id="strip-canvas"></canvas>
+        <span class="strip-trace-label" id="strip-trace-label">Amplitude</span>
+        <span class="strip-trace-label strip-ghost-label" id="strip-ghost-label"></span>
+        <select id="strip-feature">
+          <optgroup label="Sonification Curves">
+            <option value="rootAmpCurve" selected>Amplitude</option>
+            <option value="morphOvertones">Harmonic Content</option>
+            <option value="morphBalance">Polarity Balance</option>
+            <option value="fmIndexCurve">Spectral Modulation</option>
+            <option value="excitation">Event Impulse</option>
+          </optgroup>
+          <optgroup label="Signal Features">
+            <option value="feat:envelope">Envelope</option>
+            <option value="feat:centroid">Centroid</option>
+            <option value="feat:lineLength">Line Length</option>
+            <option value="feat:mobility">Mobility</option>
+            <option value="feat:permEntropy">Entropy</option>
+            <option value="feat:ppaf">PPAF</option>
+            <option value="feat:slowRMS">Slow RMS</option>
+            <option value="feat:spectralFlux">Spectral Flux</option>
+            <option value="feat:slopeAsymmetry">Slope Asymmetry</option>
+          </optgroup>
+        </select>
+        <span class="strip-cursor" id="strip-cursor"></span>
+      </div>
     </div>
 
     <!-- Status bar -->
@@ -1929,6 +2475,7 @@
   let preprocessed   = null;
   let currentFile    = null;
   let selectedShafts = new Set();  // shaft names selected for processing
+  let excludedContacts = new Map(); // shaftName → Set<contactNumber> excluded within that shaft
 
   // Engine state
   let engine  = null;
@@ -1951,6 +2498,10 @@
   let pitchMap = null;           // Map<label, {ratio, ratioLabel, hz, pan}>
   let ratioOverrides = new Map(); // label → ratio (user edits)
   let masterTune = 130;          // Hz — global tuning reference
+  let tuningMode = 'rank';       // 'rank' | 'consonance'
+  let octaveCap  = 4;            // 2–5
+  let primeLimit = null;         // null=unlimited, or 3/5/7/11/13
+  let stereoWidth = 1.0;         // 0=mono, 1=atlas, 2=exaggerated
   let seekDragging = false;
 
   // Channel selection state
@@ -2072,27 +2623,82 @@
   // Feature overlay state
   let featureOverlay = { label: null, feature: '', color: '', phaseColoring: false };
 
-  // Synthesis curve overlay — shows the actual curve the last-touched fader modifies
-  let curveOverlay = { curve: 'rootAmpCurve', color: '#f0a030', label: 'Amplitude' };
-  const FADER_CURVE_MAP = {
-    'fader-rmsFast':         { curve: 'rootAmpCurve',   color: '#f0a030', label: 'Amplitude' },
-    'fader-rmsMid':          { curve: 'rootAmpCurve',   color: '#f0a030', label: 'Amplitude' },
-    'fader-rmsSlow':         { curve: 'rootAmpCurve',   color: '#f0a030', label: 'Amplitude' },
-    'fader-rmsAdaptive':     { curve: 'rootAmpCurve',   color: '#f0a030', label: 'Amplitude' },
-    'fader-hilbertAM':       { curve: 'rootAmpCurve',   color: '#f0a030', label: 'Amplitude' },
-    'fader-dynRange':        { curve: 'rootAmpCurve',   color: '#f0a030', label: 'Amplitude' },
-    'fader-range':           { curve: 'morphOvertones', color: '#38bdf8', label: 'Overtones' },
-    'fader-slopeDepth':      { curve: 'morphBalance',   color: '#38bdf8', label: 'Polarity' },
-    'fader-sensitivity':     { curve: 'morphBalance',   color: '#38bdf8', label: 'Polarity' },
-    'fader-complexityDepth': { curve: 'morphOvertones', color: '#38bdf8', label: 'Overtones' },
-    'fader-focus':           { curve: 'fmIndexCurve',   color: '#4ade80', label: 'FM Index' },
-    'fader-mobility':        { curve: 'fmIndexCurve',   color: '#4ade80', label: 'FM Index' },
-    'fader-bandwidth':       { curve: 'fmIndexCurve',   color: '#4ade80', label: 'FM Index' },
-    'fader-entropy':         { curve: 'fmIndexCurve',   color: '#4ade80', label: 'FM Index' },
-    'fader-ppafThreshold':   { curve: 'events',         color: '#f87171', label: 'Events' },
-    'fader-saturation':      { curve: 'events',         color: '#f87171', label: 'Events' },
-    'fader-noise':           { curve: 'events',         color: '#f87171', label: 'Events' },
+  // Feature strip trace state — fader-linked
+  let stripTrace = {
+    type: 'rootAmpCurve',
+    color: '#f0a030',
+    label: 'Amplitude',
+    isFeature: false,
   };
+
+  // Companion feature: maps synth curve → underlying DSP feature for dual-layer display
+  const SYNTH_TO_FEATURE = {
+    rootAmpCurve:   'envelope',
+    morphOvertones: 'complexity',
+    morphBalance:   'envelope',
+    fmIndexCurve:   'centroid',
+    excitation:     'ppaf',
+  };
+
+  // Track active fader adjustment for opacity boost
+  let stripAdjusting = false;
+  let _stripAdjustTimer = 0;
+
+  // Currently hovered feature — persists across mousedown/mouseup for ghost display
+  let _hoveredFeature = null;  // { type, color, label } or null
+
+  const FADER_TRACE_MAP = {
+    'fader-rmsFast':         { trace: 'rootAmpCurve',  color: '#f0a030', label: 'Amplitude' },
+    'fader-rmsMid':          { trace: 'rootAmpCurve',  color: '#f0a030', label: 'Amplitude' },
+    'fader-rmsSlow':         { trace: 'rootAmpCurve',  color: '#f0a030', label: 'Amplitude' },
+    'fader-rmsAdaptive':     { trace: 'rootAmpCurve',  color: '#f0a030', label: 'Amplitude' },
+    'fader-hilbertAM':       { trace: 'rootAmpCurve',  color: '#f0a030', label: 'Amplitude' },
+    'fader-dynRange':        { trace: 'rootAmpCurve',  color: '#f0a030', label: 'Amplitude' },
+    'fader-range':           { trace: 'morphOvertones', color: '#38bdf8', label: 'Harmonic Content' },
+    'fader-slopeDepth':      { trace: 'morphBalance',   color: '#38bdf8', label: 'Polarity Balance' },
+    'fader-sensitivity':     { trace: 'morphBalance',   color: '#38bdf8', label: 'Polarity Balance' },
+    'fader-complexityDepth': { trace: 'morphOvertones', color: '#38bdf8', label: 'Harmonic Content' },
+    'fader-focus':           { trace: 'fmIndexCurve',   color: '#4ade80', label: 'Spectral Modulation' },
+    'fader-mobility':        { trace: 'fmIndexCurve',   color: '#4ade80', label: 'Spectral Modulation' },
+    'fader-bandwidth':       { trace: 'fmIndexCurve',   color: '#4ade80', label: 'Spectral Modulation' },
+    'fader-entropy':         { trace: 'fmIndexCurve',   color: '#4ade80', label: 'Spectral Modulation' },
+    'fader-ppafThreshold':   { trace: 'excitation',     color: '#f87171', label: 'Event Impulse' },
+    'fader-saturation':      { trace: 'excitation',     color: '#f87171', label: 'Event Impulse' },
+    'fader-noise':           { trace: 'excitation',     color: '#f87171', label: 'Event Impulse' },
+    'fader-noiseAttack':     { trace: 'excitation',     color: '#f87171', label: 'Event Impulse' },
+    'fader-noiseDecay':      { trace: 'excitation',     color: '#f87171', label: 'Event Impulse' },
+    'fader-flux':            { trace: 'excitation',     color: '#f87171', label: 'Event Impulse' },
+    'fader-refractory':      { trace: 'excitation',     color: '#f87171', label: 'Event Impulse' },
+    'fader-activityGate':    { trace: 'rootAmpCurve',   color: '#8888a0', label: 'Activity' },
+    'fader-drive':           { trace: 'rootAmpCurve',   color: '#8888a0', label: 'Amplitude' },
+    'fader-intensity':       { trace: 'rootAmpCurve',   color: '#8888a0', label: 'Amplitude' },
+    'fader-waveform':        { trace: 'rootAmpCurve',   color: '#f0a030', label: 'Amplitude' },
+    'fader-ampLevel':        { trace: 'rootAmpCurve',   color: '#f0a030', label: 'Amplitude' },
+    'fader-morphLevel':      { trace: 'morphOvertones', color: '#38bdf8', label: 'Harmonic Content' },
+    'fader-freqLevel':       { trace: 'fmIndexCurve',   color: '#4ade80', label: 'Spectral Modulation' },
+    'fader-detLevel':        { trace: 'excitation',     color: '#f87171', label: 'Event Impulse' },
+    'fader-masterVolume':    { trace: 'rootAmpCurve',   color: '#8888a0', label: 'Amplitude' },
+  };
+
+  function updateStripTrace(faderId) {
+    const mapping = FADER_TRACE_MAP[faderId];
+    if (!mapping) return;
+    stripTrace = {
+      type: mapping.trace,
+      color: mapping.color,
+      label: mapping.label,
+      isFeature: false,
+    };
+    const dropdown = document.getElementById('strip-feature');
+    if (dropdown) dropdown.value = mapping.trace;
+
+    // If no mousedown is active (non-feature faders), use timeout for adjusting state
+    if (!stripAdjusting) {
+      stripAdjusting = true;
+      clearTimeout(_stripAdjustTimer);
+      _stripAdjustTimer = setTimeout(() => { stripAdjusting = false; scheduleRedraw(); }, 800);
+    }
+  }
 
   // Per-channel gain trim storage (label → dB)
   let gainTrimMap = new Map();
@@ -2213,14 +2819,21 @@
       if (_isDemoFile && DEMO_CONFIG?.shafts) {
         const demoShafts = new Set(DEMO_CONFIG.shafts);
         selectedShafts.clear();
+        excludedContacts.clear();
         document.querySelectorAll('.shaft-cb').forEach(cb => {
           const shaft = cb.dataset.shaft;
           if (demoShafts.has(shaft)) {
             cb.checked = true;
+            cb.indeterminate = false;
             selectedShafts.add(shaft);
           } else {
             cb.checked = false;
+            cb.indeterminate = false;
           }
+        });
+        // Ensure contact checkboxes match shaft selection
+        document.querySelectorAll('.contact-cb').forEach(cb => {
+          cb.checked = demoShafts.has(cb.dataset.shaft);
         });
         updateShaftCount();
         // Auto-click preprocess after a brief yield
@@ -2247,6 +2860,10 @@
 
     document.getElementById('import-fname').textContent = fileName;
 
+    // Show filename in header bar (right next to logo)
+    const hfn = document.getElementById('header-fname');
+    if (hfn) { hfn.textContent = fileName; hfn.style.display = ''; }
+
     // File KV
     const fileRows = [
       ['Duration',    s.duration],
@@ -2263,6 +2880,7 @@
     const shaftEl = document.getElementById('import-shaft-list');
     shaftEl.innerHTML = '';
     selectedShafts = new Set();
+    excludedContacts = new Map();
 
     const shaftNames = Object.keys(ir.shaftSummary);
     if (shaftNames.length > 0) {
@@ -2276,40 +2894,149 @@
       shaftEl.appendChild(hdr);
 
       for (const [name, shaft] of Object.entries(ir.shaftSummary)) {
-        selectedShafts.add(name);
         const detail = shaft.preBipolar
           ? shaft.contacts + ' ch'
           : shaft.contacts + ' contacts → ' + shaft.bipolarPairs + ' pairs';
-        const row = document.createElement('label');
+
+        // Shaft group container
+        const group = document.createElement('div');
+        group.className = 'shaft-group';
+
+        // Shaft header row — div (not label) so chevron click doesn't toggle checkbox
+        const row = document.createElement('div');
         row.className = 'shaft-row';
         row.innerHTML =
-          `<input type="checkbox" class="shaft-cb" data-shaft="${esc(name)}" checked>` +
+          `<span class="shaft-chevron" data-shaft="${esc(name)}">▸</span>` +
+          `<input type="checkbox" class="shaft-cb" data-shaft="${esc(name)}">` +
           `<span class="shaft-name">${esc(name)}</span>` +
           `<span class="shaft-detail">${esc(detail)}</span>`;
-        shaftEl.appendChild(row);
+        group.appendChild(row);
+
+        // Contact list (initially hidden)
+        // SEEG: ir.shafts[name] = [{signal, contact}, ...]
+        // EEG virtual group: ir.shafts is {}, fall back to shaftSummary signals
+        let contacts = ir.shafts[name] || [];
+        if (contacts.length === 0 && shaft.signals) {
+          contacts = shaft.signals.map((sig, i) => ({ signal: sig, contact: i + 1 }));
+        }
+        if (contacts.length > 0) {
+          const cList = document.createElement('div');
+          cList.className = 'contact-list';
+          cList.dataset.shaft = name;
+
+          for (const c of contacts) {
+            const cRow = document.createElement('label');
+            cRow.className = 'contact-row';
+            const cLabel = c.signal.label;
+            const cNum = c.contact;
+            cRow.innerHTML =
+              `<input type="checkbox" class="contact-cb" ` +
+              `data-shaft="${esc(name)}" data-contact="${cNum}" data-label="${esc(cLabel)}">` +
+              `<span class="contact-label">${esc(cLabel)}</span>`;
+            cList.appendChild(cRow);
+          }
+          group.appendChild(cList);
+
+          // Direct click listener on chevron — no delegation issues
+          const chevron = row.querySelector('.shaft-chevron');
+          if (chevron) {
+            chevron.addEventListener('click', ev => {
+              ev.preventDefault();
+              ev.stopPropagation();
+              chevron.classList.toggle('open');
+              cList.classList.toggle('open');
+            });
+          }
+        }
+
+        // Click shaft name/detail → toggle checkbox (since row is div, not label)
+        row.addEventListener('click', e => {
+          if (e.target.closest('.shaft-chevron') || e.target.closest('input')) return;
+          const cb = row.querySelector('.shaft-cb');
+          if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change', { bubbles: true })); }
+        });
+
+        shaftEl.appendChild(group);
       }
 
-      // Checkbox change
+      // Shaft checkbox change — toggle all contacts in that shaft
       shaftEl.addEventListener('change', e => {
-        if (!e.target.classList.contains('shaft-cb')) return;
-        const shaft = e.target.dataset.shaft;
-        if (e.target.checked) selectedShafts.add(shaft);
-        else                  selectedShafts.delete(shaft);
-        updateShaftCount();
+        if (e.target.classList.contains('shaft-cb')) {
+          const shaft = e.target.dataset.shaft;
+          if (e.target.checked) {
+            selectedShafts.add(shaft);
+            excludedContacts.delete(shaft);
+            // Check all contact checkboxes
+            shaftEl.querySelectorAll(`.contact-cb[data-shaft="${shaft}"]`).forEach(cb => {
+              cb.checked = true;
+            });
+          } else {
+            selectedShafts.delete(shaft);
+            excludedContacts.delete(shaft);
+            // Uncheck all contact checkboxes
+            shaftEl.querySelectorAll(`.contact-cb[data-shaft="${shaft}"]`).forEach(cb => {
+              cb.checked = false;
+            });
+          }
+          updateShaftCount();
+          return;
+        }
+
+        if (e.target.classList.contains('contact-cb')) {
+          const shaft = e.target.dataset.shaft;
+          const contactNum = parseInt(e.target.dataset.contact, 10);
+
+          // Update excludedContacts
+          if (!e.target.checked) {
+            if (!excludedContacts.has(shaft)) excludedContacts.set(shaft, new Set());
+            excludedContacts.get(shaft).add(contactNum);
+          } else {
+            const excl = excludedContacts.get(shaft);
+            if (excl) { excl.delete(contactNum); if (excl.size === 0) excludedContacts.delete(shaft); }
+          }
+
+          // Update shaft checkbox state (checked / unchecked / indeterminate)
+          const allCbs = shaftEl.querySelectorAll(`.contact-cb[data-shaft="${shaft}"]`);
+          const checkedCount = [...allCbs].filter(cb => cb.checked).length;
+          const shaftCb = shaftEl.querySelector(`.shaft-cb[data-shaft="${shaft}"]`);
+          if (shaftCb) {
+            if (checkedCount === 0) {
+              shaftCb.checked = false;
+              shaftCb.indeterminate = false;
+              selectedShafts.delete(shaft);
+            } else if (checkedCount === allCbs.length) {
+              shaftCb.checked = true;
+              shaftCb.indeterminate = false;
+              selectedShafts.add(shaft);
+            } else {
+              shaftCb.checked = false;
+              shaftCb.indeterminate = true;
+              selectedShafts.add(shaft); // partial = still included
+            }
+          }
+          updateShaftCount();
+          return;
+        }
       });
 
       document.getElementById('btn-shafts-all').addEventListener('click', () => {
         shaftEl.querySelectorAll('.shaft-cb').forEach(cb => {
           cb.checked = true;
+          cb.indeterminate = false;
           selectedShafts.add(cb.dataset.shaft);
         });
+        shaftEl.querySelectorAll('.contact-cb').forEach(cb => { cb.checked = true; });
+        excludedContacts.clear();
         updateShaftCount();
       });
       document.getElementById('btn-shafts-none').addEventListener('click', () => {
         shaftEl.querySelectorAll('.shaft-cb').forEach(cb => {
           cb.checked = false;
+          cb.indeterminate = false;
           selectedShafts.delete(cb.dataset.shaft);
         });
+        shaftEl.querySelectorAll('.contact-cb').forEach(cb => { cb.checked = false; });
+        excludedContacts.clear();
         updateShaftCount();
       });
 
@@ -2402,12 +3129,26 @@
         ? Array.from(selectedShafts)
         : null;
 
+      // Build excludeLabels from individually excluded contacts
+      const excludeLabels = [];
+      for (const [shaftName, contactNums] of excludedContacts) {
+        if (!selectedShafts.has(shaftName)) continue; // shaft not selected anyway
+        let contacts = importResult.shafts[shaftName] || [];
+        if (contacts.length === 0) {
+          const ss = importResult.shaftSummary[shaftName];
+          if (ss && ss.signals) contacts = ss.signals.map((sig, i) => ({ signal: sig, contact: i + 1 }));
+        }
+        for (const c of contacts) {
+          if (contactNums.has(c.contact)) excludeLabels.push(c.signal.label);
+        }
+      }
+
       showProcessing('Preprocessing: DC removal + notch + re-reference…');
       await new Promise(r => setTimeout(r, 30));
 
       const t0  = performance.now();
       preprocessed = preprocessRecording(edfResult, importResult, {
-        lineFreq, referenceMode, includeShafts,
+        lineFreq, referenceMode, includeShafts, excludeLabels,
       });
       const tPreprocess = performance.now() - t0;
 
@@ -2452,7 +3193,7 @@
 
     // Compute pitch map for TCP display
     const { assignPitches } = await import('./src/mapping.js');
-    pitchMap = assignPitches(channels, masterTune, ratioOverrides.size > 0 ? ratioOverrides : null);
+    pitchMap = assignPitches(channels, masterTune, ratioOverrides.size > 0 ? ratioOverrides : null, tuningMode, octaveCap, primeLimit);
 
     // Header file info
     const s  = importResult.summary;
@@ -2481,6 +3222,9 @@
     const placeholder = document.getElementById('timeline-placeholder');
     trackArea.innerHTML = '';
     trackArea.appendChild(placeholder);
+
+    // Reset feature strip to placeholder state (it lives outside track-area now)
+    hideFeatureStrip();
 
     // Draw EEG sum in the seek bar
     drawSeekSum();
@@ -2736,6 +3480,362 @@
 
   function viewDuration() { return viewEndSec - viewStartSec; }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SYNTHESIS OVERLAY STATE
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  let synthOverlayAlpha  = 0.6;
+  let synthOverlayTarget = 0.6;
+  let synthOverlayTimer  = null;
+
+  function synthOverlayActivate() {
+    synthOverlayTarget = 1.0;
+    synthOverlayAlpha  = 1.0;
+    clearTimeout(synthOverlayTimer);
+    synthOverlayTimer = setTimeout(() => { synthOverlayTarget = 0.6; }, 600);
+  }
+
+  function updateSynthOverlayAlpha() {
+    const rate = 0.06;
+    synthOverlayAlpha += (synthOverlayTarget - synthOverlayAlpha) * rate;
+    if (Math.abs(synthOverlayAlpha - synthOverlayTarget) < 0.005) {
+      synthOverlayAlpha = synthOverlayTarget;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SYNTHESIS WAVEFORM PREVIEW — per-channel color-coded ghost
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function drawSynthesizedWaveform(ctx, label, vStart, vDur, w, h) {
+    const curves = engine?.getVoiceCurves(label);
+    if (!curves) return;
+    const voice = engine?.getVoiceInfo?.(label);
+    if (!voice) return;
+
+    const pitch      = voice.pitchHz;
+    const framesPerSec = 60;   // AUTOMATION_RATE
+    const nFrames    = curves.rootAmpCurve.length;
+    const TWO_PI     = 2 * Math.PI;
+    const levels     = layerMix;
+    const a          = synthOverlayAlpha;
+
+    if (a < 0.02) return;
+
+    const secsPerPx   = vDur / w;
+    const mid         = h / 2;
+
+    // ── Helper: read per-layer amplitudes at a given automation frame ──
+    function layerAmps(frame) {
+      const ra  = (curves.rootAmpCurve[frame] ?? 0) * levels.root;
+      const m   = curves.morphology;
+      const ma  = ((m.over2[frame] ?? 0) + (m.over3[frame] ?? 0) + (m.over4[frame] ?? 0)
+                 + (m.under05[frame] ?? 0) + (m.under23[frame] ?? 0)) * levels.phase;
+      const fa  = (curves.fmAmpCurve[frame] ?? 0) * levels.fm;
+      return { ra, ma, fa, total: ra + ma + fa };
+    }
+
+    // ── Estimate peak amplitude for normalization ──
+    let peakAmp = 0;
+    for (let probe = 0; probe < 300; probe++) {
+      const t = vStart + (probe / 300) * vDur;
+      const frame = Math.min(Math.max(0, Math.floor(t * framesPerSec)), nFrames - 1);
+      const la = layerAmps(frame);
+      if (la.total > peakAmp) peakAmp = la.total;
+    }
+    if (peakAmp < 0.001) return;
+
+    const scale = (h * 0.38) / peakAmp;
+
+    // ── Build per-pixel excitation envelope from events ──
+    // Events become opacity FLARES in the ghost — no separate markers.
+    const eventAlpha = new Float32Array(w);
+    if (curves.events) {
+      const vEnd = vStart + vDur;
+      const pxPerSec = w / vDur;
+      for (const ev of curves.events) {
+        if (ev.timeSec < vStart || ev.timeSec > vEnd) continue;
+        const centerPx = Math.floor(((ev.timeSec - vStart) / vDur) * w);
+        const spread = Math.ceil(3 + ev.excitation * 8);
+        for (let dx = -spread; dx <= spread; dx++) {
+          const px = centerPx + dx;
+          if (px < 0 || px >= w) continue;
+          const dist = Math.abs(dx) / spread;
+          const falloff = 1 - dist * dist;
+          const boost = ev.excitation * falloff;
+          if (boost > eventAlpha[px]) eventAlpha[px] = boost;
+        }
+      }
+    }
+
+    // ── Decide rendering mode ──
+    const cyclesPerPx = secsPerPx * pitch;
+    const envelopeMode = cyclesPerPx > 2;
+
+    if (envelopeMode) {
+      // ════════════════════════════════════════════════════════════════
+      // ENVELOPE MODE — filled band showing loudness + color composition
+      // ════════════════════════════════════════════════════════════════
+      for (let px = 0; px < w; px++) {
+        const tPx = vStart + (px / w) * vDur;
+        const frame = Math.min(Math.max(0, Math.floor(tPx * framesPerSec)), nFrames - 1);
+        const la = layerAmps(frame);
+        if (la.total < 0.001) continue;
+
+        const envH = la.total * scale;  // half-height of envelope band
+        const yTop = mid - envH;
+        const yBot = mid + envH;
+        const pixH = yBot - yTop;
+
+        // Color fractions
+        const rootFrac  = la.ra / la.total;
+        const morphFrac = la.ma / la.total;
+        const fmFrac    = la.fa / la.total;
+
+        let y = yTop;
+        const pixA = Math.min(1.0, a * (1 + eventAlpha[px] * 2.5));
+
+        const rootH = pixH * rootFrac;
+        if (rootH > 0.3) {
+          ctx.fillStyle = `rgba(240, 160, 48, ${(0.45 * pixA).toFixed(3)})`;
+          ctx.fillRect(px, y, 1, rootH);
+        }
+        y += rootH;
+
+        const morphH = pixH * morphFrac;
+        if (morphH > 0.3) {
+          ctx.fillStyle = `rgba(56, 189, 248, ${(0.35 * pixA).toFixed(3)})`;
+          ctx.fillRect(px, y, 1, morphH);
+        }
+        y += morphH;
+
+        const fmH = pixH * fmFrac;
+        if (fmH > 0.3) {
+          ctx.fillStyle = `rgba(74, 222, 128, ${(0.30 * pixA).toFixed(3)})`;
+          ctx.fillRect(px, y, 1, fmH);
+        }
+      }
+
+      // Envelope outline strokes (top + bottom edges)
+      ctx.strokeStyle = `rgba(200, 200, 220, ${(0.25 * a).toFixed(3)})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let px = 0; px < w; px++) {
+        const tPx = vStart + (px / w) * vDur;
+        const frame = Math.min(Math.max(0, Math.floor(tPx * framesPerSec)), nFrames - 1);
+        const la = layerAmps(frame);
+        const yEnv = mid - la.total * scale;
+        if (px === 0) ctx.moveTo(px, yEnv); else ctx.lineTo(px, yEnv);
+      }
+      ctx.stroke();
+      ctx.beginPath();
+      for (let px = 0; px < w; px++) {
+        const tPx = vStart + (px / w) * vDur;
+        const frame = Math.min(Math.max(0, Math.floor(tPx * framesPerSec)), nFrames - 1);
+        const la = layerAmps(frame);
+        const yEnv = mid + la.total * scale;
+        if (px === 0) ctx.moveTo(px, yEnv); else ctx.lineTo(px, yEnv);
+      }
+      ctx.stroke();
+
+    } else {
+      // ════════════════════════════════════════════════════════════════
+      // WAVEFORM MODE — actual synthesis with sin() evaluation
+      // ════════════════════════════════════════════════════════════════
+      const highestFreq = pitch * 4;
+      const spp = Math.min(48, Math.max(8, Math.ceil(highestFreq * 2 * secsPerPx)));
+
+      for (let px = 0; px < w; px++) {
+        const tPx = vStart + (px / w) * vDur;
+        const dt  = secsPerPx / spp;
+
+        let totalMax = -Infinity, totalMin = Infinity;
+        let rootAtMax = 0, morphAtMax = 0, fmAtMax = 0;
+        let rootAtMin = 0, morphAtMin = 0, fmAtMin = 0;
+
+        for (let s = 0; s < spp; s++) {
+          const t = tPx + s * dt;
+          const frame = Math.min(Math.max(0, Math.floor(t * framesPerSec)), nFrames - 1);
+
+          const ra  = (curves.rootAmpCurve[frame] ?? 0) * levels.root;
+          const m   = curves.morphology;
+          const o2  = (m.over2[frame] ?? 0)   * levels.phase;
+          const o3  = (m.over3[frame] ?? 0)   * levels.phase;
+          const o4  = (m.over4[frame] ?? 0)   * levels.phase;
+          const u05 = (m.under05[frame] ?? 0) * levels.phase;
+          const u23 = (m.under23[frame] ?? 0) * levels.phase;
+          const fmA = (curves.fmAmpCurve[frame] ?? 0) * levels.fm;
+          const fmI = curves.fmIndexCurve[frame] ?? 0;
+
+          const phase = TWO_PI * pitch * t;
+
+          const rootVal = ra * Math.sin(phase);
+
+          const morphVal = o2  * Math.sin(phase * 2)
+                         + o3  * Math.sin(phase * 3)
+                         + o4  * Math.sin(phase * 4)
+                         + u05 * Math.sin(phase * 0.5)
+                         + u23 * Math.sin(phase * (2 / 3));
+
+          let fmVal = 0;
+          if (fmA > 0.001) {
+            const modulator = Math.sin(phase);
+            fmVal = fmA * Math.sin(phase + fmI * modulator);
+          }
+
+          const total = rootVal + morphVal + fmVal;
+
+          if (total > totalMax) {
+            totalMax = total;
+            rootAtMax  = rootVal;
+            morphAtMax = morphVal;
+            fmAtMax    = fmVal;
+          }
+          if (total < totalMin) {
+            totalMin = total;
+            rootAtMin  = rootVal;
+            morphAtMin = morphVal;
+            fmAtMin    = fmVal;
+          }
+        }
+
+        const yTop = mid - totalMax * scale;
+        const yBot = mid - totalMin * scale;
+        const pixH = yBot - yTop;
+        if (pixH < 0.5) continue;
+
+        const absRoot  = Math.abs(rootAtMax)  + Math.abs(rootAtMin);
+        const absMorph = Math.abs(morphAtMax) + Math.abs(morphAtMin);
+        const absFm    = Math.abs(fmAtMax)    + Math.abs(fmAtMin);
+        const absTotal = absRoot + absMorph + absFm;
+
+        if (absTotal < 0.0001) continue;
+
+        const rootFrac  = absRoot  / absTotal;
+        const morphFrac = absMorph / absTotal;
+        const fmFrac    = absFm    / absTotal;
+
+        let y = yTop;
+        const pixA = Math.min(1.0, a * (1 + eventAlpha[px] * 2.5));
+
+        const rootH = pixH * rootFrac;
+        if (rootH > 0.3) {
+          ctx.fillStyle = `rgba(240, 160, 48, ${(0.55 * pixA).toFixed(3)})`;
+          ctx.fillRect(px, y, 1, rootH);
+        }
+        y += rootH;
+
+        const morphH = pixH * morphFrac;
+        if (morphH > 0.3) {
+          ctx.fillStyle = `rgba(56, 189, 248, ${(0.45 * pixA).toFixed(3)})`;
+          ctx.fillRect(px, y, 1, morphH);
+        }
+        y += morphH;
+
+        const fmH = pixH * fmFrac;
+        if (fmH > 0.3) {
+          ctx.fillStyle = `rgba(74, 222, 128, ${(0.40 * pixA).toFixed(3)})`;
+          ctx.fillRect(px, y, 1, fmH);
+        }
+      }
+
+      // Envelope outline
+      ctx.strokeStyle = `rgba(200, 200, 220, ${(0.30 * a).toFixed(3)})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let px = 0; px < w; px++) {
+        const tPx = vStart + (px / w) * vDur;
+        const frame = Math.min(Math.max(0, Math.floor(tPx * framesPerSec)), nFrames - 1);
+        const la = layerAmps(frame);
+        const yEnv = mid - la.total * scale;
+        if (px === 0) ctx.moveTo(px, yEnv); else ctx.lineTo(px, yEnv);
+      }
+      ctx.stroke();
+    }
+
+    // Detection events are embedded as opacity flares in the ghost —
+    // no separate markers. eventAlpha modulates per-pixel opacity above.
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SEEK BAR SYNTHESIS OVERLAY — aggregate energy bands (no sin() eval)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function drawSeekSynthOverlay(ctx, w, h) {
+    if (!engine) return;
+    const layers = engine.getSummedLayers();
+    if (!layers || layers.nFrames < 2) return;
+
+    const { amp, morph, fm, nFrames } = layers;
+    const mid = h / 2;
+    const framesPerPx = nFrames / w;
+
+    let peak = 0;
+    for (let i = 0; i < nFrames; i++) {
+      const total = amp[i] + morph[i] + fm[i];
+      if (total > peak) peak = total;
+    }
+    if (peak < 0.001) return;
+
+    const scale = (h * 0.42) / peak;
+
+    for (let px = 0; px < w; px++) {
+      const frame = Math.min(Math.floor(px * framesPerPx), nFrames - 1);
+
+      const ampVal   = amp[frame];
+      const morphVal = morph[frame];
+      const fmVal    = fm[frame];
+      const total    = ampVal + morphVal + fmVal;
+      if (total < 0.001) continue;
+
+      const pixH = total * scale;
+      let y = mid;
+
+      const ampH = (ampVal / total) * pixH;
+      if (ampH > 0.3) {
+        ctx.fillStyle = 'rgba(240, 160, 48, 0.35)';
+        ctx.fillRect(px, y, 1, ampH);
+      }
+      y += ampH;
+
+      const morphH = (morphVal / total) * pixH;
+      if (morphH > 0.3) {
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.28)';
+        ctx.fillRect(px, y, 1, morphH);
+      }
+      y += morphH;
+
+      const fmH = (fmVal / total) * pixH;
+      if (fmH > 0.3) {
+        ctx.fillStyle = 'rgba(74, 222, 128, 0.25)';
+        ctx.fillRect(px, y, 1, fmH);
+      }
+    }
+
+    // Detection events: subtle density heat (not individual ticks)
+    // Bin events into pixel buckets → opacity from density, not 1:1 ticks
+    const events = engine.getAggregateEvents();
+    if (events.length > 0 && totalDuration > 0) {
+      const bins = new Float32Array(w);
+      for (const ev of events) {
+        const px = Math.floor((ev.timeSec / totalDuration) * w);
+        if (px >= 0 && px < w) bins[px] += ev.excitation;
+      }
+      // Find peak density for normalization
+      let binMax = 0;
+      for (let i = 0; i < w; i++) if (bins[i] > binMax) binMax = bins[i];
+      if (binMax > 0) {
+        for (let px = 0; px < w; px++) {
+          if (bins[px] < 0.01) continue;
+          const norm = bins[px] / binMax;
+          const a = 0.04 + norm * 0.14;  // very subtle: 4% → 18% opacity
+          ctx.fillStyle = `rgba(248, 113, 113, ${a.toFixed(3)})`;
+          ctx.fillRect(px, mid - norm * h * 0.3, 1, norm * h * 0.6);
+        }
+      }
+    }
+  }
+
   // ── Redraw scheduling (coalesce rapid events) ──────────────────────────────
   function scheduleRedraw() {
     if (_rafId) return;
@@ -2745,6 +3845,9 @@
       drawWaveforms();
       drawSeekSum();
       drawRuler();
+      if (selectedChannels.size > 0 && lastClickedChannel) {
+        drawFeatureStrip(lastClickedChannel);
+      }
       updateScaleLabels();
       updatePlayhead(engine ? engine.currentTimeSec : 0);
       if (vuRulerVisible) updateVURulerTicks();
@@ -2757,6 +3860,7 @@
   // ── Waveform drawing (per-channel canvases) ──────────────────────────────
   function drawWaveforms() {
     if (!preprocessed) return;
+    updateSynthOverlayAlpha();
     const channels = preprocessed.channels;
     const dpr = window.devicePixelRatio || 1;
 
@@ -2788,10 +3892,10 @@
       const data = ch.data;
       const fs   = ch.fs;
 
-      // ── Synthesis curve overlay (disabled — re-enable when curve data is verified) ──
-      // if (engine && selectedChannels.has(label)) {
-      //   drawCurveOverlay(ctx, label, vStart, vDur, width, height);
-      // }
+      // ── Synthesis preview (behind EEG, selected channels only) ──
+      if (engine && selectedChannels.has(label)) {
+        drawSynthesizedWaveform(ctx, label, vStart, vDur, width, height);
+      }
 
       const hue = shaftHues[ch.shaft || ch.label] ?? 200;
       const lightness = ch.quality?.status === 'bad' ? 25 : 45;
@@ -2854,8 +3958,8 @@
           }
         }
 
-        // Standard feature trace overlay
-        if (featureOverlay.feature) {
+        // Standard feature trace overlay — only on waveform when synth ghost is NOT active
+        if (featureOverlay.feature && !(engine && selectedChannels.has(label))) {
           const feat = ch.features[featureOverlay.feature];
           if (feat && feat.length) {
             let fMin = Infinity, fMax = -Infinity;
@@ -2946,153 +4050,6 @@
     scheduleRedraw();
   }
 
-  // ── Curve overlay helpers ─────────────────────────────────────────────────
-
-  function _drawSingleCurve(ctx, curve, vStart, vDur, w, h, color, fillAlpha) {
-    if (!curve || curve.length < 2) return;
-    const fps = 60, n = curve.length;
-    const fStart = Math.max(0, Math.floor(vStart * fps));
-    const fEnd = Math.min(Math.ceil((vStart + vDur) * fps), n);
-    let cMin = Infinity, cMax = -Infinity;
-    for (let f = fStart; f < fEnd; f++) {
-      if (curve[f] < cMin) cMin = curve[f];
-      if (curve[f] > cMax) cMax = curve[f];
-    }
-    const cRange = cMax - cMin || 1;
-
-    const hex = color.replace('#', '');
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-
-    // Filled area from bottom
-    ctx.fillStyle = `rgba(${r},${g},${b},${fillAlpha})`;
-    ctx.beginPath();
-    ctx.moveTo(0, h);
-    for (let px = 0; px < w; px++) {
-      const t = vStart + (px / w) * vDur;
-      const frame = Math.min(Math.max(0, Math.floor(t * fps)), n - 1);
-      const norm = (curve[frame] - cMin) / cRange;
-      ctx.lineTo(px, h - norm * h * 0.8 - h * 0.05);
-    }
-    ctx.lineTo(w, h);
-    ctx.closePath();
-    ctx.fill();
-
-    // Stroke top edge
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.2;
-    ctx.globalAlpha = 0.7;
-    ctx.beginPath();
-    for (let px = 0; px < w; px++) {
-      const t = vStart + (px / w) * vDur;
-      const frame = Math.min(Math.max(0, Math.floor(t * fps)), n - 1);
-      const norm = (curve[frame] - cMin) / cRange;
-      const y = h - norm * h * 0.8 - h * 0.05;
-      if (px === 0) ctx.moveTo(px, y); else ctx.lineTo(px, y);
-    }
-    ctx.stroke();
-    ctx.globalAlpha = 1.0;
-  }
-
-  function _drawBipolarCurve(ctx, curve, vStart, vDur, w, h, alpha) {
-    if (!curve || curve.length < 2) return;
-    const fps = 60, n = curve.length, mid = h / 2;
-    const fStart = Math.max(0, Math.floor(vStart * fps));
-    const fEnd = Math.min(Math.ceil((vStart + vDur) * fps), n);
-    let maxAbs = 0;
-    for (let f = fStart; f < fEnd; f++) {
-      const a = Math.abs(curve[f]);
-      if (a > maxAbs) maxAbs = a;
-    }
-    if (maxAbs < 0.001) return;
-    const scale = (h * 0.35) / maxAbs;
-
-    for (let px = 0; px < w; px++) {
-      const t = vStart + (px / w) * vDur;
-      const frame = Math.min(Math.max(0, Math.floor(t * fps)), n - 1);
-      const val = curve[frame];
-      const y = mid - val * scale;
-      if (val > 0) {
-        ctx.fillStyle = `rgba(240, 180, 80, ${alpha})`;
-        ctx.fillRect(px, y, 1, mid - y);
-      } else {
-        ctx.fillStyle = `rgba(80, 160, 240, ${alpha})`;
-        ctx.fillRect(px, mid, 1, y - mid);
-      }
-    }
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    ctx.moveTo(0, mid);
-    ctx.lineTo(w, mid);
-    ctx.stroke();
-  }
-
-  function _drawEventMarkers(ctx, events, vStart, vDur, w, h) {
-    if (!events) return;
-    const vEnd = vStart + vDur;
-    ctx.fillStyle = 'rgba(248, 113, 113, 0.50)';
-    for (const ev of events) {
-      if (ev.timeSec < vStart || ev.timeSec > vEnd) continue;
-      const px = ((ev.timeSec - vStart) / vDur) * w;
-      const markerH = h * 0.08 + h * 0.15 * (ev.excitation ?? 0.5);
-      ctx.beginPath();
-      ctx.moveTo(px - 2, 0);
-      ctx.lineTo(px, markerH);
-      ctx.lineTo(px + 2, 0);
-      ctx.closePath();
-      ctx.fill();
-    }
-  }
-
-  /**
-   * Draw the synthesis curve that the last-touched fader actually modifies.
-   * Shows the REAL curve the engine uses, not an energy summary.
-   */
-  function drawCurveOverlay(ctx, label, vStart, vDur, w, h) {
-    const curves = engine?.getVoiceCurves(label);
-    if (!curves || !curves.rootAmpCurve || curves.rootAmpCurve.length < 2) return;
-
-    const nFrames = curves.rootAmpCurve.length;
-    const c = curveOverlay;
-
-    if (c.curve === 'rootAmpCurve') {
-      _drawSingleCurve(ctx, curves.rootAmpCurve, vStart, vDur, w, h, c.color, 0.25);
-
-    } else if (c.curve === 'morphOvertones') {
-      const m = curves.morphology;
-      _drawSingleCurve(ctx, m.over2,   vStart, vDur, w, h, '#38bdf8', 0.30);
-      _drawSingleCurve(ctx, m.over3,   vStart, vDur, w, h, '#60c8f8', 0.22);
-      _drawSingleCurve(ctx, m.over4,   vStart, vDur, w, h, '#90d8ff', 0.15);
-      _drawSingleCurve(ctx, m.under05, vStart, vDur, w, h, '#2090c0', 0.22);
-      _drawSingleCurve(ctx, m.under23, vStart, vDur, w, h, '#3098c8', 0.15);
-
-    } else if (c.curve === 'morphBalance') {
-      const m = curves.morphology;
-      const balance = new Float32Array(nFrames);
-      for (let i = 0; i < nFrames; i++) {
-        const overSum  = (m.over2[i] ?? 0) + (m.over3[i] ?? 0) + (m.over4[i] ?? 0);
-        const underSum = (m.under05[i] ?? 0) + (m.under23[i] ?? 0);
-        balance[i] = overSum - underSum;
-      }
-      _drawBipolarCurve(ctx, balance, vStart, vDur, w, h, 0.25);
-
-    } else if (c.curve === 'fmIndexCurve') {
-      _drawSingleCurve(ctx, curves.fmIndexCurve, vStart, vDur, w, h, c.color, 0.25);
-
-    } else if (c.curve === 'events') {
-      _drawEventMarkers(ctx, curves.events, vStart, vDur, w, h);
-    }
-
-    // Label in bottom-left corner
-    ctx.fillStyle = c.color;
-    ctx.globalAlpha = 0.5;
-    ctx.font = '8px monospace';
-    ctx.fillText(c.label, 4, h - 4);
-    ctx.globalAlpha = 1.0;
-  }
-
   /** Draw full-duration EEG sum waveform in the seek bar, per-shaft colors */
   function drawSeekSum() {
     const canvas = document.getElementById('seek-sum-canvas');
@@ -3109,8 +4066,8 @@
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
 
-    // ── Synthesis bands (disabled — re-enable when curve data is verified) ──
-    // if (engine) { ... getSummedLayers / getAggregateEvents ... }
+    // ── Synthesis overlay (behind EEG sum) ──
+    drawSeekSynthOverlay(ctx, width, height);
 
     // ── Shaft-colored EEG sum ──
     const channels = preprocessed.channels.filter(ch => !isChannelMuted(ch.label));
@@ -3821,6 +4778,13 @@
       const t = engine ? engine.currentTimeSec : 0;
       addMarker(t);
     } else if (e.code === 'Escape') {
+      // Close About overlay first if open
+      const aboutOv = document.getElementById('about-overlay');
+      if (aboutOv && aboutOv.style.display === 'flex') {
+        aboutOv.style.display = 'none';
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
       clearLoop();
       unzoomChannels();
@@ -4003,111 +4967,415 @@
       row.classList.toggle('selected', sel);
       row.classList.toggle('dimmed', anySelected && !sel);
     }
+
+    // Feature strip follows last clicked channel
+    if (selectedChannels.size > 0 && lastClickedChannel) {
+      showFeatureStrip(lastClickedChannel);
+    } else {
+      hideFeatureStrip();
+    }
+
+    scheduleRedraw();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // INSPECTOR PANEL
+  // FEATURE STRIP — sub-track inspector + fader-linked feature trace
   // ═══════════════════════════════════════════════════════════════════════════
 
   function updateInspector() {
-    const el = document.getElementById('inspector-content');
-    if (!el) return;
-
-    if (selectedChannels.size === 0) {
-      const name = currentFile?.name ?? 'No file';
-      const nCh = preprocessed?.channels?.length ?? 0;
-      el.innerHTML =
-        `<span class="insp-dim">${esc(name)}</span>` +
-        (nCh > 0 ? `<span class="insp-dim">${nCh} channels</span>` : '') +
-        `<span class="insp-dim" style="margin-left:auto">Thomas Listens · 2026</span>`;
-      return;
-    }
-
-    if (selectedChannels.size === 1) {
-      const label = [...selectedChannels][0];
-      const ch = preprocessed?.channels.find(c => c.label === label);
-      if (!ch) return;
-
-      const pm = pitchMap?.get(label);
-      const pitch = pm?.hz?.toFixed(1) ?? '—';
-      const ratio = pm?.ratioLabel ?? '—';
-      const q = ch.quality ?? {};
-      const statusColor = q.status === 'good' ? 'good' : q.status === 'warn' ? 'warn' : 'bad';
-      const trimDB = gainTrimMap.get(label) ?? 0;
-
-      el.innerHTML =
-        `<strong class="insp-val">${esc(label)}</strong>` +
-        `<span class="insp-label">Shaft: <span class="insp-val">${esc(ch.shaft || '—')}</span></span>` +
-        `<span class="insp-val">${pitch} Hz</span>` +
-        `<span class="insp-val">${esc(ratio)}</span>` +
-        `<span class="insp-label">fs: <span class="insp-val">${ch.fs}</span></span>` +
-        `<span style="color:var(--${statusColor})">${q.status ?? '—'}</span>` +
-        `<span class="insp-label">RMS: <span class="insp-val">${q.rms?.toFixed(1) ?? '—'} µV</span></span>` +
-        `<span style="display:inline-flex;align-items:center;gap:4px">` +
-          `<span class="insp-label">Gain</span>` +
-          `<input type="range" id="inspector-gain" min="-20" max="12" step="0.5" value="${trimDB}"` +
-          ` style="width:80px;accent-color:var(--accent)">` +
-          `<span id="inspector-gain-val" style="font-size:10px;color:var(--muted);min-width:45px">` +
-          `${trimDB >= 0 ? '+' : ''}${trimDB.toFixed(1)} dB</span>` +
-        `</span>` +
-        `<span style="display:inline-flex;align-items:center;gap:4px">` +
-          `<span class="insp-label">Feature</span>` +
-          `<select id="inspector-feature" style="background:var(--surface2);border:1px solid var(--border2);` +
-          `color:var(--text);padding:2px 6px;font-family:var(--mono);font-size:10px;border-radius:3px">` +
-            `<option value="">None</option>` +
-            `<option value="envelope"${featureOverlay.feature==='envelope'?' selected':''}>Envelope</option>` +
-            `<option value="centroid"${featureOverlay.feature==='centroid'?' selected':''}>Centroid</option>` +
-            `<option value="lineLength"${featureOverlay.feature==='lineLength'?' selected':''}>Line Length</option>` +
-            `<option value="mobility"${featureOverlay.feature==='mobility'?' selected':''}>Mobility</option>` +
-            `<option value="permEntropy"${featureOverlay.feature==='permEntropy'?' selected':''}>Entropy</option>` +
-            `<option value="ppaf"${featureOverlay.feature==='ppaf'?' selected':''}>PPAF</option>` +
-            `<option value="slowRMS"${featureOverlay.feature==='slowRMS'?' selected':''}>Slow RMS</option>` +
-            `<option value="spectralFlux"${featureOverlay.feature==='spectralFlux'?' selected':''}>Spectral Flux</option>` +
-          `</select>` +
-        `</span>` +
-        `<span id="inspector-cursor" class="insp-dim"></span>`;
-
-      // Wire gain trim fader
-      document.getElementById('inspector-gain')?.addEventListener('input', onInspGainInput);
-      // Wire feature overlay select
-      document.getElementById('inspector-feature')?.addEventListener('change', onInspFeatureChange);
-      return;
-    }
-
-    // Multiple selection
-    const shafts = new Set();
-    for (const lbl of selectedChannels) {
-      const ch = preprocessed?.channels.find(c => c.label === lbl);
-      if (ch) shafts.add(ch.shaft || '—');
-    }
-    const shaftStr = shafts.size === 1 ? ` · Shaft: ${[...shafts][0]}` : '';
-    el.innerHTML =
-      `<span class="insp-val">${selectedChannels.size} channels selected${shaftStr}</span>` +
-      `<span style="display:inline-flex;align-items:center;gap:4px">` +
-        `<span class="insp-label">Gain</span>` +
-        `<input type="range" id="inspector-gain" min="-20" max="12" step="0.5" value="0"` +
-        ` style="width:80px;accent-color:var(--accent)">` +
-        `<span id="inspector-gain-val" style="font-size:10px;color:var(--muted);min-width:45px">+0.0 dB</span>` +
-      `</span>` +
-      `<span id="inspector-cursor" class="insp-dim"></span>`;
-
-    document.getElementById('inspector-gain')?.addEventListener('input', onInspGainInput);
-  }
-
-  function onInspGainInput(e) {
-    const dB = parseFloat(e.target.value);
-    document.getElementById('inspector-gain-val').textContent =
-      (dB >= 0 ? '+' : '') + dB.toFixed(1) + ' dB';
-    for (const label of selectedChannels) {
-      gainTrimMap.set(label, dB);
-      if (engine) engine.setChannelGainTrim(label, dB);
+    // Replaced by feature strip — just update the strip
+    if (selectedChannels.size > 0 && lastClickedChannel) {
+      showFeatureStrip(lastClickedChannel);
+    } else {
+      hideFeatureStrip();
     }
   }
 
-  function onInspFeatureChange(e) {
-    featureOverlay.feature = e.target.value;
-    featureOverlay.label = selectedChannels.size === 1 ? [...selectedChannels][0] : null;
-    scheduleRedraw();
+  function showFeatureStrip(label) {
+    const strip = document.getElementById('feature-strip');
+    if (!strip) return;
+
+    const tcp = document.getElementById('strip-tcp');
+    if (tcp) tcp.classList.remove('empty');
+
+    // Channel label with colored dot
+    const chanLabel = document.getElementById('strip-channel-label');
+    if (chanLabel) chanLabel.innerHTML = `<span class="strip-dot"></span>${label}`;
+
+    // Update TCP info
+    const pm = pitchMap?.get(label);
+    const pitchEl = document.getElementById('strip-pitch');
+    const ratioEl = document.getElementById('strip-ratio');
+    if (pitchEl) pitchEl.textContent = pm ? `${pm.hz.toFixed(1)} Hz` : '— Hz';
+    if (ratioEl) ratioEl.textContent = pm?.ratioLabel ?? '—';
+
+    // Sync gain fader
+    const trimDB = gainTrimMap.get(label) ?? 0;
+    const gainFader = document.getElementById('strip-gain-fader');
+    const gainVal = document.getElementById('strip-gain-val');
+    if (gainFader) gainFader.value = trimDB;
+    if (gainVal) gainVal.textContent =
+      `${trimDB >= 0 ? '+' : ''}${trimDB.toFixed(1)}`;
+
+    // Update trace label color
+    const traceLabel = document.getElementById('strip-trace-label');
+    if (traceLabel) {
+      traceLabel.textContent = stripTrace.label;
+      traceLabel.style.color = stripTrace.color;
+    }
+
+    drawFeatureStrip(label);
+  }
+
+  function hideFeatureStrip() {
+    const tcp = document.getElementById('strip-tcp');
+    if (tcp) tcp.classList.add('empty');
+
+    const chanLabel = document.getElementById('strip-channel-label');
+    if (chanLabel) chanLabel.innerHTML = '';
+
+    // Clear canvas
+    const canvas = document.getElementById('strip-canvas');
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+
+  // ── Strip drawing ─────────────────────────────────────────────────────────
+
+  function drawFeatureStrip(label) {
+    const canvas = document.getElementById('strip-canvas');
+    if (!canvas) return;
+
+    const ch = preprocessed?.channels.find(c => c.label === label);
+    if (!ch?.features) return;
+
+    const container = document.getElementById('strip-wave');
+    const dpr = window.devicePixelRatio || 1;
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    if (w <= 0 || h <= 0) return;
+
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const traceLabel = document.getElementById('strip-trace-label');
+
+    const vStart = viewStartSec;
+    const vDur = viewDuration();
+
+    const ghostLabel = document.getElementById('strip-ghost-label');
+
+    if (stripTrace.isFeature) {
+      // Feature foreground (hover / post-release) — synth curve as visible ghost
+      const synthType = Object.entries(SYNTH_TO_FEATURE)
+        .find(([, feat]) => feat === stripTrace.type)?.[0];
+      if (synthType) {
+        ctx.globalAlpha = 0.30;
+        drawStripSynthCurve(ctx, label, ch, synthType, w, h, vStart, vDur);
+        ctx.globalAlpha = 1.0;
+      }
+      drawStripRawFeature(ctx, ch, stripTrace.type, w, h, vStart, vDur);
+      if (traceLabel) {
+        traceLabel.textContent = stripTrace.label;
+        traceLabel.style.color = stripTrace.color;
+      }
+      if (ghostLabel) {
+        ghostLabel.textContent = synthType ? synthType.replace(/Curve$/, '') : '';
+        ghostLabel.style.color = stripTrace.color;
+      }
+    } else {
+      // Synth curve foreground (adjusting fader) — hovered feature as ghost
+      // Prefer _hoveredFeature (specific to fader) over generic SYNTH_TO_FEATURE companion
+      const ghostFeat = _hoveredFeature?.type || SYNTH_TO_FEATURE[stripTrace.type];
+      const ghostColor = _hoveredFeature?.color || '#777';
+      if (ghostFeat && ch.features[ghostFeat]) {
+        ctx.globalAlpha = stripAdjusting ? 0.25 : 0.30;
+        const savedColor = stripTrace.color;
+        stripTrace.color = ghostColor;
+        drawStripRawFeature(ctx, ch, ghostFeat, w, h, vStart, vDur);
+        stripTrace.color = savedColor;
+        ctx.globalAlpha = 1.0;
+      }
+      ctx.globalAlpha = stripAdjusting ? 1.0 : 0.85;
+      drawStripSynthCurve(ctx, label, ch, stripTrace.type, w, h, vStart, vDur);
+      ctx.globalAlpha = 1.0;
+      if (traceLabel) {
+        traceLabel.textContent = stripTrace.label;
+        traceLabel.style.color = stripTrace.color;
+      }
+      if (ghostLabel) {
+        ghostLabel.textContent = ghostFeat || '';
+        ghostLabel.style.color = ghostColor;
+      }
+    }
+  }
+
+  function drawStripRawFeature(ctx, ch, featureName, w, h, vStart, vDur) {
+    const feat = ch.features[featureName];
+    if (!feat || !feat.length) return;
+
+    const featPerSec = feat.length / (ch.data.length / ch.fs);
+    const color = stripTrace.color;
+
+    const fStart = Math.max(0, Math.floor(vStart * featPerSec));
+    const fEnd = Math.min(Math.ceil((vStart + vDur) * featPerSec), feat.length);
+    let fMin = Infinity, fMax = -Infinity;
+    for (let i = fStart; i < fEnd; i++) {
+      if (feat[i] < fMin) fMin = feat[i];
+      if (feat[i] > fMax) fMax = feat[i];
+    }
+    const fRange = fMax - fMin || 1;
+
+    // Fill
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    for (let px = 0; px < w; px++) {
+      const tAtPx = vStart + (px / w) * vDur;
+      const idx = Math.min(Math.max(0, Math.floor(tAtPx * featPerSec)), feat.length - 1);
+      const norm = (feat[idx] - fMin) / fRange;
+      ctx.lineTo(px, h - norm * h * 0.82 - h * 0.05);
+    }
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fillStyle = color + '15';
+    ctx.fill();
+
+    // Stroke
+    ctx.strokeStyle = color + '80';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let px = 0; px < w; px++) {
+      const tAtPx = vStart + (px / w) * vDur;
+      const idx = Math.min(Math.max(0, Math.floor(tAtPx * featPerSec)), feat.length - 1);
+      const norm = (feat[idx] - fMin) / fRange;
+      const y = h - norm * h * 0.82 - h * 0.05;
+      if (px === 0) ctx.moveTo(px, y); else ctx.lineTo(px, y);
+    }
+    ctx.stroke();
+  }
+
+  function drawStripSynthCurve(ctx, label, ch, curveType, w, h, vStart, vDur) {
+    const curves = engine?.getVoiceCurves(label);
+    if (!curves) return;
+
+    const framesPerSec = 60;
+    const nFrames = curves.rootAmpCurve?.length ?? 0;
+    if (nFrames < 2) return;
+
+    const color = stripTrace.color;
+
+    if (curveType === 'rootAmpCurve') {
+      drawStripCurveLine(ctx, curves.rootAmpCurve, framesPerSec, nFrames,
+                         w, h, vStart, vDur, color);
+      return;
+    }
+
+    if (curveType === 'morphOvertones') {
+      const m = curves.morphology;
+      const sumCurve = new Float32Array(nFrames);
+      for (let i = 0; i < nFrames; i++) {
+        sumCurve[i] = (m.over2[i] ?? 0) + (m.over3[i] ?? 0) + (m.over4[i] ?? 0)
+                     + (m.under05[i] ?? 0) + (m.under23[i] ?? 0);
+      }
+      drawStripCurveLine(ctx, sumCurve, framesPerSec, nFrames,
+                         w, h, vStart, vDur, color);
+
+      // Individual overtone lines
+      const morphCurves = [
+        { data: m.over2,   alpha: '90' },
+        { data: m.over3,   alpha: '70' },
+        { data: m.over4,   alpha: '50' },
+        { data: m.under05, alpha: '60' },
+        { data: m.under23, alpha: '45' },
+      ];
+      for (const { data, alpha } of morphCurves) {
+        if (!data) continue;
+        drawStripCurveStroke(ctx, data, framesPerSec, nFrames,
+                             w, h, vStart, vDur, color + alpha, 0.7);
+      }
+      return;
+    }
+
+    if (curveType === 'morphBalance') {
+      const m = curves.morphology;
+      const balance = new Float32Array(nFrames);
+      for (let i = 0; i < nFrames; i++) {
+        const overSum = (m.over2[i] ?? 0) + (m.over3[i] ?? 0) + (m.over4[i] ?? 0);
+        const underSum = (m.under05[i] ?? 0) + (m.under23[i] ?? 0);
+        balance[i] = overSum - underSum;
+      }
+      drawStripBipolar(ctx, balance, framesPerSec, nFrames,
+                       w, h, vStart, vDur);
+      return;
+    }
+
+    if (curveType === 'fmIndexCurve') {
+      drawStripCurveLine(ctx, curves.fmIndexCurve, framesPerSec, nFrames,
+                         w, h, vStart, vDur, color);
+      return;
+    }
+
+    if (curveType === 'excitation') {
+      drawStripExcitation(ctx, curves.events, w, h, vStart, vDur, color);
+      return;
+    }
+  }
+
+  // ── Strip drawing primitives ──────────────────────────────────────────────
+
+  function drawStripCurveLine(ctx, curve, fps, nFrames, w, h, vStart, vDur, color) {
+    if (!curve || curve.length < 2) return;
+
+    const fStart = Math.max(0, Math.floor(vStart * fps));
+    const fEnd = Math.min(Math.ceil((vStart + vDur) * fps), nFrames);
+    let cMin = Infinity, cMax = -Infinity;
+    for (let f = fStart; f < fEnd; f++) {
+      if (curve[f] < cMin) cMin = curve[f];
+      if (curve[f] > cMax) cMax = curve[f];
+    }
+    const cRange = cMax - cMin || 1;
+
+    // Fill
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    for (let px = 0; px < w; px++) {
+      const t = vStart + (px / w) * vDur;
+      const frame = Math.min(Math.max(0, Math.floor(t * fps)), nFrames - 1);
+      const norm = (curve[frame] - cMin) / cRange;
+      ctx.lineTo(px, h - norm * h * 0.82 - h * 0.05);
+    }
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fillStyle = color + '18';
+    ctx.fill();
+
+    // Stroke
+    ctx.strokeStyle = color + '99';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (let px = 0; px < w; px++) {
+      const t = vStart + (px / w) * vDur;
+      const frame = Math.min(Math.max(0, Math.floor(t * fps)), nFrames - 1);
+      const norm = (curve[frame] - cMin) / cRange;
+      const y = h - norm * h * 0.82 - h * 0.05;
+      if (px === 0) ctx.moveTo(px, y); else ctx.lineTo(px, y);
+    }
+    ctx.stroke();
+  }
+
+  function drawStripCurveStroke(ctx, curve, fps, nFrames, w, h, vStart, vDur, strokeColor, lineW) {
+    if (!curve || curve.length < 2) return;
+
+    const fStart = Math.max(0, Math.floor(vStart * fps));
+    const fEnd = Math.min(Math.ceil((vStart + vDur) * fps), nFrames);
+    let cMin = Infinity, cMax = -Infinity;
+    for (let f = fStart; f < fEnd; f++) {
+      if (curve[f] < cMin) cMin = curve[f];
+      if (curve[f] > cMax) cMax = curve[f];
+    }
+    const cRange = cMax - cMin || 1;
+
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = lineW;
+    ctx.beginPath();
+    for (let px = 0; px < w; px++) {
+      const t = vStart + (px / w) * vDur;
+      const frame = Math.min(Math.max(0, Math.floor(t * fps)), nFrames - 1);
+      const norm = (curve[frame] - cMin) / cRange;
+      const y = h - norm * h * 0.82 - h * 0.05;
+      if (px === 0) ctx.moveTo(px, y); else ctx.lineTo(px, y);
+    }
+    ctx.stroke();
+  }
+
+  function drawStripBipolar(ctx, curve, fps, nFrames, w, h, vStart, vDur) {
+    const mid = h / 2;
+
+    const fStart = Math.max(0, Math.floor(vStart * fps));
+    const fEnd = Math.min(Math.ceil((vStart + vDur) * fps), nFrames);
+    let maxAbs = 0;
+    for (let f = fStart; f < fEnd; f++) {
+      const a = Math.abs(curve[f]);
+      if (a > maxAbs) maxAbs = a;
+    }
+    if (maxAbs < 0.0001) return;
+
+    const scale = (h * 0.38) / maxAbs;
+
+    for (let px = 0; px < w; px++) {
+      const t = vStart + (px / w) * vDur;
+      const frame = Math.min(Math.max(0, Math.floor(t * fps)), nFrames - 1);
+      const val = curve[frame];
+      const y = mid - val * scale;
+
+      if (val > 0) {
+        ctx.fillStyle = 'rgba(240, 180, 80, 0.35)';
+        ctx.fillRect(px, y, 1, mid - y);
+      } else {
+        ctx.fillStyle = 'rgba(80, 160, 240, 0.35)';
+        ctx.fillRect(px, mid, 1, y - mid);
+      }
+    }
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(0, mid);
+    ctx.lineTo(w, mid);
+    ctx.stroke();
+  }
+
+  function drawStripExcitation(ctx, events, w, h, vStart, vDur, color) {
+    if (!events || events.length === 0) return;
+
+    const vEnd = vStart + vDur;
+    const pxPerSec = w / vDur;
+    const decayPx = Math.max(3, Math.ceil(0.1 * pxPerSec));
+
+    const envelope = new Float32Array(w);
+    for (const ev of events) {
+      if (ev.timeSec < vStart || ev.timeSec > vEnd) continue;
+      const centerPx = Math.floor(((ev.timeSec - vStart) / vDur) * w);
+      const exc = ev.excitation ?? 0.5;
+
+      for (let dx = 0; dx <= decayPx; dx++) {
+        const px = centerPx + dx;
+        if (px < 0 || px >= w) continue;
+        const decay = 1 - (dx / decayPx);
+        const val = exc * decay;
+        if (val > envelope[px]) envelope[px] = val;
+      }
+      for (let dx = -2; dx < 0; dx++) {
+        const px = centerPx + dx;
+        if (px < 0 || px >= w) continue;
+        const val = exc * 0.3;
+        if (val > envelope[px]) envelope[px] = val;
+      }
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    for (let px = 0; px < w; px++) {
+      const y = h - envelope[px] * h * 0.85 - h * 0.02;
+      ctx.lineTo(px, y);
+    }
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fillStyle = color + '25';
+    ctx.fill();
+
+    ctx.strokeStyle = color + '90';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let px = 0; px < w; px++) {
+      const y = h - envelope[px] * h * 0.85 - h * 0.02;
+      if (px === 0) ctx.moveTo(px, y); else ctx.lineTo(px, y);
+    }
+    ctx.stroke();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -4168,7 +5436,7 @@
   });
 
   function updateCursorDisplay() {
-    const el = document.getElementById('inspector-cursor');
+    const el = document.getElementById('strip-cursor');
     if (!el) return;
     if (cursorInfo.visible && cursorInfo.channel) {
       const t = cursorInfo.time;
@@ -4178,7 +5446,6 @@
         ? (cursorInfo.voltage / 1000).toFixed(2) + ' mV'
         : cursorInfo.voltage.toFixed(1) + ' µV';
       el.textContent = `${m}:${s.padStart(6, '0')}  │  ${vStr}`;
-      el.style.color = 'var(--text)';
     } else {
       el.textContent = '';
     }
@@ -4752,104 +6019,9 @@
   }
 
   /** Show all markers left-to-right in inspector, selected one highlighted */
+  /** Marker comparison — stubbed out (inspector removed, will move to modal/tooltip later) */
   function showMarkerPanel() {
-    const insp = document.getElementById('inspector');
-    if (!insp) return;
-
-    insp.querySelectorAll('.marker-snap-info').forEach(el => el.remove());
-    if (markers.length === 0) return;
-
-    // Sort by time (left to right)
-    const sorted = [...markers].sort((a, b) => a.timeSec - b.timeSec);
-
-    const firstSnap = sorted.find(m => m.snapshot)?.snapshot;
-    if (!firstSnap) return;
-
-    const n = sorted.length;
-    const hasDelta = n >= 2;
-    const bandAbbr = { delta:'dlt', theta:'tht', alpha:'alp', beta:'bet',
-      lowGamma:'lGm', highGamma:'hGm', hfoRipple:'hRp', hfoFast:'hFt' };
-    const shortBand = (b) => bandAbbr[b] || (b ? b.slice(0,3) : '-');
-    const fmtV = (v) => Math.abs(v) >= 1000
-      ? (v / 1000).toFixed(1) + 'mV'
-      : Math.round(v) + 'µV';
-
-    let html = `<div class="marker-snap-info" style="margin-top:8px;border-top:1px solid var(--border);padding-top:4px;overflow-x:auto">`;
-    html += `<table style="font-size:9px;font-family:var(--mono);border-collapse:collapse;border-spacing:0">`;
-
-    // Header: Ch | #1 | #2 | ... | delta
-    html += `<tr>`;
-    html += `<th style="padding:1px 4px;text-align:left">Ch</th>`;
-    for (const m of sorted) {
-      const isSel = m.id === selectedMarkerId;
-      html += `<th data-marker-pill="${m.id}" style="padding:1px 4px;text-align:right;cursor:pointer;color:${m.color};border-bottom:2px solid ${m.color}${isSel ? '' : '44'};font-weight:${isSel ? '700' : '400'}">#${m.id}</th>`;
-    }
-    if (hasDelta) html += `<th style="padding:1px 4px;text-align:right">&Delta;</th>`;
-    html += `</tr>`;
-
-    // Time row
-    html += `<tr style="color:var(--text-dim)"><td></td>`;
-    for (const m of sorted) {
-      html += `<td style="padding:1px 4px;text-align:right">${m.label}</td>`;
-    }
-    if (hasDelta) {
-      const dt = (sorted[n-1].timeSec - sorted[0].timeSec).toFixed(1);
-      html += `<td style="padding:1px 4px;text-align:right">${dt}s</td>`;
-    }
-    html += `</tr>`;
-
-    // Channel rows: each cell = "band rms µV" stacked in one cell
-    for (let ci = 0; ci < firstSnap.channels.length; ci++) {
-      if (!firstSnap.channels[ci].domBand) continue;
-      const chLabel = firstSnap.channels[ci].label;
-      const rmsVals = sorted.map(m => m.snapshot?.channels[ci]?.rms ?? null);
-
-      html += `<tr><td style="padding:1px 4px;text-align:left;border-top:1px solid rgba(255,255,255,0.04)">${chLabel}</td>`;
-      for (let mi = 0; mi < n; mi++) {
-        const c = sorted[mi].snapshot?.channels[ci];
-        if (!c?.domBand) { html += `<td style="padding:1px 4px;text-align:right;border-top:1px solid rgba(255,255,255,0.04)">-</td>`; continue; }
-        const isSel = sorted[mi].id === selectedMarkerId;
-        const op = isSel ? '1' : '0.5';
-
-        // Background tint for change from previous
-        let bg = '';
-        if (mi > 0 && rmsVals[mi - 1] != null && rmsVals[mi] != null) {
-          const d = rmsVals[mi] - rmsVals[mi - 1];
-          if (Math.abs(d) > 0.01) {
-            bg = d > 0 ? 'background:rgba(248,113,113,0.1)' : 'background:rgba(74,222,128,0.1)';
-          }
-        }
-
-        // Compact: "band rms µV" on one line
-        html += `<td style="padding:1px 4px;text-align:right;opacity:${op};border-top:1px solid rgba(255,255,255,0.04);${bg}" title="${c.domBand} | RMS ${c.rms.toFixed(2)} | ${fmtV(c.voltage)}">`;
-        html += `<span style="color:var(--text-dim)">${shortBand(c.domBand)}</span> ${c.rms.toFixed(2)} <span style="color:var(--muted)">${fmtV(c.voltage)}</span>`;
-        html += `</td>`;
-      }
-      // Net delta
-      if (hasDelta) {
-        const first = rmsVals[0];
-        const last = rmsVals[n - 1];
-        if (first != null && last != null) {
-          const d = last - first;
-          const cls = d > 0 ? 'delta-up' : 'delta-down';
-          html += `<td style="padding:1px 4px;text-align:right;border-top:1px solid rgba(255,255,255,0.04)" class="${cls}">${d >= 0 ? '+' : ''}${d.toFixed(2)}</td>`;
-        } else {
-          html += `<td style="padding:1px 4px;text-align:right;border-top:1px solid rgba(255,255,255,0.04)">-</td>`;
-        }
-      }
-      html += `</tr>`;
-    }
-
-    html += `</table></div>`;
-    const content = insp.querySelector('#inspector-content') || insp;
-    content.insertAdjacentHTML('beforeend', html);
-
-    // Wire header clicks to select marker
-    content.querySelectorAll('[data-marker-pill]').forEach(th => {
-      th.addEventListener('click', () => {
-        selectMarker(parseInt(th.dataset.markerPill));
-      });
-    });
+    // TODO: marker comparison UI (was in #inspector, now removed)
   }
 
   // Draw markers in ruler canvas (called from drawRuler)
@@ -5085,10 +6257,56 @@
     const el = document.getElementById('shaft-count-display');
     if (!el || !importResult) return;
     const total = Object.keys(importResult.shaftSummary).length;
-    el.textContent = selectedShafts.size + ' / ' + total + ' shafts';
-    // Warn if nothing selected
+
+    // Estimate bipolar channel count from selected shafts, minus excluded contacts
+    const shaftNames = selectedShafts.size > 0 ? [...selectedShafts] : [];
+    let estimatedChannels = 0;
+    for (const name of shaftNames) {
+      const shaft = importResult.shaftSummary[name];
+      if (!shaft) continue;
+
+      if (shaft.preBipolar || shaft.isVirtual) {
+        // Pre-bipolar or virtual (scalp EEG/CAR): each contact IS a channel
+        const excl = excludedContacts.get(name);
+        estimatedChannels += shaft.contacts - (excl ? excl.size : 0);
+      } else {
+        // Monopolar SEEG: simulate bipolar pairing with excluded contacts removed
+        let contacts = importResult.shafts[name] || [];
+        if (contacts.length === 0 && shaft.signals) {
+          contacts = shaft.signals.map((sig, i) => ({ signal: sig, contact: i + 1 }));
+        }
+        const excl = excludedContacts.get(name);
+        const included = excl
+          ? contacts.filter(c => !excl.has(c.contact))
+          : contacts;
+        // Count consecutive pairs among included contacts
+        let pairs = 0;
+        for (let i = 0; i < included.length - 1; i++) {
+          if (included[i + 1].contact - included[i].contact === 1) pairs++;
+        }
+        estimatedChannels += pairs;
+      }
+    }
+
+    el.textContent = selectedShafts.size + ' / ' + total + ' shafts'
+      + (estimatedChannels > 0 ? ` · ${estimatedChannels} ch` : '');
+
+    // Disable button if nothing selected
     const btn = document.getElementById('btn-preprocess');
     if (btn) btn.disabled = selectedShafts.size === 0 && total > 0;
+
+    // Inline warning when channel count is high
+    const warn = document.getElementById('channel-count-warning');
+    if (warn) {
+      if (estimatedChannels > 20) {
+        warn.style.display = '';
+        warn.textContent =
+          `${estimatedChannels} channels — the browser audio engine works best ` +
+          `with 15–20 channels. Consider selecting specific shafts of interest.`;
+      } else {
+        warn.style.display = 'none';
+      }
+    }
   }
 
   // ── Engine ────────────────────────────────────────────────────────────────
@@ -5103,6 +6321,9 @@
       await engine.prepare(preprocessed, controls, {
         masterTune,
         ratioOverrides: ratioOverrides.size > 0 ? ratioOverrides : null,
+        tuningMode,
+        octaveCap,
+        primeLimit,
       });
       hideProcessing();
 
@@ -5126,6 +6347,7 @@
         updatePlayhead(t);
         updateBarometer(t);
         drawPPAFDisplay(t);
+        drawWavetableDisplay(t);
         updateOutputMeter();
         updateChannelMeters();
       });
@@ -5255,7 +6477,11 @@
     // OUTPUT column
     'fader-activityGate':    { key: 'activityGate',     rebuild: true },
     'fader-drive':           { key: 'drive',            rebuild: true },
+    'fader-width':           { special: 'width' },
     'fader-intensity':       { key: 'intensity',        rebuild: true },
+
+    // WAVETABLE
+    'fader-waveform':        { special: 'waveform' },
   };
 
   for (const [id, cfg] of Object.entries(FADER_MAP)) {
@@ -5263,47 +6489,95 @@
     if (!el) continue;
 
     if (cfg.special === 'masterVolume') {
-      // Master volume — live via setMasterGain (handled separately)
       el.addEventListener('input', e => {
+        synthOverlayActivate();
+        updateStripTrace(id);
         controls.masterVolume = parseFloat(e.target.value);
         if (engine) engine.setMasterGain(controls.masterVolume);
+        scheduleRedraw();
+      });
+    } else if (cfg.special === 'width') {
+      el.addEventListener('input', e => {
+        synthOverlayActivate();
+        stereoWidth = parseFloat(e.target.value);
+        if (engine) engine.setStereoWidth(stereoWidth);
+      });
+    } else if (cfg.special === 'waveform') {
+      el.addEventListener('input', e => {
+        synthOverlayActivate();
+        const blend = parseFloat(e.target.value);
+        if (engine) engine.setWavetableBlend(blend);
+        drawWavetableDisplay(engine?.currentTimeSec ?? 0);
       });
     } else if (cfg.layer) {
-      // Level faders → layerMix (always live)
       el.addEventListener('input', e => {
+        synthOverlayActivate();
+        updateStripTrace(id);
         layerMix[cfg.layer] = parseFloat(e.target.value);
         if (engine) engine.setLayerGains(layerMix);
+        scheduleRedraw();
       });
     } else if (cfg.live) {
-      // Live faders → update immediately
       el.addEventListener('input', e => {
+        synthOverlayActivate();
+        updateStripTrace(id);
         controls[cfg.key] = parseFloat(e.target.value);
         if (engine) engine.setControls(preprocessed, controls, false);
+        scheduleRedraw();
       });
     } else if (cfg.rebuild) {
-      // Rebuild faders → throttled continuous hot-swap (one rebuild per frame)
       el.addEventListener('input', e => {
+        synthOverlayActivate();
+        updateStripTrace(id);
         controls[cfg.key] = parseFloat(e.target.value);
         if (!_rebuildPending && engine) {
           _rebuildPending = true;
           requestAnimationFrame(async () => {
             _rebuildPending = false;
             await engine.setControls(preprocessed, controls, true);
+            scheduleRedraw();
           });
         }
       });
     }
   }
 
-  // ── Curve overlay (disabled — re-enable when curve data is verified) ──
-  // for (const [id, mapping] of Object.entries(FADER_CURVE_MAP)) {
-  //   const el = document.getElementById(id);
-  //   if (!el) continue;
-  //   el.addEventListener('input', () => {
-  //     curveOverlay = { ...mapping };
-  //     scheduleRedraw();
-  //   });
-  // }
+  // ── Strip gain fader wiring ─────────────────────────────────────────────
+  document.getElementById('strip-gain-fader')?.addEventListener('input', e => {
+    const dB = parseFloat(e.target.value);
+    const valEl = document.getElementById('strip-gain-val');
+    if (valEl) valEl.textContent = `${dB >= 0 ? '+' : ''}${dB.toFixed(1)}`;
+    for (const label of selectedChannels) {
+      gainTrimMap.set(label, dB);
+      if (engine) engine.setChannelGainTrim(label, dB);
+    }
+  });
+
+  // ── Strip feature dropdown wiring ─────────────────────────────────────────
+  document.getElementById('strip-feature')?.addEventListener('change', e => {
+    const val = e.target.value;
+    if (val.startsWith('feat:')) {
+      stripTrace = {
+        type: val.slice(5),
+        color: '#7c7ffa',
+        label: e.target.options[e.target.selectedIndex].text,
+        isFeature: true,
+      };
+    } else {
+      const colorMap = {
+        rootAmpCurve: '#f0a030', morphOvertones: '#38bdf8',
+        morphBalance: '#38bdf8', fmIndexCurve: '#4ade80',
+        excitation: '#f87171',
+      };
+      stripTrace = {
+        type: val,
+        color: colorMap[val] ?? '#7c7ffa',
+        label: e.target.options[e.target.selectedIndex].text,
+        isFeature: false,
+      };
+    }
+    scheduleRedraw();
+  });
 
   // ── Double-click any fader to reset to default ────────────────────────────
   // Store defaults from HTML value attributes
@@ -5312,7 +6586,7 @@
     _faderDefaults[r.id] = r.defaultValue;
   });
   // Inspector gain default
-  _faderDefaults['inspector-gain'] = '0';
+  _faderDefaults['strip-gain-fader'] = '0';
 
   document.addEventListener('dblclick', e => {
     const input = e.target.closest('input[type="range"]');
@@ -5362,12 +6636,8 @@
     // Update pitchMap
     if (pitchMap && preprocessed) {
       const { assignPitches } = await import('./src/mapping.js');
-      pitchMap = assignPitches(preprocessed.channels, masterTune, ratioOverrides.size > 0 ? ratioOverrides : null);
-      // Update TCP row tooltips with new Hz values
-      for (const [label, entry] of pitchMap) {
-        const row = document.querySelector(`.track-row[data-label="${CSS.escape(label)}"]`);
-        if (row) row.title = `${entry.hz.toFixed(1)} Hz`;
-      }
+      pitchMap = assignPitches(preprocessed.channels, masterTune, ratioOverrides.size > 0 ? ratioOverrides : null, tuningMode, octaveCap, primeLimit);
+      updateTCPPitchDisplays();
     }
     if (engine) {
       engine.setMasterTune(masterTune, ratioOverrides.size > 0 ? ratioOverrides : null);
@@ -5380,6 +6650,63 @@
     if (e.key === 'Enter') e.target.blur();
     e.stopPropagation();
   });
+
+  // ── Tuning mode + consonance options ──────────────────────────────────────────
+  function updateTCPPitchDisplays() {
+    if (!pitchMap) return;
+    for (const [label, entry] of pitchMap) {
+      const row = document.querySelector(`.track-row[data-label="${CSS.escape(label)}"]`);
+      if (!row) continue;
+      const input = row.querySelector('.tcp-pitch');
+      if (input) input.value = entry.ratioLabel;
+      row.title = `${entry.hz.toFixed(1)} Hz`;
+    }
+  }
+
+  let _recalcTimer = 0;
+  let _recalcGeneration = 0;
+  function recalcPitches() {
+    // Debounce — rapid dropdown changes don't stack
+    clearTimeout(_recalcTimer);
+    _recalcTimer = setTimeout(_recalcPitchesNow, 80);
+  }
+  async function _recalcPitchesNow() {
+    const gen = ++_recalcGeneration;
+
+    tuningMode = document.getElementById('tuning-mode')?.value || 'rank';
+    octaveCap = parseInt(document.getElementById('octave-cap')?.value || '4', 10);
+    const pl = parseInt(document.getElementById('prime-limit')?.value || '0', 10);
+    primeLimit = pl > 0 ? pl : null;
+
+    if (engine) {
+      engine.setTuningMode(tuningMode, octaveCap, primeLimit);
+      engine.setMasterTune(masterTune, ratioOverrides.size > 0 ? ratioOverrides : null);
+      if (gen !== _recalcGeneration) return;  // superseded by newer change
+      // Update local pitchMap for TCP display
+      if (preprocessed) {
+        const { assignPitches } = await import('./src/mapping.js');
+        pitchMap = assignPitches(preprocessed.channels, masterTune, ratioOverrides.size > 0 ? ratioOverrides : null, tuningMode, octaveCap, primeLimit);
+      }
+      updateTCPPitchDisplays();
+      if (gen !== _recalcGeneration) return;  // superseded
+      const wasPlaying = engine.isPlaying;
+      const t = engine.currentTimeSec;
+      await engine.seek(t, wasPlaying);
+    } else if (pitchMap && preprocessed) {
+      const { assignPitches } = await import('./src/mapping.js');
+      pitchMap = assignPitches(preprocessed.channels, masterTune, ratioOverrides.size > 0 ? ratioOverrides : null, tuningMode, octaveCap, primeLimit);
+      updateTCPPitchDisplays();
+    }
+  }
+
+  document.getElementById('tuning-mode')?.addEventListener('change', e => {
+    const isConsonance = e.target.value === 'consonance';
+    for (const el of document.querySelectorAll('.consonance-opt'))
+      el.style.display = isConsonance ? '' : 'none';
+    recalcPitches();
+  });
+  document.getElementById('octave-cap')?.addEventListener('change', recalcPitches);
+  document.getElementById('prime-limit')?.addEventListener('change', recalcPitches);
 
   // ── Band barometer (stacked bars in Source module) ──────────────────────
   function updateBarometer(timeSec) {
@@ -5510,34 +6837,105 @@
     return `rgba(${r},${g},${b},${alpha})`;
   }
 
-  document.querySelectorAll('.syn-fader[data-feature]').forEach(fader => {
-    const feature = fader.dataset.feature;
-    const mod = fader.closest('.synth-mod');
-    const modColorMap = {
-      'amplitude': '#f0a030', 'morphology': '#38bdf8',
-      'frequency': '#4ade80', 'detection': '#f87171',
-    };
-    const modName = mod?.dataset.mod || '';
-    const overlayColor = hexToRgba(modColorMap[modName] || '#7c7ffa', 0.6);
+  // Fader hover → show DSP feature in strip (and phase coloring on waveform)
+  // Three-state interaction:
+  //   hover  → raw DSP feature foreground, synth curve ghost behind
+  //   drag   → synth curve foreground, hovered feature ghost behind
+  //   release → feature foreground again
+  //
+  // Works for ALL faders: data-feature gives explicit feature name;
+  // faders without it derive a feature from FADER_TRACE_MAP → SYNTH_TO_FEATURE.
+  const COL_COLOR_MAP = {
+    'amplitude': '#f0a030', 'morphology': '#38bdf8',
+    'frequency': '#4ade80', 'detection': '#f87171',
+    'output': '#8888a0',
+  };
 
+  document.querySelectorAll('.syn-fader, .syn-mod-level').forEach(fader => {
+    const rangeInput = fader.querySelector('input[type="range"]');
+    if (!rangeInput) return;
+
+    const faderId = rangeInput.id;
+    const explicitFeature = fader.dataset.feature || null;
+    const traceMapping = FADER_TRACE_MAP[faderId];
+
+    // Determine hover feature: explicit data-feature, or derive from synth curve companion
+    let hoverFeature = null;
+    if (explicitFeature) {
+      hoverFeature = explicitFeature;
+    } else if (traceMapping) {
+      hoverFeature = SYNTH_TO_FEATURE[traceMapping.trace] || null;
+    }
+
+    // Does this fader also trigger phase coloring on the waveform?
+    const hasPhaseColoring = fader.dataset.phaseColoring === 'true';
+
+    // Column color for this fader (syn-mod-level uses data-mod, syn-fader uses parent data-col)
+    const col = fader.closest('[data-col]');
+    const modColor = COL_COLOR_MAP[col?.dataset.col] || COL_COLOR_MAP[fader.dataset.mod] || '#7c7ffa';
+
+    // Skip faders with no feature to show and no phase coloring
+    if (!hoverFeature && !hasPhaseColoring) return;
+
+    // State 1: Hover — feature foreground
     fader.addEventListener('mouseenter', () => {
       if (selectedChannels.size !== 1) return;
-      featureOverlay.feature = feature === 'phase-coloring' ? '' : feature;
-      featureOverlay.label = [...selectedChannels][0];
-      featureOverlay.color = overlayColor;
-      featureOverlay.phaseColoring = (feature === 'phase-coloring');
+
+      // Phase coloring: tint waveform with voltage polarity
+      if (hasPhaseColoring) {
+        featureOverlay.phaseColoring = true;
+        featureOverlay.label = [...selectedChannels][0];
+      }
+
+      // Strip trace: show raw DSP feature
+      if (hoverFeature) {
+        _hoveredFeature = { type: hoverFeature, color: modColor, label: hoverFeature };
+        stripTrace = {
+          type: hoverFeature,
+          color: modColor,
+          label: hoverFeature,
+          isFeature: true,
+        };
+        const dropdown = document.getElementById('strip-feature');
+        if (dropdown) dropdown.value = 'feat:' + hoverFeature;
+      }
       scheduleRedraw();
     });
 
     fader.addEventListener('mouseleave', () => {
-      setTimeout(() => {
-        if (featureOverlay.feature === feature || (feature === 'phase-coloring' && featureOverlay.phaseColoring)) {
-          featureOverlay.feature = '';
-          featureOverlay.phaseColoring = false;
-          scheduleRedraw();
-        }
-      }, 2000);
+      _hoveredFeature = null;
+      if (hasPhaseColoring) {
+        setTimeout(() => {
+          if (featureOverlay.phaseColoring) {
+            featureOverlay.phaseColoring = false;
+            scheduleRedraw();
+          }
+        }, 2000);
+      }
     });
+
+    // State 2 & 3: mousedown → synth curve foreground; mouseup → feature foreground
+    if (hoverFeature) {
+      rangeInput.addEventListener('mousedown', () => {
+        stripAdjusting = true;
+        clearTimeout(_stripAdjustTimer);
+      });
+
+      rangeInput.addEventListener('mouseup', () => {
+        stripAdjusting = false;
+        clearTimeout(_stripAdjustTimer);
+        // Restore feature foreground
+        if (hoverFeature) {
+          stripTrace = {
+            type: hoverFeature,
+            color: modColor,
+            label: hoverFeature,
+            isFeature: true,
+          };
+        }
+        scheduleRedraw();
+      });
+    }
   });
 
   // ── Output meter ──────────────────────────────────────────────────────────
@@ -5597,6 +6995,144 @@
   }
 
   // ── PPAF mini-display ─────────────────────────────────────────────────────
+  // ── Wavetable display ─────────────────────────────────────────────────────
+  function drawWavetableDisplay(timeSec) {
+    const waveCanvas = document.getElementById('wt-wave');
+    const specCanvas = document.getElementById('wt-spectrum');
+    if (!waveCanvas || !specCanvas) return;
+    if (!engine || !preprocessed) return;
+
+    const label = lastClickedChannel || preprocessed.channels[0]?.label;
+    if (!label) return;
+
+    const snaps = engine.getWavetableSnapshots(label);
+    const rate  = engine.getWavetableRate(label);
+    if (!snaps || snaps.length === 0) return;
+
+    // Interpolate snapshot at current time
+    const snapIdx = timeSec * rate;
+    const lo = Math.max(0, Math.floor(snapIdx));
+    const hi = Math.min(lo + 1, snaps.length - 1);
+    const t  = snapIdx - lo;
+    const snapLo = snaps[lo];
+    const snapHi = snaps[hi];
+    if (!snapLo) return;
+
+    const numH  = snapLo.real.length - 1;
+    const blend = parseFloat(document.getElementById('fader-waveform')?.value || '0');
+
+    // Build blended coefficients (mirrors engine logic)
+    const real = new Float32Array(numH + 1);
+    const imag = new Float32Array(numH + 1);
+
+    for (let k = 1; k <= numH; k++) {
+      const eegR = snapLo.real[k] * (1 - t) + (snapHi?.real[k] || 0) * t;
+      const eegI = snapLo.imag[k] * (1 - t) + (snapHi?.imag[k] || 0) * t;
+
+      if (blend < 0.5) {
+        // saw (0) → sine (0.5)
+        const sineT = blend / 0.5;
+        const saw = (1 / k) * ((k % 2 === 0) ? -1 : 1);
+        const sine = k === 1 ? 1 : 0;
+        real[k] = saw * (1 - sineT) + sine * sineT;
+      } else {
+        // sine (0.5) → EEG (1.0)
+        const eegT = (blend - 0.5) / 0.5;
+        const sine = k === 1 ? 1 : 0;
+        real[k] = sine * (1 - eegT) + eegR * eegT;
+        imag[k] = eegI * eegT;
+      }
+    }
+
+    // ── Draw waveform ────────────────────────────────────────
+    const dpr = window.devicePixelRatio || 1;
+    const wW = waveCanvas.clientWidth;
+    const wH = waveCanvas.clientHeight;
+    if (wW === 0 || wH === 0) return;
+    waveCanvas.width  = wW * dpr;
+    waveCanvas.height = wH * dpr;
+    const wCtx = waveCanvas.getContext('2d');
+    wCtx.scale(dpr, dpr);
+    wCtx.clearRect(0, 0, wW, wH);
+
+    // Synthesize one cycle
+    const nPts = wW;
+    const wave = new Float32Array(nPts);
+    let maxAbs = 0;
+    for (let i = 0; i < nPts; i++) {
+      let val = 0;
+      const phase = (i / nPts) * 2 * Math.PI;
+      for (let k = 1; k <= numH; k++) {
+        val += real[k] * Math.cos(k * phase) + imag[k] * Math.sin(k * phase);
+      }
+      wave[i] = val;
+      if (Math.abs(val) > maxAbs) maxAbs = Math.abs(val);
+    }
+
+    const scale = maxAbs > 0.001 ? (wH * 0.38) / maxAbs : 1;
+    const mid = wH / 2;
+
+    // Center line
+    wCtx.strokeStyle = 'rgba(255,255,255,0.04)';
+    wCtx.lineWidth = 0.5;
+    wCtx.beginPath();
+    wCtx.moveTo(0, mid);
+    wCtx.lineTo(wW, mid);
+    wCtx.stroke();
+
+    // Filled area
+    wCtx.beginPath();
+    wCtx.moveTo(0, mid);
+    for (let i = 0; i < nPts; i++) wCtx.lineTo(i, mid - wave[i] * scale);
+    wCtx.lineTo(nPts - 1, mid);
+    wCtx.closePath();
+    wCtx.fillStyle = 'rgba(167, 139, 250, 0.06)';
+    wCtx.fill();
+
+    // Stroke
+    wCtx.strokeStyle = 'rgba(167, 139, 250, 0.55)';
+    wCtx.lineWidth = 1.2;
+    wCtx.beginPath();
+    for (let i = 0; i < nPts; i++) {
+      const y = mid - wave[i] * scale;
+      if (i === 0) wCtx.moveTo(i, y); else wCtx.lineTo(i, y);
+    }
+    wCtx.stroke();
+
+    // ── Draw spectrum bars ───────────────────────────────────
+    const sW = specCanvas.clientWidth;
+    const sH = specCanvas.clientHeight;
+    if (sW === 0 || sH === 0) return;
+    specCanvas.width  = sW * dpr;
+    specCanvas.height = sH * dpr;
+    const sCtx = specCanvas.getContext('2d');
+    sCtx.scale(dpr, dpr);
+    sCtx.clearRect(0, 0, sW, sH);
+
+    let maxMag = 0;
+    const mags = new Float32Array(numH + 1);
+    for (let k = 1; k <= numH; k++) {
+      mags[k] = Math.sqrt(real[k] * real[k] + imag[k] * imag[k]);
+      if (mags[k] > maxMag) maxMag = mags[k];
+    }
+    if (maxMag < 0.0001) return;
+
+    const barPad   = 2;
+    const barTotal = sW - barPad * 2;
+    const barW     = Math.max(1.5, barTotal / numH - 1);
+    const gap      = (barTotal - barW * numH) / Math.max(1, numH - 1);
+
+    for (let k = 1; k <= numH; k++) {
+      const norm = mags[k] / maxMag;
+      const barH = Math.max(0.5, norm * (sH - 3));
+      const x = barPad + (k - 1) * (barW + gap);
+      const y = sH - barH - 1;
+      const alpha = 0.25 + 0.45 * (1 - (k - 1) / numH);
+      sCtx.fillStyle = `rgba(167, 139, 250, ${alpha.toFixed(2)})`;
+      sCtx.fillRect(x, y, barW, barH);
+    }
+  }
+
   function drawPPAFDisplay(timeSec) {
     const canvas = document.getElementById('ppaf-canvas');
     if (!canvas || selectedChannels.size !== 1) return;
@@ -5751,9 +7287,178 @@
       .replace(/>/g, '&gt;');
   }
 
+  // ── About overlay ────────────────────────────────────────────────────────
+  document.getElementById('btn-about')?.addEventListener('click', () => {
+    document.getElementById('about-overlay').style.display = 'flex';
+  });
+  document.getElementById('about-close')?.addEventListener('click', () => {
+    document.getElementById('about-overlay').style.display = 'none';
+  });
+  document.getElementById('about-overlay')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('about-overlay')) {
+      document.getElementById('about-overlay').style.display = 'none';
+    }
+  });
+
   // ── Init ──────────────────────────────────────────────────────────────────
   showScreen('welcome');
 </script>
+
+<!-- About overlay -->
+<div id="about-overlay" style="display:none">
+  <div class="about-content">
+    <button class="about-close" id="about-close">&times;</button>
+
+    <h1>sEEG Sonification Toolkit</h1>
+    <p class="about-version">v8 · research prototype · not for clinical use</p>
+
+    <p class="about-lead">
+      A browser-based tool for auditory exploration of intracranial EEG data.
+      Each electrode contact becomes a pitched audio voice whose loudness, timbre,
+      and spectral complexity are driven by quantitative features extracted from the
+      neural signal in real time.
+    </p>
+
+    <div class="about-pipeline">
+      <div class="pipe-stage">
+        <div class="pipe-label">EDF / EDF+</div>
+        <div class="pipe-desc">Parsed in-browser, no server</div>
+      </div>
+      <div class="pipe-arrow">&darr;</div>
+      <div class="pipe-stage">
+        <div class="pipe-label">Preprocessing</div>
+        <div class="pipe-desc">DC removal &rarr; notch filter (50/60 Hz) &rarr; bipolar re-reference or CAR</div>
+      </div>
+      <div class="pipe-arrow">&darr;</div>
+      <div class="pipe-stage pipe-wide">
+        <div class="pipe-label">Feature Extraction</div>
+        <div class="pipe-desc">21 time-series features per channel</div>
+        <div class="pipe-grid">
+          <div class="pipe-group">
+            <div class="pipe-group-title">Amplitude</div>
+            <div class="pipe-group-items">RMS (&times;3 scales) &middot; Hilbert envelope &middot; Line length</div>
+          </div>
+          <div class="pipe-group">
+            <div class="pipe-group-title">Spectral</div>
+            <div class="pipe-group-items">Centroid &middot; Bandwidth &middot; Flux &middot; Band powers (&delta; &theta; &alpha; &beta; &gamma; h&gamma;)</div>
+          </div>
+          <div class="pipe-group">
+            <div class="pipe-group-title">Waveform</div>
+            <div class="pipe-group-items">Hjorth mobility &middot; Hjorth complexity &middot; Slope asymmetry &middot; Kurtosis &middot; Skewness</div>
+          </div>
+          <div class="pipe-group">
+            <div class="pipe-group-title">Regularity</div>
+            <div class="pipe-group-items">Permutation entropy</div>
+          </div>
+          <div class="pipe-group">
+            <div class="pipe-group-title">Events</div>
+            <div class="pipe-group-items">Peak-to-peak amplitude &middot; Spectral flux threshold &middot; Refractory gating</div>
+          </div>
+        </div>
+      </div>
+      <div class="pipe-arrow">&darr;</div>
+      <div class="pipe-stage pipe-wide">
+        <div class="pipe-label">Synthesis Mapping</div>
+        <div class="pipe-desc">Five modules, each mapping signal features to a dimension of sound</div>
+        <div class="pipe-mapping">
+          <div class="pipe-map" style="--mc:#f0a030">
+            <span class="pipe-map-name">Amplitude</span>
+            <span class="pipe-map-arrow">&rarr;</span>
+            <span class="pipe-map-target">loudness</span>
+          </div>
+          <div class="pipe-map" style="--mc:#38bdf8">
+            <span class="pipe-map-name">Polarity</span>
+            <span class="pipe-map-arrow">&rarr;</span>
+            <span class="pipe-map-target">harmonic balance (overtone / undertone)</span>
+          </div>
+          <div class="pipe-map" style="--mc:#4ade80">
+            <span class="pipe-map-name">Frequency</span>
+            <span class="pipe-map-arrow">&rarr;</span>
+            <span class="pipe-map-target">FM modulation depth</span>
+          </div>
+          <div class="pipe-map" style="--mc:#f87171">
+            <span class="pipe-map-name">Detection</span>
+            <span class="pipe-map-arrow">&rarr;</span>
+            <span class="pipe-map-target">transient emphasis</span>
+          </div>
+          <div class="pipe-map" style="--mc:#8888a0">
+            <span class="pipe-map-name">Output</span>
+            <span class="pipe-map-arrow">&rarr;</span>
+            <span class="pipe-map-target">activity gating &middot; saturation</span>
+          </div>
+        </div>
+      </div>
+      <div class="pipe-arrow">&darr;</div>
+      <div class="pipe-stage">
+        <div class="pipe-label">Additive Synthesis</div>
+        <div class="pipe-desc">Per channel: root + 3 overtones + 2 undertones + FM &middot; waveshaper &middot; stereo panner &middot; master limiter</div>
+      </div>
+      <div class="pipe-arrow">&darr;</div>
+      <div class="pipe-stage pipe-end">
+        <div class="pipe-label">Audio</div>
+      </div>
+    </div>
+
+    <div class="about-section">
+      <h2>What this is for</h2>
+      <p>
+        Auditory display of multi-channel neural recordings. The mapping is designed
+        so that clinically significant signal features &mdash; amplitude changes, spectral
+        shifts, waveform asymmetry, transient discharges &mdash; produce distinct, learnable
+        auditory patterns. The goal is to complement visual EEG review, not replace it.
+      </p>
+    </div>
+
+    <div class="about-section">
+      <h2>How it was built</h2>
+      <p>
+        Designed and directed by Thomas Meier. Architecture, DSP pipeline, synthesis
+        design, and mapping decisions are original work informed by the sEEG and signal
+        processing literature. Implementation was developed with substantial assistance
+        from agentic AI coding tools (Claude / Anthropic), which generated code from
+        detailed architectural specifications. No frameworks, no dependencies &mdash; six
+        JavaScript modules and one HTML file.
+      </p>
+    </div>
+
+    <div class="about-section">
+      <h2>Limitations</h2>
+      <p>
+        Browser-based; best with &le;20 channels. Pitch assignment is heuristic (RMS rank),
+        not atlas-based. No electrode localization. Event detection is amplitude-based only.
+        Not validated against clinical standards.
+      </p>
+    </div>
+
+    <div class="about-section">
+      <h2>Acknowledgments</h2>
+      <p>
+        Inspired by the thalamocortical network dynamics research of
+        Dr. Andrew Yang and colleagues at Barrow Neurological Institute.
+      </p>
+    </div>
+
+    <div class="about-section about-refs">
+      <h2>References</h2>
+      <p>
+        Yang et al. (2026) Distinct spectral and directional thalamocortical network dynamics define focal seizure evolution. <em>medRxiv</em>.<br>
+        Yang et al. (2025) Thalamocortical seizure onset patterns in drug resistant focal epilepsy. <em>medRxiv</em>.<br>
+        Frauscher et al. (2024) Learn how to interpret and use intracranial EEG findings. <em>Epileptic Disorders</em> 26(1).<br>
+        Bartolomei et al. (2017) Defining epileptogenic networks. <em>Epilepsia</em> 58(7).<br>
+        Mercier et al. (2022) Advances in human iEEG research, guidelines and good practices. <em>NeuroImage</em> 260.<br>
+        Li et al. (2018) Optimal referencing for sEEG recordings. <em>NeuroImage</em> 183.<br>
+        Hjorth (1970) EEG analysis based on time domain properties. <em>EEG Clin Neurophysiol</em> 29(3).<br>
+        Bandt &amp; Pompe (2002) Permutation entropy. <em>Phys Rev Lett</em> 88(17).<br>
+        Hermann et al. (2011) <em>The Sonification Handbook</em>. Logos Verlag.<br>
+        Baier et al. (2007) Using sonification to detect seizures in intracranial EEG. <em>ICAD</em>.
+      </p>
+    </div>
+
+    <div class="about-footer">
+      Thomas Meier &middot; 2025
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
