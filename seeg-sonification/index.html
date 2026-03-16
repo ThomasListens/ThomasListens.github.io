@@ -908,6 +908,61 @@
     .syn-mod-level[data-mod="detection"]  { flex: 1; }
     .syn-mod-level[data-mod="output"]     { flex: 0 0 120px; box-sizing: border-box; }
 
+    /* ── Polarity + Frequency zone wrapper ──────────────────────────── */
+    /* Header wrapper: takes 2 shares, inner labels split evenly */
+    .morph-freq-header-zone {
+      display: flex;
+      flex: 2;
+      min-width: 0;
+    }
+
+    /* Body wrapper: takes 2 shares, columns inside keep standard grey dividers */
+    .morph-freq-zone {
+      display: flex;
+      flex: 2;
+      flex-direction: column;
+      min-width: 0;
+      box-sizing: border-box;
+    }
+    /* Top row: the two columns side by side, filling available height */
+    .morph-freq-zone .mfz-columns {
+      display: flex;
+      flex: 1 1 0;
+      min-height: 105px;
+      position: relative;
+      border-left: 1px solid rgba(240, 160, 48, 0.40);
+    }
+    /* Amplitude column's right border replaced by the amber left border */
+    .synth-col[data-col="amplitude"] {
+      border-right: none !important;
+    }
+    .morph-freq-zone .mfz-columns > .synth-col {
+      flex: 1;
+      border-right: none !important;  /* pseudo-elements handle dividers */
+    }
+    /* Grey divider between Polarity and Frequency */
+    .mfz-columns::before {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0;
+      left: 50%;
+      width: 1px;
+      background: var(--border);
+      pointer-events: none;
+      z-index: 1;
+    }
+    /* Grey divider between Frequency and Detection */
+    .mfz-columns::after {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0;
+      right: 0;
+      width: 1px;
+      background: var(--border);
+      pointer-events: none;
+      z-index: 1;
+    }
+
     .syn-mod-level:last-child { border-right: none; }
 
     .syn-mod-level span {
@@ -941,25 +996,35 @@
       opacity: 0;
     }
 
-    /* ── Wavetable strip — absolutely positioned over Polarity + Frequency ── */
+    /* Grey divider between fader columns and wavetable zone */
+    .wt-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 6px 0 0;
+    }
+    /* ── Wavetable strip ── */
     .wavetable-strip {
-      position: absolute;
-      bottom: 0;
-      /* Source=311px, Output=120px, 4 equal cols share the rest.
-         Polarity starts after Source + Amplitude = 311px + 1 part.
-         Frequency ends before Detection + Output = 311px + 3 parts.
-         +2px for column borders to the left (source + amplitude). */
-      left: calc(311px + (100% - 431px) / 4 + 2px);
-      width: calc((100% - 431px) / 2 - 1px);
-      height: 62px;
+      flex: 0 0 auto;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      border-top: 2px solid rgba(240, 160, 48, 0.35);
-      border-left: 2px solid rgba(240, 160, 48, 0.25);
+      flex-direction: column;
+      border-top: 1px solid rgba(240, 160, 48, 0.40);
+      border-left: 1px solid var(--border);
+      border-right: 1px solid rgba(240, 160, 48, 0.40);
       background: rgba(240, 160, 48, 0.02);
-      z-index: 1;
       pointer-events: auto;
+      box-sizing: border-box;
+    }
+    .wt-header {
+      padding: 2px 0 0;
+      text-align: center;
+    }
+    .wt-header-label {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      user-select: none;
     }
     .synth-body.collapsed .wavetable-strip { display: none; }
 
@@ -972,40 +1037,20 @@
 
     /* Left half = fader, centers under Polarity column */
     .wt-fader-half {
-      width: 50%;
+      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 4px 10px;
+      padding: 2px 10px;
       gap: 0;
-    }
-
-    .wt-label {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 2px;
-    }
-    .wt-label .syn-label-main {
-      font-size: 9px;
-      letter-spacing: 0.06em;
-      color: var(--muted);
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
-    .wt-label .syn-label-sub {
-      font-size: 8px;
-      color: var(--dim);
-      font-style: italic;
-      white-space: nowrap;
     }
 
     .wt-fader-row {
       display: flex;
       align-items: center;
-      gap: 6px;
       width: 100%;
+      padding: 0 2px;
     }
     #fader-waveform { accent-color: #f0a030 !important; }
     .wt-fader-row .syn-range {
@@ -1014,45 +1059,71 @@
       min-width: 40px;
     }
 
+    .wt-labels-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding: 0 4px;
+      margin-top: 2px;
+    }
+
     .wt-endpoint {
-      font-size: 8px;
-      color: var(--dim);
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text);
       letter-spacing: 0.06em;
-      text-transform: lowercase;
-      white-space: nowrap;
-      min-width: 20px;
       user-select: none;
     }
-    .wt-endpoint:first-child { text-align: right; }
-    .wt-endpoint:last-child  { text-align: left; }
 
-    .wt-center-mark {
-      font-size: 7px;
-      color: var(--dim);
+    .wt-sine-label {
+      font-size: 8px;
+      font-weight: 500;
+      color: #f0a030;
       letter-spacing: 0.06em;
+      text-transform: uppercase;
       user-select: none;
+    }
+
+    .wt-tick-row {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      padding: 0 4px;
+      margin-top: 2px;
+    }
+    .wt-tick {
+      width: 1px;
+      height: 4px;
+      background: var(--dim);
+      opacity: 0.4;
+    }
+    .wt-tick-center {
+      width: 1px;
+      height: 6px;
       opacity: 0.6;
+      background: #f0a030;
     }
 
     /* Right half = canvases, centers under Frequency column */
     .wt-visual-half {
-      width: 50%;
+      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 4px 10px;
-      gap: 3px;
+      padding: 2px 10px;
+      gap: 2px;
     }
     #wt-wave {
       width: 100%;
-      height: 28px;
+      height: 26px;
       border-radius: 2px;
       display: block;
     }
     #wt-spectrum {
       width: 100%;
-      height: 14px;
+      height: 16px;
       border-radius: 2px;
       display: block;
     }
@@ -1323,7 +1394,7 @@
 
     .syn-tune {
       display: flex; align-items: center; gap: 4px;
-      margin-top: auto; padding-top: 4px; border-top: 1px solid var(--border);
+      margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border);
     }
     .syn-tune-ref {
       display: flex; align-items: center; gap: 0;
@@ -2141,15 +2212,17 @@
           <input type="range" class="syn-range" id="fader-ampLevel" min="0" max="1" step="0.01" value="1">
         </label>
 
-        <label class="syn-mod-level" data-mod="morphology" style="--mc:#38bdf8">
-          <span>Polarity</span>
-          <input type="range" class="syn-range" id="fader-morphLevel" min="0" max="1" step="0.01" value="1">
-        </label>
+        <div class="morph-freq-header-zone">
+          <label class="syn-mod-level" data-mod="morphology" style="--mc:#38bdf8">
+            <span>Polarity</span>
+            <input type="range" class="syn-range" id="fader-morphLevel" min="0" max="1" step="0.01" value="1">
+          </label>
 
-        <label class="syn-mod-level" data-mod="frequency" style="--mc:#4ade80">
-          <span>Frequency</span>
-          <input type="range" class="syn-range" id="fader-freqLevel" min="0" max="1" step="0.01" value="1">
-        </label>
+          <label class="syn-mod-level" data-mod="frequency" style="--mc:#4ade80">
+            <span>Frequency</span>
+            <input type="range" class="syn-range" id="fader-freqLevel" min="0" max="1" step="0.01" value="1">
+          </label>
+        </div>
 
         <label class="syn-mod-level" data-mod="detection" style="--mc:#f87171">
           <span>Detection</span>
@@ -2179,13 +2252,12 @@
             </div>
             <div class="syn-divider"></div>
             <div class="syn-range-endpoints">
-              <span class="syn-endpoint" id="intensity-left">relative</span>
+              <span class="syn-endpoint" id="intensity-left">absolute</span>
               <input type="range" class="syn-range" id="fader-intensity"
                      min="0" max="1" step="0.01" value="0.0"
                      style="accent-color: #6b8cff">
-              <span class="syn-endpoint" id="intensity-right">absolute</span>
+              <span class="syn-endpoint" id="intensity-right">relative</span>
             </div>
-            <div class="syn-divider"></div>
             <div class="syn-tune">
               <div class="syn-tune-ref" title="Fundamental pitch — click to edit">
                 <span>1/1=</span>
@@ -2217,71 +2289,110 @@
           <!-- Under "Amplitude" -->
           <div class="synth-col" data-col="amplitude">
             <label class="syn-fader" data-feature="fastRMS">
-              <span class="syn-label"><span class="syn-label-main">RMS 50ms</span><span class="syn-label-sub">fast energy tracking</span></span>
+              <span class="syn-label"><span class="syn-label-main">RMS 50ms</span><span class="syn-label-sub">energy average (fast)</span></span>
               <input type="range" class="syn-range" id="fader-rmsFast" min="0" max="1" step="0.01" value="0">
             </label>
             <label class="syn-fader" data-feature="midRMS">
-              <span class="syn-label"><span class="syn-label-main">RMS 250ms</span><span class="syn-label-sub">oscillatory energy</span></span>
+              <span class="syn-label"><span class="syn-label-main">RMS 250ms</span><span class="syn-label-sub">energy average (medium)</span></span>
               <input type="range" class="syn-range" id="fader-rmsMid" min="0" max="1" step="0.01" value="0">
             </label>
             <label class="syn-fader" data-feature="slowRMS">
-              <span class="syn-label"><span class="syn-label-main">RMS 1.5s</span><span class="syn-label-sub">slow contour</span></span>
+              <span class="syn-label"><span class="syn-label-main">RMS 1.5s</span><span class="syn-label-sub">energy average (slow)</span></span>
               <input type="range" class="syn-range" id="fader-rmsSlow" min="0" max="1" step="0.01" value="0.5">
             </label>
             <label class="syn-fader" data-feature="adaptiveRMS">
-              <span class="syn-label"><span class="syn-label-main">Adaptive</span><span class="syn-label-sub">adapts to dominant band</span></span>
+              <span class="syn-label"><span class="syn-label-main">Adaptive</span><span class="syn-label-sub">dominant band energy</span></span>
               <input type="range" class="syn-range" id="fader-rmsAdaptive" min="0" max="1" step="0.01" value="0.5">
             </label>
             <div class="syn-divider"></div>
             <label class="syn-fader" data-feature="envelope">
-              <span class="syn-label"><span class="syn-label-main">Envelope</span><span class="syn-label-sub">Hilbert analytic signal</span></span>
+              <span class="syn-label"><span class="syn-label-main">Envelope</span><span class="syn-label-sub">Hilbert envelope</span></span>
               <input type="range" class="syn-range" id="fader-hilbertAM" min="0" max="1" step="0.01" value="0.3">
             </label>
             <label class="syn-fader">
-              <span class="syn-label"><span class="syn-label-main">Contrast</span><span class="syn-label-sub">quiet ↔ loud range</span></span>
+              <span class="syn-label"><span class="syn-label-main">Contrast</span><span class="syn-label-sub">dynamic range</span></span>
               <input type="range" class="syn-range" id="fader-dynRange" min="0" max="1" step="0.01" value="0.6">
             </label>
           </div>
 
-          <!-- Under "Polarity" -->
-          <div class="synth-col" data-col="morphology">
-            <label class="syn-fader" data-feature="complexity">
-              <span class="syn-label"><span class="syn-label-main">Harmonic Range</span><span class="syn-label-sub">polarity → harmonic richness</span></span>
-              <input type="range" class="syn-range" id="fader-range" min="0" max="1" step="0.01" value="0.5">
-            </label>
-            <label class="syn-fader syn-sub" data-feature="slopeAsymmetry">
-              <span class="syn-label"><span class="syn-label-main">Slope</span><span class="syn-label-sub">waveform slope asymmetry</span></span>
-              <input type="range" class="syn-range" id="fader-slopeDepth" min="0" max="1" step="0.01" value="0.4">
-            </label>
-            <label class="syn-fader" data-feature="envelope" data-phase-coloring="true">
-              <span class="syn-label"><span class="syn-label-main">Polarity Depth</span><span class="syn-label-sub">voltage sign response</span></span>
-              <input type="range" class="syn-range" id="fader-sensitivity" min="0" max="1" step="0.01" value="0.4">
-            </label>
-            <label class="syn-fader syn-sub" data-feature="complexity">
-              <span class="syn-label"><span class="syn-label-main">Complexity</span><span class="syn-label-sub">signal regularity → spread</span></span>
-              <input type="range" class="syn-range" id="fader-complexityDepth" min="0" max="1" step="0.01" value="0.5">
-            </label>
-          </div>
+          <!-- Polarity + Frequency zone — wrapped for layout -->
+          <div class="morph-freq-zone">
+           <div class="mfz-columns">
 
-          <!-- Under "Frequency" -->
-          <div class="synth-col" data-col="frequency">
-            <label class="syn-fader" data-feature="centroid">
-              <span class="syn-label"><span class="syn-label-main">Spectral Focus</span><span class="syn-label-sub">centroid ↔ band power</span></span>
-              <input type="range" class="syn-range" id="fader-focus" min="0" max="1" step="0.01" value="0.5">
-            </label>
-            <label class="syn-fader syn-sub" data-feature="mobility">
-              <span class="syn-label"><span class="syn-label-main">Mobility</span><span class="syn-label-sub">rate of spectral change</span></span>
-              <input type="range" class="syn-range" id="fader-mobility" min="0" max="1" step="0.01" value="0.3">
-            </label>
-            <label class="syn-fader" data-feature="spectralBandwidth">
-              <span class="syn-label"><span class="syn-label-main">Bandwidth</span><span class="syn-label-sub">spectral width → tonal spread</span></span>
-              <input type="range" class="syn-range" id="fader-bandwidth" min="0" max="1" step="0.01" value="0.0">
-            </label>
-            <label class="syn-fader syn-sub" data-feature="permEntropy">
-              <span class="syn-label"><span class="syn-label-main">Entropy</span><span class="syn-label-sub">regularity → narrow / wide</span></span>
-              <input type="range" class="syn-range" id="fader-entropy" min="0" max="1" step="0.01" value="0.0">
-            </label>
-          </div>
+            <!-- Under "Polarity" -->
+            <div class="synth-col" data-col="morphology">
+              <label class="syn-fader" data-feature="complexity">
+                <span class="syn-label"><span class="syn-label-main">Harmonic Range</span><span class="syn-label-sub">available harmonics</span></span>
+                <input type="range" class="syn-range" id="fader-range" min="0" max="1" step="0.01" value="0.5">
+              </label>
+              <label class="syn-fader syn-sub" data-feature="slopeAsymmetry">
+                <span class="syn-label"><span class="syn-label-main">Slope</span><span class="syn-label-sub">polarity transition rate</span></span>
+                <input type="range" class="syn-range" id="fader-slopeDepth" min="0" max="1" step="0.01" value="0.4">
+              </label>
+              <label class="syn-fader" data-feature="envelope" data-phase-coloring="true">
+                <span class="syn-label"><span class="syn-label-main">Sign Response</span><span class="syn-label-sub">± voltage tracking</span></span>
+                <input type="range" class="syn-range" id="fader-sensitivity" min="0" max="1" step="0.01" value="0.4">
+              </label>
+              <label class="syn-fader syn-sub" data-feature="complexity">
+                <span class="syn-label"><span class="syn-label-main">Complexity</span><span class="syn-label-sub">entropy → width modulation</span></span>
+                <input type="range" class="syn-range" id="fader-complexityDepth" min="0" max="1" step="0.01" value="0.5">
+              </label>
+            </div>
+
+            <!-- Under "Frequency" -->
+            <div class="synth-col" data-col="frequency">
+              <label class="syn-fader" data-feature="centroid">
+                <span class="syn-label"><span class="syn-label-main">Spectral Focus</span><span class="syn-label-sub">centroid → FM depth</span></span>
+                <input type="range" class="syn-range" id="fader-focus" min="0" max="1" step="0.01" value="0.5">
+              </label>
+              <label class="syn-fader syn-sub" data-feature="mobility">
+                <span class="syn-label"><span class="syn-label-main">Mobility</span><span class="syn-label-sub">Hjorth mobility</span></span>
+                <input type="range" class="syn-range" id="fader-mobility" min="0" max="1" step="0.01" value="0.3">
+              </label>
+              <label class="syn-fader" data-feature="spectralBandwidth">
+                <span class="syn-label"><span class="syn-label-main">Spectral Range</span><span class="syn-label-sub">narrow ↔ open</span></span>
+                <input type="range" class="syn-range" id="fader-bandwidth" min="0" max="1" step="0.01" value="0.0">
+              </label>
+              <label class="syn-fader syn-sub" data-feature="permEntropy">
+                <span class="syn-label"><span class="syn-label-main">Entropy</span><span class="syn-label-sub">variable bandwidth</span></span>
+                <input type="range" class="syn-range" id="fader-entropy" min="0" max="1" step="0.01" value="0.0">
+              </label>
+            </div>
+
+           </div><!-- /mfz-columns -->
+
+            <div class="wt-divider" style="margin-top:auto"></div>
+
+            <!-- Wavetable strip — flows at bottom of morph-freq-zone -->
+            <div class="wavetable-strip" id="wavetable-strip">
+              <div class="wt-header">
+                <span class="wt-header-label">Waveform</span>
+              </div>
+              <div class="wt-inner">
+                <div class="wt-fader-half">
+                  <div class="wt-fader-row">
+                    <input type="range" class="syn-range" id="fader-waveform"
+                           min="0" max="1" step="0.01" value="0.5">
+                  </div>
+                  <div class="wt-tick-row">
+                    <span class="wt-tick"></span>
+                    <span class="wt-tick wt-tick-center"></span>
+                    <span class="wt-tick"></span>
+                  </div>
+                  <div class="wt-labels-row">
+                    <span class="wt-endpoint">SAW</span>
+                    <span class="wt-sine-label">sine</span>
+                    <span class="wt-endpoint">EEG</span>
+                  </div>
+                </div>
+                <div class="wt-visual-half">
+                  <canvas id="wt-wave"></canvas>
+                  <canvas id="wt-spectrum"></canvas>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /morph-freq-zone -->
 
           <!-- Under "Detection" -->
           <div class="synth-col" data-col="detection">
@@ -2294,7 +2405,7 @@
               <input type="range" class="syn-range" id="fader-ppafThreshold" min="0" max="1" step="0.01" value="0.5">
             </label>
             <label class="syn-fader">
-              <span class="syn-label"><span class="syn-label-main">Transient Intensity</span><span class="syn-label-sub">event emphasis strength</span></span>
+              <span class="syn-label"><span class="syn-label-main">Transient Gain</span><span class="syn-label-sub">detection → loudness boost</span></span>
               <input type="range" class="syn-range" id="fader-saturation" min="0" max="1" step="0.01" value="0.5">
             </label>
             <label class="syn-fader">
@@ -2303,11 +2414,11 @@
             </label>
             <div class="syn-pair-row">
               <label class="syn-fader">
-                <span class="syn-label"><span class="syn-label-main">Onset</span></span>
+                <span class="syn-label"><span class="syn-label-main">Attack</span></span>
                 <input type="range" class="syn-range" id="fader-noiseAttack" min="2" max="30" step="1" value="15">
               </label>
               <label class="syn-fader">
-                <span class="syn-label"><span class="syn-label-main">Release</span></span>
+                <span class="syn-label"><span class="syn-label-main">Decay</span></span>
                 <input type="range" class="syn-range" id="fader-noiseDecay" min="15" max="200" step="5" value="80">
               </label>
             </div>
@@ -2341,29 +2452,6 @@
             <div class="output-meter">
               <div class="output-meter-fill" id="output-meter-fill"></div>
               <div class="output-meter-threshold"></div>
-            </div>
-          </div>
-
-          <!-- Wavetable strip — absolutely positioned over bottom of Polarity + Frequency -->
-          <div class="wavetable-strip" id="wavetable-strip">
-            <div class="wt-inner">
-              <div class="wt-fader-half">
-                <div class="wt-label">
-                  <span class="syn-label-main">Waveform</span>
-                  <span class="syn-label-sub">source shape</span>
-                </div>
-                <div class="wt-fader-row">
-                  <span class="wt-endpoint">saw</span>
-                  <input type="range" class="syn-range" id="fader-waveform"
-                         min="0" max="1" step="0.01" value="0.5">
-                  <span class="wt-endpoint">eeg</span>
-                </div>
-                <div class="wt-center-mark">sine</div>
-              </div>
-              <div class="wt-visual-half">
-                <canvas id="wt-wave"></canvas>
-                <canvas id="wt-spectrum"></canvas>
-              </div>
             </div>
           </div>
 
@@ -2459,6 +2547,62 @@
     </div>
   </div>
 
+  <!-- About overlay -->
+  <div id="about-overlay" style="display:none">
+    <div class="about-content">
+      <button class="about-close" id="about-close">&times;</button>
+
+      <h1>sEEG Sonification Toolkit</h1>
+      <p class="about-lead">
+        Translating amplitude, morphology &amp; frequency response of EEG into audio.
+      </p>
+
+      <div class="about-section" style="border-top:1px solid var(--border); padding-top:14px">
+        <h2>Pipeline</h2>
+        <p style="color:var(--text); font-size:11px; letter-spacing:0.02em; margin-bottom:8px">
+          EDF/EDF+ &rarr; Preprocessing &rarr; 21 Features &rarr; Synthesis &rarr; Audio
+        </p>
+        <p>
+          <strong style="color:var(--muted)">Preprocessing:</strong> DC removal, notch (50/60 Hz), bipolar or CAR<br>
+          <strong style="color:var(--muted)">Features:</strong> amplitude, spectral, waveform morphology, regularity, transient events<br>
+          <strong style="color:var(--muted)">Synthesis:</strong> additive (root + overtones + undertones + FM)
+        </p>
+      </div>
+
+      <div class="about-section" style="border-top:1px solid var(--border); padding-top:14px">
+        <h2>Mapping</h2>
+        <table style="font-size:10px; color:var(--muted); line-height:2; border-collapse:collapse; width:100%">
+          <tr><td style="color:#f0a030; font-weight:600; width:90px">Amplitude</td><td style="width:200px">RMS, Hilbert envelope</td><td style="color:var(--text)">&rarr; loudness</td></tr>
+          <tr><td style="color:#38bdf8; font-weight:600">Polarity</td><td>voltage sign, complexity</td><td style="color:var(--text)">&rarr; overtone/undertone balance</td></tr>
+          <tr><td style="color:#4ade80; font-weight:600">Frequency</td><td>spectral centroid, entropy</td><td style="color:var(--text)">&rarr; FM depth, spectral range</td></tr>
+          <tr><td style="color:#f87171; font-weight:600">Detection</td><td>PPAF, spectral flux</td><td style="color:var(--text)">&rarr; transient emphasis</td></tr>
+          <tr><td style="color:#8888a0; font-weight:600">Output</td><td>line length, waveshaper</td><td style="color:var(--text)">&rarr; gating, saturation, stereo</td></tr>
+        </table>
+      </div>
+
+      <div class="about-section about-refs" style="border-top:1px solid var(--border); padding-top:14px">
+        <h2>References</h2>
+        <p>
+          Yang et al. (2026) Thalamocortical network dynamics. <em>medRxiv</em>.<br>
+          Yang et al. (2025) Thalamocortical seizure onset patterns. <em>medRxiv</em>.<br>
+          Frauscher et al. (2024) Intracranial EEG findings. <em>Epileptic Disorders</em>.<br>
+          Hjorth (1970) EEG time domain properties. <em>EEG Clin Neurophysiol</em>.<br>
+          Bandt &amp; Pompe (2002) Permutation entropy. <em>Phys Rev Lett</em>.<br>
+          Baier et al. (2007) Sonification for seizure detection. <em>ICAD</em>.
+        </p>
+      </div>
+
+      <div class="about-footer" style="border-top:1px solid var(--border)">
+        Thomas LeRoy Meier &middot; 2026<br>
+        <a href="https://github.com/ThomasListens/ThomasListens.github.io/tree/main/seeg-sonification"
+           target="_blank" rel="noopener"
+           style="color:var(--accent); text-decoration:none; font-size:10px; letter-spacing:0.04em">
+          github.com/ThomasListens
+        </a>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /main -->
 
 <!-- ────────────────────────────────────────────────────────────────────────────
@@ -2544,26 +2688,27 @@
   // ── Demo auto-config (applied after engine init on demo file load) ──────
   const DEMO_CONFIG = {
     controls: {
-      rmsFast: 0.22, rmsMid: 0.44, rmsSlow: 0.3, rmsAdaptive: 1,
-      amDepth: 0.44, range: 0.6,
+      rmsFast: 0.22, rmsMid: 0.44, rmsSlow: 0.3, rmsAdaptive: 0.5,
+      amDepth: 0.69, range: 0.6,
       harmonicRange: 0.38, sensitivity: 0.31, slopeDepth: 0.4, complexityDepth: 0.76,
       focus: 0.41, mobilityDepth: 0.55, bandwidthSpread: 0.16, entropyDepth: 0,
       ppafThreshold: 0.5, fluxSensitivity: 0, refractoryMs: 80,
       detectionLevel: 0.7, saturation: 0.5, noiseMix: 0.4,
       noiseAttackMs: 15, noiseDecayMs: 155,
-      activityGate: 0.3, drive: 0.38, intensity: 0, masterVolume: 0.7,
+      activityGate: 0.3, drive: 0.38, intensity: 0, masterVolume: 0.65,
     },
     faders: {
       "fader-ampLevel": 1, "fader-morphLevel": 1, "fader-freqLevel": 1,
-      "fader-detLevel": 0.7, "fader-masterVolume": 0.7, "fader-intensity": 0,
+      "fader-detLevel": 0.7, "fader-masterVolume": 0.65, "fader-intensity": 0,
       "fader-rmsFast": 0.22, "fader-rmsMid": 0.44, "fader-rmsSlow": 0.3,
-      "fader-rmsAdaptive": 0.5, "fader-hilbertAM": 0.44, "fader-dynRange": 0.6,
+      "fader-rmsAdaptive": 0.5, "fader-hilbertAM": 0.69, "fader-dynRange": 0.6,
       "fader-range": 0.38, "fader-slopeDepth": 0.4, "fader-sensitivity": 0.31,
       "fader-complexityDepth": 0.76, "fader-focus": 0.41, "fader-mobility": 0.55,
-      "fader-bandwidth": 0.16, "fader-entropy": 0, "fader-ppafThreshold": 0.5,
-      "fader-saturation": 0.5, "fader-noise": 0.4, "fader-noiseAttack": 15,
-      "fader-noiseDecay": 155, "fader-flux": 0, "fader-refractory": 80,
-      "fader-activityGate": 0.3, "fader-drive": 0.38,
+      "fader-bandwidth": 0.16, "fader-entropy": 0, "fader-waveform": 0.5,
+      "fader-ppafThreshold": 0.5, "fader-saturation": 0.5, "fader-noise": 0.4,
+      "fader-noiseAttack": 15, "fader-noiseDecay": 155, "fader-flux": 0,
+      "fader-refractory": 80, "fader-activityGate": 0.3, "fader-drive": 0.38,
+      "fader-width": 1,
     },
     masterTune: 130,
     viewStart: 119.30658719775587,
@@ -3195,7 +3340,9 @@
     const { assignPitches } = await import('./src/mapping.js');
     pitchMap = assignPitches(channels, masterTune, ratioOverrides.size > 0 ? ratioOverrides : null, tuningMode, octaveCap, primeLimit);
 
-    // Header file info
+    // Header file info — hide the import-screen filename, show the full info bar
+    const hfn2 = document.getElementById('header-fname');
+    if (hfn2) hfn2.style.display = 'none';
     const s  = importResult.summary;
     const pi = document.getElementById('header-file-info');
     const typeClass = s.type.toLowerCase();
@@ -3421,6 +3568,7 @@
       document.getElementById('btn-play').textContent = '\u23F8';
       document.getElementById('btn-play').classList.add('active');
     }
+    drawWavetableDisplay(t);
   }
 
   function initView() {
@@ -3854,6 +4002,7 @@
       if (markers.length > 0) drawMarkers();
       updateSeekViewport();
       updateHScroll();
+      drawWavetableDisplay(engine?.currentTimeSec ?? 0);
     });
   }
 
@@ -4681,8 +4830,9 @@
 
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
   document.addEventListener('keydown', (e) => {
-    // Don't capture when typing in inputs
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    // Don't capture when typing in text inputs — but DO capture Space on range inputs
+    const isTextInput = e.target.tagName === 'INPUT' && e.target.type !== 'range';
+    if (isTextInput || e.target.tagName === 'SELECT') return;
 
     if (e.code === 'Space') {
       e.preventDefault();
@@ -6430,6 +6580,7 @@
     const t = parseFloat(seekBar.value) * engine.durationSec;
     const wasPlaying = engine.isPlaying;
     await engine.seek(t, wasPlaying);
+    drawWavetableDisplay(t);
     if (wasPlaying) {
       document.getElementById('btn-play').textContent = '\u23F8';
       document.getElementById('btn-play').classList.add('active');
@@ -6624,6 +6775,10 @@
     updateIntensityEndpoints(parseFloat(e.target.value));
   });
   updateIntensityEndpoints(0); // initial state
+
+  // Draw wavetable preview on load + resize + any visibility change
+  window.addEventListener('load', () => setTimeout(drawWavetablePreview, 300));
+  window.addEventListener('resize', drawWavetablePreview);
 
   // ── Master tune ──────────────────────────────────────────────────────────
   document.getElementById('master-tune')?.addEventListener('change', async e => {
@@ -6996,18 +7151,46 @@
 
   // ── PPAF mini-display ─────────────────────────────────────────────────────
   // ── Wavetable display ─────────────────────────────────────────────────────
+
+  // Static preview: draws saw/sine/eeg blend without needing engine or data
+  function drawWavetablePreview() {
+    const waveCanvas = document.getElementById('wt-wave');
+    const specCanvas = document.getElementById('wt-spectrum');
+    if (!waveCanvas || !specCanvas) return;
+
+    const blend = parseFloat(document.getElementById('fader-waveform')?.value || '0.5');
+    const numH = 32;
+    const real = new Float32Array(numH + 1);
+    const imag = new Float32Array(numH + 1);
+
+    for (let k = 1; k <= numH; k++) {
+      if (blend < 0.5) {
+        const sineT = blend / 0.5;
+        // Sawtooth: sine coefficients (-1)^(k+1) / k
+        const sawImag = ((k % 2 === 0) ? -1 : 1) / k;
+        const sineImag = k === 1 ? 1 : 0;
+        imag[k] = sawImag * (1 - sineT) + sineImag * sineT;
+      } else {
+        // sine → eeg: without data, just show sine
+        imag[k] = k === 1 ? 1 : 0;
+      }
+    }
+
+    _drawWavetableCanvases(waveCanvas, specCanvas, real, imag, numH);
+  }
+
   function drawWavetableDisplay(timeSec) {
     const waveCanvas = document.getElementById('wt-wave');
     const specCanvas = document.getElementById('wt-spectrum');
     if (!waveCanvas || !specCanvas) return;
-    if (!engine || !preprocessed) return;
+    if (!engine || !preprocessed) { drawWavetablePreview(); return; }
 
     const label = lastClickedChannel || preprocessed.channels[0]?.label;
-    if (!label) return;
+    if (!label) { drawWavetablePreview(); return; }
 
     const snaps = engine.getWavetableSnapshots(label);
     const rate  = engine.getWavetableRate(label);
-    if (!snaps || snaps.length === 0) return;
+    if (!snaps || snaps.length === 0) { drawWavetablePreview(); return; }
 
     // Interpolate snapshot at current time
     const snapIdx = timeSec * rate;
@@ -7030,21 +7213,25 @@
       const eegI = snapLo.imag[k] * (1 - t) + (snapHi?.imag[k] || 0) * t;
 
       if (blend < 0.5) {
-        // saw (0) → sine (0.5)
+        // saw (0) → sine (0.5) — sine (imag) coefficients
         const sineT = blend / 0.5;
-        const saw = (1 / k) * ((k % 2 === 0) ? -1 : 1);
-        const sine = k === 1 ? 1 : 0;
-        real[k] = saw * (1 - sineT) + sine * sineT;
+        const sawImag = ((k % 2 === 0) ? -1 : 1) / k;
+        const sineImag = k === 1 ? 1 : 0;
+        imag[k] = sawImag * (1 - sineT) + sineImag * sineT;
       } else {
         // sine (0.5) → EEG (1.0)
-        const eegT = (blend - 0.5) / 0.5;
-        const sine = k === 1 ? 1 : 0;
-        real[k] = sine * (1 - eegT) + eegR * eegT;
-        imag[k] = eegI * eegT;
+        const eegLinear = (blend - 0.5) / 0.5;
+        const eegT = eegLinear * eegLinear * eegLinear;  // cubic ease-in
+        const sineImag = k === 1 ? 1 : 0;
+        real[k] = eegR * eegT;
+        imag[k] = sineImag * (1 - eegT) + eegI * eegT;
       }
     }
 
-    // ── Draw waveform ────────────────────────────────────────
+    _drawWavetableCanvases(waveCanvas, specCanvas, real, imag, numH);
+  }
+
+  function _drawWavetableCanvases(waveCanvas, specCanvas, real, imag, numH) {
     const dpr = window.devicePixelRatio || 1;
     const wW = waveCanvas.clientWidth;
     const wH = waveCanvas.clientHeight;
@@ -7055,7 +7242,6 @@
     wCtx.scale(dpr, dpr);
     wCtx.clearRect(0, 0, wW, wH);
 
-    // Synthesize one cycle
     const nPts = wW;
     const wave = new Float32Array(nPts);
     let maxAbs = 0;
@@ -7072,15 +7258,12 @@
     const scale = maxAbs > 0.001 ? (wH * 0.38) / maxAbs : 1;
     const mid = wH / 2;
 
-    // Center line
     wCtx.strokeStyle = 'rgba(255,255,255,0.04)';
     wCtx.lineWidth = 0.5;
     wCtx.beginPath();
-    wCtx.moveTo(0, mid);
-    wCtx.lineTo(wW, mid);
+    wCtx.moveTo(0, mid); wCtx.lineTo(wW, mid);
     wCtx.stroke();
 
-    // Filled area
     wCtx.beginPath();
     wCtx.moveTo(0, mid);
     for (let i = 0; i < nPts; i++) wCtx.lineTo(i, mid - wave[i] * scale);
@@ -7089,7 +7272,6 @@
     wCtx.fillStyle = 'rgba(167, 139, 250, 0.06)';
     wCtx.fill();
 
-    // Stroke
     wCtx.strokeStyle = 'rgba(167, 139, 250, 0.55)';
     wCtx.lineWidth = 1.2;
     wCtx.beginPath();
@@ -7099,7 +7281,7 @@
     }
     wCtx.stroke();
 
-    // ── Draw spectrum bars ───────────────────────────────────
+    // Spectrum bars
     const sW = specCanvas.clientWidth;
     const sH = specCanvas.clientHeight;
     if (sW === 0 || sH === 0) return;
@@ -7303,162 +7485,6 @@
   // ── Init ──────────────────────────────────────────────────────────────────
   showScreen('welcome');
 </script>
-
-<!-- About overlay -->
-<div id="about-overlay" style="display:none">
-  <div class="about-content">
-    <button class="about-close" id="about-close">&times;</button>
-
-    <h1>sEEG Sonification Toolkit</h1>
-    <p class="about-version">v8 · research prototype · not for clinical use</p>
-
-    <p class="about-lead">
-      A browser-based tool for auditory exploration of intracranial EEG data.
-      Each electrode contact becomes a pitched audio voice whose loudness, timbre,
-      and spectral complexity are driven by quantitative features extracted from the
-      neural signal in real time.
-    </p>
-
-    <div class="about-pipeline">
-      <div class="pipe-stage">
-        <div class="pipe-label">EDF / EDF+</div>
-        <div class="pipe-desc">Parsed in-browser, no server</div>
-      </div>
-      <div class="pipe-arrow">&darr;</div>
-      <div class="pipe-stage">
-        <div class="pipe-label">Preprocessing</div>
-        <div class="pipe-desc">DC removal &rarr; notch filter (50/60 Hz) &rarr; bipolar re-reference or CAR</div>
-      </div>
-      <div class="pipe-arrow">&darr;</div>
-      <div class="pipe-stage pipe-wide">
-        <div class="pipe-label">Feature Extraction</div>
-        <div class="pipe-desc">21 time-series features per channel</div>
-        <div class="pipe-grid">
-          <div class="pipe-group">
-            <div class="pipe-group-title">Amplitude</div>
-            <div class="pipe-group-items">RMS (&times;3 scales) &middot; Hilbert envelope &middot; Line length</div>
-          </div>
-          <div class="pipe-group">
-            <div class="pipe-group-title">Spectral</div>
-            <div class="pipe-group-items">Centroid &middot; Bandwidth &middot; Flux &middot; Band powers (&delta; &theta; &alpha; &beta; &gamma; h&gamma;)</div>
-          </div>
-          <div class="pipe-group">
-            <div class="pipe-group-title">Waveform</div>
-            <div class="pipe-group-items">Hjorth mobility &middot; Hjorth complexity &middot; Slope asymmetry &middot; Kurtosis &middot; Skewness</div>
-          </div>
-          <div class="pipe-group">
-            <div class="pipe-group-title">Regularity</div>
-            <div class="pipe-group-items">Permutation entropy</div>
-          </div>
-          <div class="pipe-group">
-            <div class="pipe-group-title">Events</div>
-            <div class="pipe-group-items">Peak-to-peak amplitude &middot; Spectral flux threshold &middot; Refractory gating</div>
-          </div>
-        </div>
-      </div>
-      <div class="pipe-arrow">&darr;</div>
-      <div class="pipe-stage pipe-wide">
-        <div class="pipe-label">Synthesis Mapping</div>
-        <div class="pipe-desc">Five modules, each mapping signal features to a dimension of sound</div>
-        <div class="pipe-mapping">
-          <div class="pipe-map" style="--mc:#f0a030">
-            <span class="pipe-map-name">Amplitude</span>
-            <span class="pipe-map-arrow">&rarr;</span>
-            <span class="pipe-map-target">loudness</span>
-          </div>
-          <div class="pipe-map" style="--mc:#38bdf8">
-            <span class="pipe-map-name">Polarity</span>
-            <span class="pipe-map-arrow">&rarr;</span>
-            <span class="pipe-map-target">harmonic balance (overtone / undertone)</span>
-          </div>
-          <div class="pipe-map" style="--mc:#4ade80">
-            <span class="pipe-map-name">Frequency</span>
-            <span class="pipe-map-arrow">&rarr;</span>
-            <span class="pipe-map-target">FM modulation depth</span>
-          </div>
-          <div class="pipe-map" style="--mc:#f87171">
-            <span class="pipe-map-name">Detection</span>
-            <span class="pipe-map-arrow">&rarr;</span>
-            <span class="pipe-map-target">transient emphasis</span>
-          </div>
-          <div class="pipe-map" style="--mc:#8888a0">
-            <span class="pipe-map-name">Output</span>
-            <span class="pipe-map-arrow">&rarr;</span>
-            <span class="pipe-map-target">activity gating &middot; saturation</span>
-          </div>
-        </div>
-      </div>
-      <div class="pipe-arrow">&darr;</div>
-      <div class="pipe-stage">
-        <div class="pipe-label">Additive Synthesis</div>
-        <div class="pipe-desc">Per channel: root + 3 overtones + 2 undertones + FM &middot; waveshaper &middot; stereo panner &middot; master limiter</div>
-      </div>
-      <div class="pipe-arrow">&darr;</div>
-      <div class="pipe-stage pipe-end">
-        <div class="pipe-label">Audio</div>
-      </div>
-    </div>
-
-    <div class="about-section">
-      <h2>What this is for</h2>
-      <p>
-        Auditory display of multi-channel neural recordings. The mapping is designed
-        so that clinically significant signal features &mdash; amplitude changes, spectral
-        shifts, waveform asymmetry, transient discharges &mdash; produce distinct, learnable
-        auditory patterns. The goal is to complement visual EEG review, not replace it.
-      </p>
-    </div>
-
-    <div class="about-section">
-      <h2>How it was built</h2>
-      <p>
-        Designed and directed by Thomas Meier. Architecture, DSP pipeline, synthesis
-        design, and mapping decisions are original work informed by the sEEG and signal
-        processing literature. Implementation was developed with substantial assistance
-        from agentic AI coding tools (Claude / Anthropic), which generated code from
-        detailed architectural specifications. No frameworks, no dependencies &mdash; six
-        JavaScript modules and one HTML file.
-      </p>
-    </div>
-
-    <div class="about-section">
-      <h2>Limitations</h2>
-      <p>
-        Browser-based; best with &le;20 channels. Pitch assignment is heuristic (RMS rank),
-        not atlas-based. No electrode localization. Event detection is amplitude-based only.
-        Not validated against clinical standards.
-      </p>
-    </div>
-
-    <div class="about-section">
-      <h2>Acknowledgments</h2>
-      <p>
-        Inspired by the thalamocortical network dynamics research of
-        Dr. Andrew Yang and colleagues at Barrow Neurological Institute.
-      </p>
-    </div>
-
-    <div class="about-section about-refs">
-      <h2>References</h2>
-      <p>
-        Yang et al. (2026) Distinct spectral and directional thalamocortical network dynamics define focal seizure evolution. <em>medRxiv</em>.<br>
-        Yang et al. (2025) Thalamocortical seizure onset patterns in drug resistant focal epilepsy. <em>medRxiv</em>.<br>
-        Frauscher et al. (2024) Learn how to interpret and use intracranial EEG findings. <em>Epileptic Disorders</em> 26(1).<br>
-        Bartolomei et al. (2017) Defining epileptogenic networks. <em>Epilepsia</em> 58(7).<br>
-        Mercier et al. (2022) Advances in human iEEG research, guidelines and good practices. <em>NeuroImage</em> 260.<br>
-        Li et al. (2018) Optimal referencing for sEEG recordings. <em>NeuroImage</em> 183.<br>
-        Hjorth (1970) EEG analysis based on time domain properties. <em>EEG Clin Neurophysiol</em> 29(3).<br>
-        Bandt &amp; Pompe (2002) Permutation entropy. <em>Phys Rev Lett</em> 88(17).<br>
-        Hermann et al. (2011) <em>The Sonification Handbook</em>. Logos Verlag.<br>
-        Baier et al. (2007) Using sonification to detect seizures in intracranial EEG. <em>ICAD</em>.
-      </p>
-    </div>
-
-    <div class="about-footer">
-      Thomas Meier &middot; 2025
-    </div>
-  </div>
-</div>
 
 </body>
 </html>

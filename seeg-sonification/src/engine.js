@@ -58,8 +58,9 @@ export class Engine {
   #layerGains      = { root: 1, phase: 1, fm: 1, transient: 1 };
   #bandMode        = 'full'; // 'full' | band name | 'auto'
   #stereoWidth     = 1.0;    // 0=mono, 1=atlas, 2=exaggerated
-  #wavetableBlend  = 0;      // 0=sine, 0.33=tri, 0.66=saw, 1=EEG
+  #wavetableBlend  = 0.5;    // 0=saw, 0.5=sine (default), 1=EEG
   #wtUpdateCounter = 0;
+  #wtTimer         = null;   // dedicated fast timer for wavetable morphing
   #tuningMode      = 'rank'; // 'rank' | 'consonance'
   #octaveCap       = 4;
   #primeLimit      = null;  // null=unlimited, or 3/5/7/11/13
@@ -126,7 +127,7 @@ export class Engine {
       // ── Intensity: blend normalized ↔ absolute voltage scaling ──────
       // intensity=0 → all channels equal (normalized). intensity=1 → quiet
       // channels sound quiet, loud channels loud (absolute µV differences).
-      const intensityBlend = synthParams.intensity ?? 0;
+      const intensityBlend = 1.0 - (synthParams.intensity ?? 0);
       if (intensityBlend > 0 && globalP95 > 0) {
         const chCeil  = ch.features.calibration?.ampCeiling ?? globalP95;
         const scale   = 1.0 - intensityBlend + intensityBlend * (chCeil / globalP95);
@@ -839,73 +840,122 @@ export class Engine {
 
     if (!this.#audioCtx) return;
 
-    // At dead center (sine), use built-in type for efficiency
+    // At dead center (sine), reset both oscs and stop fast timer
     if (Math.abs(value - 0.5) < 0.01) {
+      this.#stopWtTimer();
       for (const v of this.#voices) {
-        if (v.graph?.rootOsc) v.graph.rootOsc.type = 'sine';
+        if (!v.graph) continue;
+        v.graph.rootOscA.type = 'sine';
+        v.graph.rootOscB.type = 'sine';
+        v.graph.rootOscGainA.gain.setTargetAtTime(1, this.#audioCtx.currentTime, 0.02);
+        v.graph.rootOscGainB.gain.setTargetAtTime(0, this.#audioCtx.currentTime, 0.02);
+        v._wtActive = 'A';
       }
       return;
     }
 
-    // Left or right of center: PeriodicWave applied in updateWavetables()
+    // Apply immediately then start fast timer if playing
+    this.updateWavetables(this.currentTimeSec, true);
+    this.#startWtTimer();
+  }
+
+  #startWtTimer() {
+    if (this.#wtTimer || !this.#isPlaying) return;
+    this.#wtTimer = setInterval(() => {
+      this.updateWavetables(this.currentTimeSec, true);
+    }, 30);  // 33Hz — smooth morphing
+  }
+
+  #stopWtTimer() {
+    if (this.#wtTimer) {
+      clearInterval(this.#wtTimer);
+      this.#wtTimer = null;
+    }
   }
 
   /**
    * Called from the timeupdate handler. Updates wavetable oscillators at ~8Hz.
    */
-  updateWavetables(currentTimeSec) {
+  updateWavetables(currentTimeSec, force = false) {
     // Skip when at dead-center sine
     if (Math.abs(this.#wavetableBlend - 0.5) < 0.01 || !this.#audioCtx) return;
 
-    this.#wtUpdateCounter++;
-    if (this.#wtUpdateCounter % 12 !== 0) return; // ~8Hz from 100ms timer
+    if (!force) {
+      this.#wtUpdateCounter++;
+      if (this.#wtUpdateCounter % 2 !== 0) return; // ~5Hz from 100ms timer
+    }
 
     const blend = this.#wavetableBlend;
+    const ctx = this.#audioCtx;
+    const now = ctx.currentTime;
+    const XFADE = 0.030; // 30ms crossfade
 
     for (const voice of this.#voices) {
-      if (!voice.graph?.rootOsc || voice.muted) continue;
-      if (!voice.wavetableSnapshots) continue;
+      if (!voice.graph || voice.muted) continue;
 
-      const snaps = voice.wavetableSnapshots;
-      const rate  = voice.wavetableRate;
-      const snapIdx = currentTimeSec * rate;
-      const lo = Math.max(0, Math.floor(snapIdx));
-      const hi = Math.min(lo + 1, snaps.length - 1);
-      const t  = snapIdx - lo;
+      const g = voice.graph;
+      // Track which osc is active (default A)
+      if (!voice._wtActive) voice._wtActive = 'A';
+      const activeIsA = voice._wtActive === 'A';
+      const idleOsc   = activeIsA ? g.rootOscB : g.rootOscA;
+      const idleGain  = activeIsA ? g.rootOscGainB : g.rootOscGainA;
+      const activeGain = activeIsA ? g.rootOscGainA : g.rootOscGainB;
 
-      const snapLo = snaps[lo];
-      const snapHi = snaps[hi];
-      if (!snapLo || !snapHi) continue;
-
-      const numH = snapLo.real.length;
-      const real = new Float32Array(numH);
-      const imag = new Float32Array(numH);
+      // Build the new PeriodicWave
+      let wave = null;
 
       if (blend < 0.5) {
-        // Left side: saw (0) → sine (0.5)
-        // At 0: pure saw. At 0.5: pure sine (k=1 only).
-        const sineT = blend / 0.5;  // 0→1 as blend goes 0→0.5
+        // Left side: saw (0) → sine (0.5) — no EEG data needed
+        const numH = 32;
+        const real = new Float32Array(numH);
+        const imag = new Float32Array(numH);
+        const sineT = blend / 0.5;
         for (let k = 1; k < numH; k++) {
-          const saw = (1 / k) * ((k % 2 === 0) ? -1 : 1);
-          const sine = k === 1 ? 1 : 0;
-          real[k] = saw * (1 - sineT) + sine * sineT;
+          const sawImag = ((k % 2 === 0) ? -1 : 1) / k;
+          const sineImag = k === 1 ? 1 : 0;
+          imag[k] = sawImag * (1 - sineT) + sineImag * sineT;
         }
+        wave = ctx.createPeriodicWave(real, imag, { disableNormalization: false });
       } else {
-        // Right side: sine (0.5) → EEG (1.0)
-        const eegT = (blend - 0.5) / 0.5;  // 0→1 as blend goes 0.5→1
+        // Right side: sine (0.5) → EEG (1.0) — needs snapshots
+        if (!voice.wavetableSnapshots) continue;
+
+        const snaps = voice.wavetableSnapshots;
+        const rate  = voice.wavetableRate;
+        const snapIdx = currentTimeSec * rate;
+        const lo = Math.max(0, Math.floor(snapIdx));
+        const hi = Math.min(lo + 1, snaps.length - 1);
+        const t  = snapIdx - lo;
+        const snapLo = snaps[lo];
+        const snapHi = snaps[hi];
+        if (!snapLo || !snapHi) continue;
+
+        const numH = snapLo.real.length;
+        const real = new Float32Array(numH);
+        const imag = new Float32Array(numH);
+        const eegLinear = (blend - 0.5) / 0.5;
+        const eegT = eegLinear * eegLinear * eegLinear;  // cubic ease-in
         for (let k = 1; k < numH; k++) {
           const eegReal = snapLo.real[k] * (1 - t) + snapHi.real[k] * t;
           const eegImag = snapLo.imag[k] * (1 - t) + snapHi.imag[k] * t;
-          const sine = k === 1 ? 1 : 0;
-          real[k] = sine * (1 - eegT) + eegReal * eegT;
-          imag[k] = eegImag * eegT;
+          const sineImag = k === 1 ? 1 : 0;
+          real[k] = eegReal * eegT;
+          imag[k] = sineImag * (1 - eegT) + eegImag * eegT;
         }
+        wave = ctx.createPeriodicWave(real, imag, { disableNormalization: false });
       }
 
-      const wave = this.#audioCtx.createPeriodicWave(real, imag, {
-        disableNormalization: false
-      });
-      voice.graph.rootOsc.setPeriodicWave(wave);
+      if (!wave) continue;
+
+      // Set new wave on the IDLE oscillator (silent, no click)
+      idleOsc.setPeriodicWave(wave);
+
+      // Crossfade: active → 0, idle → 1 over 30ms
+      activeGain.gain.setTargetAtTime(0, now, XFADE / 3);
+      idleGain.gain.setTargetAtTime(1, now, XFADE / 3);
+
+      // Swap active label
+      voice._wtActive = activeIsA ? 'B' : 'A';
     }
   }
 
@@ -1268,7 +1318,6 @@ export class Engine {
 
     this.#timeupdateTimer = setInterval(() => {
       const t = this.currentTimeSec;
-      this.updateWavetables(t);
       this.#emit('timeupdate', t);
       if (t >= this.#durationSec - 0.1) {
         this.#stopInternal();
@@ -1276,6 +1325,11 @@ export class Engine {
         this.#emit('ended', null);
       }
     }, TIMEUPDATE_INTERVAL_MS);
+
+    // Start wavetable fast timer if blend is not at center
+    if (Math.abs(this.#wavetableBlend - 0.5) >= 0.01) {
+      this.#startWtTimer();
+    }
   }
 
   #stopTimers() {
@@ -1287,6 +1341,7 @@ export class Engine {
       clearInterval(this.#timeupdateTimer);
       this.#timeupdateTimer = null;
     }
+    this.#stopWtTimer();
   }
 
   #stopInternal() {

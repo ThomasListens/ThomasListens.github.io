@@ -165,9 +165,20 @@ export function createVoiceGraph(audioCtx, destination, pitchHz, pan, distortion
   // LAYER 1: Root + AM
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const rootOsc = audioCtx.createOscillator();
-  rootOsc.type = 'sine';
-  rootOsc.frequency.value = pitchHz;
+  // Dual root oscillators for click-free wavetable morphing.
+  // One is active, the other idles at zero gain. On wavetable update,
+  // the new PeriodicWave is set on the idle osc, then gains crossfade.
+  const rootOscA = audioCtx.createOscillator();
+  rootOscA.type = 'sine';
+  rootOscA.frequency.value = pitchHz;
+  const rootOscGainA = audioCtx.createGain();
+  rootOscGainA.gain.value = 1.0;  // A starts active
+
+  const rootOscB = audioCtx.createOscillator();
+  rootOscB.type = 'sine';
+  rootOscB.frequency.value = pitchHz;
+  const rootOscGainB = audioCtx.createGain();
+  rootOscGainB.gain.value = 0.0;  // B starts idle
 
   const rootGain = audioCtx.createGain();
   rootGain.gain.value = 0;
@@ -175,7 +186,10 @@ export function createVoiceGraph(audioCtx, destination, pitchHz, pan, distortion
   const layer1Gain = audioCtx.createGain();
   layer1Gain.gain.value = 1.0;
 
-  rootOsc.connect(rootGain);
+  rootOscA.connect(rootOscGainA);
+  rootOscB.connect(rootOscGainB);
+  rootOscGainA.connect(rootGain);
+  rootOscGainB.connect(rootGain);
   rootGain.connect(layer1Gain);
   layer1Gain.connect(channelBus);
 
@@ -326,10 +340,11 @@ export function createVoiceGraph(audioCtx, destination, pitchHz, pan, distortion
   // RETURN
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const allOscs = [rootOsc, ...overOscs, ...underOscs, fmCarrier, fmModulator];
+  const allOscs = [rootOscA, rootOscB, ...overOscs, ...underOscs, fmCarrier, fmModulator];
   let _muted = false;
 
   return {
+    rootOscA, rootOscB, rootOscGainA, rootOscGainB,  // dual oscs for wavetable crossfade
     allOscs,
     noiseSource,   // started separately (not in allOscs — no frequency)
     rootGain, layer1Gain,
