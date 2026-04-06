@@ -57,6 +57,7 @@ export class Engine {
   #preprocessed    = null;
   #layerGains      = { root: 1, phase: 1, fm: 1, transient: 1 };
   #bandMode        = 'full'; // 'full' | band name | 'auto'
+  #playbackRate    = 1.0;    // 0.25=quarter speed, 1=normal, 2=double
   #stereoWidth     = 1.0;    // 0=mono, 1=atlas, 2=exaggerated
   #wavetableBlend  = 0.5;    // 0=saw, 0.5=sine (default), 1=EEG
   #wtUpdateCounter = 0;
@@ -285,7 +286,7 @@ export class Engine {
 
   get currentTimeSec() {
     if (!this.#audioCtx || !this.#isPlaying) return this.#offsetSec;
-    const elapsed = this.#audioCtx.currentTime - this.#t0;
+    const elapsed = (this.#audioCtx.currentTime - this.#t0) * this.#playbackRate;
     return Math.min(this.#offsetSec + elapsed, this.#durationSec);
   }
 
@@ -411,6 +412,40 @@ export class Engine {
       voice.graph.trimGain.gain.setTargetAtTime(linear, this.#audioCtx.currentTime, 0.02);
     }
   }
+
+  /**
+   * Set per-channel stereo pan position.
+   * Overrides the atlas-derived pan. Respects stereo width scaling.
+   * @param {string} label — channel label
+   * @param {number} pan — [-1 (left) … 0 (center) … +1 (right)]
+   */
+  setChannelPan(label, pan) {
+    const voice = this.#voices.find(v => v.label === label);
+    if (!voice) return;
+    voice.basePan = Math.max(-1, Math.min(1, pan));
+    const scaled = Math.max(-1, Math.min(1, voice.basePan * this.#stereoWidth));
+    voice.pan = scaled;
+    if (voice.graph?.panner && this.#audioCtx) {
+      voice.graph.panner.pan.setTargetAtTime(scaled, this.#audioCtx.currentTime, 0.02);
+    }
+  }
+
+  /**
+   * Set playback rate. 1.0 = normal, 0.5 = half speed, 2.0 = double.
+   * Rebuilds curves at the new rate (brief audio gap during seek).
+   * @param {number} rate — clamped to [0.1, 4.0]
+   */
+  async setPlaybackRate(rate) {
+    rate = Math.max(0.1, Math.min(4.0, rate));
+    if (rate === this.#playbackRate) return;
+    const t = this.currentTimeSec;
+    this.#playbackRate = rate;
+    if (this.#isPlaying) {
+      await this.seek(t, true);
+    }
+  }
+
+  get playbackRate() { return this.#playbackRate; }
 
   /**
    * Set band mode for envelope source.
@@ -1029,10 +1064,11 @@ export class Engine {
         graph.trimGain.gain.value = linear;
       }
 
-      const frameOffset = Math.floor(this.#offsetSec * AUTOMATION_RATE);
-      const remaining   = voice.durationSec - this.#offsetSec;
+      const frameOffset  = Math.floor(this.#offsetSec * AUTOMATION_RATE);
+      const dataRemaining = voice.durationSec - this.#offsetSec;
+      const remaining     = dataRemaining / this.#playbackRate; // real-time seconds
 
-      if (remaining <= 0) { voiceData.push(null); continue; }
+      if (dataRemaining <= 0) { voiceData.push(null); continue; }
 
       const rootSlice  = voice.rootAmpCurve.subarray(frameOffset);
       const fmIdxSlice = voice.fmIndexCurve.subarray(frameOffset);

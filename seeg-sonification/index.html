@@ -305,6 +305,12 @@
     .shaft-row input[type="checkbox"] { accent-color: var(--accent); width: 12px; height: 12px; flex-shrink: 0; margin: 0; cursor: pointer; }
     .shaft-row .shaft-name { color: var(--accent); flex: 1; }
     .shaft-row .shaft-detail { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .shaft-group-input {
+      width: 72px; background: var(--surface); color: var(--text); border: 1px solid var(--border);
+      border-radius: 3px; font-size: 10px; padding: 1px 4px; flex-shrink: 0;
+    }
+    .shaft-group-input:focus { border-color: var(--accent); outline: none; }
+    .shaft-group-input::placeholder { color: var(--dim); }
 
     /* Shaft expander chevron */
     .shaft-chevron {
@@ -351,6 +357,21 @@
       cursor: pointer;
     }
     .option-row select:focus { outline: none; border-color: var(--accent); }
+
+    /* Segment time inputs */
+    .segment-row {
+      display: flex; align-items: center; gap: 6px; padding: 4px 0;
+    }
+    .segment-row .opt-label { color: var(--muted); white-space: nowrap; }
+    .segment-row input[type="number"] {
+      background: var(--surface2); border: 1px solid var(--border2);
+      color: var(--text); padding: 3px 6px; font-family: var(--mono);
+      font-size: 11px; border-radius: 3px; width: 64px; text-align: right;
+    }
+    .segment-row input[type="number"]:focus { outline: none; border-color: var(--accent); }
+    .segment-row .seg-unit { color: var(--muted); font-size: 10px; }
+    .segment-row .seg-dash { color: var(--muted); }
+    .segment-row .seg-info { color: var(--muted); font-size: 10px; margin-left: auto; }
 
     /* Band tags */
     .band-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
@@ -2050,6 +2071,168 @@
       letter-spacing: 0.08em;
       text-align: center;
     }
+
+    /* ── Montage overlay ─────────────────────────────────────────── */
+    /* ── Montage overlay ─────────────────────────────────────────── */
+    #montage-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(6, 6, 8, 0.96);
+      backdrop-filter: blur(10px);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .montage-bar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 16px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0; background: var(--bg2);
+    }
+    .montage-bar h2 {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text); margin: 0;
+    }
+    .montage-bar .bar-gap { flex: 1; }
+    .m-btn {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); font-size: 10px; padding: 3px 10px;
+      border-radius: 3px; cursor: pointer; letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .m-btn:hover { border-color: var(--accent); }
+    .m-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+    .m-btn.primary:hover { opacity: 0.85; }
+    .m-btn.danger { color: var(--warn); }
+    .m-btn.danger:hover { border-color: var(--warn); }
+
+    /* Bulk actions bar — shown when checkboxes are ticked */
+    .montage-bulk {
+      display: none; align-items: center; gap: 8px;
+      padding: 5px 16px; border-bottom: 1px solid var(--border);
+      background: var(--surface); flex-shrink: 0; font-size: 10px;
+    }
+    .montage-bulk.active { display: flex; }
+    .montage-bulk .bulk-count { color: var(--accent); font-weight: 600; margin-right: 4px; }
+
+    /* Table */
+    .montage-scroll { flex: 1; overflow-y: auto; }
+    .m-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .m-table th {
+      text-align: left; font-size: 8px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim);
+      padding: 4px 6px; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; background: rgba(6, 6, 8, 0.96); z-index: 1;
+    }
+    .m-table td { padding: 2px 6px; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text); }
+    .m-table tr:hover td { background: var(--surface2); }
+    .m-table tr.selected td { background: rgba(124,127,250,0.08); }
+    .m-table tr.dragging { opacity: 0.35; }
+    .m-table tr.drop-above td { box-shadow: inset 0 2px 0 0 var(--accent); }
+    .m-table tr.drop-below td { box-shadow: inset 0 -2px 0 0 var(--accent); }
+
+    /* Group separator rows */
+    .m-table tr.group-row td {
+      background: var(--surface); padding: 5px 6px;
+      border-bottom: 1px solid var(--border); font-weight: 600;
+    }
+    .m-table tr.group-row:hover td { background: var(--surface2); }
+    .group-name-edit {
+      background: transparent; border: 1px solid transparent; color: var(--accent);
+      font-size: 11px; font-weight: 600; padding: 0 4px; border-radius: 2px;
+      letter-spacing: 0.04em;
+    }
+    .group-name-edit:hover { border-color: var(--border); }
+    .group-name-edit:focus { border-color: var(--accent); outline: none; background: var(--surface); }
+
+    /* Grip handle */
+    .m-grip { cursor: grab; color: var(--dim); font-size: 10px; user-select: none; text-align: center; }
+    .m-grip:hover { color: var(--text); }
+
+    /* Compact inputs */
+    .m-table input[type="text"] {
+      background: transparent; border: 1px solid transparent; color: var(--text);
+      font-size: 11px; padding: 1px 3px; border-radius: 2px; width: 100%;
+    }
+    .m-table input[type="text"]:hover { border-color: var(--border); }
+    .m-table input[type="text"]:focus { border-color: var(--accent); outline: none; background: var(--surface); }
+    .m-table input[type="range"] { width: 52px; accent-color: var(--accent); vertical-align: middle; }
+    .m-table input[type="color"] {
+      width: 18px; height: 14px; padding: 0; border: 1px solid var(--border);
+      border-radius: 2px; cursor: pointer; background: transparent;
+    }
+    .m-table select {
+      background: var(--surface); color: var(--text); border: 1px solid var(--border);
+      border-radius: 2px; font-size: 10px; padding: 1px 3px; cursor: pointer; max-width: 80px;
+    }
+    .m-pan-val, .m-hz-val {
+      font-size: 8px; color: var(--muted); display: inline-block;
+      min-width: 22px; text-align: center; font-variant-numeric: tabular-nums;
+    }
+    .m-vol-val {
+      font-size: 8px; color: var(--muted); min-width: 32px;
+      display: inline-block; text-align: center; font-variant-numeric: tabular-nums;
+    }
+
+    /* Derivation builder (bottom panel) */
+    .montage-derive {
+      display: none; flex-shrink: 0; padding: 8px 16px;
+      border-top: 1px solid var(--border); background: var(--bg2);
+      align-items: center; gap: 10px; font-size: 11px;
+    }
+    .montage-derive.active { display: flex; }
+    .montage-derive label { color: var(--dim); font-size: 9px; letter-spacing: 0.06em; }
+    .montage-derive select { max-width: 180px; }
+
+    /* ── Export overlay ──────────────────────────────────────────── */
+    #export-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(6, 6, 8, 0.96);
+      backdrop-filter: blur(10px);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .export-bar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 16px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0; background: var(--bg2);
+    }
+    .export-bar h2 {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text); margin: 0;
+    }
+    .export-body {
+      flex: 1; overflow-y: auto; padding: 16px 20px;
+      display: flex; flex-direction: column; gap: 16px;
+    }
+    .export-scope {
+      display: flex; align-items: center; gap: 12px; font-size: 11px; color: var(--text);
+    }
+    .export-scope label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+    .export-channels {
+      display: flex; flex-wrap: wrap; gap: 6px; font-size: 10px;
+    }
+    .export-channels label { display: flex; align-items: center; gap: 3px; cursor: pointer; color: var(--text); }
+    .export-ch-mode { font-size: 10px; color: var(--dim); display: flex; gap: 8px; }
+    .export-ch-mode label { display: flex; align-items: center; gap: 3px; cursor: pointer; color: var(--text); }
+    .export-panels {
+      display: flex; gap: 12px; flex-wrap: wrap;
+    }
+    .export-card {
+      flex: 1; min-width: 220px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 4px; padding: 12px;
+    }
+    .export-card h3 {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--accent); margin: 0 0 10px 0;
+    }
+    .export-card .e-row {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+      font-size: 10px; color: var(--text);
+    }
+    .export-card .e-row label { color: var(--dim); min-width: 56px; font-size: 9px; letter-spacing: 0.04em; }
+    .export-card select, .export-card input[type="number"] {
+      background: var(--bg); color: var(--text); border: 1px solid var(--border);
+      border-radius: 2px; font-size: 10px; padding: 2px 4px;
+    }
+    .export-card .e-note {
+      font-size: 8px; color: var(--dim); margin-top: 8px; line-height: 1.5;
+    }
   </style>
 </head>
 <body>
@@ -2060,6 +2243,8 @@
   <span class="header-fname" id="header-fname" style="display:none"></span>
   <div class="file-info" id="header-file-info" style="display:none"></div>
   <button class="header-action" id="btn-about" style="margin-left:auto">About</button>
+  <button class="header-action" id="btn-montage" style="display:none">Montage</button>
+  <button class="header-action" id="btn-export" style="display:none">Export</button>
   <button class="header-action" id="btn-reopen" style="display:none">Open file…</button>
 </div>
 
@@ -2082,14 +2267,14 @@
     </div>
 
     <div id="drop-zone">
-      <div class="dz-title">Drop EDF file here</div>
+      <div class="dz-title">Drop EEG file here</div>
       <div class="dz-sub">
         or click to browse<br>
-        EDF and EDF+ (with annotations) supported
+        EDF, EDF+, and EEGLAB .set supported
       </div>
-      <span class="dz-ext">.edf &nbsp;·&nbsp; .edf+</span>
+      <span class="dz-ext">.edf &nbsp;·&nbsp; .edf+ &nbsp;·&nbsp; .set</span>
     </div>
-    <input type="file" id="file-input" accept=".edf">
+    <input type="file" id="file-input" accept=".edf,.set,.fdt" multiple>
   </div>
 
   <!-- ── Screen: Import review ──────────────────────────────────────────── -->
@@ -2136,6 +2321,14 @@
               <option value="none">None (monopolar)</option>
             </select>
           </div>
+          <div class="segment-row">
+            <span class="opt-label">Segment</span>
+            <input type="number" id="opt-seg-start" min="0" step="1" value="0">
+            <span class="seg-dash">–</span>
+            <input type="number" id="opt-seg-end" min="1" step="1" value="0">
+            <span class="seg-unit">sec</span>
+            <span class="seg-info" id="seg-info"></span>
+          </div>
           <div id="line-ambig-warning" class="line-ambig" style="display:none"></div>
           <div id="prebipolar-note" class="line-ambig" style="display:none;border-color:var(--accent);color:var(--accent);background:var(--accent-bg)"></div>
         </div>
@@ -2170,6 +2363,12 @@
         <button class="transport-btn" id="btn-zoom-sel" title="Zoom to selected channels (Z)">Z</button>
         <button class="transport-btn" id="btn-zoom-reset" title="Reset zoom (Esc)" style="font-size:11px">⟲</button>
         <button class="transport-btn" id="btn-add-marker" title="Add marker at playhead (N)" style="font-size:11px">⚑</button>
+        <div style="display:flex;align-items:center;gap:3px;margin:0 4px;flex-shrink:0">
+          <span style="font-size:8px;color:var(--dim);letter-spacing:0.06em">RATE</span>
+          <input type="range" id="rate-slider" min="10" max="200" value="100" step="5"
+            style="width:48px;accent-color:var(--accent)" title="Playback rate">
+          <span id="rate-val" style="font-size:9px;color:var(--muted);min-width:28px;font-variant-numeric:tabular-nums">1.0×</span>
+        </div>
         <div class="transport-seek">
           <span class="transport-time cur" id="transport-cur">0:00</span>
           <div id="seek-wrap" style="position:relative;flex:1;display:flex;align-items:center;height:28px">
@@ -2611,6 +2810,188 @@
 
 </div><!-- /main -->
 
+<!-- ── Montage overlay ───────────────────────────────────────────────────── -->
+<div id="montage-overlay" style="display:none">
+  <!-- Top bar -->
+  <div class="montage-bar">
+    <h2>Montage</h2>
+    <button class="m-btn" id="m-add-group">+ Group</button>
+    <button class="m-btn" id="m-add-derive">+ Derivation</button>
+    <span class="bar-gap"></span>
+    <button class="m-btn" id="m-close">Cancel</button>
+    <button class="m-btn primary" id="m-apply">Apply &amp; Close</button>
+  </div>
+
+  <!-- Bulk actions (hidden until checkboxes ticked) -->
+  <div class="montage-bulk" id="m-bulk">
+    <span class="bulk-count" id="m-bulk-count">0</span> selected
+    <button class="m-btn" id="m-bulk-group">Move to group…</button>
+    <button class="m-btn" id="m-bulk-pan">Set pan…</button>
+    <button class="m-btn" id="m-bulk-color">Set color…</button>
+    <button class="m-btn" id="m-bulk-vol">Set volume…</button>
+    <button class="m-btn danger" id="m-bulk-remove">Remove</button>
+  </div>
+
+  <!-- Main channel table -->
+  <div class="montage-scroll">
+    <table class="m-table">
+      <thead>
+        <tr>
+          <th style="width:20px"></th>
+          <th style="width:20px"></th>
+          <th>Channel</th>
+          <th style="width:80px">Group</th>
+          <th style="width:56px">Volume</th>
+          <th style="width:80px">Pan</th>
+          <th style="width:56px">Pitch</th>
+          <th style="width:48px">Hz</th>
+          <th style="width:28px">Color</th>
+        </tr>
+      </thead>
+      <tbody id="m-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Derivation builder (shown when + Derivation clicked) -->
+  <div class="montage-derive" id="m-derive-panel">
+    <label>Signal A</label>
+    <select id="m-derive-a"></select>
+    <span style="color:var(--dim)">minus</span>
+    <label>Signal B</label>
+    <select id="m-derive-b"></select>
+    <label>Label</label>
+    <input type="text" id="m-derive-label" style="width:100px" placeholder="auto">
+    <button class="m-btn primary" id="m-derive-go">Add</button>
+    <button class="m-btn" id="m-derive-cancel">Cancel</button>
+  </div>
+</div>
+
+<!-- ── Export overlay ─────────────────────────────────────────────────────── -->
+<div id="export-overlay" style="display:none">
+  <div class="export-bar">
+    <h2>Export</h2>
+    <span class="bar-gap" style="flex:1"></span>
+    <button class="m-btn" id="export-close">Close</button>
+  </div>
+  <div class="export-body">
+
+    <!-- Scope -->
+    <div class="export-scope">
+      <strong style="color:var(--dim);font-size:9px;letter-spacing:0.06em">SCOPE</strong>
+      <label><input type="radio" name="export-scope" value="whole" checked> Whole file</label>
+      <label><input type="radio" name="export-scope" value="selection"> Loop selection</label>
+      <span id="export-sel-info" style="font-size:9px;color:var(--dim)"></span>
+    </div>
+
+    <!-- Channel checkboxes -->
+    <div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <strong style="color:var(--dim);font-size:9px;letter-spacing:0.06em">CHANNELS</strong>
+        <button class="m-btn" id="export-ch-all" style="font-size:8px;padding:1px 6px">All</button>
+        <button class="m-btn" id="export-ch-none" style="font-size:8px;padding:1px 6px">None</button>
+      </div>
+      <div class="export-channels" id="export-ch-list"></div>
+      <div class="export-ch-mode" style="margin-top:6px">
+        <label><input type="radio" name="export-ch-mode" value="sum" checked> Summed (stereo mix)</label>
+        <label><input type="radio" name="export-ch-mode" value="individual"> Individual files</label>
+      </div>
+    </div>
+
+    <!-- Three export cards -->
+    <div class="export-panels">
+
+      <!-- WAV Audio -->
+      <div class="export-card">
+        <h3>WAV Audio</h3>
+        <div class="e-row">
+          <label>Source</label>
+          <select id="exp-wav-mode">
+            <option value="synthesis">Synthesis</option>
+            <option value="raw">Raw EEG</option>
+          </select>
+        </div>
+        <div class="e-row">
+          <label>Bit depth</label>
+          <select id="exp-wav-bits">
+            <option value="32" selected>32-bit float</option>
+            <option value="16">16-bit PCM</option>
+          </select>
+        </div>
+        <div class="e-row">
+          <label>Sample rate</label>
+          <select id="exp-wav-sr">
+            <option value="44100">44100</option>
+            <option value="48000" selected>48000</option>
+            <option value="96000">96000</option>
+          </select>
+        </div>
+        <button class="m-btn primary" id="exp-wav-go" style="margin-top:8px;width:100%">Export WAV</button>
+        <div class="e-note" id="exp-wav-status"></div>
+      </div>
+
+      <!-- Automation Envelope -->
+      <div class="export-card">
+        <h3>Automation Envelope</h3>
+        <div class="e-row">
+          <label>Signal</label>
+          <select id="exp-env-signal">
+            <option value="raw">Raw signal</option>
+            <option value="envelope" selected>Envelope</option>
+            <option value="derivative">Derivative</option>
+            <option value="bandpass">Band power</option>
+          </select>
+        </div>
+        <div class="e-row" id="exp-env-band-row" style="display:none">
+          <label>Band</label>
+          <select id="exp-env-band">
+            <option value="delta">Delta</option>
+            <option value="theta">Theta</option>
+            <option value="alpha" selected>Alpha</option>
+            <option value="beta">Beta</option>
+            <option value="lowGamma">Low Gamma</option>
+            <option value="highGamma">High Gamma</option>
+          </select>
+        </div>
+        <div class="e-row">
+          <label>Density</label>
+          <input type="number" id="exp-env-pps" value="50" min="1" max="200" style="width:50px">
+          <span style="color:var(--dim);font-size:9px">pts/sec</span>
+        </div>
+        <div class="e-row">
+          <label>Normalize</label>
+          <label style="min-width:0"><input type="checkbox" id="exp-env-norm" checked> 0–1</label>
+        </div>
+        <button class="m-btn primary" id="exp-env-go" style="margin-top:8px;width:100%">Export Envelope</button>
+        <div class="e-note">Exports CSV + REAPER automation snippet.<br>One channel at a time — uses first selected.</div>
+      </div>
+
+      <!-- Wavetable -->
+      <div class="export-card">
+        <h3>Wavetable</h3>
+        <div class="e-row">
+          <label>Frame size</label>
+          <select id="exp-wt-size">
+            <option value="256">256</option>
+            <option value="512">512</option>
+            <option value="1024" selected>1024</option>
+            <option value="2048">2048</option>
+          </select>
+        </div>
+        <div class="e-row">
+          <label>Mode</label>
+          <select id="exp-wt-mode">
+            <option value="single">Single frame</option>
+            <option value="stack" selected>Stacked</option>
+          </select>
+        </div>
+        <button class="m-btn primary" id="exp-wt-go" style="margin-top:8px;width:100%">Export Wavetable</button>
+        <div class="e-note">Requires a loop selection. For cleanest loops, select a segment that starts and ends near zero crossing.<br>Compatible with Surge XT, Vital, Serum.</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <!-- ────────────────────────────────────────────────────────────────────────────
      Application logic — regular script (NOT type=module) so the UI responds
      to clicks immediately, even before module imports complete.
@@ -2626,6 +3007,8 @@
   let currentFile    = null;
   let selectedShafts = new Set();  // shaft names selected for processing
   let excludedContacts = new Map(); // shaftName → Set<contactNumber> excluded within that shaft
+  let shaftGroupNames = new Map();  // originalShaftName → customGroupName (montage renaming)
+  let channelPanOverrides = new Map(); // channelLabel → pan [-1…+1]
 
   // Engine state
   let engine  = null;
@@ -2902,12 +3285,13 @@
   dropZone.addEventListener('drop', e => {
     e.preventDefault();
     dropZone.classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
+    const files = [...e.dataTransfer.files];
+    if (files.length) handleFiles(files);
   });
 
   fileInput.addEventListener('change', e => {
-    if (e.target.files[0]) handleFile(e.target.files[0]);
+    const files = [...e.target.files];
+    if (files.length) handleFiles(files);
     fileInput.value = '';   // allow re-selecting the same file
   });
 
@@ -2935,33 +3319,58 @@
   })();
 
   // ── File handling ─────────────────────────────────────────────────────────
-  async function handleFile(file) {
+
+  /** Route dropped/selected files: pair .set+.fdt, then delegate. */
+  function handleFiles(files) {
+    // Find the primary file (.edf or .set)
+    const setFile = files.find(f => f.name.toLowerCase().endsWith('.set'));
+    const fdtFile = files.find(f => f.name.toLowerCase().endsWith('.fdt'));
+    const edfFile = files.find(f => f.name.toLowerCase().endsWith('.edf'));
+
+    if (setFile) {
+      handleFile(setFile, fdtFile);
+    } else if (edfFile) {
+      handleFile(edfFile);
+    } else if (files[0]) {
+      handleFile(files[0]); // let it try and show a useful error
+    }
+  }
+
+  async function handleFile(file, fdtFile = null) {
     // git-annex pointer files (BIDS/OpenNeuro datasets) are tiny text files,
-    // not actual EDF data. A real EDF is always at least several KB.
+    // not actual EDF data. A real file is always at least several KB.
     if (file.size < 4096) {
       alert(
-        '"' + file.name + '" is only ' + file.size + ' bytes — too small to be a valid EDF file.\n\n' +
+        '"' + file.name + '" is only ' + file.size + ' bytes — too small to be a valid data file.\n\n' +
         'If this file is from a BIDS dataset (e.g. OpenNeuro), it may be a git-annex pointer.\n' +
         'Download the actual data first:\n\n' +
-        '  git annex get <path/to/file.edf>\n' +
-        '  datalad get <path/to/file.edf>'
+        '  git annex get <path/to/file>\n' +
+        '  datalad get <path/to/file>'
       );
       return;
     }
 
+    const isSET = file.name.toLowerCase().endsWith('.set');
     currentFile = file;
     showProcessing('Parsing ' + file.name + '…');
 
     try {
-      // Dynamic import — requires HTTP server
-      const [{ parseEDF }, { analyzeImport }] = await Promise.all([
-        import('./lib/edf-parser.js'),
-        import('./src/import.js'),
-      ]);
+      const { analyzeImport } = await import('./src/import.js');
 
-      const buffer  = await file.arrayBuffer();
-      edfResult     = parseEDF(buffer);
-      importResult  = analyzeImport(edfResult);
+      if (isSET) {
+        // ── EEGLAB .set path ───────────────────────────────────────────────
+        const { parseSET } = await import('./lib/set-parser.js');
+        const setBuffer = await file.arrayBuffer();
+        const fdtBuffer = fdtFile ? await fdtFile.arrayBuffer() : null;
+        edfResult    = await parseSET(setBuffer, fdtBuffer);
+        importResult = analyzeImport(edfResult);
+      } else {
+        // ── EDF path (default) ─────────────────────────────────────────────
+        const { parseEDF } = await import('./lib/edf-parser.js');
+        const buffer  = await file.arrayBuffer();
+        edfResult     = parseEDF(buffer);
+        importResult  = analyzeImport(edfResult);
+      }
 
       hideProcessing();
       renderImportScreen(file.name);
@@ -3054,13 +3463,25 @@
         group.className = 'shaft-group';
 
         // Shaft header row — div (not label) so chevron click doesn't toggle checkbox
+        const isDefaultOff = shaft.defaultOff === true;
         const row = document.createElement('div');
         row.className = 'shaft-row';
         row.innerHTML =
           `<span class="shaft-chevron" data-shaft="${esc(name)}">▸</span>` +
-          `<input type="checkbox" class="shaft-cb" data-shaft="${esc(name)}">` +
-          `<span class="shaft-name">${esc(name)}</span>` +
-          `<span class="shaft-detail">${esc(detail)}</span>`;
+          `<input type="checkbox" class="shaft-cb" data-shaft="${esc(name)}"` +
+          `${isDefaultOff ? ' data-default-off="1"' : ''}>` +
+          `<span class="shaft-name"${isDefaultOff ? ' style="color:var(--dim)"' : ''}>${esc(name)}</span>` +
+          `<span class="shaft-detail">${esc(detail)}</span>` +
+          `<input type="text" class="shaft-group-input" data-shaft="${esc(name)}" ` +
+          `placeholder="group…" title="Custom group name (channels with the same group name will be grouped together)">`;
+        // Wire up group name input
+        const groupInput = row.querySelector('.shaft-group-input');
+        groupInput.addEventListener('input', () => {
+          const val = groupInput.value.trim();
+          if (val) shaftGroupNames.set(name, val);
+          else shaftGroupNames.delete(name);
+        });
+        groupInput.addEventListener('click', e => e.stopPropagation());
         group.appendChild(row);
 
         // Contact list (initially hidden)
@@ -3163,6 +3584,12 @@
               shaftCb.checked = false;
               shaftCb.indeterminate = true;
               selectedShafts.add(shaft); // partial = still included
+              // Rebuild excludedContacts from all unchecked contacts
+              const excl = new Set();
+              allCbs.forEach(cb => {
+                if (!cb.checked) excl.add(parseInt(cb.dataset.contact, 10));
+              });
+              if (excl.size > 0) excludedContacts.set(shaft, excl);
             }
           }
           updateShaftCount();
@@ -3172,11 +3599,16 @@
 
       document.getElementById('btn-shafts-all').addEventListener('click', () => {
         shaftEl.querySelectorAll('.shaft-cb').forEach(cb => {
+          // Skip auxiliary/defaultOff groups — user must opt in explicitly
+          if (cb.dataset.defaultOff) return;
           cb.checked = true;
           cb.indeterminate = false;
           selectedShafts.add(cb.dataset.shaft);
         });
-        shaftEl.querySelectorAll('.contact-cb').forEach(cb => { cb.checked = true; });
+        shaftEl.querySelectorAll('.contact-cb').forEach(cb => {
+          if (cb.closest('.shaft-group')?.querySelector('.shaft-cb[data-default-off]')) return;
+          cb.checked = true;
+        });
         excludedContacts.clear();
         updateShaftCount();
       });
@@ -3200,13 +3632,8 @@
         `<span class="shaft-detail">${ir.scalp.length} channels</span>`;
       shaftEl.appendChild(row);
     }
-    if (ir.auxiliary.length > 0) {
-      const row = document.createElement('div');
-      row.className = 'shaft-row';
-      row.innerHTML = `<span class="shaft-name" style="color:var(--dim)">Excluded</span>` +
-        `<span class="shaft-detail" style="color:var(--dim)">${ir.auxiliary.map(s => s.label).join(', ')}</span>`;
-      shaftEl.appendChild(row);
-    }
+    // Auxiliary channels are now surfaced as a selectable "Auxiliary" group
+    // in shaftSummary (with defaultOff=true) — rendered by the shaft loop above.
 
     // Line noise
     const lfSel = document.getElementById('opt-line-freq');
@@ -3235,6 +3662,16 @@
       refSel.value = s.type === 'EEG' ? 'car' : 'bipolar';
     }
 
+    // Segment time range
+    const durSec = Math.floor(ir.duration);
+    const segStart = document.getElementById('opt-seg-start');
+    const segEnd   = document.getElementById('opt-seg-end');
+    segStart.value = 0;
+    segStart.max   = durSec;
+    segEnd.value   = durSec;
+    segEnd.max     = durSec;
+    document.getElementById('seg-info').textContent = `(full = ${durSec}s)`;
+
     // Bands
     const bandEl = document.getElementById('import-band-tags');
     bandEl.innerHTML = '';
@@ -3261,6 +3698,16 @@
 
   async function runPreprocess() {
     if (!importResult) return;
+
+    // Restore full signal data if a previous segment trim was applied
+    if (importResult._origDuration != null) {
+      importResult.duration = importResult._origDuration;
+    }
+    const allSigs = [...importResult.scalp, ...importResult.seeg,
+                     ...importResult.unknown, ...importResult.auxiliary];
+    for (const sig of allSigs) {
+      if (sig._fullData) sig.data = sig._fullData;
+    }
 
     const lineFreq      = parseInt(document.getElementById('opt-line-freq').value, 10);
     const referenceMode = document.getElementById('opt-reference').value;
@@ -3294,7 +3741,34 @@
         }
       }
 
-      showProcessing('Preprocessing: DC removal + notch + re-reference…');
+      // ── Segment trimming ─────────────────────────────────────────────────
+      const fullDur     = importResult._origDuration ?? importResult.duration;
+      const segStartRaw = parseFloat(document.getElementById('opt-seg-start').value);
+      const segEndRaw   = parseFloat(document.getElementById('opt-seg-end').value);
+      const segStartSec = Math.max(0, Math.min(isFinite(segStartRaw) ? segStartRaw : 0, fullDur));
+      const segEndSec   = Math.max(segStartSec + 1, Math.min(isFinite(segEndRaw) ? segEndRaw : fullDur, fullDur));
+      const segmented   = segStartSec > 0 || segEndSec < fullDur;
+
+      if (segmented) {
+        // Trim every signal's .data (shallow subarray — raw EDF buffer survives)
+        const allSignals = [...importResult.scalp, ...importResult.seeg,
+                            ...importResult.unknown, ...importResult.auxiliary];
+        for (const sig of allSignals) {
+          const fs  = sig.fs;
+          if (!fs) continue;
+          sig._fullData = sig._fullData || sig.data;   // stash original once
+          const s0  = Math.max(0, Math.round(segStartSec * fs));
+          const s1  = Math.min(sig._fullData.length, Math.round(segEndSec * fs));
+          sig.data = sig._fullData.subarray(s0, Math.max(s0, s1));
+        }
+        importResult._segStart     = segStartSec;
+        importResult._segEnd       = segEndSec;
+        importResult._origDuration = importResult._origDuration ?? importResult.duration;
+        importResult.duration      = segEndSec - segStartSec;
+        showProcessing(`Preprocessing segment ${segStartSec}–${segEndSec}s…`);
+      } else {
+        showProcessing('Preprocessing: DC removal + notch + re-reference…');
+      }
       await new Promise(r => setTimeout(r, 30));
 
       const t0  = performance.now();
@@ -3312,6 +3786,7 @@
           `Feature extraction: ${i + 1} / ${total}  —  ${ch.label}`
         );
         await new Promise(r => setTimeout(r, 0));   // yield to UI thread
+        console.log(`[feat] ${ch.label}: data.length=${ch.data?.length}, fs=${ch.fs}`);
         ch.features = extractFeatures(ch.data, ch.fs);
       }
       const tFeatures = performance.now() - tFeat0;
@@ -3345,6 +3820,7 @@
     // Compute pitch map for TCP display
     const { assignPitches } = await import('./src/mapping.js');
     pitchMap = assignPitches(channels, masterTune, ratioOverrides.size > 0 ? ratioOverrides : null, tuningMode, octaveCap, primeLimit);
+    _applyPanOverrides();
 
     // Header file info — hide the import-screen filename, show the full info bar
     const hfn2 = document.getElementById('header-fname');
@@ -3360,6 +3836,8 @@
       `<span class="pill">${esc(s.fs + ' Hz')}</span>`;
 
     document.getElementById('btn-reopen').style.display = '';
+    document.getElementById('btn-montage').style.display = '';
+    document.getElementById('btn-export').style.display = '';
 
     // Status bar
     const flagged = channels.filter(c => c.quality?.status === 'bad').length;
@@ -3388,16 +3866,21 @@
     const _rmsP95 = _rmsVals[Math.floor(_rmsVals.length * 0.95)] ?? 1;
     window._rmsHeatRange = { lo: _rmsP05, hi: _rmsP95 };
 
-    if (referenceMode === 'bipolar') {
-      // Group by shaft
-      const byShaft = {};
+    const hasCustomGroups = shaftGroupNames.size > 0 || channels.some(c => c._customGroup);
+    if (referenceMode === 'bipolar' || hasCustomGroups) {
+      // Group by effective group (custom name > shaft rename > original shaft)
+      const byGroup = new Map();
+      if (montageGroupOrder.length > 0) {
+        for (const g of montageGroupOrder) byGroup.set(g, []);
+      }
       for (const ch of channels) {
-        const key = ch.shaft || '(other)';
-        if (!byShaft[key]) byShaft[key] = [];
-        byShaft[key].push(ch);
+        const key = _effectiveGroup(ch);
+        if (!byGroup.has(key)) byGroup.set(key, []);
+        byGroup.get(key).push(ch);
       }
 
-      for (const [shaftName, chs] of Object.entries(byShaft)) {
+      for (const [shaftName, chs] of byGroup) {
+        if (chs.length === 0) continue;
         const gHdr = document.createElement('div');
         gHdr.className = 'shaft-header';
         const gBad  = chs.filter(c => c.quality?.status === 'bad').length;
@@ -3478,10 +3961,9 @@
         for (const ch of chs) appendTrackRow(shaftGroup, ch);
         trackArea.appendChild(shaftGroup);
 
-        // Click header to collapse/expand, or select shaft channels
+        // Click header to collapse/expand, Alt+click to select group
         titleSpan.addEventListener('click', e => {
           if (e.altKey) {
-            // Alt+click shaft header: select all channels in shaft
             selectShaftChannels(shaftName);
             return;
           }
@@ -4052,10 +4534,19 @@
         drawSynthesizedWaveform(ctx, label, vStart, vDur, width, height);
       }
 
-      const hue = shaftHues[ch.shaft || ch.label] ?? 200;
-      const lightness = ch.quality?.status === 'bad' ? 25 : 45;
+      // Use montage color if set, otherwise fall back to shaft hue
+      let traceColor;
+      if (channelColors.size > 0 || groupColors.size > 0) {
+        const mc = _channelColor(ch.label);
+        const lightness = ch.quality?.status === 'bad' ? 0.4 : 1.0;
+        traceColor = lightness < 1 ? mc + '66' : mc;
+      } else {
+        const hue = shaftHues[ch.shaft || ch.label] ?? 200;
+        const lightness = ch.quality?.status === 'bad' ? 25 : 45;
+        traceColor = `hsl(${hue}, 55%, ${lightness}%)`;
+      }
 
-      ctx.strokeStyle = `hsl(${hue}, 55%, ${lightness}%)`;
+      ctx.strokeStyle = traceColor;
       ctx.lineWidth = 0.8;
       ctx.beginPath();
 
@@ -4934,7 +5425,19 @@
       const t = engine ? engine.currentTimeSec : 0;
       addMarker(t);
     } else if (e.code === 'Escape') {
-      // Close About overlay first if open
+      // Close overlays first
+      const montageOv = document.getElementById('montage-overlay');
+      if (montageOv && montageOv.style.display === 'flex') {
+        closeMontage();
+        e.preventDefault();
+        return;
+      }
+      const exportOv = document.getElementById('export-overlay');
+      if (exportOv && exportOv.style.display === 'flex') {
+        closeExport();
+        e.preventDefault();
+        return;
+      }
       const aboutOv = document.getElementById('about-overlay');
       if (aboutOv && aboutOv.style.display === 'flex') {
         aboutOv.style.display = 'none';
@@ -4998,7 +5501,7 @@
   function selectShaftChannels(shaftName) {
     if (!preprocessed) return;
     for (const ch of preprocessed.channels) {
-      if ((ch.shaft || ch.label) === shaftName) selectedChannels.add(ch.label);
+      if (_effectiveGroup(ch) === shaftName) selectedChannels.add(ch.label);
     }
     applySelectionVisuals();
     updateInspector();
@@ -6340,7 +6843,8 @@
     ratioInput.type = 'text';
     ratioInput.value = ratioLabel;
     ratioInput.title = `Ratio for ${ch.label} — e.g. 3/2, 5/4, 2/1 (Enter to apply)`;
-    ratioInput.addEventListener('click', e => e.stopPropagation());
+    ratioInput.addEventListener('click', e => { e.stopPropagation(); ratioInput.select(); });
+    ratioInput.addEventListener('focus', () => ratioInput.select());
     ratioInput.addEventListener('change', async e => {
       e.stopPropagation();
       const newRatio = parseRatio(e.target.value);
@@ -6376,9 +6880,14 @@
     const sat = Math.round(t * 25);
     const rmsColor = t < 0.1 ? 'var(--muted)' : `hsl(${hue}, ${sat}%, 55%)`;
 
+    const dotColor = (channelColors.size > 0 || groupColors.size > 0)
+      ? _channelColor(ch.label) : '';
+    const dotStyle = dotColor
+      ? `background:${dotColor}; opacity:0.7; box-shadow:0 0 4px ${dotColor}40` : '';
+
     tcp.innerHTML =
       `<div style="display:flex;align-items:center;justify-content:center">` +
-        `<div class="tcp-dot"></div></div>` +
+        `<div class="tcp-dot"${dotStyle ? ` style="${dotStyle}"` : ''}></div></div>` +
       `<div class="tcp-label">${esc(ch.label)}</div>` +
       `<div class="tcp-val" style="color:${rmsColor}">${esc(rms)}</div>`;
     tcp.appendChild(ratioInput);
@@ -6406,6 +6915,149 @@
     if (status === 'bad') {
       muteBtn.classList.add('muted');
     }
+  }
+
+  // ── Montage helpers ──────────────────────────────────────────────────────
+
+  /** Apply user pan overrides to pitchMap entries. */
+  function _applyPanOverrides() {
+    if (!pitchMap || channelPanOverrides.size === 0) return;
+    for (const [label, pan] of channelPanOverrides) {
+      const entry = pitchMap.get(label);
+      if (entry) entry.pan = pan;
+    }
+  }
+
+  /** Format pan value as "L50", "C", "R30" etc. */
+  function _panLabel(pan) {
+    if (Math.abs(pan) < 0.02) return 'C';
+    return (pan < 0 ? 'L' : 'R') + Math.abs(Math.round(pan * 100));
+  }
+
+  /** Get all known group names (auto-detected + user-created). */
+  function _allGroupNames() {
+    const names = new Set();
+    if (preprocessed) {
+      for (const ch of preprocessed.channels) {
+        names.add(_effectiveGroup(ch));
+      }
+    }
+    // Also include any groups created via shaft rename
+    for (const v of shaftGroupNames.values()) names.add(v);
+    return [...names].sort();
+  }
+
+
+  /** Assign a channel to a custom group. */
+  function _assignChannelGroup(label, groupName) {
+    if (!preprocessed) return;
+    const ch = preprocessed.channels.find(c => c.label === label);
+    if (!ch) return;
+    // We use shaftGroupNames but need a per-channel override.
+    // Since multiple channels can share a shaft, we create a synthetic shaft entry.
+    // Store on the channel object directly.
+    ch._customGroup = groupName;
+  }
+
+  /**
+   * Get the effective group for a channel, checking per-channel override first,
+   * then shaft-level rename, then original shaft name.
+   */
+  function _effectiveGroup(ch) {
+    if (ch._customGroup) return ch._customGroup;
+    const shaft = ch.shaft || '(Ungrouped)';
+    return shaftGroupNames.get(shaft) || shaft;
+  }
+
+  /**
+   * Re-render the track area with current grouping, preserving mute/solo/selection state.
+   */
+  function _refreshTrackGrouping() {
+    if (!preprocessed) return;
+    const channels = preprocessed.channels;
+
+    // Save state
+    const mutedLabels = new Set();
+    const savedSelection = new Set(selectedChannels);
+    document.querySelectorAll('.tcp-mute.muted').forEach(btn => {
+      const row = btn.closest('.track-row');
+      if (row) mutedLabels.add(row.dataset.label);
+    });
+
+    // Rebuild grouped structure
+    const trackArea = document.getElementById('track-area');
+    const placeholder = document.getElementById('timeline-placeholder');
+    trackArea.innerHTML = '';
+    if (placeholder) trackArea.appendChild(placeholder);
+
+    // Build groups respecting montageGroupOrder if available
+    const grouped = new Map();
+    if (montageGroupOrder.length > 0) {
+      for (const g of montageGroupOrder) grouped.set(g, []);
+    }
+    for (const ch of channels) {
+      const g = _effectiveGroup(ch);
+      if (!grouped.has(g)) grouped.set(g, []);
+      grouped.get(g).push(ch);
+    }
+
+    for (const [groupName, chs] of grouped) {
+      if (chs.length === 0) continue; // skip empty groups in workspace
+      // Group header
+      const gHdr = document.createElement('div');
+      gHdr.className = 'shaft-header';
+
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'shaft-title';
+      titleSpan.textContent = '\u25BC ' + groupName;
+      titleSpan.title = 'Select group (Ctrl+click to add)';
+
+      const metaSpan = document.createElement('span');
+      metaSpan.className = 'shaft-meta';
+      metaSpan.innerHTML = `<span style="color:var(--muted)">${chs.length} ch</span>`;
+      metaSpan.style.cursor = 'pointer';
+
+      gHdr.appendChild(titleSpan);
+      gHdr.appendChild(metaSpan);
+      trackArea.appendChild(gHdr);
+
+      // Channel rows
+      const shaftGroup = document.createElement('div');
+      shaftGroup.className = 'shaft-group';
+      for (const ch of chs) appendTrackRow(shaftGroup, ch);
+      trackArea.appendChild(shaftGroup);
+
+      // Click group name → select all channels in group
+      titleSpan.addEventListener('click', e => {
+        if (!e.ctrlKey && !e.metaKey) selectedChannels.clear();
+        selectShaftChannels(groupName);
+      });
+
+      // Click meta/badge → collapse/expand
+      metaSpan.addEventListener('click', e => {
+        e.stopPropagation();
+        const collapsed = shaftGroup.style.display === 'none';
+        shaftGroup.style.display = collapsed ? '' : 'none';
+        titleSpan.textContent = (collapsed ? '\u25BC' : '\u25B6') + ' ' + groupName;
+        scheduleRedraw();
+      });
+    }
+
+    // Restore state
+    document.querySelectorAll('.track-row').forEach(row => {
+      const label = row.dataset.label;
+      if (mutedLabels.has(label)) {
+        const btn = row.querySelector('.tcp-mute');
+        if (btn) btn.classList.add('muted');
+      }
+      if (savedSelection.has(label)) row.classList.add('selected');
+    });
+    // Re-apply selection + inspector
+    applySelectionVisuals();
+    updateInspector();
+
+    // Redraw waveforms
+    scheduleRedraw();
   }
 
   // ── Shaft selection count ─────────────────────────────────────────────────
@@ -6540,6 +7192,18 @@
       document.getElementById('btn-play').textContent = '\u23F8';
       document.getElementById('btn-play').classList.add('active');
     }
+  });
+
+  document.getElementById('rate-slider')?.addEventListener('input', async e => {
+    const rate = parseInt(e.target.value) / 100;
+    document.getElementById('rate-val').textContent = rate.toFixed(1) + '×';
+    if (engine) await engine.setPlaybackRate(rate);
+  });
+
+  document.getElementById('rate-slider')?.addEventListener('dblclick', async e => {
+    e.target.value = 100;
+    document.getElementById('rate-val').textContent = '1.0×';
+    if (engine) await engine.setPlaybackRate(1.0);
   });
 
   document.getElementById('btn-stop').addEventListener('click', () => {
@@ -6798,6 +7462,7 @@
     if (pitchMap && preprocessed) {
       const { assignPitches } = await import('./src/mapping.js');
       pitchMap = assignPitches(preprocessed.channels, masterTune, ratioOverrides.size > 0 ? ratioOverrides : null, tuningMode, octaveCap, primeLimit);
+    _applyPanOverrides();
       updateTCPPitchDisplays();
     }
     if (engine) {
@@ -6847,6 +7512,7 @@
       if (preprocessed) {
         const { assignPitches } = await import('./src/mapping.js');
         pitchMap = assignPitches(preprocessed.channels, masterTune, ratioOverrides.size > 0 ? ratioOverrides : null, tuningMode, octaveCap, primeLimit);
+    _applyPanOverrides();
       }
       updateTCPPitchDisplays();
       if (gen !== _recalcGeneration) return;  // superseded
@@ -6856,6 +7522,7 @@
     } else if (pitchMap && preprocessed) {
       const { assignPitches } = await import('./src/mapping.js');
       pitchMap = assignPitches(preprocessed.channels, masterTune, ratioOverrides.size > 0 ? ratioOverrides : null, tuningMode, octaveCap, primeLimit);
+    _applyPanOverrides();
       updateTCPPitchDisplays();
     }
   }
@@ -7487,6 +8154,807 @@
       document.getElementById('about-overlay').style.display = 'none';
     }
   });
+
+  // ── Export overlay ───────────────────────────────────────────────────────
+
+  function openExport() {
+    if (!preprocessed) return;
+    document.getElementById('export-overlay').style.display = 'flex';
+
+    // Populate channel checkboxes
+    const chList = document.getElementById('export-ch-list');
+    chList.innerHTML = '';
+    for (const ch of preprocessed.channels) {
+      const lbl = document.createElement('label');
+      lbl.innerHTML = `<input type="checkbox" class="exp-ch-cb" data-label="${esc(ch.label)}" checked> ${esc(ch.label)}`;
+      chList.appendChild(lbl);
+    }
+
+    // Update selection info
+    const selInfo = document.getElementById('export-sel-info');
+    if (loopStart != null && loopEnd != null) {
+      selInfo.textContent = `(${loopStart.toFixed(1)}s – ${loopEnd.toFixed(1)}s)`;
+    } else {
+      selInfo.textContent = '(no selection set)';
+      // Disable selection radio
+      document.querySelector('input[name="export-scope"][value="selection"]').disabled = true;
+    }
+  }
+
+  function closeExport() {
+    document.getElementById('export-overlay').style.display = 'none';
+  }
+
+  function _getExportChannels() {
+    const labels = new Set(
+      [...document.querySelectorAll('.exp-ch-cb:checked')].map(cb => cb.dataset.label)
+    );
+    return preprocessed.channels.filter(ch => labels.has(ch.label));
+  }
+
+  function _getExportScope() {
+    const scope = document.querySelector('input[name="export-scope"]:checked')?.value || 'whole';
+    return {
+      scope,
+      selectionStart: scope === 'selection' ? loopStart : 0,
+      selectionEnd:   scope === 'selection' ? loopEnd : 0,
+    };
+  }
+
+  document.getElementById('btn-export')?.addEventListener('click', openExport);
+  document.getElementById('export-close')?.addEventListener('click', closeExport);
+
+  document.getElementById('export-ch-all')?.addEventListener('click', () => {
+    document.querySelectorAll('.exp-ch-cb').forEach(cb => cb.checked = true);
+  });
+  document.getElementById('export-ch-none')?.addEventListener('click', () => {
+    document.querySelectorAll('.exp-ch-cb').forEach(cb => cb.checked = false);
+  });
+
+  // Show/hide band dropdown
+  document.getElementById('exp-env-signal')?.addEventListener('change', e => {
+    document.getElementById('exp-env-band-row').style.display =
+      e.target.value === 'bandpass' ? '' : 'none';
+  });
+
+  // WAV export
+  document.getElementById('exp-wav-go')?.addEventListener('click', async () => {
+    const channels = _getExportChannels();
+    if (channels.length === 0) { alert('Select at least one channel.'); return; }
+
+    const statusEl = document.getElementById('exp-wav-status');
+    statusEl.textContent = 'Exporting...';
+
+    try {
+      const { exportWAV } = await import('./src/export.js');
+      const scopeOpts = _getExportScope();
+      await exportWAV(channels, {
+        ...scopeOpts,
+        mode: document.getElementById('exp-wav-mode').value,
+        sumChannels: document.querySelector('input[name="export-ch-mode"]:checked')?.value === 'sum',
+        bitDepth: parseInt(document.getElementById('exp-wav-bits').value),
+        sampleRate: parseInt(document.getElementById('exp-wav-sr').value),
+        synthConfig: {
+          controls,
+          masterTune,
+          ratioOverrides: ratioOverrides.size > 0 ? ratioOverrides : null,
+          tuningMode,
+          octaveCap,
+          primeLimit,
+          layerMix,
+          playbackRate: engine?.playbackRate ?? 1.0,
+        },
+        onProgress: msg => { statusEl.textContent = msg; },
+      });
+      statusEl.textContent = 'Done!';
+      setTimeout(() => { statusEl.textContent = ''; }, 3000);
+    } catch (e) {
+      statusEl.textContent = '';
+      alert('Export error: ' + e.message);
+      console.error(e);
+    }
+  });
+
+  // Automation export
+  document.getElementById('exp-env-go')?.addEventListener('click', async () => {
+    const channels = _getExportChannels();
+    if (channels.length === 0) { alert('Select at least one channel.'); return; }
+
+    try {
+      const { exportAutomation } = await import('./src/export.js');
+      const scopeOpts = _getExportScope();
+      exportAutomation(channels[0], {
+        ...scopeOpts,
+        signalSource: document.getElementById('exp-env-signal').value,
+        band: document.getElementById('exp-env-band').value,
+        pointsPerSecond: parseInt(document.getElementById('exp-env-pps').value) || 50,
+        normalize: document.getElementById('exp-env-norm').checked,
+      });
+    } catch (e) {
+      alert('Export error: ' + e.message);
+      console.error(e);
+    }
+  });
+
+  // Wavetable export
+  document.getElementById('exp-wt-go')?.addEventListener('click', async () => {
+    const channels = _getExportChannels();
+    if (channels.length === 0) { alert('Select at least one channel.'); return; }
+    if (loopStart == null || loopEnd == null) {
+      alert('Set a loop selection in the waveform view first (click+drag on the ruler).');
+      return;
+    }
+
+    try {
+      const { exportWavetable } = await import('./src/export.js');
+      exportWavetable(channels[0], {
+        selectionStart: loopStart,
+        selectionEnd: loopEnd,
+        frameSize: parseInt(document.getElementById('exp-wt-size').value),
+        mode: document.getElementById('exp-wt-mode').value,
+      });
+    } catch (e) {
+      alert('Export error: ' + e.message);
+      console.error(e);
+    }
+  });
+
+  // ESC closes export overlay
+  // (handled in existing Escape handler — need to add check)
+
+  // ── Montage overlay ──────────────────────────────────────────────────────
+
+  const GROUP_COLORS = [
+    '#7c7ffa', '#4ade80', '#f0a030', '#38bdf8', '#f87171',
+    '#a78bfa', '#34d399', '#fbbf24', '#60a5fa', '#fb7185',
+    '#c084fc', '#2dd4bf', '#f59e0b', '#818cf8', '#f472b6',
+  ];
+  const groupColors   = new Map();   // groupName → hex
+  const channelColors = new Map();   // label → hex
+  let montageChannelOrder = [];      // ordered label list — THE montage order
+  let montageGroupOrder   = [];     // ordered group names — controls group display order
+  let montageRemoved = new Set();    // labels removed in this montage session
+  let montageAdded   = [];           // [{label,data,fs,shaft,...}] custom derivations
+
+  function _groupColor(name, idx) {
+    return groupColors.get(name) || GROUP_COLORS[(idx ?? 0) % GROUP_COLORS.length];
+  }
+  function _channelColor(label) {
+    if (channelColors.has(label)) return channelColors.get(label);
+    const ch = preprocessed?.channels.find(c => c.label === label) ||
+               montageAdded.find(c => c.label === label);
+    if (!ch) return GROUP_COLORS[0];
+    const g = _effectiveGroup(ch);
+    const gs = _allGroupNames();
+    return _groupColor(g, Math.max(0, gs.indexOf(g)));
+  }
+
+  // ── Open / Close ────────────────────────────────────────────────────────
+
+  function openMontage() {
+    if (!preprocessed) return;
+    document.getElementById('montage-overlay').style.display = 'flex';
+    document.getElementById('m-derive-panel').classList.remove('active');
+    // Sync montageChannelOrder with current channels — add new, keep existing order
+    const currentLabels = new Set(preprocessed.channels.map(c => c.label));
+    // Add labels from montageAdded too
+    for (const ch of montageAdded) currentLabels.add(ch.label);
+    // Remove stale labels
+    montageChannelOrder = montageChannelOrder.filter(l => currentLabels.has(l) && !montageRemoved.has(l));
+    // Add any new channels not yet in the order
+    for (const l of currentLabels) {
+      if (!montageChannelOrder.includes(l)) montageChannelOrder.push(l);
+    }
+    // Build group order — preserve existing, add any new groups at the end
+    const currentGroups = _allGroupNames();
+    const existing = new Set(montageGroupOrder);
+    for (const g of currentGroups) {
+      if (!existing.has(g)) montageGroupOrder.push(g);
+    }
+    // Remove groups that no longer exist
+    montageGroupOrder = montageGroupOrder.filter(g => currentGroups.includes(g));
+    _renderMontageTable();
+    _updateBulkBar();
+  }
+
+  function closeMontage() {
+    document.getElementById('montage-overlay').style.display = 'none';
+  }
+
+  // ── Render table ────────────────────────────────────────────────────────
+
+  function _renderMontageTable() {
+    const tbody = document.getElementById('m-tbody');
+    tbody.innerHTML = '';
+    const allCh = _montageChannels();
+
+    console.log(`[montage] render: ${allCh.length} channels, ${montageChannelOrder.length} in order, ${montageGroupOrder.length} groups: [${montageGroupOrder.join(', ')}]`);
+
+    // Build channels-by-group map, preserving montageChannelOrder within each group
+    const activeLabels = new Set(montageChannelOrder.filter(l => !montageRemoved.has(l)));
+    const byGroup = new Map();
+    for (const g of montageGroupOrder) byGroup.set(g, []);
+    for (const label of montageChannelOrder) {
+      if (!activeLabels.has(label)) continue;
+      const ch = allCh.find(c => c.label === label);
+      if (!ch) continue;
+      const g = _effectiveGroup(ch);
+      if (!byGroup.has(g)) { byGroup.set(g, []); montageGroupOrder.push(g); }
+      byGroup.get(g).push(ch);
+    }
+
+    // Render group by group
+    const groupList = _allGroupNames();
+    for (const [group, chs] of byGroup) {
+      const gIdx = montageGroupOrder.indexOf(group);
+      const gColor = _groupColor(group, gIdx);
+
+      // ── Group header row ──────────────────────────────────────────────
+      const gr = document.createElement('tr');
+      gr.className = 'group-row';
+      gr.draggable = true;
+      gr.dataset.group = group;
+      gr.innerHTML =
+        `<td class="m-grip">⠿</td>` +
+        `<td><input type="color" draggable="false" value="${gColor}" style="width:14px;height:12px;padding:0;border:1px solid var(--border);border-radius:2px;cursor:pointer;background:transparent;pointer-events:auto"></td>` +
+        `<td colspan="5"><input type="text" draggable="false" class="group-name-edit" value="${esc(group)}" data-orig="${esc(group)}"></td>` +
+        `<td style="color:var(--dim);font-size:9px">${chs.length} ch</td>` +
+        `<td><span class="m-del-group" title="Delete group" style="cursor:pointer;color:var(--dim);font-size:12px">&times;</span></td>`;
+      gr.querySelector('input[type="color"]').addEventListener('input', e => {
+        groupColors.set(group, e.target.value);
+        // Update channel color swatches that inherit from this group (without full re-render)
+        tbody.querySelectorAll(`tr[data-label]`).forEach(tr => {
+          const label = tr.dataset.label;
+          const ch = allCh.find(c => c.label === label);
+          if (ch && _effectiveGroup(ch) === group && !channelColors.has(label)) {
+            const ci = tr.querySelector('input[type="color"]');
+            if (ci) ci.value = e.target.value;
+          }
+        });
+      });
+      const gNameInput = gr.querySelector('.group-name-edit');
+      gNameInput.addEventListener('change', () => {
+        const nv = gNameInput.value.trim();
+        if (nv && nv !== group) { _renameGroup(group, nv); _renderMontageTable(); }
+      });
+      gr.querySelector('.m-del-group')?.addEventListener('click', e => {
+        e.stopPropagation();
+        // Move channels to (Ungrouped), remove group
+        for (const ch of chs) {
+          ch._customGroup = null;
+        }
+        montageGroupOrder = montageGroupOrder.filter(g => g !== group);
+        // Remove from shaftGroupNames
+        for (const [k, v] of shaftGroupNames) {
+          if (v === group) shaftGroupNames.delete(k);
+        }
+        groupColors.delete(group);
+        _renderMontageTable();
+      });
+      tbody.appendChild(gr);
+
+      // ── Channel rows within this group ────────────────────────────────
+      for (const ch of chs) {
+        const label = ch.label;
+        const pan   = channelPanOverrides.get(label) ?? (pitchMap?.get(label)?.pan ?? 0);
+        const pitch = pitchMap?.get(label);
+        const vol   = gainTrimMap.get(label) ?? 0;
+        const hz    = pitch ? pitch.hz : (masterTune * (ratioOverrides.get(label) ?? 1));
+        const color = _channelColor(label);
+
+        const tr = document.createElement('tr');
+        tr.draggable = true;
+        tr.dataset.label = label;
+
+        // Grip
+        const tdGrip = document.createElement('td');
+        tdGrip.className = 'm-grip';
+        tdGrip.textContent = '⠿';
+        tr.appendChild(tdGrip);
+
+        // Checkbox
+        const tdCb = document.createElement('td');
+        tdCb.innerHTML = `<input type="checkbox" class="m-cb" data-label="${esc(label)}">`;
+        tdCb.querySelector('input').addEventListener('change', _updateBulkBar);
+        tr.appendChild(tdCb);
+
+        // Label
+        const tdLabel = document.createElement('td');
+        tdLabel.textContent = label;
+        tdLabel.style.fontWeight = '600';
+        tdLabel.style.fontSize = '10px';
+        tr.appendChild(tdLabel);
+
+        // Group dropdown
+        const tdGroup = document.createElement('td');
+        const gSel = document.createElement('select');
+        for (const g of groupList) {
+          const o = document.createElement('option');
+          o.value = g; o.textContent = g;
+          if (g === group) o.selected = true;
+          gSel.appendChild(o);
+        }
+        const nOpt = document.createElement('option');
+        nOpt.value = '__new__'; nOpt.textContent = '+ New…';
+        gSel.appendChild(nOpt);
+        gSel.addEventListener('change', () => {
+          if (gSel.value === '__new__') {
+            const n = prompt('New group name:');
+            if (n?.trim()) { _assignChannelGroup(label, n.trim()); _renderMontageTable(); }
+            else gSel.value = group;
+          } else {
+            _assignChannelGroup(label, gSel.value);
+            _renderMontageTable();
+          }
+        });
+        tdGroup.appendChild(gSel);
+        tr.appendChild(tdGroup);
+
+        // Volume
+        const tdVol = document.createElement('td');
+        const volSlider = document.createElement('input');
+        volSlider.type = 'range'; volSlider.min = -20; volSlider.max = 12;
+        volSlider.step = 0.5; volSlider.value = vol;
+        volSlider.style.width = '36px';
+        const volVal = document.createElement('span');
+        volVal.className = 'm-vol-val';
+        volVal.textContent = `${vol >= 0 ? '+' : ''}${vol.toFixed(1)}`;
+        volSlider.addEventListener('input', () => {
+          const v = parseFloat(volSlider.value);
+          gainTrimMap.set(label, v);
+          volVal.textContent = `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
+        });
+        tdVol.appendChild(volSlider);
+        tdVol.appendChild(volVal);
+        tr.appendChild(tdVol);
+
+        // Pan
+        const tdPan = document.createElement('td');
+        const panSlider = document.createElement('input');
+        panSlider.type = 'range'; panSlider.min = -100; panSlider.max = 100;
+        panSlider.value = Math.round(pan * 100);
+        const panVal = document.createElement('span');
+        panVal.className = 'm-pan-val';
+        panVal.textContent = _panLabel(pan);
+        panSlider.addEventListener('input', () => {
+          const v = parseInt(panSlider.value) / 100;
+          channelPanOverrides.set(label, v);
+          panVal.textContent = _panLabel(v);
+        });
+        tdPan.appendChild(panSlider);
+        tdPan.appendChild(panVal);
+        tr.appendChild(tdPan);
+
+        // Pitch
+        const tdPitch = document.createElement('td');
+        const pitchIn = document.createElement('input');
+        pitchIn.type = 'text'; pitchIn.value = pitch?.ratioLabel ?? '1/1';
+        const hzSpan = document.createElement('span');
+        hzSpan.className = 'm-hz-val';
+        hzSpan.textContent = hz.toFixed(1);
+        pitchIn.addEventListener('change', () => {
+          const r = parseRatio(pitchIn.value);
+          if (r && r > 0 && r <= 32) {
+            ratioOverrides.set(label, r);
+            hzSpan.textContent = (masterTune * r).toFixed(1);
+          } else {
+            pitchIn.value = pitch?.ratioLabel ?? '1/1';
+          }
+        });
+        tdPitch.appendChild(pitchIn);
+        tr.appendChild(tdPitch);
+
+        // Hz (read-only)
+        const tdHz = document.createElement('td');
+        tdHz.appendChild(hzSpan);
+        tr.appendChild(tdHz);
+
+        // Color
+        const tdColor = document.createElement('td');
+        const colorIn = document.createElement('input');
+        colorIn.type = 'color'; colorIn.value = color;
+        colorIn.addEventListener('input', () => channelColors.set(label, colorIn.value));
+        tdColor.appendChild(colorIn);
+        tr.appendChild(tdColor);
+
+        tbody.appendChild(tr);
+      }
+    }
+
+    // Wire drag-and-drop (once only — listeners survive innerHTML clear)
+    if (!tbody._dragWired) {
+      _wireDragDrop(tbody);
+      tbody._dragWired = true;
+    }
+  }
+
+  /** Get all channels (preprocessed + custom derivations). */
+  function _montageChannels() {
+    const base = preprocessed ? [...preprocessed.channels] : [];
+    return [...base, ...montageAdded];
+  }
+
+  // ── Drag and drop reorder ───────────────────────────────────────────────
+
+  let _dragRow = null;
+
+  function _wireDragDrop(tbody) {
+    tbody.addEventListener('dragstart', e => {
+      // Don't start drag from inputs/selects — let them handle their own events
+      if (e.target.closest('input, select')) { e.preventDefault(); return; }
+      _dragRow = e.target.closest('tr');
+      if (!_dragRow) return;
+      _dragRow.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
+    });
+
+    tbody.addEventListener('dragover', e => {
+      e.preventDefault();
+      const target = e.target.closest('tr');
+      if (!target || target === _dragRow) return;
+      // Clear old indicators
+      tbody.querySelectorAll('.drop-above,.drop-below').forEach(r =>
+        r.classList.remove('drop-above', 'drop-below'));
+      const rect = target.getBoundingClientRect();
+      target.classList.add(e.clientY < rect.top + rect.height / 2 ? 'drop-above' : 'drop-below');
+    });
+
+    tbody.addEventListener('dragleave', e => {
+      e.target.closest('tr')?.classList.remove('drop-above', 'drop-below');
+    });
+
+    tbody.addEventListener('drop', e => {
+      e.preventDefault();
+      const target = e.target.closest('tr');
+      if (!target || !_dragRow || target === _dragRow) return;
+      const rect = target.getBoundingClientRect();
+      const after = e.clientY >= rect.top + rect.height / 2;
+
+      // If dragging a group row, reorder the group in montageGroupOrder
+      if (_dragRow.classList.contains('group-row')) {
+        const gName = _dragRow.dataset.group;
+
+        // Find target group (either directly or the group of the target channel)
+        let targetGroup;
+        let insertAfter = after;
+        if (target.classList.contains('group-row')) {
+          targetGroup = target.dataset.group;
+          // Dropping group-on-group: above = before that group, below = after that group
+        } else {
+          const tCh = _montageChannels().find(c => c.label === target.dataset.label);
+          targetGroup = tCh ? _effectiveGroup(tCh) : null;
+          // Dropping group on a channel row: always insert after that channel's group
+          insertAfter = true;
+        }
+
+        if (targetGroup && targetGroup !== gName) {
+          montageGroupOrder = montageGroupOrder.filter(g => g !== gName);
+          const tIdx = montageGroupOrder.indexOf(targetGroup);
+          montageGroupOrder.splice(insertAfter ? tIdx + 1 : tIdx, 0, gName);
+        }
+      } else {
+        // Moving a single channel
+        const label = _dragRow.dataset.label;
+        if (!label) return;
+        montageChannelOrder = montageChannelOrder.filter(l => l !== label);
+        const targetLabel = target.dataset.label;
+        // If dropped on a group header, insert at start of that group
+        if (target.classList.contains('group-row')) {
+          const gName = target.dataset.group;
+          _assignChannelGroup(label, gName);
+          // Find first channel of that group
+          const firstInGroup = montageChannelOrder.find(l => {
+            const ch = _montageChannels().find(c => c.label === l);
+            return ch && _effectiveGroup(ch) === gName;
+          });
+          const idx = firstInGroup ? montageChannelOrder.indexOf(firstInGroup) : montageChannelOrder.length;
+          montageChannelOrder.splice(idx, 0, label);
+        } else if (targetLabel) {
+          const idx = montageChannelOrder.indexOf(targetLabel);
+          montageChannelOrder.splice(after ? idx + 1 : idx, 0, label);
+          // If dropped into a different group's section, update group
+          const targetCh = _montageChannels().find(c => c.label === targetLabel);
+          if (targetCh) _assignChannelGroup(label, _effectiveGroup(targetCh));
+        }
+      }
+
+      tbody.querySelectorAll('.drop-above,.drop-below').forEach(r =>
+        r.classList.remove('drop-above', 'drop-below'));
+      _renderMontageTable();
+    });
+
+    tbody.addEventListener('dragend', () => {
+      if (_dragRow) _dragRow.classList.remove('dragging');
+      _dragRow = null;
+      tbody.querySelectorAll('.drop-above,.drop-below').forEach(r =>
+        r.classList.remove('drop-above', 'drop-below'));
+    });
+
+    // Drop on the thead area → move to top
+    const thead = tbody.closest('table')?.querySelector('thead');
+    if (thead) {
+      thead.addEventListener('dragover', e => e.preventDefault());
+      thead.addEventListener('drop', e => {
+        e.preventDefault();
+        if (!_dragRow) return;
+        if (_dragRow.classList.contains('group-row')) {
+          const gName = _dragRow.dataset.group;
+          montageGroupOrder = montageGroupOrder.filter(g => g !== gName);
+          montageGroupOrder.unshift(gName);
+        } else if (_dragRow.dataset.label) {
+          const label = _dragRow.dataset.label;
+          montageChannelOrder = montageChannelOrder.filter(l => l !== label);
+          montageChannelOrder.unshift(label);
+        }
+        _renderMontageTable();
+      });
+    }
+  }
+
+  function _findFirstLabelAfter(tr) {
+    let next = tr.nextElementSibling;
+    while (next) {
+      if (next.dataset.label) return next.dataset.label;
+      next = next.nextElementSibling;
+    }
+    return null;
+  }
+
+  // ── Bulk actions ────────────────────────────────────────────────────────
+
+  function _getCheckedLabels() {
+    return [...document.querySelectorAll('#m-tbody .m-cb:checked')].map(cb => cb.dataset.label);
+  }
+
+  function _updateBulkBar() {
+    const checked = _getCheckedLabels();
+    const bar = document.getElementById('m-bulk');
+    const count = document.getElementById('m-bulk-count');
+    if (checked.length > 0) {
+      bar.classList.add('active');
+      count.textContent = checked.length;
+    } else {
+      bar.classList.remove('active');
+    }
+  }
+
+  document.getElementById('m-bulk-group')?.addEventListener('click', () => {
+    const labels = _getCheckedLabels();
+    if (!labels.length) return;
+    const name = prompt('Move to group:');
+    if (!name?.trim()) return;
+    for (const l of labels) _assignChannelGroup(l, name.trim());
+    _renderMontageTable();
+  });
+
+  document.getElementById('m-bulk-pan')?.addEventListener('click', () => {
+    const labels = _getCheckedLabels();
+    if (!labels.length) return;
+    const val = prompt('Pan (-100 to 100):');
+    const n = parseInt(val);
+    if (isNaN(n)) return;
+    for (const l of labels) channelPanOverrides.set(l, Math.max(-1, Math.min(1, n / 100)));
+    _renderMontageTable();
+  });
+
+  document.getElementById('m-bulk-color')?.addEventListener('click', () => {
+    const labels = _getCheckedLabels();
+    if (!labels.length) return;
+    // Use a temporary color input
+    const inp = document.createElement('input');
+    inp.type = 'color'; inp.value = _channelColor(labels[0]);
+    inp.addEventListener('input', () => {
+      for (const l of labels) channelColors.set(l, inp.value);
+      _renderMontageTable();
+    });
+    inp.click();
+  });
+
+  document.getElementById('m-bulk-vol')?.addEventListener('click', () => {
+    const labels = _getCheckedLabels();
+    if (!labels.length) return;
+    const val = prompt('Volume dB (-20 to +12):');
+    const n = parseFloat(val);
+    if (isNaN(n)) return;
+    for (const l of labels) gainTrimMap.set(l, Math.max(-20, Math.min(12, n)));
+    _renderMontageTable();
+  });
+
+  document.getElementById('m-bulk-remove')?.addEventListener('click', () => {
+    const labels = _getCheckedLabels();
+    if (!labels.length) return;
+    for (const l of labels) montageRemoved.add(l);
+    montageChannelOrder = montageChannelOrder.filter(l => !montageRemoved.has(l));
+    _renderMontageTable();
+    _updateBulkBar();
+  });
+
+  // ── Derivation builder ──────────────────────────────────────────────────
+
+  document.getElementById('m-add-derive')?.addEventListener('click', () => {
+    const panel = document.getElementById('m-derive-panel');
+    panel.classList.toggle('active');
+    if (!panel.classList.contains('active')) return;
+
+    // Populate signal dropdowns with all available monopolar signals
+    const signals = [];
+    if (importResult) {
+      for (const sig of [...importResult.seeg, ...importResult.scalp, ...importResult.unknown]) {
+        signals.push(sig);
+      }
+    }
+    for (const sel of [document.getElementById('m-derive-a'), document.getElementById('m-derive-b')]) {
+      sel.innerHTML = '';
+      for (const sig of signals) {
+        const o = document.createElement('option');
+        o.value = sig.label; o.textContent = sig.label;
+        sel.appendChild(o);
+      }
+    }
+    document.getElementById('m-derive-label').value = '';
+  });
+
+  document.getElementById('m-derive-cancel')?.addEventListener('click', () => {
+    document.getElementById('m-derive-panel').classList.remove('active');
+  });
+
+  document.getElementById('m-derive-go')?.addEventListener('click', async () => {
+    const aLabel = document.getElementById('m-derive-a').value;
+    const bLabel = document.getElementById('m-derive-b').value;
+    if (!aLabel || !bLabel || aLabel === bLabel) {
+      alert('Select two different signals.');
+      return;
+    }
+
+    const allSigs = [...(importResult?.seeg ?? []), ...(importResult?.scalp ?? []), ...(importResult?.unknown ?? [])];
+    const sigA = allSigs.find(s => s.label === aLabel);
+    const sigB = allSigs.find(s => s.label === bLabel);
+    if (!sigA || !sigB) return;
+
+    // Ensure signals are cleaned (DC + notch)
+    const { deriveSingle, removeDC, applyNotch } = await import('./src/preprocess.js');
+    if (!sigA.cleanData) {
+      const { clean } = removeDC(sigA.data);
+      sigA.cleanData = importResult.lineFreq > 0 ? applyNotch(clean, sigA.fs, importResult.lineFreq) : clean;
+    }
+    if (!sigB.cleanData) {
+      const { clean } = removeDC(sigB.data);
+      sigB.cleanData = importResult.lineFreq > 0 ? applyNotch(clean, sigB.fs, importResult.lineFreq) : clean;
+    }
+
+    const customLabel = document.getElementById('m-derive-label').value.trim() || `${aLabel}-${bLabel}`;
+    const derived = deriveSingle(sigA, sigB, customLabel);
+
+    // Build a channel object matching preprocessed channel shape
+    const newCh = {
+      label: derived.label,
+      data: derived.data,
+      fs: derived.fs,
+      shaft: null,
+      contact1: null,
+      contact2: null,
+      referenceMode: 'custom',
+      quality: { status: 'good', rms: 0, issues: [] },
+      _customGroup: '(Custom)',
+    };
+
+    montageAdded.push(newCh);
+    montageChannelOrder.push(newCh.label);
+
+    document.getElementById('m-derive-panel').classList.remove('active');
+    _renderMontageTable();
+  });
+
+  // ── Group management ────────────────────────────────────────────────────
+
+  /** Rename a group — update all channels that reference it. */
+  function _renameGroup(oldName, newName) {
+    for (const [shaft, name] of shaftGroupNames) {
+      if (name === oldName) shaftGroupNames.set(shaft, newName);
+    }
+    if (preprocessed) {
+      for (const ch of preprocessed.channels) {
+        if (ch._customGroup === oldName) ch._customGroup = newName;
+      }
+    }
+    for (const ch of montageAdded) {
+      if (ch._customGroup === oldName) ch._customGroup = newName;
+    }
+    // Update montageGroupOrder
+    const gIdx = montageGroupOrder.indexOf(oldName);
+    if (gIdx >= 0) montageGroupOrder[gIdx] = newName;
+    // Transfer color
+    if (groupColors.has(oldName)) {
+      groupColors.set(newName, groupColors.get(oldName));
+      groupColors.delete(oldName);
+    }
+  }
+
+  let _groupCounter = 0;
+  document.getElementById('m-add-group')?.addEventListener('click', () => {
+    // Auto-name: "Group 1", "Group 2", etc. — skip names already in use
+    const existing = new Set(_allGroupNames());
+    do { _groupCounter++; } while (existing.has('Group ' + _groupCounter));
+    const name = 'Group ' + _groupCounter;
+
+    // If channels are checked, move them into the new group
+    const checked = _getCheckedLabels();
+    if (checked.length > 0) {
+      for (const l of checked) _assignChannelGroup(l, name);
+    }
+    // Ensure the group exists in both tracking structures
+    shaftGroupNames.set('__custom_' + Date.now(), name);
+    if (!montageGroupOrder.includes(name)) montageGroupOrder.push(name);
+    _renderMontageTable();
+    _updateBulkBar();
+  });
+
+  // ── Apply montage ───────────────────────────────────────────────────────
+
+  async function applyMontage() {
+    // Merge custom derivations into preprocessed.channels
+    for (const ch of montageAdded) {
+      if (!preprocessed.channels.find(c => c.label === ch.label)) {
+        preprocessed.channels.push(ch);
+      }
+    }
+
+    // Remove channels marked for removal
+    if (montageRemoved.size > 0) {
+      preprocessed.channels = preprocessed.channels.filter(c => !montageRemoved.has(c.label));
+    }
+
+    // Reorder channels to match montage order
+    const orderMap = new Map(montageChannelOrder.map((l, i) => [l, i]));
+    preprocessed.channels.sort((a, b) => (orderMap.get(a.label) ?? 999) - (orderMap.get(b.label) ?? 999));
+
+    // Apply pan + pitch + volume to engine
+    _applyPanOverrides();
+    if (engine) {
+      for (const [label, pan] of channelPanOverrides) engine.setChannelPan(label, pan);
+      for (const [label, db] of gainTrimMap) engine.setChannelGainTrim(label, db);
+    }
+    if (engine && ratioOverrides.size > 0) {
+      for (const [label, ratio] of ratioOverrides) {
+        const hz = masterTune * ratio;
+        if (pitchMap) {
+          const entry = pitchMap.get(label);
+          if (entry) { entry.ratio = ratio; entry.hz = hz; }
+        }
+        engine.setChannelPitch(label, hz);
+      }
+    }
+
+    // If channels were added or removed, re-prepare engine
+    if (montageAdded.length > 0 || montageRemoved.size > 0) {
+      // Recompute pitchMap for new channel list
+      const { assignPitches } = await import('./src/mapping.js');
+      pitchMap = assignPitches(preprocessed.channels, masterTune,
+        ratioOverrides.size > 0 ? ratioOverrides : null, tuningMode, octaveCap, primeLimit);
+      _applyPanOverrides();
+
+      // Re-prepare engine (stop, rebuild voices, restart if was playing)
+      if (engine) {
+        const wasPlaying = engine.isPlaying;
+        const t = engine.currentTimeSec || 0;
+        await engine.stop();
+        await engine.prepare(preprocessed, pitchMap, controls, layerMix);
+        if (wasPlaying) await engine.play(t);
+      }
+
+      montageAdded = [];
+      montageRemoved.clear();
+    }
+
+    _refreshTrackGrouping();
+    closeMontage();
+  }
+
+  // ── Montage button wiring ─────────────────────────────────────────────
+  document.getElementById('btn-montage')?.addEventListener('click', openMontage);
+  document.getElementById('m-close')?.addEventListener('click', closeMontage);
+  document.getElementById('m-apply')?.addEventListener('click', applyMontage);
 
   // ── Init ──────────────────────────────────────────────────────────────────
   showScreen('welcome');

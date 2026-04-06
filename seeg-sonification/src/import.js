@@ -127,6 +127,15 @@ export function classifyChannel(label) {
     if (/^[A-Za-z][A-Za-z0-9'.-]*?\d+$/.test(norm)) return 'seeg';
   }
 
+  // Underscore-separated labels from non-standard devices (e.g. "HB_PULSE",
+  // "SEN_SPO2"). Try classifying the suffix after the last underscore.
+  const uIdx = clean.lastIndexOf('_');
+  if (uIdx > 0) {
+    const suffix = clean.slice(uIdx + 1);
+    if (AUXILIARY_PATTERN.test(suffix)) return 'auxiliary';
+    if (SCALP_10_20.has(suffix.toUpperCase())) return 'scalp';
+  }
+
   return 'unknown';
 }
 
@@ -485,7 +494,21 @@ export function analyzeImport(edfResult) {
     };
   }
 
-  // Step 7c: For scalp EEG recordings with no shaft structure, surface
+  // Step 7c: Surface auxiliary channels (ECG, EMG, EOG, etc.) as an opt-in
+  // "Auxiliary" group. Unchecked by default, but the user can include them.
+  if (auxiliary.length > 0) {
+    shaftSummary['Auxiliary'] = {
+      contacts:     auxiliary.length,
+      contactRange: `1–${auxiliary.length}`,
+      bipolarPairs: 0,
+      preBipolar:   false,
+      signals:      auxiliary,
+      isVirtual:    true,
+      defaultOff:   true,   // UI should leave these unchecked by default
+    };
+  }
+
+  // Step 7d: For scalp EEG recordings with no shaft structure, surface
   // scalp channels as a selectable "Scalp" group. Otherwise the user
   // sees an empty channel list with no way to control which channels
   // are processed.

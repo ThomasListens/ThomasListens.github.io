@@ -208,9 +208,9 @@ function phaseToInstFreq(phase, fs, smoothMs = 10) {
 
 function _stftSpectralFeatures(signal, fs, windowMs = 256, hopMs = 64) {
   const n        = signal.length;
-  const winSamps = Math.floor(fs * windowMs / 1000);
+  const winSamps = Math.max(1, Math.floor(fs * windowMs / 1000));
   const N        = nextPow2(winSamps);
-  const hopSamps = Math.floor(fs * hopMs / 1000);
+  const hopSamps = Math.max(1, Math.floor(fs * hopMs / 1000));
   const numBins  = N / 2 + 1;
   const binHz    = fs / N;
 
@@ -314,7 +314,7 @@ function _stftSpectralFeatures(signal, fs, windowMs = 256, hopMs = 64) {
 
 function _stftBandPowers(signal, fs, bands, windowSec = 2.0, hopSec = 1.0) {
   const n        = signal.length;
-  const winSamps = Math.floor(fs * windowSec);
+  const winSamps = Math.max(1, Math.floor(fs * windowSec));
   const N        = nextPow2(winSamps);
   const hopSamps = Math.max(1, Math.floor(fs * hopSec));
   const numBins  = N / 2 + 1;

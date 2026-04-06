@@ -229,6 +229,35 @@ export function applyNotch(signal, fs, lineFreq) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Derive a single channel from two signals: signalA minus signalB.
+ *
+ * This is the atomic building block for custom montage derivations.
+ * Uses cleaned data (DC-removed, notch-filtered) when available,
+ * falling back to raw data.
+ *
+ * @param {{ label: string, data: Float32Array, cleanData?: Float32Array, fs: number }} sigA
+ * @param {{ label: string, data: Float32Array, cleanData?: Float32Array, fs: number }} sigB
+ * @param {string} [label] — custom label; defaults to "sigA.label-sigB.label"
+ * @returns {{ label: string, data: Float32Array, fs: number }}
+ */
+export function deriveSingle(sigA, sigB, label) {
+  if (sigA.fs !== sigB.fs) {
+    throw new Error(`Sample rate mismatch: ${sigA.label}(${sigA.fs}) vs ${sigB.label}(${sigB.fs})`);
+  }
+  const a = sigA.cleanData ?? sigA.data;
+  const b = sigB.cleanData ?? sigB.data;
+  const len = Math.min(a.length, b.length);
+  const data = new Float32Array(len);
+  for (let i = 0; i < len; i++) data[i] = a[i] - b[i];
+
+  return {
+    label: label || `${sigA.label}-${sigB.label}`,
+    data,
+    fs: sigA.fs,
+  };
+}
+
+/**
  * Bipolar re-reference: adjacent-contact subtraction within a shaft.
  *
  * Clinical convention: label = "A2-A1" means channel A2 minus channel A1
@@ -592,7 +621,11 @@ export function preprocessRecording(edfResult, importResult, options) {
   // Auxiliary and unknown channels are not processed.
 
   const neuralSignals = [
-    ...importResult.scalp,
+    ...(includeShaftsSet && !includeShaftsSet.has('Scalp') ? [] : importResult.scalp),
+    // Unknown channels explicitly selected via the "Other" virtual group
+    ...(includeShaftsSet?.has('Other') ? importResult.unknown : []),
+    // Auxiliary channels explicitly selected via the "Auxiliary" virtual group
+    ...(includeShaftsSet?.has('Auxiliary') ? importResult.auxiliary : []),
     // SEEG signals filtered by selected shafts (shaft selection at import)
     ...importResult.seeg.filter(sig => {
       if (!includeShaftsSet) return true;
@@ -634,6 +667,39 @@ export function preprocessRecording(edfResult, importResult, options) {
           contact1:      pair.contact1,
           contact2:      pair.contact2,
           referenceMode: 'bipolar',
+        });
+      }
+    }
+
+    // Unknown channels selected via "Other" — pass through without re-referencing
+    // (no shaft structure to bipolar against; user explicitly chose these)
+    if (includeShaftsSet?.has('Other')) {
+      for (const sig of importResult.unknown) {
+        if (excludeSet.has(sig.label) || !sig.cleanData) continue;
+        channels.push({
+          label:         sig.label,
+          data:          sig.cleanData,
+          fs:            sig.fs,
+          shaft:         null,
+          contact1:      null,
+          contact2:      null,
+          referenceMode: 'none',
+        });
+      }
+    }
+
+    // Auxiliary channels selected via "Auxiliary" — pass through as-is
+    if (includeShaftsSet?.has('Auxiliary')) {
+      for (const sig of importResult.auxiliary) {
+        if (excludeSet.has(sig.label) || !sig.cleanData) continue;
+        channels.push({
+          label:         sig.label,
+          data:          sig.cleanData,
+          fs:            sig.fs,
+          shaft:         null,
+          contact1:      null,
+          contact2:      null,
+          referenceMode: 'none',
         });
       }
     }

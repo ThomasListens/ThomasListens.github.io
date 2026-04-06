@@ -51,7 +51,7 @@ export function parseEDF(buffer) {
   const str = (offset, len) =>
     decoder.decode(new Uint8Array(buffer, offset, len)).trim();
   const num = (offset, len) => {
-    const s = str(offset, len);
+    const s = str(offset, len).replace(/[^\d.+\-eE]/g, '');
     return s === '' ? 0 : Number(s);
   };
 
@@ -65,6 +65,9 @@ export function parseEDF(buffer) {
   const numRecords     = num(236,  8);  // data records in file (-1 = unknown)
   const recordDuration = num(244,  8);  // seconds per data record
   const numSignals     = num(252,  4);
+
+  const _rawNumRecords = str(236, 8);
+  console.log(`[edf-parser] headerBytes=${headerBytes}, numRecords=${numRecords} (raw="${_rawNumRecords}"), recordDuration=${recordDuration}, numSignals=${numSignals}, fileSize=${buffer.byteLength}`);
 
   const isEDFPlus      = reserved.startsWith('EDF+C') || reserved.startsWith('EDF+D');
   const isDiscontinuous = reserved.startsWith('EDF+D');
@@ -123,11 +126,18 @@ export function parseEDF(buffer) {
   }
 
   // ── Validate before reading data ────────────────────────────────────────────
-  const expectedDataBytes = numRecords * signals.reduce(
-    (sum, s) => sum + s.samplesPerRec * 2, 0
-  );
+  const bytesPerRecord = signals.reduce((sum, s) => sum + s.samplesPerRec * 2, 0);
   const availableDataBytes = buffer.byteLength - headerBytes;
 
+  // EDF spec allows numRecords = -1 (unknown). Some writers also leave it blank or corrupt.
+  let actualNumRecords = numRecords;
+  if (!Number.isFinite(actualNumRecords) || actualNumRecords <= 0) {
+    actualNumRecords = Math.floor(availableDataBytes / bytesPerRecord);
+    console.log(`EDF numRecords=${numRecords} — computed ${actualNumRecords} from file size`);
+  }
+  if (actualNumRecords <= 0) actualNumRecords = 0;
+
+  const expectedDataBytes = actualNumRecords * bytesPerRecord;
   if (availableDataBytes < expectedDataBytes) {
     console.warn(
       `EDF truncated: expected ${expectedDataBytes} data bytes, ` +
@@ -137,7 +147,7 @@ export function parseEDF(buffer) {
 
   // ── Allocate output arrays ──────────────────────────────────────────────────
   for (let i = 0; i < numSignals; i++) {
-    signals[i].data = new Float32Array(numRecords * signals[i].samplesPerRec);
+    signals[i].data = new Float32Array(actualNumRecords * signals[i].samplesPerRec);
   }
 
   // ── Read data records ───────────────────────────────────────────────────────
@@ -148,7 +158,7 @@ export function parseEDF(buffer) {
   let offset = headerBytes;
   let recordsRead = 0;
 
-  outer: for (let rec = 0; rec < numRecords; rec++) {
+  outer: for (let rec = 0; rec < actualNumRecords; rec++) {
     for (let i = 0; i < numSignals; i++) {
       const n = signals[i].samplesPerRec;
       const base = rec * n;
@@ -162,8 +172,8 @@ export function parseEDF(buffer) {
     recordsRead++;
   }
 
-  if (recordsRead < numRecords) {
-    console.warn(`Only ${recordsRead}/${numRecords} records read (truncated file)`);
+  if (recordsRead < actualNumRecords) {
+    console.warn(`Only ${recordsRead}/${actualNumRecords} records read (truncated file)`);
     for (let i = 0; i < numSignals; i++) {
       const actualLen = recordsRead * signals[i].samplesPerRec;
       signals[i].data = signals[i].data.subarray(0, actualLen);
