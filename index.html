@@ -36,13 +36,13 @@
             position: relative;
         }
         .profile-image {
-            width: 300px; height: 300px;
+            width: 320px; height: 320px;
             border: 2px solid #333;
             margin: 0 auto 20px;
             background: #111;
             display: flex; align-items: center; justify-content: center;
             font-size: 48px;
-            background-image: url('./TOWO ALBUM COVER.jpg');
+            background-image: url('./assets/images/covers/TOWO ALBUM COVER.jpg');
             background-position: center;
             border-radius: 4px;
             overflow: hidden;
@@ -57,7 +57,7 @@
             position: absolute;
             top: -60%; left: -60%;
             width: 220%; height: 220%;
-            background-image: url('./TOWO ALBUM COVER.jpg');
+            background-image: url('./assets/images/covers/TOWO ALBUM COVER.jpg');
             background-size: cover;
             background-position: center;
             z-index: 1;
@@ -87,47 +87,104 @@
         }
         
         .cryptic-flash.flash-active {
-            animation: crypticGlitch 0.8s ease-in-out forwards;
+            animation: crypticGlitch 0.45s ease-in-out forwards;
         }
-        
+
+        /* Toned-down flash: briefer, lower peak opacity, no long sustain plateau */
         @keyframes crypticGlitch {
-            0% { 
-                opacity: 0; 
+            0% {
+                opacity: 0;
                 transform: translateX(0) scale(1);
                 filter: brightness(1);
             }
-            10% { 
-                opacity: 0.95; 
-                transform: translateX(1px) scale(1.01);
-                filter: brightness(1.3) contrast(1.2);
+            18% {
+                opacity: 0.55;
+                transform: translateX(0.5px) scale(1.005);
+                filter: brightness(1.15) contrast(1.08);
             }
-            20% { 
-                opacity: 0.85; 
-                transform: translateX(-1px) scale(1);
-                filter: brightness(1.1) contrast(1.1);
+            45% {
+                opacity: 0.4;
+                transform: translateX(-0.3px) scale(1);
+                filter: brightness(1.05);
             }
-            30% { 
-                opacity: 0.9; 
-                transform: translateX(1px) scale(1);
-                filter: brightness(1.2) contrast(1.15);
-            }
-            75% { 
-                opacity: 0.88; 
-                transform: translateX(0) scale(1);
-                filter: brightness(1.05) contrast(1.05);
-            }
-            90% { 
-                opacity: 0.7; 
-                transform: translateX(0) scale(1);
-                filter: brightness(1);
-            }
-            100% { 
-                opacity: 0; 
+            100% {
+                opacity: 0;
                 transform: translateX(0) scale(1);
                 filter: brightness(1);
             }
         }
         .profile-image:hover { transform: scale(1.05);}
+
+        /* Rotating cover slides — absolute layers stacked above the intro zoom (::before)
+           but below the cryptic-flash system. Swaps are INSTANT (no opacity transition)
+           because the burn video on top provides the visual transition; crossfading here
+           would make multiple covers visible through the burn blend.
+           Each active slide runs a very subtle Ken Burns zoom during its dwell — some
+           drift inward, some outward, to feel like living images. */
+        .viewport-slide {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            border-radius: 4px;
+            opacity: 0;
+            z-index: 3;
+            pointer-events: none;
+            transform: scale(1);
+        }
+        .viewport-slide.active {
+            opacity: 1;
+        }
+
+        /* Gentle oscillating zoom — keeps motion alive whenever a slide is visible,
+           including slides that sit under a long opening promo before being revealed.
+           Alternate-infinite means it drifts in and out continuously; linear pacing
+           keeps the motion imperceptibly slow, no ease-in snap. */
+        .viewport-slide.active {
+            animation: slideKenBurns 22s linear infinite alternate;
+        }
+
+        @keyframes slideKenBurns {
+            from { transform: scale(1); }
+            to   { transform: scale(1.035); }
+        }
+
+        /* Burn transition — fullscreen video inside the viewport that plays during swaps.
+           Opaque (no blend) — the video fully covers the cover during the burn so the
+           mid-burn slide swap underneath happens cleanly without layering artifacts. */
+        .viewport-transition {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 4px;
+            opacity: 0;
+            z-index: 6;
+            pointer-events: none;
+            transition: opacity 0.35s ease-in-out;
+        }
+        .viewport-transition.playing {
+            opacity: 1;
+        }
+
+        /* Feature video — plays occasionally (e.g. every few cycles) for lingering viewers */
+        .viewport-feature {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 4px;
+            opacity: 0;
+            z-index: 5;
+            pointer-events: none;
+            transition: opacity 0.9s ease-in-out;
+        }
+        .viewport-feature.playing {
+            opacity: 1;
+        }
+
         .profile-name {
             font-size: 28px; font-weight: normal;
             margin-bottom: 20px; letter-spacing: 1px;
@@ -146,16 +203,31 @@
             background: rgba(255, 255, 255, 0.5);
         }
         
-        .album-title {
-            font-size: 28px; font-weight: 300;
-            margin-bottom: 25px; letter-spacing: 2px;
-            color: #fff; text-transform: none;
+        /* Shared vertical slot: title and billboard overlay the same region,
+           so crossfading them introduces no layout shift. Stacked above the
+           blood drip so the billboard's backsplash can occlude the line. */
+        .title-slot {
             position: relative;
             height: 35px;
+            margin-bottom: 25px;
+            z-index: 5;
+        }
+        .album-title {
+            position: absolute;
+            inset: 0;
+            font-size: 28px; font-weight: 300;
+            letter-spacing: 2px;
+            color: #fff; text-transform: none;
             display: flex;
             align-items: center;
             justify-content: center;
             margin-left: -15px;
+            transition: opacity 1.1s ease-out, filter 1.1s ease-out;
+        }
+        .album-title.faded {
+            opacity: 0;
+            filter: blur(2px);
+            pointer-events: none;
         }
         
         .letter {
@@ -248,6 +320,83 @@
             }
         }
 
+        /* Billboard — "currently releasing" marquee overlaid on the title slot */
+        .billboard {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            overflow: visible;
+            transition: opacity 1.2s ease-out;
+            cursor: pointer;
+            pointer-events: none;
+        }
+        .billboard.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        /* Backsplash: opaque-dark ellipse behind the billboard text that
+           occludes the blood drip where it would otherwise bisect the announcement. */
+        .billboard::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 125%;
+            height: 220%;
+            transform: translate(-50%, -50%);
+            background: radial-gradient(ellipse at center,
+                rgba(0, 0, 0, 0.95) 0%,
+                rgba(0, 0, 0, 0.85) 30%,
+                rgba(0, 0, 0, 0.55) 55%,
+                rgba(0, 0, 0, 0.2)  75%,
+                transparent 90%);
+            pointer-events: none;
+            z-index: -1;
+        }
+        .billboard-message {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            letter-spacing: 3.2px;
+            text-transform: uppercase;
+            font-weight: 300;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 1.1s ease-in-out, filter 0.3s ease;
+        }
+        .billboard-message.visible {
+            opacity: 1;
+        }
+        /* Per-release color flavors */
+        .billboard-message.flavor-sheik {
+            color: rgba(150, 200, 255, 0.88);
+            text-shadow:
+                0 0 10px rgba(120, 200, 255, 0.45),
+                0 0 22px rgba(70, 130, 255, 0.22);
+        }
+        .billboard-message.flavor-towo-inst {
+            color: rgba(235, 220, 180, 0.85);
+            text-shadow:
+                0 0 10px rgba(230, 205, 160, 0.32),
+                0 0 22px rgba(200, 175, 130, 0.15);
+        }
+        .billboard-message.flavor-towo {
+            color: rgba(255, 150, 150, 0.8);
+            text-shadow:
+                0 0 10px rgba(255, 100, 100, 0.32),
+                0 0 22px rgba(200, 60, 60, 0.15);
+        }
+        .billboard.active:hover .billboard-message.visible {
+            filter: brightness(1.25);
+        }
+
         .album-word.crossed-out::after {
             content: '';
             position: absolute;
@@ -284,7 +433,7 @@
                 #990000 60%, 
                 #660000 100%);
             left: 50%;
-            top: 360px;
+            top: 380px;
             transform: translateX(-50%);
             height: 0;
             z-index: 1;
@@ -330,7 +479,7 @@
             background: rgba(255,255,255,0.03);
             border: 1px solid #333;
             border-radius: 0px;
-            padding: 16px 20px;
+            padding: 12px 18px;
             text-decoration: none;
             color: #fff;
             display: flex; align-items: center;
@@ -338,7 +487,7 @@
             transition: all 0.3s ease;
             position: relative; overflow: hidden;
             text-transform: uppercase; z-index: 2;
-            min-height: 56px;
+            min-height: 44px;
             opacity: 0;
             transform: translateY(20px);
         }
@@ -426,6 +575,10 @@
             border-color: #444;
             text-transform: none;
             font-size: 14px; letter-spacing: 1.8px;
+            /* Solid dark background so the blood drip visually passes behind this button,
+               turning it into an "island" that separates streaming from social. */
+            background: #0a0a0a;
+            margin: 14px 0;
         }
         .link-item:hover {
             border-color: #666; background: rgba(255,255,255,0.08);
@@ -530,19 +683,28 @@
         }
 
         .lyric-whisper {
-            position: absolute; 
-            font-size: 13px; 
+            position: absolute;
+            font-size: 13px;
             color: rgba(255, 68, 68, 0.7);
-            font-weight: 300; 
+            font-weight: 300;
             letter-spacing: 1.8px;
             text-transform: uppercase;
-            pointer-events: none; 
+            pointer-events: none;
             z-index: 3;
             opacity: 0;
             text-shadow: 0 0 10px rgba(255, 68, 68, 0.8), 0 0 20px rgba(255, 68, 68, 0.4);
             font-family: 'Courier New', monospace;
             filter: blur(0.2px);
             white-space: nowrap;
+            /* Stay in your half of the link so the text never crosses the center drip.
+               Long content is clipped at the inner edge rather than bleeding past center. */
+            max-width: calc(50% - 62px);
+            overflow: hidden;
+        }
+        /* BeReal anchors closer to the edges (20px), so it gets more horizontal room. */
+        .lyric-whisper.bereal-left,
+        .lyric-whisper.bereal-right {
+            max-width: calc(50% - 32px);
         }
 
         .lyric-whisper.single-word {
@@ -584,36 +746,29 @@
             transform: translateY(2px);
         }
         
-        /* Strategic positioning for each link - creating gradient toward the blood line */
-        .link-item:nth-child(1) .lyric-whisper {
-            right: 55px;
-            top: 18px;
-        }
+        /* Per-link whisper positioning — whisper always lands in the OPPOSITE half from
+           the link's text (governed by its .left/.right/.center layout class), so the
+           whisper never overlaps the label. Within that constraint, top/bottom alternates
+           strictly from link to link for vertical variety.
+             · uniform 50px anchor (BeReal at 20px as the centerpiece)
+             · side: whisper opposite the link text's side (no overlap)
+             · vertical: strict T/B alternation, all four corners get used
+             · text-align faces away from the center drip, so clipping trims the inner edge. */
 
-        .link-item:nth-child(2) .lyric-whisper {
-            left: 35px;
-            bottom: 18px;
-        }
+        /* Above BeReal (alternating T / B / T) */
+        .link-item.spotify .lyric-whisper   { right: 50px; top:    13px; text-align: right; }  /* text-left link  -> whisper RT */
+        .link-item.apple .lyric-whisper     { left:  50px; bottom: 13px; text-align: left;  }  /* text-right link -> whisper LB */
+        .link-item.bandcamp .lyric-whisper  { right: 50px; top:    13px; text-align: right; }  /* text-left link  -> whisper RT */
 
-        .link-item:nth-child(3) .lyric-whisper.bereal-left {
-            left: 20px;
-            top: 22px;
-        }
+        /* BeReal centerpiece (dual, flanking the centered "BeReal" label) */
+        .link-item.bereal .lyric-whisper.bereal-left  { left:  20px; top: 14px; text-align: left;  }
+        .link-item.bereal .lyric-whisper.bereal-right { right: 20px; top: 14px; text-align: right; }
 
-        .link-item:nth-child(3) .lyric-whisper.bereal-right {
-            right: 20px;
-            top: 16px;
-        }
-
-        .link-item:nth-child(4) .lyric-whisper {
-            right: 35px;
-            bottom: 22px;
-        }
-
-        .link-item:nth-child(5) .lyric-whisper {
-            left: 55px;
-            top: 18px;
-        }
+        /* Below BeReal (alternating B / T / B / T) */
+        .link-item.instagram .lyric-whisper { right: 50px; bottom: 13px; text-align: right; }  /* text-left link  -> whisper RB */
+        .link-item.youtube .lyric-whisper   { left:  50px; top:    13px; text-align: left;  }  /* text-right link -> whisper LT */
+        .link-item.facebook .lyric-whisper  { right: 50px; bottom: 13px; text-align: right; }  /* text-left link  -> whisper RB */
+        .link-item.x-social .lyric-whisper  { left:  50px; top:    13px; text-align: left;  }  /* text-right link -> whisper LT */
 
         .lyric-whisper.active {
             animation: wordAppear 0.8s ease-in-out forwards;
@@ -656,7 +811,43 @@
             0% { opacity: 0.4; }
             100% { opacity: 0; }
         }
-        
+
+        /* Sheik's Song — soft blue river variant */
+        .lyric-whisper.sheik {
+            color: rgba(150, 200, 255, 0.8);
+            text-shadow:
+                0 0 10px rgba(120, 200, 255, 0.55),
+                0 0 22px rgba(70, 130, 255, 0.28);
+            font-weight: 300;
+            letter-spacing: 1.6px;
+            text-transform: none;
+            filter: blur(0.2px);
+        }
+
+        .lyric-whisper.sheik .letter {
+            opacity: 0;
+            transform: translateY(3px);
+            filter: blur(1.5px);
+            animation: riverLetterAppear 2.4s cubic-bezier(0.25, 0.8, 0.3, 1) forwards;
+            animation-delay: var(--letter-delay, 0ms);
+        }
+
+        .lyric-whisper.sheik.fade-out .letter {
+            animation: riverLetterRecede 3s ease-in forwards;
+            animation-delay: var(--letter-delay, 0ms);
+        }
+
+        @keyframes riverLetterAppear {
+            0%   { opacity: 0; transform: translateY(3px); filter: blur(1.5px); }
+            60%  { opacity: 0.85; transform: translateY(0); filter: blur(0.1px); }
+            100% { opacity: 0.8; transform: translateY(-0.4px); filter: blur(0.1px); }
+        }
+
+        @keyframes riverLetterRecede {
+            0%   { opacity: 0.8; transform: translateY(-0.4px); filter: blur(0.1px); }
+            100% { opacity: 0; transform: translateY(-3px); filter: blur(1.8px); }
+        }
+
         .background-lattice {
             position: fixed; top: 0; left: 0;
             width: 100vw; height: 100vh;
@@ -700,6 +891,129 @@
             animation: fadeInUp 0.8s ease-out forwards;
         }
         .footer .quote-line { display: block; margin-bottom: 2px;}
+
+        /* Experiments — cool "research lab" section below the music links */
+        .experiments-section {
+            margin: 55px auto 10px;
+            max-width: 420px;
+            padding: 0 10px;
+            opacity: 0;
+            position: relative;
+            z-index: 4;
+        }
+        .experiments-section.reveal-experiments {
+            animation: fadeInUp 1.1s ease-out forwards;
+        }
+        .experiments-title {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            letter-spacing: 7px;
+            text-transform: uppercase;
+            color: rgba(150, 200, 255, 0.6);
+            text-align: center;
+            margin: 0 0 20px;
+            font-weight: normal;
+            text-shadow: 0 0 12px rgba(100, 180, 255, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+        }
+        /* Horizontal dividers flanking the word, fading out toward the edges */
+        .experiments-title::before,
+        .experiments-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            max-width: 110px;
+        }
+        .experiments-title::before {
+            background: linear-gradient(to left,
+                rgba(150, 200, 255, 0.4) 0%,
+                rgba(150, 200, 255, 0.1) 60%,
+                transparent 100%);
+        }
+        .experiments-title::after {
+            background: linear-gradient(to right,
+                rgba(150, 200, 255, 0.4) 0%,
+                rgba(150, 200, 255, 0.1) 60%,
+                transparent 100%);
+        }
+        .experiment-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .experiment-item {
+            display: block;
+            padding: 11px 16px;
+            border: 1px solid rgba(150, 200, 255, 0.13);
+            background: rgba(150, 200, 255, 0.018);
+            text-decoration: none;
+            color: rgba(230, 240, 255, 0.88);
+            transition: border-color 0.35s ease, background 0.35s ease, transform 0.35s ease;
+            position: relative;
+        }
+        .experiment-item:hover {
+            border-color: rgba(150, 200, 255, 0.45);
+            background: rgba(150, 200, 255, 0.06);
+            transform: translateX(2px);
+        }
+        .experiment-item .exp-name {
+            display: block;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: rgba(200, 225, 255, 0.92);
+        }
+        .experiment-item .exp-desc {
+            display: block;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            letter-spacing: 0.4px;
+            color: rgba(200, 225, 255, 0.45);
+            margin-top: 3px;
+            text-transform: none;
+        }
+
+        /* Sticky scroll hint — visible on mobile only, fades after the user scrolls */
+        .experiments-hint {
+            position: fixed;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: rgba(150, 200, 255, 0.65);
+            text-shadow: 0 0 10px rgba(100, 180, 255, 0.35);
+            pointer-events: none;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 1.2s ease-out;
+            white-space: nowrap;
+        }
+        .experiments-hint .hint-arrow {
+            display: inline-block;
+            margin-left: 6px;
+            animation: hintBob 2.2s ease-in-out infinite;
+        }
+        .experiments-hint.visible {
+            opacity: 0.75;
+        }
+        .experiments-hint.dismissed {
+            opacity: 0 !important;
+        }
+        @keyframes hintBob {
+            0%, 100% { transform: translateY(0); opacity: 0.8; }
+            50%      { transform: translateY(3px); opacity: 1; }
+        }
+        /* Hide the hint on wider screens — on desktop the bottom is already closer to view */
+        @media (min-width: 600px) {
+            .experiments-hint { display: none; }
+        }
         /* Ghost image system for alternate covers */
         .ghost-image {
             position: fixed;
@@ -768,7 +1082,7 @@
                 font-size: 24px;
             }
             .profile-image {
-                width: 250px; height: 250px;
+                width: 320px; height: 320px;
             }
             .link-item {
                 padding: 14px 18px; font-size: 14px; letter-spacing: 2px;
@@ -782,8 +1096,9 @@
                 font-size: 10px;
                 opacity: 0.4;
             }
-            .blood-drip {
-                top: 320px;
+            .billboard-message {
+                font-size: 12px;
+                letter-spacing: 2.4px;
             }
         }
     </style>
@@ -795,137 +1110,153 @@
                 <div class="cryptic-flash" id="crypticFlash1"></div>
                 <div class="cryptic-flash" id="crypticFlash2"></div>
                 <div class="cryptic-flash" id="crypticFlash3"></div>
+
+                <!-- Rotating slides — slide 0 (TOWO) is the default background of
+                     .profile-image; the slides below overlay on top when active, with a
+                     burn-video transition between swaps. Order is intentional:
+                     covers first, then behind-the-scenes shots. -->
+                <div class="viewport-slide" data-slide-label="sheik"
+                     style="background-image: url('./assets/images/covers/sheiks_theme_FINAL_9MB.jpg');"></div>
+                <div class="viewport-slide" data-slide-label="towo-inst"
+                     style="background-image: url('./assets/images/covers/TOWO%5BINST%5D%20Cover.png');"></div>
+                <div class="viewport-slide" data-slide-label="tl1"
+                     style="background-image: url('./assets/images/behind-the-scenes/TL1.jpg');"></div>
+                <div class="viewport-slide" data-slide-label="tl2"
+                     style="background-image: url('./assets/images/behind-the-scenes/TL2.jpg');"></div>
+                <div class="viewport-slide" data-slide-label="tl3"
+                     style="background-image: url('./assets/images/behind-the-scenes/TL3.jpg');"></div>
+
+                <!-- Burn animation plays as the visual transition between covers -->
+                <video class="viewport-transition" id="viewportBurn"
+                       muted playsinline preload="auto">
+                    <source src="assets/video/transitions/TOWO_burn_animation.mp4" type="video/mp4">
+                </video>
+
+                <!-- Sheik's Song promo — plays once as part of the opening sequence -->
+                <video class="viewport-feature" id="viewportSheikPromo"
+                       muted playsinline preload="auto">
+                    <source src="assets/video/promo/SheiksSong-Promo.mp4" type="video/mp4">
+                </video>
+
+                <!-- Occasional feature videos for lingering viewers — rotation cycles
+                     through the full pool so repeat visitors see different content. -->
+                <video class="viewport-feature" id="viewportFeature"
+                       muted playsinline preload="metadata">
+                    <source src="assets/video/promo/TOWO-Promo.mp4" type="video/mp4">
+                </video>
+                <video class="viewport-feature" id="viewportFeatureCryptic"
+                       muted playsinline preload="metadata">
+                    <source src="assets/video/promo/Cryptic-Cut.mp4" type="video/mp4">
+                </video>
+                <video class="viewport-feature" id="viewportFeatureSheikV4"
+                       muted playsinline preload="metadata">
+                    <source src="assets/video/promo/SheiksSong-Promo-v4.mp4" type="video/mp4">
+                </video>
+                <video class="viewport-feature" id="viewportFeatureSheikSquare"
+                       muted playsinline preload="metadata">
+                    <source src="assets/video/promo/SheiksSong-Promo-Square.mp4" type="video/mp4">
+                </video>
             </div>
             <h1 class="profile-name">Thomas LeRoy Meier</h1>
             <div class="blood-drip"></div>
-            <div class="album-title">
-                <span class="album-word">
-                    <span class="letter">T</span><span class="letter">h</span><span class="letter">e</span>
-                </span>
-                <span class="album-word">
-                    <span class="letter">O</span><span class="letter">n</span><span class="letter">l</span><span class="letter">y</span>
-                </span>
-                <span class="album-word">
-                    <span class="letter">W</span><span class="letter">a</span><span class="letter">y</span>
-                </span>
-                <span class="album-word crossed-out">
-                    <span class="letter">O</span><span class="letter">u</span><span class="letter">t</span>
-                </span>
+            <div class="title-slot">
+                <div class="album-title">
+                    <span class="album-word">
+                        <span class="letter">T</span><span class="letter">h</span><span class="letter">e</span>
+                    </span>
+                    <span class="album-word">
+                        <span class="letter">O</span><span class="letter">n</span><span class="letter">l</span><span class="letter">y</span>
+                    </span>
+                    <span class="album-word">
+                        <span class="letter">W</span><span class="letter">a</span><span class="letter">y</span>
+                    </span>
+                    <span class="album-word crossed-out">
+                        <span class="letter">O</span><span class="letter">u</span><span class="letter">t</span>
+                    </span>
+                </div>
+                <div class="billboard" aria-live="polite" role="button" tabindex="0" aria-label="Jump to links">
+                    <span class="billboard-message flavor-sheik"     data-index="0">SHEIK'S SONG&emsp;STREAMING NOW</span>
+                    <span class="billboard-message flavor-towo-inst" data-index="1">TOWO INSTRUMENTALS&emsp;OUT NOW</span>
+                    <span class="billboard-message flavor-towo"      data-index="2">THE ONLY WAY OUT&emsp;DEBUT ALBUM</span>
+                </div>
             </div>
         </div>
         <div class="links-container">
-            <a href="spotify:album:4MdzvojXVyZTk90v1wXqRI" class="link-item left" target="_blank" style="padding-left: 28px;">
+            <a href="https://open.spotify.com/artist/3gw9hVeKJNOdl1gm26URuY" class="link-item spotify left" target="_blank" style="padding-left: 28px;">
                 <span>SPOTIFY</span>
                 <div class="lyric-whisper"></div>
                 <div class="link-constellation"></div>
             </a>
-            
-            <a href="music://music.apple.com/us/album/the-only-way-out/1833467317" class="link-item right" target="_blank" style="padding-left: 45px; font-size: 16px;">
+
+            <a href="https://music.apple.com/us/artist/thomas-leroy-meier/1833191958" class="link-item apple right" target="_blank" style="padding-left: 45px; font-size: 16px;">
                 <span>APPLE MUSIC</span>
                 <div class="lyric-whisper"></div>
                 <div class="link-constellation"></div>
             </a>
-            
-            <a href="http://bere.al/heliotropic" class="link-item center" target="_blank" style="letter-spacing: 9px; padding-left: 28px;">
+
+            <a href="https://thomasleroymeier.bandcamp.com/" class="link-item bandcamp left" target="_blank" style="padding-left: 28px;">
+                <span>BANDCAMP</span>
+                <div class="lyric-whisper"></div>
+                <div class="link-constellation"></div>
+            </a>
+
+            <a href="https://buy.stripe.com/eVq6oHfPPblCcCOdtYcbC02" class="link-item physical-copy" target="_blank">
+                <span>Physical Handmade Copy (TOWO)</span>
+            </a>
+
+            <a href="http://bere.al/heliotropic" class="link-item bereal center" target="_blank" style="letter-spacing: 9px; padding-left: 28px;">
                 <span>BeReal</span>
                 <div class="lyric-whisper bereal-left"></div>
                 <div class="lyric-whisper bereal-right"></div>
                 <div class="link-constellation"></div>
             </a>
-            
-            <a href="https://www.instagram.com/tlmeier" class="link-item left" target="_blank" style="padding-right: 28px;">
+
+            <a href="https://www.instagram.com/tlmeier" class="link-item instagram left" target="_blank" style="padding-right: 28px;">
                 <span>INSTAGRAM</span>
                 <div class="lyric-whisper"></div>
                 <div class="link-constellation"></div>
             </a>
-            
-            <a href="https://www.facebook.com/tlmeier/" class="link-item right" target="_blank" style="padding-left: 28px;">
+
+            <a href="https://www.youtube.com/@PixsoulVGM" class="link-item youtube right" target="_blank" style="padding-left: 28px;">
+                <span>YOUTUBE</span>
+                <div class="lyric-whisper"></div>
+                <div class="link-constellation"></div>
+            </a>
+
+            <a href="https://www.facebook.com/tlmeier/" class="link-item facebook left" target="_blank" style="padding-right: 28px;">
                 <span>FACEBOOK</span>
                 <div class="lyric-whisper"></div>
                 <div class="link-constellation"></div>
             </a>
-            
-            <a href="https://buy.stripe.com/eVq6oHfPPblCcCOdtYcbC02" class="link-item physical-copy" target="_blank">
-                <span>Handmade Physical Copy &lt;3<br><span style="font-size: 11px; opacity: 0.7; letter-spacing: 1.2px;">[thank you for helping make more meaningful music]</span></span>
-            </a></span></span>
+
+            <a href="https://x.com/ISeeYouInMyEye" class="link-item x-social right" target="_blank" style="padding-left: 28px;">
+                <span>X</span>
+                <div class="lyric-whisper"></div>
+                <div class="link-constellation"></div>
             </a>
         </div>
         
-       <div class="media-showcase">
-    <div class="slideshow-container">
-        <!-- Slide 1: TL1 Image (6s) -->
-        <div class="slide active" data-duration="6000">
-            <div class="showcase-image">
-                <img src="TL1.jpg" alt="Behind the scenes - TL1" style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
+        <section class="experiments-section">
+            <h2 class="experiments-title">Experiments</h2>
+            <div class="experiment-list">
+                <a href="./HarmonicPolarity/" class="experiment-item">
+                    <span class="exp-name">Harmonic Polarity</span>
+                    <span class="exp-desc">original equation for determining otonal vs. utonal origin of a ratio</span>
+                </a>
+                <a href="./MetabolicHarmony/" class="experiment-item">
+                    <span class="exp-name">Metabolic Harmony</span>
+                    <span class="exp-desc">gut microbiome sonification</span>
+                </a>
+                <a href="./Tuner/" class="experiment-item">
+                    <span class="exp-name">JI Pitch Ruler</span>
+                    <span class="exp-desc">xenharmonic tuner</span>
+                </a>
+                <a href="./seeg-sonification/" class="experiment-item">
+                    <span class="exp-name">sEEG Sonification Toolkit</span>
+                    <span class="exp-desc">translating brain electrode signals into sound</span>
+                </a>
             </div>
-        </div>
-        
-        <!-- Slide 2: TL2 Image (4s) -->
-        <div class="slide" data-duration="4000">
-            <div class="showcase-image">
-                <img src="TL2.jpg" alt="Behind the scenes - TL2" style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
-            </div>
-        </div>
-        
-        <!-- Slide 3: TL3 Image (4s) -->
-        <div class="slide" data-duration="4000">
-            <div class="showcase-image">
-                <img src="TL3.jpg" alt="Behind the scenes - TL3" style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
-            </div>
-        </div>
-        
-        <!-- Slide 4: TOWO Promo Video (auto-duration based on video length) -->
-        <div class="slide" data-duration="0" data-video="true" data-audio="true">
-            <div class="showcase-video">
-                <video style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;" 
-       preload="auto" 
-       playsinline
-       volume="0.35"
-       onloadedmetadata="console.log('Video duration:', this.duration)" 
-       onended="nextSlide()">
-                    <source src="TOWO-Promo.mp4" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
-            </div>
-        </div>
-        
-        <!-- Slide 5: TL1 Image repeat (6.5s) -->
-        <div class="slide" data-duration="6500">
-            <div class="showcase-image">
-                <img src="TL1.jpg" alt="Behind the scenes - TL1" style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
-            </div>
-        </div>
-        
-        <!-- Slide 6: TL2 Image repeat (6.5s) -->
-        <div class="slide" data-duration="6500">
-            <div class="showcase-image">
-                <img src="TL2.jpg" alt="Behind the scenes - TL2" style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
-            </div>
-        </div>
-        
-        <!-- Slide 7: TL3 Image repeat (6.5s) -->
-        <div class="slide" data-duration="6500">
-            <div class="showcase-image">
-                <img src="TL3.jpg" alt="Behind the scenes - TL3" style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;">
-            </div>
-        </div>
-        
-        <!-- Slide 8: Cryptic Cut Video (auto-duration based on video length) -->
-        <div class="slide" data-duration="0" data-video="true" data-audio="true">
-            <div class="showcase-video">
-                <video style="width: 330px; height: 330px; object-fit: cover; border: 1px solid #333; border-radius: 4px;" 
-       preload="auto" 
-       playsinline
-       volume="0.35"
-       onloadedmetadata="console.log('Video duration:', this.duration)" 
-       onended="nextSlide()">
-                    <source src="Cryptic-Cut.mp4" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
-            </div>
-        </div>
-    </div>
-</div>
+        </section>
 
         <div class="footer">
             <span class="quote-line">"When the air is clear,</span>
@@ -937,6 +1268,10 @@
         <div class="spotlight-mask" id="spotlight"></div>
         <div class="background-lattice" id="backgroundLattice"></div>
     </div>
+
+    <!-- Mobile-only scroll affordance: fades in after intro, dismisses on first scroll -->
+    <div class="experiments-hint" id="experimentsHint">experiments<span class="hint-arrow">&darr;</span></div>
+
     <script>
     // Breathing cosmic soundscape - B drone with wandering harmonics
 let audioContext;
@@ -1388,43 +1723,86 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
 
             function startBloodDrip() {
                 const bloodDrip = document.querySelector('.blood-drip');
-                
+
+                // Drip geometry — tuned so the line reaches through the full 9-link stack
+                // (buttons are 44px min-height with 12px vertical padding; handmade-copy
+                // adds 28px section margin; drip extends to just under the X link).
+                const DRIP_DURATION_MS = 3700;
+                const DRIP_HEIGHT_PX = 590;
+
                 // Start the cover zoom-out during blood drip
                 profileImage.classList.add('slide-to-normal');
-                
-                bloodDrip.style.transition = 'height 2.5s cubic-bezier(0.4, 0, 0.2, 1)';
-                
+
+                bloodDrip.style.transition = `height ${DRIP_DURATION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+
                 setTimeout(() => {
-                    bloodDrip.style.height = '420px';
+                    bloodDrip.style.height = DRIP_HEIGHT_PX + 'px';
                 }, 50);
-                
+
+                // Hand the title slot to the billboard early — while the drip is still drawing,
+                // so we get into the "current releases" state quickly. The drip continues at
+                // full opacity underneath; the billboard's dark backsplash + higher stacking
+                // conceal the line where it would otherwise bisect the announcement text.
+                setTimeout(startBillboardHandoff, 1200);
+
                 const links = document.querySelectorAll('.link-item');
-                const revealDelay = 2500 / links.length;
-                
+                const revealDelay = DRIP_DURATION_MS / links.length;
+
                 links.forEach((link, index) => {
                     setTimeout(() => {
                         link.classList.add('reveal');
-                        
+
                         if (index === links.length - 1) {
-    setTimeout(() => {
-        document.querySelector('.media-showcase').classList.add('reveal-media');
-        
-        setTimeout(() => {
-            document.querySelector('.footer').classList.add('reveal-footer');
-        }, 600);
-        
-        // Don't start slideshow here - wait for blood drip to complete
-        
-    }, 800);
-}
+                            setTimeout(() => {
+                                document.querySelector('.footer').classList.add('reveal-footer');
+                            }, 1400);
+
+                            setTimeout(() => {
+                                const exp = document.querySelector('.experiments-section');
+                                if (exp) exp.classList.add('reveal-experiments');
+                            }, 1900);
+                        }
                     }, 500 + (revealDelay * index));
                 });
-                
-                // Start slideshow AFTER blood drip completes (2.5s + small buffer)
+            }
+
+            // Crossfade the album title into the billboard (same vertical slot, no layout
+            // shift). Then cycle announcements on a relaxed interval.
+            function startBillboardHandoff() {
+                const title = document.querySelector('.album-title');
+                const billboard = document.querySelector('.billboard');
+                const messages = billboard ? billboard.querySelectorAll('.billboard-message') : [];
+
+                if (title) title.classList.add('faded');
+
+                // Clicking/tapping the billboard smooth-scrolls to the link stack.
+                const scrollToLinks = () => {
+                    const links = document.querySelector('.links-container');
+                    if (links) links.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                };
+                if (billboard) {
+                    billboard.addEventListener('click', scrollToLinks);
+                    billboard.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToLinks(); }
+                    });
+                }
+
+                // Slight overlap so the crossfade registers as one movement.
                 setTimeout(() => {
-                    console.log('Blood drip complete, starting slideshow');
-                    initializeSlideshow();
-                }, 3000);
+                    if (!billboard || !messages.length) return;
+                    billboard.classList.add('active');
+
+                    let idx = 0;
+                    messages[idx].classList.add('visible');
+
+                    setInterval(() => {
+                        messages[idx].classList.remove('visible');
+                        idx = (idx + 1) % messages.length;
+                        setTimeout(() => {
+                            messages[idx].classList.add('visible');
+                        }, 700);
+                    }, 5200);
+                }, 450);
             }
 
             // FIXED LYRIC WHISPER SYSTEM
@@ -1459,20 +1837,76 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                 ["dearly"]
             ];
 
-            // Get whisper elements in order: Spotify, Apple, BeReal-Left, BeReal-Right, Instagram, Facebook
-            const whisperElements = [
-                document.querySelector('.link-item:nth-child(1) .lyric-whisper'), // Spotify
-                document.querySelector('.link-item:nth-child(2) .lyric-whisper'), // Apple Music
-                document.querySelector('.link-item:nth-child(3) .lyric-whisper.bereal-left'), // BeReal Left
-                document.querySelector('.link-item:nth-child(3) .lyric-whisper.bereal-right'), // BeReal Right
-                document.querySelector('.link-item:nth-child(4) .lyric-whisper'), // Instagram
-                document.querySelector('.link-item:nth-child(5) .lyric-whisper')  // Facebook
+            // Sheik's Song — soft blue, water-like fade
+            const sheikPhrases = [
+                ["sing", "a", "song"],
+                ["only", "you'd", "know"],
+                ["i", "will", "listen"],
+                ["where", "it", "goes"],
+                ["if", "you", "see", "me"],
+                ["don't", "say"],
+                ["how", "long"],
+                ["i", "couldn't", "wait"],
+                ["somewhere", "in", "the", "dark"],
+                ["no", "i", "won't", "be", "afraid"],
+                ["if", "you're", "all", "alone"],
+                ["it's", "my", "songs"],
+                ["you'll", "sing"],
+                ["how", "do", "you", "know"],
+                ["rivers", "flow"],
+                ["guide", "me", "so"],
+                ["here", "my", "words"],
+                ["i", "give", "to", "you"],
+                ["hold", "my", "truths"],
+                ["see", "me", "through"],
+                ["i", "will", "take"],
+                ["the", "only", "way"],
+                ["where", "it", "leads"],
+                ["i", "couldn't", "say"],
+                ["i", "won't", "ask"],
+                ["why", "you", "have"],
+                ["to", "masquerade"],
+                ["i", "know", "what", "you", "mean"],
+                ["please", "don't"],
+                ["say", "a", "thing"],
+                ["it's", "in", "your", "eyes"],
+                ["time", "will", "see"],
+                ["E v e r y t h i n g"],
+                ["rivers"],
+                ["flow"],
+                ["listen"],
+                ["guide"],
+                ["sing"]
             ];
 
-            function createCrypticWord(word) {
+            // Whisper elements in top-to-bottom visual order. The handmade-copy link has no
+            // whisper (stays clean). BeReal contributes two whispers (dual left/right).
+            const whisperElements = [
+                document.querySelector('.link-item.spotify .lyric-whisper'),        // 0
+                document.querySelector('.link-item.apple .lyric-whisper'),          // 1
+                document.querySelector('.link-item.bandcamp .lyric-whisper'),       // 2
+                document.querySelector('.link-item.bereal .lyric-whisper.bereal-left'),  // 3
+                document.querySelector('.link-item.bereal .lyric-whisper.bereal-right'), // 4
+                document.querySelector('.link-item.instagram .lyric-whisper'),      // 5
+                document.querySelector('.link-item.youtube .lyric-whisper'),        // 6
+                document.querySelector('.link-item.facebook .lyric-whisper'),       // 7
+                document.querySelector('.link-item.x-social .lyric-whisper')        // 8
+            ];
+
+            function createCrypticWord(word, flavor = 'towo') {
                 const letters = word.split('');
                 const crypticClasses = ['', 'up', 'down', 'up2', 'down2'];
-                
+
+                if (flavor === 'sheik') {
+                    // Staggered letter delays create the running-water feel; no vertical jitter.
+                    const stagger = 90;
+                    return letters.map((letter, i) => {
+                        const delay = i * stagger;
+                        const ch = letter === ' ' ? '&nbsp;' : letter;
+                        return `<span class="letter" style="--letter-delay: ${delay}ms">${ch}</span>`;
+                    }).join('');
+                }
+
                 return letters.map(letter => {
                     const randomClass = Math.random() < 0.4 ? crypticClasses[Math.floor(Math.random() * crypticClasses.length)] : '';
                     return `<span class="letter ${randomClass}">${letter}</span>`;
@@ -1482,47 +1916,51 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             function clearAllWhispers() {
                 whisperElements.forEach(el => {
                     if (el) {
-                        el.classList.remove('active', 'fade-out', 'single-word', 'peripheral');
+                        el.classList.remove('active', 'fade-out', 'single-word', 'peripheral', 'sheik');
                         el.innerHTML = '';
                         el.style.opacity = '0';
                     }
                 });
             }
 
-            function displayPhrase(phraseWords) {
+            function displayPhrase(phraseWords, flavor = 'towo') {
                 clearAllWhispers();
 
+                const isSheik = flavor === 'sheik';
                 const isSingleWord = phraseWords.length === 1;
-                const isPeripheral = Math.random() < 0.3;
+                const isPeripheral = !isSheik && Math.random() < 0.3;
                 
                 // Create available positions - but handle BeReal specially
                 let availablePositions = [];
-                
-                // Always include the 4 main positions
-                availablePositions.push(0, 1, 4, 5); // Spotify, Apple, Instagram, Facebook
-                
-                // Only sometimes include BeReal positions (50% chance each, increased from 40%)
+
+                // Always include the 7 main positions (indices 0,1,2,5,6,7,8 from whisperElements)
+                availablePositions.push(0, 1, 2, 5, 6, 7, 8); // Spotify, Apple, Bandcamp, Instagram, YouTube, Facebook, X
+
+                // Only sometimes include BeReal positions (50% chance each)
                 if (Math.random() < 0.5) {
-                    availablePositions.push(2); // BeReal-left
+                    availablePositions.push(3); // BeReal-left
                 }
                 if (Math.random() < 0.5) {
-                    availablePositions.push(3); // BeReal-right
+                    availablePositions.push(4); // BeReal-right
                 }
                 
-                // Handle positioning based on phrase type
-                if (isSingleWord) {
-                    // Single words can appear anywhere - full randomization
-                    availablePositions.sort(() => Math.random() - 0.5);
-                } else if (Math.random() < 0.75) {
-                    // 75% chance: keep multi-word phrases in natural order (increased from 60%)
-                    availablePositions.sort((a, b) => a - b);
-                } else {
-                    // 25% chance: shuffle multi-word phrases for variety (decreased from 40%)
-                }
-                
-                // Take only as many positions as we have words, but ensure we use them
+                // Placement strategy:
+                //   · Single words land on a random position.
+                //   · Multi-word phrases stay in natural top-to-bottom reading order (so the
+                //     phrase is always readable), but slide to a RANDOM starting offset each
+                //     cycle — so phrases explore the whole stack rather than always starting
+                //     at the top OR always ending at X.
                 const wordsToPlace = Math.min(phraseWords.length, availablePositions.length);
-                const positionsToUse = availablePositions.slice(0, wordsToPlace);
+                let positionsToUse;
+                if (isSingleWord) {
+                    availablePositions.sort(() => Math.random() - 0.5);
+                    positionsToUse = availablePositions.slice(0, wordsToPlace);
+                } else {
+                    availablePositions.sort((a, b) => a - b);
+                    const maxStart = Math.max(0, availablePositions.length - wordsToPlace);
+                    const start = Math.floor(Math.random() * (maxStart + 1));
+                    positionsToUse = availablePositions.slice(start, start + wordsToPlace);
+                }
 
                 // Make sure we actually have positions and words to display
                 if (positionsToUse.length === 0 || phraseWords.length === 0) {
@@ -1535,30 +1973,35 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                 phraseWords.slice(0, positionsToUse.length).forEach((word, index) => {
                     const elementIndex = positionsToUse[index];
                     const element = whisperElements[elementIndex];
-                    
+
                     if (element) {
                         setTimeout(() => {
-                            element.innerHTML = createCrypticWord(word);
-                            
-                            if (isSingleWord) {
+                            element.innerHTML = createCrypticWord(word, flavor);
+
+                            if (isSheik) {
+                                element.classList.add('sheik');
+                            } else if (isSingleWord) {
                                 element.classList.add('single-word');
                             } else if (isPeripheral) {
                                 element.classList.add('peripheral');
                             }
-                            
+
                             element.classList.add('active');
-                            
-                            // Ensure letters are visible
-                            const letters = element.querySelectorAll('.letter');
-                            letters.forEach(letter => {
-                                letter.style.opacity = '1';
-                            });
-                        }, index * (isSingleWord ? 0 : 400));
+
+                            // For TOWO whispers, ensure parent letters are visible (sheik letters
+                            // animate their own opacity via CSS stagger, so skip the override).
+                            if (!isSheik) {
+                                const letters = element.querySelectorAll('.letter');
+                                letters.forEach(letter => {
+                                    letter.style.opacity = '1';
+                                });
+                            }
+                        }, index * (isSingleWord ? 0 : (isSheik ? 700 : 400)));
                     }
                 });
 
                 // Clear after sustain time
-                const sustainTime = isSingleWord ? 300 : 2000;
+                const sustainTime = isSheik ? (isSingleWord ? 2600 : 3800) : (isSingleWord ? 300 : 2000);
                 setTimeout(() => {
                     whisperElements.forEach(el => {
                         if (el && el.classList.contains('active')) {
@@ -1571,19 +2014,24 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             
             function startLyricCycle() {
                 function nextPhrase() {
-                    const randomIndex = Math.floor(Math.random() * phrases.length);
-                    const phrase = phrases[randomIndex];
-                    
-                    displayPhrase(phrase);
-                    
+                    // Sheik phrases linger longer on-screen than TOWO ones, so a lower pick
+                    // rate still gives them a fair share of visible time.
+                    const flavor = Math.random() < 0.4 ? 'sheik' : 'towo';
+                    const pool = flavor === 'sheik' ? sheikPhrases : phrases;
+                    const phrase = pool[Math.floor(Math.random() * pool.length)];
+
+                    displayPhrase(phrase, flavor);
+
                     const isSingleWord = phrase.length === 1;
-                    const baseDelay = isSingleWord ? 1500 : 3000;
+                    const baseDelay = flavor === 'sheik'
+                        ? (isSingleWord ? 3200 : 5200)
+                        : (isSingleWord ? 1500 : 3000);
                     const randomDelay = Math.random() * 2000 + 1000;
                     const cycleDelay = baseDelay + randomDelay;
-                    
+
                     setTimeout(nextPhrase, cycleDelay);
                 }
-                
+
                 setTimeout(nextPhrase, 3000);
             }
 
@@ -1591,9 +2039,26 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             createLinkConstellations();
             generateDynamicLattice();
             setInterval(generateDynamicLattice, 45000);
-            
-            // Start cryptic image flashing system
-            startCrypticFlashing();
+
+            // Mobile scroll-affordance: show the "experiments" hint after the intro
+            // settles, dismiss it on first meaningful scroll.
+            const experimentsHint = document.getElementById('experimentsHint');
+            if (experimentsHint) {
+                setTimeout(() => experimentsHint.classList.add('visible'), 5500);
+
+                const onScroll = () => {
+                    if (window.scrollY > 120) {
+                        experimentsHint.classList.add('dismissed');
+                        window.removeEventListener('scroll', onScroll);
+                    }
+                };
+                window.addEventListener('scroll', onScroll, { passive: true });
+            }
+
+            // Viewport rotation (cover cycle + occasional feature video). The cryptic
+            // flashing system is started from *inside* the opening sequence after Sheik's
+            // cover has settled, so the TL images don't flash over the opening burn/promo.
+            startViewportRotation();
             
             // Simple spotlight system
             const spotlight = document.getElementById('spotlight');
@@ -1660,9 +2125,9 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
         // Cryptic image flashing system
         function startCrypticFlashing() {
             const flashImages = [
-                'FlashPromo1.jpg',
-                'FlashPromo2.jpg', 
-                'FlashPromo3.jpg'
+                'assets/images/promo/FlashPromo1.jpg',
+                'assets/images/promo/FlashPromo2.jpg',
+                'assets/images/promo/FlashPromo3.jpg'
             ];
             
             const flashElements = [
@@ -1691,10 +2156,10 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                         setTimeout(() => {
                             randomElement.classList.add('flash-active');
                             
-                            // Remove class after animation completes
+                            // Remove class after animation completes (matches shortened 0.45s duration)
                             setTimeout(() => {
                                 randomElement.classList.remove('flash-active');
-                            }, 800);
+                            }, 500);
                         }, 50);
                     }
                 }
@@ -1704,8 +2169,140 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                 setTimeout(triggerCrypticFlash, nextFlash);
             }
             
-            // Start the flashing cycle after initial page setup
-            setTimeout(triggerCrypticFlash, 12000);
+            // Caller controls the start moment now — just a brief buffer so the first
+            // flash doesn't land the instant Sheik's cover appears.
+            setTimeout(triggerCrypticFlash, 3000);
+        }
+
+        // Top viewport rotation — cycles through cover art with a burn-video
+        // transition between each swap, and plays a feature video every few cycles.
+        function startViewportRotation() {
+            const slides = Array.from(document.querySelectorAll('.viewport-slide'));
+            const burn = document.getElementById('viewportBurn');
+            const sheikPromo = document.getElementById('viewportSheikPromo');
+            // Feature videos cycle through in alternation — drop any that are missing
+            // so the array only holds usable elements.
+            const featureVideos = [
+                document.getElementById('viewportFeature'),           // TOWO promo
+                document.getElementById('viewportFeatureSheikV4'),    // Sheik's v4 promo
+                document.getElementById('viewportFeatureCryptic'),    // Cryptic-Cut
+                document.getElementById('viewportFeatureSheikSquare') // Sheik's square promo
+            ].filter(Boolean);
+            if (!slides.length || !burn) return;
+
+            // Positions: 0 = base TOWO cover (default background of .profile-image),
+            //            1..N = overlay slides in DOM order (Sheik, Instrumentals,
+            //            TL1, TL2, TL3, ...).
+            const totalPositions = slides.length + 1;
+            let currentPosition = 0;
+            let cyclesSinceFeature = 0;
+            let featureIndex = 0;
+
+            const SLIDE_DURATION_MS    = 14000;  // dwell on each cover
+            const SWAP_DELAY_MS        = 900;    // mid-burn point to swap the slide underneath
+            const FEATURE_INTERVAL     = 4;      // TOWO-Promo plays every Nth swap-burn
+            const OPENING_DELAY_MS     = 500;    // burn fires right off the bat
+            const SHEIK_PROMO_SWAP_MS  = 1500;   // mid-promo, cover swaps to Sheik's underneath
+
+            // Browser autoplay policies block UNMUTED autoplay until the user has
+            // interacted with the page. Track that so promo videos can come in with
+            // audio once the user has clicked or pressed a key.
+            let userHasInteracted = false;
+            const markInteracted = () => { userHasInteracted = true; };
+            document.addEventListener('click',      markInteracted, { once: true });
+            document.addEventListener('keydown',    markInteracted, { once: true });
+            document.addEventListener('touchstart', markInteracted, { once: true, passive: true });
+
+            function setActivePosition(position) {
+                slides.forEach((s, i) => s.classList.toggle('active', i === position - 1));
+            }
+
+            // options.withAudio: if true AND the user has interacted, play the video
+            //                    unmuted so its audio mixes into the ambient drone.
+            //                    Otherwise the video stays muted (required for autoplay).
+            function playVideo(el, options) {
+                const opts = options || {};
+                return new Promise((resolve) => {
+                    let done = false;
+                    const cleanup = () => {
+                        if (done) return;
+                        done = true;
+                        el.classList.remove('playing');
+                        resolve();
+                    };
+                    el.currentTime = 0;
+                    el.muted = !(opts.withAudio && userHasInteracted);
+                    el.classList.add('playing');
+                    el.play().catch(() => {
+                        // If unmuted play was blocked, retry muted so the video still shows.
+                        if (!el.muted) {
+                            el.muted = true;
+                            el.play().catch(cleanup);
+                        } else {
+                            cleanup();
+                        }
+                    });
+                    el.addEventListener('ended', cleanup, { once: true });
+                    // Safety: if metadata isn't ready yet, use a generous fallback.
+                    const maxMs = (isFinite(el.duration) && el.duration > 0)
+                        ? (el.duration * 1000 + 1500)
+                        : 60000;
+                    setTimeout(cleanup, maxMs);
+                });
+            }
+
+            // Opening sequence: burn → Sheik's Song promo → Sheik's cover revealed.
+            // Runs once at page load, then hands off to the normal rotation.
+            async function openingSequence() {
+                // 1) Opening burn — flame over the TOWO cover, no swap
+                await playVideo(burn);
+
+                // 2) Sheik's Song promo — cover swaps to Sheik's mid-play (viewer sees
+                //    only the promo video; swap is invisible behind it). Plays with audio
+                //    if the user has interacted with the page by now (browser policy).
+                if (sheikPromo) {
+                    const promoPromise = playVideo(sheikPromo, { withAudio: true });
+                    setTimeout(() => {
+                        currentPosition = 1;  // Sheik (first overlay slide)
+                        setActivePosition(currentPosition);
+                    }, SHEIK_PROMO_SWAP_MS);
+                    await promoPromise;
+                } else {
+                    // Fallback if promo asset is missing
+                    currentPosition = 1;
+                    setActivePosition(currentPosition);
+                }
+
+                // Cryptic TOWO flashes paused for now — re-enable by uncommenting:
+                //   if (typeof startCrypticFlashing === 'function') startCrypticFlashing();
+                // (Function definition is still in place, so just flip the call back on.)
+
+                // 3) Dwell on Sheik's cover, then hand off to the normal rotation
+                setTimeout(nextTransition, SLIDE_DURATION_MS);
+            }
+
+            // Normal rotation: each cycle plays burn + swaps cover; every Nth cycle
+            // preludes with the TOWO-Promo feature video for lingering viewers.
+            async function nextTransition() {
+                cyclesSinceFeature++;
+                if (cyclesSinceFeature >= FEATURE_INTERVAL && featureVideos.length) {
+                    cyclesSinceFeature = 0;
+                    const nextFeature = featureVideos[featureIndex % featureVideos.length];
+                    featureIndex++;
+                    await playVideo(nextFeature, { withAudio: true });
+                }
+
+                const burnPromise = playVideo(burn);
+                setTimeout(() => {
+                    currentPosition = (currentPosition + 1) % totalPositions;
+                    setActivePosition(currentPosition);
+                }, SWAP_DELAY_MS);
+                await burnPromise;
+
+                setTimeout(nextTransition, SLIDE_DURATION_MS);
+            }
+
+            setTimeout(openingSequence, OPENING_DELAY_MS);
         }
 // Enhanced slideshow system with better video handling and timeouts
 let currentSlide = 0;

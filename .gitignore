@@ -1,0 +1,10 @@
+# Local-only media: raw, unused, or too large for GitHub's 100MB push limit.
+# Preserved on disk under media-archive/ but never committed.
+media-archive/
+
+# OS / editor / tooling cruft
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.claude/
