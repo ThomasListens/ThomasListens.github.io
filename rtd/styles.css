@@ -1,0 +1,2202 @@
+﻿:root {
+  --paper: #F4F1EC;
+  --ink: #1A1A1A;
+  --ink-blue: #143E63;
+  /* Secondary blue, distinguishable from --ink-blue without leaving
+     the deck's palette. Used on slide 6 (IAF) to render the second
+     EEG-style waveform alongside the primary ink-blue one. */
+  --ink-blue-2: #5C7FA3;
+  --meta: #6B6860;
+  /* Warm Venetian red — sits comfortably with the Prussian blue and
+     the cream paper. Used as a focal accent on slide 4 (the heart
+     silhouette, the word "pulse", the "1"s in "a 1 of 1."). */
+  --accent-red: #B83A36;
+
+  --font-body: 'EB Garamond', Garamond, 'Adobe Garamond Pro', Baskerville, Georgia, serif;
+  --font-meta: 'IBM Plex Mono', 'Courier New', Courier, monospace;
+  --font-zh: 'Noto Serif TC', 'EB Garamond', serif;
+
+  --base-content-size: clamp(1.35rem, 1.75vw + 0.15rem, 2rem);
+  --meta-size: clamp(0.69rem, 0.56vw + 0.2rem, 0.81rem);
+  --margin-x: clamp(2.3rem, 4.5vw, 4.5rem);
+  --margin-y: clamp(1.45rem, 2.7vw, 2.5rem);
+  --transition-ms: 700ms;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-body);
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.deck {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+.slide {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-ms) ease;
+  background: var(--paper);
+}
+
+.slide.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.slide-ellipse {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  /* Perspective so 3D transforms on the orbits below render as
+     depth, not as flat horizontal scaling. */
+  perspective: 1500px;
+  perspective-origin: 50% 50%;
+}
+
+/* Backstop: ellipses are stroked, never filled. Slide 2's
+   .orbit-trace overrides this via .slide-ellipse .orbit-trace
+   below — its engulf animation depends on the fill becoming
+   opaque to flood the screen with blue. */
+.slide-ellipse ellipse { fill: none; }
+
+.slide-body {
+  position: relative;
+  z-index: 1;
+  grid-row: 2;
+  margin-inline: var(--margin-x);
+  font-size: var(--base-content-size);
+}
+
+/* Meta tiers are absolutely positioned at the slide corners. This
+   keeps the URL (bottom-left) and attribution (bottom-right) anchored
+   to the actual edges of the slide regardless of what the body
+   container is doing. Several slide bodies use `position: absolute;
+   inset: 0` to claim the whole slide for their own layout — a
+   flow-based meta would render *underneath* those bodies. The
+   z-index:3 puts meta above any body content.
+
+   `top` and `bottom` are set on the per-tier rules below so the
+   margins reference the slide edges rather than flowing through the
+   grid template. */
+.slide-meta {
+  position: absolute;
+  left: clamp(0.8rem, 1.5vw, 1.5rem);
+  right: clamp(0.8rem, 1.5vw, 1.5rem);
+  color: var(--meta);
+  font-family: var(--font-meta);
+  font-size: var(--meta-size);
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: lowercase;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 3;
+}
+
+.slide-meta-top {
+  top: clamp(0.6rem, 1.2vw, 1.2rem);
+}
+
+.slide-meta-bottom {
+  bottom: clamp(0.6rem, 1.2vw, 1.2rem);
+}
+
+/* === SLIDE 0: TITLE ==================================================
+   Bilingual front door. We hear you. / 我們聽見你了
+   Both lines centered and stacked. The English is italic EB Garamond;
+   the Chinese is upright Noto Serif TC. Same ink-blue color — same
+   utterance in two languages. No animation, no ellipse, no metadata.
+   ===================================================================== */
+.slide-title .slide-body-title {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: left;
+  justify-content:  center;
+  gap: px;
+}
+
+.title-en {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(28px, 3.4vw, 46px);
+  color: var(--ink-blue);
+  margin: 0;
+  letter-spacing: -0.005em;
+  text-align: left;
+}
+
+.title-zh {
+  font-family: var(--font-zh);
+  font-weight: 400;
+  font-size: clamp(22px, 2.6vw, 36px);
+  color: var(--ink-blue);
+  margin: 0;
+  opacity: 0.88;
+  letter-spacing: 0.06em;
+  text-align: left;
+}
+
+/* === SLIDE 1: THE QUESTION ===========================================
+   Static composition — no cadence, no animation. The ellipse arches
+   from the bottom of the slide (cy=650 in the 1600x900 viewBox);
+   the two foci dots sit on the focus axis at x=137 and x=1463.
+   Statement is left-aligned in the upper portion, sentence case.
+   The italic question sits centered on the focus axis (top: 72.2%
+   in slide-coords ≈ y=650 in viewBox-coords), so it literally rests
+   between the two foci.
+   ===================================================================== */
+
+.slide-body-canary {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+/* Statement is just a positioning frame — the three lines anchor
+   themselves independently against the ellipse geometry, so the
+   container only needs to fill the slide. */
+.slide-body-canary .statement {
+  position: absolute;
+  inset: 0;
+  color: var(--ink);
+}
+
+/* The per-line rules below (paired with .echo-statement .line-N for
+   slide 03) declare every font property each line needs. Don't add a
+   blanket `.slide-body-canary .statement p` rule here — its specificity
+   (0,3,1) would beat the per-line rules (0,2,0) and override their
+   font-size, which is what caused slide 02's lines to render at the
+   wrong size during the cross-fade to slide 03. */
+
+/* Each line is positioned absolutely against the slide so it can
+   land in a specific zone relative to the two ellipse crests:
+       outer crest ≈ 30% of slide (viewBox-y 270)
+       inner crest ≈ 41% of slide (viewBox-y 370)
+       focus axis  = 72.2% (where the question sits)
+
+   The pattern is `left: X%; transform: translateX(-50%)` — the
+   element sizes to its text and centers around the X% horizontal
+   anchor. Adjust `top` to slide the line up/down, and `left` to
+   nudge it horizontally. white-space:nowrap keeps each line on
+   one line regardless of viewport width.
+
+   The selectors below are paired: each rule applies to BOTH the
+   slide-02 statement (.slide-body-canary .line-N) AND the slide-03
+   echo (.echo-statement .line-N). Sharing one rule guarantees the
+   cross-fade hands off without any size or position drift — change
+   either one and both update together. */
+
+/* Line 1: above the outer crest, slightly left of slide center. */
+.slide-body-canary .line-1,
+.echo-statement .line-1 {
+  position: absolute;
+  top: 10%;
+  left: 40%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  text-align: center;
+  font-size: clamp(65px, 7.5vw, 100px);
+  line-height: 1.45;
+  font-family: var(--font-body);
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  margin: 0;
+}
+
+/* Line 2: between the two crests, slightly right of slide center. */
+.slide-body-canary .line-2,
+.echo-statement .line-2 {
+  position: absolute;
+  top: 29%;
+  left: 60%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  text-align: center;
+  font-size: clamp(65px, 5vw, 80px);
+  line-height: 1.45;
+  font-family: var(--font-body);
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  margin: 0;
+}
+
+/* Line 3: below both crests, fully centered, above the question. */
+.slide-body-canary .line-3,
+.echo-statement .line-3 {
+  position: absolute;
+  top: 44%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  text-align: center;
+  font-size: clamp(36px, 4vw, 65px);
+  line-height: 1.45;
+  font-family: var(--font-body);
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  margin: 0;
+}
+
+/* Question — sits centered on the focus axis at viewBox y=650,
+   which is ~72% from the top. Same shared-rule pattern as the
+   line-N rules above: slide 02's question and slide 03's echo
+   question render with identical styling. */
+.slide-body-canary .question,
+.echo-question {
+  position: absolute;
+  top: 72.2%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(36px, 4vw, 70px);
+  color: var(--ink-blue);
+}
+
+/* Line 1, line 2, and individual words start invisible — they fade
+   in on a paced cadence (see slide-question.active rules below).
+   .line-3 is intentionally NOT in this rule: setting opacity:0 on
+   the parent <p> would multiply through to its child .word spans
+   and hide them no matter what their own opacity is. The line-3
+   words handle their own visibility individually. */
+.slide-body-canary .line-1,
+.slide-body-canary .line-2,
+.slide-body-canary .word {
+  opacity: 0;
+}
+
+/* inline-block keeps each word in its layout slot even at opacity:0,
+   so siblings don't slide sideways as words appear. */
+.slide-body-canary .word {
+  display: inline-block;
+}
+
+/* Mandarin watermark — large, faint, anchored on the focus axis
+   directly behind the question. The watermark and the question share
+   a center: the question reads as if the Mandarin gloss is rising up
+   underneath it. Tune opacity (0.10 starting value) on a real screen
+   — sweet spot is whisper-faint but unambiguously present. */
+.zh-watermark {
+  position: absolute;
+  top: 72.2%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-zh);
+  font-weight: 400;
+  font-size: clamp(60px, 9vw, 130px);
+  color: var(--ink-blue);
+  opacity: 0.10;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  z-index: 1;
+}
+
+/* Slide 1 orbits start invisible and fade in on the cadence. The
+   subtle Y-axis tilts give a 3D plane feel and match slide 2's
+   engulf "from" state for a seamless cross-fade handoff. */
+.orbit {
+  transform-box: view-box;
+  transform-origin: 800px 650px;
+  will-change: transform, opacity;
+  opacity: 0;
+}
+
+.orbit-outer {
+  transform: rotateY(12deg);
+}
+
+.orbit-inner {
+  transform: rotateY(-12deg);
+}
+
+/* === Slide 1 cadence — paced reveal coordinated with the drone =====
+   Conversational pacing — what someone speaking the slide aloud
+   would do. Statement lands in ~3.3s, then a ~1s contemplative
+   pause as the drone enters and dots begin to breathe, then the
+   question lands in ~2.4s riding the drone's rises.
+   Times below are seconds from .slide-question.active.
+
+      0.3s   outer ellipse fades in     (1.0s)
+      0.3s   line 1: "Time is Everything." (0.8s)
+      1.4s   inner ellipse + dots fade in (0.8s)
+      1.4s   line 2: "And everyone"    (0.6s)
+      2.7s   "moves"   (0.25s)   — extra contemplative beat after line 2
+      2.95s  "to"      (0.20s)
+      3.15s  "their"   (0.20s)
+      3.35s  "own"     (0.20s)
+      3.55s  "beat."   (0.30s)
+      4.0s   dot pulse begins; drone enters (matches in JS)
+      5.0s   "What"    (0.30s)   — question is faster, 250ms apart
+      5.25s  "does"    (0.30s)
+      5.5s   "your"    (0.30s)
+      5.75s  "time"    (0.30s)
+      6.0s   "sound"   (0.30s)
+      6.25s  "like?"   (0.30s)
+      6.55s  slide rests; drone sustains; dots pulse
+   ===================================================================== */
+
+.slide-question.active .orbit-outer {
+  animation: slide1-fade-in 1.0s ease-in forwards 0.3s;
+}
+
+.slide-question.active .orbit-inner {
+  animation: slide1-fade-in 0.8s ease-in forwards 1.4s;
+}
+
+/* Dots fade in to 0.9 opacity with line 2, then start a slow breath
+   between 0.9 and 0.55 at t=4.0s (after line 3 finishes). Two
+   animations chained on the same property: the second (pulse)
+   overrides the first's forwards state when it begins. */
+.slide-question.active .dot {
+  animation:
+    slide1-dot-in 0.8s ease-in forwards 1.4s,
+    slide1-dot-pulse 4.0s ease-in-out 4.0s infinite;
+}
+
+@keyframes slide1-fade-in {
+  to { opacity: 1; }
+}
+
+@keyframes slide1-dot-in {
+  to { opacity: 0.9; }
+}
+
+@keyframes slide1-dot-pulse {
+  0%   { opacity: 0.9; }
+  50%  { opacity: 0.55; }
+  100% { opacity: 0.9; }
+}
+
+/* Statement lines */
+.slide-question.active .line-1 {
+  animation: slide1-fade-in 0.8s ease-in forwards 0.3s;
+}
+
+.slide-question.active .line-2 {
+  animation: slide1-fade-in 0.6s ease-in forwards 1.4s;
+}
+
+/* Line 3 — "moves to their own beat." paced like beats, with an
+   extra contemplative beat after line 2 settles. */
+.slide-question.active .line-3 .w-1 { animation: slide1-fade-in 0.25s ease-in forwards 2.70s; }
+.slide-question.active .line-3 .w-2 { animation: slide1-fade-in 0.20s ease-in forwards 2.95s; }
+.slide-question.active .line-3 .w-3 { animation: slide1-fade-in 0.20s ease-in forwards 3.15s; }
+.slide-question.active .line-3 .w-4 { animation: slide1-fade-in 0.20s ease-in forwards 3.35s; }
+.slide-question.active .line-3 .w-5 { animation: slide1-fade-in 0.30s ease-in forwards 3.55s; }
+
+/* Question — six words at 250ms apart riding the drone's rises
+   (see app.js cues). Faster than the statement, more incantatory. */
+.slide-question.active .question .qw-1 { animation: slide1-fade-in 0.3s ease-in forwards 5.00s; }
+.slide-question.active .question .qw-2 { animation: slide1-fade-in 0.3s ease-in forwards 5.25s; }
+.slide-question.active .question .qw-3 { animation: slide1-fade-in 0.3s ease-in forwards 5.50s; }
+.slide-question.active .question .qw-4 { animation: slide1-fade-in 0.3s ease-in forwards 5.75s; }
+.slide-question.active .question .qw-5 { animation: slide1-fade-in 0.3s ease-in forwards 6.00s; }
+.slide-question.active .question .qw-6 { animation: slide1-fade-in 0.3s ease-in forwards 6.25s; }
+
+.slide-blank {
+  background: var(--paper);
+}
+
+/* === Slide 3 (ii. the method) — RTD reveal ============================
+   Slide 3 mirrors slide 2's composition. On entry the two ellipses
+   grow outward and saturate from a faint tint to solid rich blue,
+   eventually filling the entire screen. Echo text and dots fade out
+   as the blue overtakes them. Once the screen is fully blue, the
+   title "Relative Tempo Derivation" writes itself across the field
+   left → right in white.
+
+   Cadence (slide.active at t=0):
+     0.15s   outer ellipse begins engulf  (1.9s, ease-in-out)
+     0.30s   inner ellipse begins engulf  (2.0s — slight stagger)
+     0.10s   echo text fades out          (0.7s)
+     0.10s   echo dots fade out           (0.5s)
+     0.60s   meta lightens to paper       (0.8s)
+     2.50s   title writes left → right    (1.7s)
+
+   Slide 2's current orbit angle is captured by JS at navigation time
+   and passed in as --start-rotation, so the engulf begins from that
+   rotation rather than snapping back to 0. Slide 2's elements are
+   also held visible during cross-fade so the handoff is seamless.
+   ===================================================================== */
+
+/* Slide-body-method fills the full slide so its absolutely-positioned
+   children (collapse-bundle → echo-statement → line-N) resolve their
+   percentages against the slide, not against the narrower margin-inline
+   column the deck-wide .slide-body rule would otherwise impose. This
+   makes the slide-02 → slide-03 cross-fade hand off without a position
+   shift on the echo lines. */
+.slide-body-method {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+/* Wrapper for the echo content — fades out as the blue takes over. */
+.collapse-bundle {
+  position: absolute;
+  inset: 0;
+}
+
+.echo {
+  position: absolute;
+}
+
+/* Echo wrapper just provides the positioning context — the actual
+   line and question styling is shared with slide 02 via paired
+   selectors above. inset:0 so the absolutely-positioned children
+   resolve percentages against the slide, not the wrapper's content
+   box. */
+.echo-statement {
+  inset: 0;
+  color: var(--ink);
+}
+
+/* Orbit traces start fully drawn (mirror slide 1's end state).
+   .slide-ellipse selector lifts specificity above the deck-wide
+   `.slide-ellipse ellipse { fill: none }` backstop so the engulf
+   keyframe can flood the screen with rich blue. transform-origin
+   is fixed at the new ellipse center (800, 650). */
+.slide-ellipse .orbit-trace {
+  fill: var(--ink-blue);
+  fill-opacity: 0.06;
+  transform-box: view-box;
+  transform-origin: 800px 650px;
+}
+
+/* --start-rotation is set by JS at slide-2 → slide-3 navigation,
+   capturing slide 2's current orbit angle so slide 3's echoes start
+   from exactly where slide 2 left off. Defaults to 0deg when arriving
+   at slide 3 from elsewhere. */
+.orbit-trace-outer {
+  transform: rotateY(12deg) rotate(var(--start-rotation, 0deg));
+}
+
+.orbit-trace-inner {
+  transform: rotateY(-12deg) rotate(var(--start-rotation, 0deg));
+}
+
+/* Engulf — both orbits scale up from their centers, untilt, and
+   saturate from 6% blue to fully opaque. They overshoot the viewport
+   so the screen ends up uniformly rich blue. The rotation captured
+   from slide 2 (--start-rotation) is preserved through the engulf so
+   the orbits never snap; they simply grow from where they were. */
+.slide-method.active .orbit-trace-outer {
+  animation: engulf-outer 1.9s cubic-bezier(0.45, 0, 0.4, 1) forwards 0.15s;
+}
+
+.slide-method.active .orbit-trace-inner {
+  animation: engulf-inner 2s cubic-bezier(0.45, 0, 0.4, 1) forwards 0.3s;
+}
+
+@keyframes engulf-outer {
+  from {
+    transform: rotateY(12deg) rotate(var(--start-rotation, 0deg)) scale(1);
+    fill-opacity: 0.06;
+    stroke-opacity: 0.28;
+  }
+  to {
+    transform: rotateY(0deg)  rotate(var(--start-rotation, 0deg)) scale(7);
+    fill-opacity: 1;
+    stroke-opacity: 0;
+  }
+}
+
+@keyframes engulf-inner {
+  from {
+    transform: rotateY(-12deg) rotate(var(--start-rotation, 0deg)) scale(1);
+    fill-opacity: 0.06;
+    stroke-opacity: 0.7;
+  }
+  to {
+    transform: rotateY(0deg)   rotate(var(--start-rotation, 0deg)) scale(7);
+    fill-opacity: 1;
+    stroke-opacity: 0;
+  }
+}
+
+/* Echo content (text + dots) fades out as the blue flood takes over. */
+.slide-method.active .collapse-bundle {
+  animation: echo-flood-out 0.7s ease-in forwards 0.1s;
+}
+
+.slide-method.active .echo-dot-wrap {
+  animation: echo-flood-out 0.5s ease-in forwards 0.1s;
+}
+
+@keyframes echo-flood-out {
+  to { opacity: 0; }
+}
+
+/* Meta text shifts from gray → paper so it stays legible against
+   the rich blue background. */
+.slide-method.active .slide-meta {
+  animation: meta-on-blue 0.8s ease forwards 0.6s;
+}
+
+@keyframes meta-on-blue {
+  to { color: var(--paper); opacity: 0.55; }
+}
+
+/* Title writes itself in across the (now rich blue) field, left to
+   right, in paper-color. Anchored ABOVE the horizontal middle so
+   the title stays in the always-blue top half on slide B. The
+   element is auto-width (sized to its text) and centered via
+   translateX, so the clip-path reveal sweeps from the text's actual
+   left edge — not from a wide centered container's left padding. */
+.reveal-title {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  margin: 0;
+  text-align: left;
+  color: var(--paper);
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: clamp(2.4rem, 4.8vw + 0.5rem, 5.6rem);
+  letter-spacing: 0.02em;
+  /* Looser line-height so descenders ("p" in "Tempo") fit inside
+     the clip-path reference box. With the tighter inherited 1.2,
+     the bottom of "p" was getting trimmed by inset(0 0 0 0). */
+  line-height: 1.4;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  clip-path: inset(0 100% 0 0);
+}
+
+.slide-method.active .reveal-title {
+  animation: title-write 1.7s cubic-bezier(0.45, 0, 0.55, 1) forwards 2.5s;
+}
+
+@keyframes title-write {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+
+/* Mandarin watermark — slide A (engulf, blue surface).
+   Settles in after the engulf completes (~2.2s into the slide), at
+   higher opacity than slide 1's watermark because the blue surface
+   darkens it. Anchored BELOW the horizontal middle so the watermark
+   sits in what will become the paper-half on slide B — and so the
+   title above it is paired with the gloss below, like a heading and
+   its shadow. */
+.zh-watermark-method {
+  top: 60%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--paper);
+  opacity: 0;
+  font-size: clamp(50px, 7.5vw, 110px);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.slide-method.active .zh-watermark-method {
+  animation: watermark-method-in 1.0s ease-out forwards 2.2s;
+}
+
+@keyframes watermark-method-in {
+  to { opacity: 0.22; }
+}
+
+/* === Slide B (ii. the method) — split-surface invert and define =====
+   The slide is divided horizontally at 50%. The TOP HALF stays blue
+   forever — it carries the title (paper on blue) untouched from
+   slide A. The BOTTOM HALF inverts blue → paper, swapping the
+   Mandarin gloss for the English definition.
+
+   The split is implemented as a ::after pseudo-element covering
+   only the bottom half. The slide's own background is var(--ink-blue)
+   for the top; the pseudo-element's background animates to paper.
+   This way the title doesn't have to animate at all — only the
+   bottom half changes underneath it.
+
+   Cadence (slide.active at t=0):
+     0.30s   bottom-half ::after inverts blue → paper  (1.2s)
+     0.30s   Mandarin watermark fades to 0             (1.2s)
+     0.30s   bottom meta inverts paper → meta-grey     (1.2s)
+     0.80s   definition fades in (italic ink-blue)     (1.0s)
+   ===================================================================== */
+
+.slide-defined {
+  background: var(--ink-blue);  /* top half — stays blue. */
+  transition: none;             /* snap to opacity:1, no cross-fade flash */
+}
+
+/* Bottom-half overlay. Initial state matches the slide background
+   (also blue) so on entry the slide is uniformly blue, indistinguishable
+   from slide A's engulfed end-state. The animation drives the bottom
+   half from blue → paper. */
+.slide-defined::after {
+  content: '';
+  position: absolute;
+  inset: 50% 0 0 0;
+  background: var(--ink-blue);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.slide-defined.active::after {
+  animation: bottom-half-invert 1.2s ease forwards 0.3s;
+}
+
+@keyframes bottom-half-invert {
+  to { background: var(--paper); }
+}
+
+/* Top meta sits in the always-blue top half — paper-on-blue forever.
+   Bottom meta starts paper-on-blue (matching slide A's end-state for
+   the cross-fade) and inverts to meta-grey-on-paper as the bottom
+   half catches up. */
+.slide-defined .slide-meta-top,
+.slide-defined .slide-meta-bottom {
+  color: var(--paper);
+  opacity: 0.55;
+}
+
+.slide-defined.active .slide-meta-bottom {
+  animation: meta-bottom-invert 1.2s ease forwards 0.3s;
+}
+
+@keyframes meta-bottom-invert {
+  to { color: var(--meta); opacity: 1; }
+}
+
+/* Body fills the slide so absolute children land at slide-relative
+   percentages (top:25% / 75% map directly to top half / bottom half).
+   z-index above ::after so the title and definition render on top. */
+.slide-body-defined {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+/* Title carries over from slide A unchanged — same position, font,
+   color — so the cross-fade handoff is invisible. No animation on
+   the title; it sits in the top half which stays blue forever. */
+.title-carry {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  margin: 0;
+  text-align: left;
+  color: var(--paper);
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: clamp(2.4rem, 4.8vw + 0.5rem, 5.6rem);
+  letter-spacing: 0.02em;
+  /* Match slide 03's reveal-title line-height so the cross-fade
+     handoff doesn't shift the title vertically. */
+  line-height: 1.4;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+
+/* Definition fades in quickly inside the surface-change window —
+   short enough not to drag (0.4s vs the 1.2s color change), late
+   enough that the watermark has already cleared so the two don't
+   compete for the same vertical slot. Starts at opacity:0 so it
+   doesn't hover invisibly against the blue surface; the fade gives
+   it a soft entrance instead of a hard pop. */
+.definition {
+  position: absolute;
+  top: 60%;
+  left: 12vw;
+  right: 12vw;
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(1.4rem, 1.8vw + 0.4rem, 2.2rem);
+  line-height: 1.4;
+  color: var(--ink-blue);
+  letter-spacing: -0.005em;
+  opacity: 0;
+  transform: translateY(-50%);
+}
+
+.slide-defined.active .definition {
+  animation: definition-in 0.4s ease-out forwards 0.8s;
+}
+
+@keyframes definition-in {
+  to { opacity: 1; }
+}
+
+/* Slide-B watermark fades out at the start of the surface change
+   so it has cleared the top:60% slot before the definition fades
+   in there. Without this fade the watermark would linger (only
+   disappearing via color-matching with the paper surface) and the
+   ink-blue definition + paper watermark would visually overlap
+   while both are partially transparent. */
+.zh-watermark-method-rest {
+  top: 60%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--paper);
+  opacity: 0.22;
+  font-size: clamp(50px, 7.5vw, 110px);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.slide-defined.active .zh-watermark-method-rest {
+  animation: watermark-fade-out 0.5s ease-out forwards 0.3s;
+}
+
+@keyframes watermark-fade-out {
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Slide 1 reduced-motion: skip cadence, show fully-rendered final
+     state. The drone is also skipped (gated in startSlide1Drone in
+     app.js by checking matchMedia). */
+  .slide-question.active .orbit-outer,
+  .slide-question.active .orbit-inner,
+  .slide-question.active .dot,
+  .slide-question.active .line,
+  .slide-question.active .word {
+    animation: none;
+  }
+  .slide-question .orbit-outer,
+  .slide-question .orbit-inner {
+    opacity: 1;
+  }
+  .slide-question .dot {
+    opacity: 0.9;
+  }
+  .slide-question .line,
+  .slide-question .word {
+    opacity: 1;
+  }
+
+  /* Slide A reduced-motion: skip animations, show engulfed end state
+     with title and watermark fully revealed. */
+  .slide-method.active .orbit-trace-outer,
+  .slide-method.active .orbit-trace-inner,
+  .slide-method.active .collapse-bundle,
+  .slide-method.active .echo-dot-wrap,
+  .slide-method.active .slide-meta,
+  .slide-method.active .reveal-title,
+  .slide-method.active .zh-watermark-method {
+    animation: none;
+  }
+  .slide-method .collapse-bundle,
+  .slide-method .echo-dot-wrap {
+    display: none;
+  }
+  .slide-method .orbit-trace {
+    transform: scale(7);
+    fill-opacity: 1;
+    stroke-opacity: 0;
+  }
+  .slide-method .slide-meta {
+    color: var(--paper);
+    opacity: 0.55;
+  }
+  .reveal-title {
+    clip-path: none;
+  }
+  .slide-method .zh-watermark-method {
+    opacity: 0.22;
+  }
+
+  /* Slide B reduced-motion: skip animations, show final split-surface
+     state. Top half stays blue with title (paper-on-blue). Bottom
+     half is paper with the definition (italic ink-blue). Top meta
+     is paper-on-blue; bottom meta is meta-grey-on-paper. */
+  .slide-defined.active::after,
+  .slide-defined.active .slide-meta-bottom,
+  .slide-defined.active .zh-watermark-method-rest,
+  .slide-defined.active .definition {
+    animation: none;
+  }
+  .slide-defined::after {
+    background: var(--paper);
+  }
+  .slide-defined .slide-meta-top {
+    color: var(--paper);
+    opacity: 0.55;
+  }
+  .slide-defined .slide-meta-bottom {
+    color: var(--meta);
+    opacity: 1;
+  }
+  .slide-defined .zh-watermark-method-rest {
+    opacity: 0;
+  }
+  .slide-defined .definition {
+    opacity: 1;
+  }
+
+  /* Slide 4 reduced-motion: skip cadence, show fully-rendered resting
+     state. Heart silhouette visible, waveform drawn, declaration +
+     payoff + quote all visible, trace fully drawn. Heartbeat audio
+     is skipped via AudioEngine's user-gesture gating elsewhere. */
+  .slide-heart-cadence.active .heart-figure,
+  .slide-heart-cadence.active .cardiac-wave,
+  .slide-heart-cadence.active .declaration,
+  .slide-heart-cadence.active .payoff,
+  .slide-heart-cadence.active .trace-ellipse,
+  .slide-heart-cadence.active .research-quote {
+    animation: none;
+  }
+  .slide-heart-cadence .heart-figure {
+    opacity: 0.85;
+  }
+  .slide-heart-cadence .cardiac-wave {
+    stroke-dashoffset: 0;
+  }
+  .slide-heart-cadence .declaration,
+  .slide-heart-cadence .payoff,
+  .slide-heart-cadence .research-quote {
+    opacity: 1;
+  }
+  .slide-heart-cadence .trace-ellipse {
+    stroke-dashoffset: 0;
+  }
+
+  /* Slide 5 reduced-motion: skip cadence, show fully-rendered resting
+     state. Path drawn, step marks visible, both trace circles
+     complete, formula fully built, schematic visible, quote present
+     at its target opacity. Audio is skipped via AudioEngine's
+     user-gesture gating elsewhere. */
+  .slide-gait-cadence.active .gait-path,
+  .slide-gait-cadence.active .step,
+  .slide-gait-cadence.active .trace-ellipse-outer,
+  .slide-gait-cadence.active .research-quote,
+  .slide-gait-cadence.active .formula > span,
+  .slide-gait-cadence.active .schematic-line {
+    animation: none;
+  }
+  .slide-gait-cadence .gait-path {
+    clip-path: none;
+  }
+  .slide-gait-cadence .step {
+    opacity: 0.85;
+  }
+  .slide-gait-cadence .trace-ellipse-outer {
+    stroke-dashoffset: 0;
+  }
+  .slide-gait-cadence .research-quote {
+    opacity: 0.85;
+  }
+  .slide-gait-cadence .formula > span,
+  .slide-gait-cadence .schematic-line {
+    opacity: 1;
+  }
+
+  /* Slide 6 reduced-motion: skip cadence, show fully-rendered resting
+     state. Curves drawn, wave + α label visible (static), trace fully
+     drawn, bridge + formula + alpha definition all visible. Quote
+     hidden (transient by design). JS wave oscillation is short-circuited
+     at the top of startSlide6Wave() via the same media query. */
+  .slide-iaf-cadence.active .personal-top,
+  .slide-iaf-cadence.active .iaf-curve-left,
+  .slide-iaf-cadence.active .iaf-curve-right,
+  .slide-iaf-cadence.active .iaf-wave,
+  .slide-iaf-cadence.active .iaf-wave-label,
+  .slide-iaf-cadence.active .trace-ellipse-inner,
+  .slide-iaf-cadence.active .trace-ellipse-outer,
+  .slide-iaf-cadence.active .research-quote,
+  .slide-iaf-cadence.active .bridge,
+  .slide-iaf-cadence.active .formula-line > span {
+    animation: none;
+  }
+  .slide-iaf-cadence .trace-ellipse-inner,
+  .slide-iaf-cadence .trace-ellipse-outer {
+    transform: scale(1.5, 0.85);
+  }
+  .slide-iaf-cadence .personal-top,
+  .slide-iaf-cadence .bridge,
+  .slide-iaf-cadence .formula-line > span {
+    opacity: 1;
+  }
+  .slide-iaf-cadence .iaf-curve {
+    stroke-dashoffset: 0;
+  }
+  .slide-iaf-cadence .iaf-wave {
+    opacity: 0.85;
+  }
+  .slide-iaf-cadence .iaf-wave-label {
+    opacity: 0.75;
+  }
+  .slide-iaf-cadence .research-quote {
+    opacity: 0;
+  }
+
+  /* Slide 7a reduced-motion: skip the alternating reveal cadence and
+     show the opening line + both halves fully populated. The two
+     warped carry-over ellipses are static anyway. */
+  .slide-bloom-cadence.active .bloom-opening,
+  .slide-bloom-cadence.active .bloom-heading,
+  .slide-bloom-cadence.active .bloom-item {
+    animation: none;
+  }
+  .slide-bloom-cadence .bloom-opening,
+  .slide-bloom-cadence .bloom-heading,
+  .slide-bloom-cadence .bloom-item {
+    opacity: 1;
+  }
+
+  /* Slide 7b reduced-motion: skip the build-out, show the integrated
+     schematic + legend + question all present. Legend rests at 0.75
+     opacity to preserve its subordination to the schematic. */
+  .slide-integrate-cadence.active .schematic-piece,
+  .slide-integrate-cadence.active .schematic-colon,
+  .slide-integrate-cadence.active .schematic-legend-integrated,
+  .slide-integrate-cadence.active .integrated-question {
+    animation: none;
+  }
+  .slide-integrate-cadence .schematic-piece,
+  .slide-integrate-cadence .schematic-colon,
+  .slide-integrate-cadence .integrated-question {
+    opacity: 1;
+  }
+  .slide-integrate-cadence .schematic-legend-integrated {
+    opacity: 0.75;
+  }
+}
+
+/* === Slide 4 (iii. the build) — Heart rate ===========================
+   Three vertical zones inside .slide-body-heart:
+     ~22%  declaration  ("It starts with a pulse.")  — charcoal, EB Garamond
+     ~36%  hero visual  (heart in charcoal + cardiac wave in ink-blue)
+     ~78%  payoff       ("a 1 of 1.")                — italic, ink-blue
+   The slide-ellipse on this slide is a quiet contextual frame at 0.18
+   opacity, not a focal element — slide 4 is carried by the visual.
+   ===================================================================== */
+.slide-body-heart {
+  position: relative;
+}
+
+.declaration {
+  position: absolute;
+  top: 22%;
+  left: 0;
+  right: 0;
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: clamp(22px, 2.6vw, 32px);
+  color: var(--ink);
+}
+
+/* Inline highlight — used for "pulse" inside the declaration and
+   the two "1"s in the payoff. The .accent class is generic enough
+   to reuse elsewhere in the deck if a single-word red emphasis is
+   wanted again. The payoff scope below also bumps the size and
+   weight so the "1"s stand out further. */
+.accent {
+  color: var(--accent-red);
+}
+
+/* Each slide sets its own --hero-top via a modifier class — slide 4
+   uses a slightly different vertical anchor than slide 5 because their
+   visuals have different intrinsic heights (heart 240, gait 280, etc.).
+   Keeping the position out of .hero-visual itself prevents one slide's
+   layout choice from leaking into another's. */
+.hero-visual {
+  position: absolute;
+  top: var(--hero-top, 36%);
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.hero-visual--heart { --hero-top: 36%; }
+.hero-visual--gait  { --hero-top: 33%; }
+.hero-visual--iaf   { --hero-top: 30%; }
+
+.hero-visual svg {
+  width: clamp(380px, 50vw, 560px);
+  height: auto;
+}
+
+.payoff {
+  position: absolute;
+  top: 78%;
+  left: 0;
+  right: 0;
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(28px, 3.4vw, 44px);
+  color: var(--ink-blue);
+}
+
+/* === Slide 4 cadence — paced reveal coordinated with the heartbeat ===
+   Audio is handled by the deck-wide AudioEngine (SLIDES[4].audio =
+   { hr_pulse: 0.7 }) — the engine fades hr_pulse.mp3 to 0.7 on slide
+   entry over 800ms automatically, and rebalances to 0.5 on slide 5
+   when gait_layer joins.
+
+   Heart silhouette is colored red (var(--accent-red)) and starts
+   hidden — it appears AFTER the waveform finishes drawing, so the
+   pulse line resolves into the heart shape rather than the heart
+   sitting there waiting to be marked.
+
+   Visual cadence (slide.active at t=0):
+      0.4s   declaration "It starts with a pulse." fades in   (1.0s)
+      0.4s   waveform begins drawing left → right             (2.5s)
+      2.9s   waveform fully drawn; heart silhouette fades in  (0.6s)
+      4.0s   ellipse trace begins (counter-clockwise)         (3.0s)
+      4.2s   research quote fades in (and stays)              (1.0s)
+      7.0s   ellipse trace converges back at bottom
+      7.3s   "a 1 of 1." fades in                             (1.0s)
+      8.3s   slide rests
+   ===================================================================== */
+
+/* Heart silhouette — colored red as the focal accent. The stroke
+   override beats the SVG presentation attribute (stroke="var(--ink)")
+   via CSS specificity. Children paths inherit. */
+.slide-heart-cadence .heart-figure {
+  stroke: var(--accent-red);
+}
+
+/* Heart starts invisible and fades in only after the waveform has
+   finished drawing — the line resolves into the figure rather than
+   the figure being pre-marked. CSS opacity beats the SVG attribute
+   opacity="0.85". Scale anchors at the figure's bbox center so the
+   pulse animation grows symmetrically. The positioning translate
+   lives on the parent <g> in the markup, so this transform is free
+   to carry only the scale. */
+.slide-heart-cadence .heart-figure {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+
+/* Two chained animations. heart-fade-in runs once at t=2.9s. The
+   pulse begins at t=3.5s (after the fade completes) and loops — fast
+   contraction (systole) at 20%, return to rest (diastole) by 40%, then
+   rests for the remainder of the 800ms cycle (~75 BPM). The shape
+   reads as alive rather than vibrating. */
+.slide-heart-cadence.active .heart-figure {
+  animation:
+    heart-fade-in 0.6s ease-in forwards 2.9s,
+    heart-pulse 0.8s ease-in-out 3.5s infinite;
+}
+
+@keyframes heart-fade-in {
+  to { opacity: 0.85; }
+}
+
+@keyframes heart-pulse {
+  0%   { transform: scale(1.0); }
+  20%  { transform: scale(1.06); }
+  40%  { transform: scale(1.0); }
+  100% { transform: scale(1.0); }
+}
+
+/* Waveform — stroke-dasharray draws progressively. The actual path
+   length depends on the browser, so we use a generous static dasharray
+   (2000 user units, well beyond the ~1300 actual path length) and
+   start fully offset (invisible). */
+.slide-heart-cadence .cardiac-wave {
+  stroke-dasharray: 2000;
+  stroke-dashoffset: 2000;
+}
+
+.slide-heart-cadence.active .cardiac-wave {
+  animation: cardiac-wave-draw 2.5s cubic-bezier(0.4, 0, 0.4, 1) forwards 0.4s;
+}
+
+@keyframes cardiac-wave-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Declaration and payoff start invisible — they fade in at their
+   respective beats. Declaration arrives early (with the waveform)
+   so the slide opens with its top text rather than waiting for the
+   build-up. */
+.slide-heart-cadence .declaration,
+.slide-heart-cadence .payoff {
+  opacity: 0;
+}
+
+.slide-heart-cadence.active .declaration {
+  animation: slide4-fade-in 1.0s ease-in forwards 0.4s;
+}
+
+.slide-heart-cadence.active .payoff {
+  animation: slide4-fade-in 1.0s ease-in forwards 7.3s;
+}
+
+@keyframes slide4-fade-in {
+  to { opacity: 1; }
+}
+
+/* Ellipse trace — a CIRCLE (rx = ry = 400) anchored at the slide's
+   bottom edge (cy = 500, ry = 400 → lowest point at viewBox y=900).
+   The trace begins at the bottom of the screen and sweeps counter-
+   clockwise around back to the bottom.
+
+   Circumference for r=400 is 2πr ≈ 2513; rounding up to 2600 keeps
+   the dash safely longer than the path so no gap remains at the
+   end of the animation.
+
+   Native SVG ellipse paths begin at angle 0 (3 o'clock visually) and
+   trace clockwise on screen. To start at 6 o'clock counter-clockwise:
+     - scaleX(-1) flips the start to 9 o'clock and reverses direction
+       to counter-clockwise.
+     - rotate(-90deg) then walks 9 o'clock down to 6 o'clock,
+       preserving the counter-clockwise direction.
+   The start/end seam of the dash pattern lands at 6 o'clock — tucked
+   behind the slide-meta-bottom row where it's not visually prominent. */
+.trace-ellipse {
+  stroke-dasharray: 2600;
+  stroke-dashoffset: 2600;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: rotate(-90deg) scaleX(-1);
+}
+
+/* Carry-over circle on slides 5 and 6 — same geometry as slide 4's
+   trace, already drawn. Overrides the base rule's stroke-dashoffset
+   so the inner ring is visible from slide load with no animation. */
+.trace-ellipse-inner {
+  stroke-dashoffset: 0;
+}
+
+.slide-heart-cadence.active .trace-ellipse {
+  animation: ellipse-trace 3.0s cubic-bezier(0.4, 0, 0.4, 1) forwards 4.0s;
+}
+
+@keyframes ellipse-trace {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Research quote — bigger than a footnote, persists once visible.
+   Fades in just after the trace begins and stays for the rest of
+   the slide. Italic body for the quote, mono for the citation. */
+.research-quote {
+  position: absolute;
+  top: 64%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  opacity: 0;
+}
+
+.research-quote .quote-text {
+  margin: 0 0 8px 0;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(20px, 1.8vw, 26px);
+  color: var(--meta);
+  letter-spacing: -0.005em;
+}
+
+.research-quote .quote-cite {
+  margin: 0;
+  font-family: var(--font-meta);
+  font-weight: 400;
+  font-size: clamp(13px, 1.1vw, 15px);
+  color: var(--meta);
+  letter-spacing: 0.12em;
+  opacity: 0.75;
+}
+
+.slide-heart-cadence.active .research-quote {
+  animation: slide4-fade-in 1.0s ease-in forwards 4.2s;
+}
+
+/* === Slide 5 (iii. the build) — Gait =================================
+   Three vertical zones inside .slide-body-gait:
+     ~22%  personal-top  ("You set the pace.")  — italic ink-blue, AT TOP
+     ~33%  hero visual   (two footprints + dashed stride line)
+     ~76%  schematic     (↟ 2 : 1 ♥)            — first ratio glyph
+   Note the rhetorical inversion from slide 4: the personal voice has
+   moved to the top now. The schematic block (.schematic, .schematic-*)
+   is shared with slide 6, which extends the ratio to three terms.
+   ===================================================================== */
+.slide-body-gait {
+  position: relative;
+}
+
+.personal-top {
+  position: absolute;
+  top: 22%;
+  left: 0;
+  right: 0;
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(22px, 2.6vw, 32px);
+  color: var(--ink-blue);
+}
+
+.schematic {
+  position: absolute;
+  top: 76%;
+  left: 0;
+  right: 0;
+  text-align: center;
+}
+
+.schematic-ratio {
+  font-family: var(--font-meta);
+  font-size: clamp(16px, 1.6vw, 20px);
+  letter-spacing: 0.1em;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.schematic-ratio .glyph {
+  color: var(--ink-blue);
+}
+
+.schematic-ratio .num {
+  color: var(--meta);
+}
+
+.schematic-ratio .colon {
+  color: var(--meta);
+  font-size: 1.2em;
+  font-weight: 300;
+}
+
+.schematic-legend {
+  font-family: var(--font-meta);
+  font-size: clamp(9px, 0.9vw, 11px);
+  color: var(--meta);
+  letter-spacing: 0.14em;
+  margin-top: 12px;
+}
+
+/* === Slide 5 cadence — paced reveal coordinated with the gait audio ==
+   Audio is handled by the deck-wide AudioEngine (SLIDES[5].audio =
+   { hr_pulse: 0.5, gait_layer: 0.7 }). On slide entry it crossfades
+   slide 4's heartbeat from 0.7 → 0.5 and brings in gait_layer at 0.7
+   over 800ms. No per-slide audio element or controller is needed.
+
+   The composition departs from slide 4's centered subject in favor of
+   a horizontal path with step marks accumulating along it — gait
+   reads as temporal/extended rather than as a single subject.
+
+   Visual cadence (slide.active at t=0):
+      0.0s   personal-top "You set the pace." visible (from slide load)
+      0.4s   horizontal dashed path begins drawing left → right (2.0s)
+      1.2s   first step mark appears; subsequent marks at 0.4s intervals
+      ...    (13 marks total, finishing at 6.0s)
+      3.0s   ellipse trace begins counter-clockwise from bottom (3.0s)
+      3.5s   research quote fades in
+      6.0s   ellipse trace converges back at bottom
+      6.3s   formula begins building piece by piece at the bottom:
+              HR → ×2 → ×α → "Tempo = " (prefix) → "(walking)" annotation
+      8.3s   slide rests
+   ===================================================================== */
+
+/* Anchor the gait visual slightly lower than the spec's 33% so it
+   leaves room for the research quote at top:56%. Override only on the
+   cadence-equipped slide. */
+.slide-gait-cadence .hero-visual--gait {
+  --hero-top: 35%;
+}
+
+/* Path: a dashed horizontal line that "draws" itself in by uncovering
+   a clip-path. We use clip-path rather than stroke-dasharray because
+   the line ALSO uses stroke-dasharray for its dashed visual style —
+   reusing dasharray for the draw animation would conflict. */
+.slide-gait-cadence .gait-path {
+  clip-path: inset(0 100% 0 0);
+}
+
+.slide-gait-cadence.active .gait-path {
+  animation: gait-path-draw 2.0s cubic-bezier(0.4, 0, 0.4, 1) forwards 0.4s;
+}
+
+@keyframes gait-path-draw {
+  to { clip-path: inset(0 0 0 0); }
+}
+
+/* Step marks fade in sequentially at 0.4s intervals, alternating
+   left/right via their cy offset in the SVG. Pace ≈ 150 SPM (twice
+   the heartbeat at 75 BPM). 13 marks accumulate from t=1.2s to t=6.0s,
+   finishing as the ellipse trace converges. */
+.slide-gait-cadence .step {
+  opacity: 0;
+}
+
+.slide-gait-cadence.active .step[data-step-index="0"]  { animation: step-in 0.3s ease-in forwards 1.2s; }
+.slide-gait-cadence.active .step[data-step-index="1"]  { animation: step-in 0.3s ease-in forwards 1.6s; }
+.slide-gait-cadence.active .step[data-step-index="2"]  { animation: step-in 0.3s ease-in forwards 2.0s; }
+.slide-gait-cadence.active .step[data-step-index="3"]  { animation: step-in 0.3s ease-in forwards 2.4s; }
+.slide-gait-cadence.active .step[data-step-index="4"]  { animation: step-in 0.3s ease-in forwards 2.8s; }
+.slide-gait-cadence.active .step[data-step-index="5"]  { animation: step-in 0.3s ease-in forwards 3.2s; }
+.slide-gait-cadence.active .step[data-step-index="6"]  { animation: step-in 0.3s ease-in forwards 3.6s; }
+.slide-gait-cadence.active .step[data-step-index="7"]  { animation: step-in 0.3s ease-in forwards 4.0s; }
+.slide-gait-cadence.active .step[data-step-index="8"]  { animation: step-in 0.3s ease-in forwards 4.4s; }
+.slide-gait-cadence.active .step[data-step-index="9"]  { animation: step-in 0.3s ease-in forwards 4.8s; }
+.slide-gait-cadence.active .step[data-step-index="10"] { animation: step-in 0.3s ease-in forwards 5.2s; }
+.slide-gait-cadence.active .step[data-step-index="11"] { animation: step-in 0.3s ease-in forwards 5.6s; }
+.slide-gait-cadence.active .step[data-step-index="12"] { animation: step-in 0.3s ease-in forwards 6.0s; }
+
+@keyframes step-in {
+  to { opacity: 0.85; }
+}
+
+/* Research quote — same visual treatment as slide 4 but smaller and
+   constrained in width because the gait quote is longer ("Heart rate
+   and step rate naturally synchronize..."). Cycles in/hold/out during
+   the trace; gone before the formula starts building. */
+.slide-gait-cadence .research-quote {
+  position: absolute;
+  top: 56%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  opacity: 0;
+}
+
+.slide-gait-cadence .research-quote .quote-text {
+  margin: 0 auto 6px;
+  max-width: 70%;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(15px, 1.4vw, 20px);
+  color: var(--meta);
+  letter-spacing: -0.005em;
+}
+
+.slide-gait-cadence .research-quote .quote-cite {
+  margin: 0;
+  font-family: var(--font-meta);
+  font-weight: 400;
+  font-size: clamp(10px, 1.0vw, 12px);
+  color: var(--meta);
+  letter-spacing: 0.12em;
+  opacity: 0.75;
+}
+
+/* Quote fades in at t=3.5s and stays visible at 0.85 — the presenter
+   uses it as a teleprompter cue. Lower opacity keeps it subordinate
+   to the formula at the bottom while staying legible. */
+.slide-gait-cadence.active .research-quote {
+  animation: slide5-quote-in 1.0s ease-in forwards 3.5s;
+}
+
+@keyframes slide5-quote-in {
+  to { opacity: 0.85; }
+}
+
+/* Outer trace circle — perimeter is 2π × 540 ≈ 3393, so dasharray
+   needs its own value larger than the base 2600. Begins at t=3.0s
+   and converges back to its start at t=6.0s. Direction inherits the
+   base .trace-ellipse transform (rotate(-90deg) scaleX(-1)) so the
+   start sits at 6 o'clock — but with cy=500 + ry=540 = 1040, that
+   start point is below the visible viewBox bottom (y=900). Visually
+   the trace appears from below the screen, sweeps up around the
+   slide, and returns below — a circle larger than the frame. */
+.slide-gait-cadence .trace-ellipse-outer {
+  stroke-dasharray: 3500;
+  stroke-dashoffset: 3500;
+}
+
+.slide-gait-cadence.active .trace-ellipse-outer {
+  animation: ellipse-trace-outer 3.0s cubic-bezier(0.4, 0, 0.4, 1) forwards 3.0s;
+}
+
+@keyframes ellipse-trace-outer {
+  to { stroke-dashoffset: 0; }
+}
+
+/* "You set the pace." is the slide's primary thesis — bumped from
+   the global .personal-top size so it reads as a real assertion
+   rather than a small label. Roughly aligned with slide 1's statement
+   weight. */
+.slide-gait-cadence .personal-top {
+  font-size: clamp(32px, 3.6vw, 48px);
+}
+
+/* Formula block — formula on top, schematic glyph-line below. The
+   formula is the mathematical version; the schematic is the intuitive
+   version. Both sit at the bottom together so the audience can read
+   one against the other. */
+.slide-gait-cadence .formula-block {
+  position: absolute;
+  bottom: 12%;
+  left: 0;
+  right: 0;
+  text-align: center;
+}
+
+.slide-gait-cadence .formula-line-main {
+  font-family: var(--font-meta);
+  font-size: clamp(24px, 2.4vw, 32px);
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  margin-bottom: 16px;
+}
+
+.slide-gait-cadence .formula-line-main > span {
+  opacity: 0;
+  display: inline-block;
+}
+
+/* Schematic line — smaller mono with glyphs in ink-blue. The flex
+   column stacks the ratio above the legend with a tight gap. */
+.slide-gait-cadence .schematic-line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+}
+
+.slide-gait-cadence .schematic-line .schematic-ratio {
+  font-family: var(--font-meta);
+  font-size: clamp(20px, 1.8vw, 26px);
+  letter-spacing: 0.1em;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.slide-gait-cadence .schematic-line .glyph {
+  color: var(--ink-blue);
+  font-family: var(--font-body);
+}
+
+.slide-gait-cadence .schematic-line .num {
+  color: var(--meta);
+}
+
+.slide-gait-cadence .schematic-line .colon {
+  color: var(--meta);
+  font-size: 1.2em;
+  font-weight: 300;
+}
+
+.slide-gait-cadence .schematic-line .schematic-legend {
+  font-family: var(--font-meta);
+  font-size: clamp(11px, 1.0vw, 14px);
+  color: var(--meta);
+  letter-spacing: 0.14em;
+  opacity: 0.75;
+}
+
+/* (walking) annotation — sits on its own line under the main formula,
+   smaller and meta-grey so it reads as a regime annotation rather
+   than part of the equation. */
+.slide-gait-cadence .formula-regime {
+  display: block;
+  margin-top: 8px;
+  font-family: var(--font-meta);
+  font-size: clamp(11px, 1.0vw, 14px);
+  color: var(--meta);
+  letter-spacing: 0.14em;
+}
+
+/* α renders in the body font for visual continuity with the alpha
+   glyph on slide 6's three-term schematic. */
+.slide-gait-cadence .formula-mult-alpha {
+  font-family: var(--font-body);
+}
+
+/* Reveal sequence — the formula builds piece by piece as the trace
+   converges and the slide settles, then the schematic appears as a
+   single unit at the end. Slide rests at ~9.4s. */
+.slide-gait-cadence.active .formula-hr         { animation: formula-piece-in 0.5s ease-in forwards 6.3s; }
+.slide-gait-cadence.active .formula-mult-2     { animation: formula-piece-in 0.5s ease-in forwards 6.8s; }
+.slide-gait-cadence.active .formula-mult-alpha { animation: formula-piece-in 0.5s ease-in forwards 7.3s; }
+.slide-gait-cadence.active .formula-prefix     { animation: formula-piece-in 0.5s ease-in forwards 7.8s; }
+.slide-gait-cadence.active .formula-regime     { animation: formula-piece-in 0.6s ease-in forwards 8.3s; }
+.slide-gait-cadence.active .schematic-line     { animation: formula-piece-in 0.8s ease-in forwards 8.6s; }
+
+@keyframes formula-piece-in {
+  to { opacity: 1; }
+}
+
+/* === Slide 6 (iii. the build) — IAF cadence ==========================
+   The slide locates IAF as the *interior space between the ears*. Two
+   vertical curves draw inward like the inner walls of an enclosure;
+   an oscillating wave (continuously animated by JS, frequency-modulated)
+   lives between them. The slide closes by extending slide 5's formula
+   with α's range — completing the math.
+
+   Audio is handled by the deck-wide AudioEngine (SLIDES[6].audio =
+   { hr_pulse: 0.4, gait_layer: 0.5, iaf_shimmer: 0.6 }). On slide entry
+   it crossfades hr_pulse 0.5 → 0.4, gait_layer 0.7 → 0.5, and brings
+   in iaf_shimmer at 0.6 over 800ms. No per-slide audio element needed.
+
+   Visual cadence (slide.active at t=0):
+      0.4s   personal-top "Your perspective..." fades in (1.0s)
+      1.4s   two vertical curves draw simultaneously top→bottom (1.6s)
+      3.2s   oscillating wave + α label fade in (0.8s); JS frequency
+             modulation runs continuously throughout the slide
+      4.5s   ellipse trace begins counter-clockwise from bottom (3.0s)
+      5.0s   research quote fades in / sits / fades out (2.0s cycle)
+      7.5s   trace converges back at bottom
+      7.8s   bridge "Tempo from your perception of time." fades in
+      8.5s   main formula "Tempo = HR × 2 × α (walking)" fades in
+      9.2s   α definition "α ∈ [4/5, 5/4]" fades in below
+     10.0s   slide rests; wave continues oscillating
+   ===================================================================== */
+.slide-body-iaf {
+  position: relative;
+}
+
+/* Personal-top — fades in early. Inherits italic ink-blue + size from
+   the global .personal-top rule. */
+.slide-iaf-cadence .personal-top {
+  top: 18%;
+  opacity: 0;
+}
+
+.slide-iaf-cadence.active .personal-top {
+  animation: iaf-fade-in 1.0s ease-in forwards 0.4s;
+}
+
+@keyframes iaf-fade-in {
+  to { opacity: 1; }
+}
+
+/* Hero visual: nudge the cadence variant slightly higher than the
+   default --hero-top to leave room for the quote at top:56%. */
+.slide-iaf-cadence .hero-visual--iaf {
+  --hero-top: 28%;
+}
+
+.slide-iaf-cadence .hero-visual--iaf svg {
+  width: clamp(360px, 38vw, 480px);
+  height: auto;
+}
+
+/* Vertical curves draw simultaneously, top → bottom, via stroke-
+   dasharray. Path length ≈ 270 viewBox units; dasharray of 320 covers
+   it with margin so the line fully appears. */
+.slide-iaf-cadence .iaf-curve {
+  stroke-dasharray: 320;
+  stroke-dashoffset: 320;
+}
+
+.slide-iaf-cadence.active .iaf-curve-left,
+.slide-iaf-cadence.active .iaf-curve-right {
+  animation: iaf-curve-draw 1.6s cubic-bezier(0.4, 0, 0.4, 1) forwards 1.4s;
+}
+
+@keyframes iaf-curve-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Wave + α label fade in once curves have drawn. The wave's continuous
+   oscillation (frequency-modulated 2.0 → 5.0 cycles over a 12s period,
+   plus rightward phase drift) is driven by JS in startSlide6Wave(). */
+.slide-iaf-cadence.active .iaf-wave {
+  animation: iaf-wave-fade-in 0.8s ease-in forwards 3.2s;
+}
+
+.slide-iaf-cadence.active .iaf-wave-label {
+  animation: iaf-wave-label-fade-in 0.8s ease-in forwards 3.2s;
+}
+
+@keyframes iaf-wave-fade-in {
+  to { opacity: 0.85; }
+}
+
+@keyframes iaf-wave-label-fade-in {
+  to { opacity: 0.75; }
+}
+
+/* Research quote — same pattern as slide 5: cycles in, holds, fades
+   out during the trace. Italic body + mono cite, meta-grey. Sits
+   above where the bridge will appear (bridge enters at 7.8s, well
+   after the quote has cleared at ~7.0s). */
+.slide-iaf-cadence .research-quote {
+  position: absolute;
+  top: 56%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  opacity: 0;
+}
+
+.slide-iaf-cadence .research-quote .quote-text {
+  margin: 0 auto 6px;
+  max-width: 70%;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(15px, 1.4vw, 20px);
+  color: var(--meta);
+  letter-spacing: -0.005em;
+}
+
+.slide-iaf-cadence .research-quote .quote-cite {
+  margin: 0;
+  font-family: var(--font-meta);
+  font-weight: 400;
+  font-size: clamp(10px, 1.0vw, 12px);
+  color: var(--meta);
+  letter-spacing: 0.12em;
+  opacity: 0.75;
+}
+
+.slide-iaf-cadence.active .research-quote {
+  animation: slide6-quote-cycle 2.0s ease-in-out forwards 5.0s;
+}
+
+@keyframes slide6-quote-cycle {
+  0%   { opacity: 0; }
+  40%  { opacity: 1; }
+  60%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Carry-over circles from slides 4 and 5 — both pre-drawn so the
+   5 → 6 cross-fade hands off without the rings flickering out. The
+   base .trace-ellipse rule sets dashoffset:2600 (invisible); the
+   inner override is global, so we only need a slide-6-scoped
+   override for the outer here. */
+.slide-iaf-cadence .trace-ellipse-outer {
+  stroke-dashoffset: 0;
+}
+
+/* Warp — the slide's signature gesture. Both carry-over circles
+   stretch horizontally and compress vertically around their shared
+   center, becoming wider/shorter ellipses that read as the head's
+   left-right axis (the "between the ears" the slide is about).
+
+   Slight inner→outer stagger (200ms) gives the warp an organic feel
+   rather than reading as a uniform CSS transform. The base
+   .trace-ellipse transform (rotate + scaleX) only governed the
+   dash-pattern's start direction — visually inert on fully-drawn
+   circles, so we override with pure scale here.
+
+   Begins at t=4.5s, completes by t=7.5s — fills the window the old
+   slide-6 trace animation used, finishing just before the bridge
+   sentence appears at t=7.8s. */
+.slide-iaf-cadence.active .trace-ellipse-inner {
+  animation: iaf-circle-warp 3.0s cubic-bezier(0.4, 0, 0.4, 1) forwards 4.5s;
+}
+
+.slide-iaf-cadence.active .trace-ellipse-outer {
+  animation: iaf-circle-warp 3.0s cubic-bezier(0.4, 0, 0.4, 1) forwards 4.7s;
+}
+
+@keyframes iaf-circle-warp {
+  to { transform: scale(1.5, 0.85); }
+}
+
+/* Bridge sentence — appears after trace converges, before the formula
+   resolves. Sits between the hero visual and the bottom-anchored
+   formula. Inherits font/color from the global .bridge but overrides
+   position for the cadence layout. */
+.slide-iaf-cadence .bridge {
+  position: absolute;
+  top: 68%;
+  left: 0;
+  right: 0;
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: clamp(20px, 2.2vw, 28px);
+  color: var(--ink);
+  opacity: 0;
+}
+
+.slide-iaf-cadence.active .bridge {
+  animation: iaf-fade-in 0.8s ease-in forwards 7.8s;
+}
+
+/* Formula extension — slide 5's formula returns on top, then α
+   resolves below it. Two lines, mono on top, body on the alpha
+   definition (matches the alpha glyph styling elsewhere in the deck).
+   Anchored at the bottom; sits well above the slide-meta-bottom row. */
+.slide-iaf-cadence .formula-extended {
+  position: absolute;
+  bottom: 12%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: var(--font-meta);
+  color: var(--ink);
+}
+
+.slide-iaf-cadence .formula-line {
+  margin: 0;
+  letter-spacing: 0.04em;
+}
+
+.slide-iaf-cadence .formula-line-main {
+  font-size: clamp(20px, 2.0vw, 28px);
+}
+
+.slide-iaf-cadence .formula-line-alpha {
+  margin-top: 12px;
+  font-size: clamp(15px, 1.5vw, 20px);
+  color: var(--meta);
+}
+
+.slide-iaf-cadence .formula-line > span {
+  opacity: 0;
+  display: inline-block;
+}
+
+.slide-iaf-cadence.active .formula-prefix,
+.slide-iaf-cadence.active .formula-hr,
+.slide-iaf-cadence.active .formula-mult-2,
+.slide-iaf-cadence.active .formula-mult-alpha,
+.slide-iaf-cadence.active .formula-regime {
+  animation: formula-piece-in 0.6s ease-in forwards 8.5s;
+}
+
+.slide-iaf-cadence.active .formula-alpha-def {
+  animation: formula-piece-in 0.8s ease-in forwards 9.2s;
+}
+
+/* Regime annotation — same approach as slide 5: smaller, meta-grey,
+   on its own line under the main formula. */
+.slide-iaf-cadence .formula-regime {
+  display: block;
+  margin-top: 10px;
+  font-family: var(--font-meta);
+  font-size: clamp(11px, 1.0vw, 14px);
+  color: var(--meta);
+  letter-spacing: 0.14em;
+}
+
+/* α renders in body font for visual continuity with the alpha glyph
+   on slide 5's formula. */
+.slide-iaf-cadence .formula-mult-alpha,
+.slide-iaf-cadence .formula-alpha-def {
+  font-family: var(--font-body);
+}
+
+/* === Slide 7a (iii. the build) — Expansion ==========================
+   Two halves: biological signals on the left, contextual signals on
+   the right. Items reveal alternating between halves so the slide
+   accumulates equally on both sides. The two warped carry-over
+   ellipses from slides 4-5-6 hold as the geometric frame.
+   ===================================================================== */
+
+/* Carry-over ellipses on slides AFTER the slide-6 warp animation —
+   pinned to slide 6's end-state (transform: scale(1.5, 0.85)) so they
+   match seamlessly through the cross-fade. The base .trace-ellipse
+   rule's transform (rotate(-90deg) scaleX(-1)) was for trace-direction
+   control on slides 4-5; on a fully-drawn ring it's visually inert,
+   and we override it here entirely with the warp scale. */
+.warped {
+  transform: scale(1.5, 0.85);
+}
+
+.slide-bloom-cadence .slide-body-bloom {
+  position: absolute;
+  inset: 0;
+}
+
+.slide-bloom-cadence .bloom-opening {
+  position: absolute;
+  top: 18%;
+  left: 0;
+  right: 0;
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: clamp(28px, 3.0vw, 38px);
+  font-weight: 400;
+  color: var(--ink);
+  opacity: 0;
+}
+
+.slide-bloom-cadence.active .bloom-opening {
+  animation: bloom-fade-in 1.0s ease-in forwards 0.4s;
+}
+
+@keyframes bloom-fade-in {
+  to { opacity: 1; }
+}
+
+.bloom-halves {
+  position: absolute;
+  top: 32%;
+  left: 12%;
+  right: 12%;
+  bottom: 16%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10%;
+}
+
+.bloom-half {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Heading: small mono lowercase, meta-grey. The two heading words
+   ("biological", "contextual") establish the conceptual category for
+   each half. */
+.bloom-heading {
+  font-family: var(--font-meta);
+  font-size: clamp(11px, 1.1vw, 14px);
+  letter-spacing: 0.18em;
+  color: var(--meta);
+  text-transform: lowercase;
+  border-bottom: 0.5px solid var(--meta);
+  padding-bottom: 10px;
+  margin-bottom: 6px;
+  opacity: 0;
+}
+
+.bloom-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bloom-item {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-family: var(--font-body);
+  font-size: clamp(18px, 1.7vw, 22px);
+  color: var(--ink);
+  opacity: 0;
+}
+
+/* Glyph column — alpha, breath, HRV plus, etc. Min-width keeps items
+   vertically aligned with their labels regardless of glyph width.
+   ink-blue on the biological column; the contextual column has no
+   glyphs to color. */
+.bloom-item .bloom-glyph {
+  font-family: var(--font-body);
+  color: var(--ink-blue);
+  min-width: 1.5em;
+  display: inline-block;
+}
+
+.bloom-item .bloom-num {
+  font-family: var(--font-meta);
+  color: var(--meta);
+  font-size: 0.85em;
+  min-width: 1.8em;
+}
+
+.bloom-item .bloom-label {
+  font-family: var(--font-body);
+  color: var(--ink);
+}
+
+/* "derived" items (valence + arousal) — visually subordinate. Glyph
+   in meta-grey rather than ink-blue, label in italic. Signals to
+   careful viewers that this item is *inferred* (frontal alpha
+   asymmetry, valence-arousal plane) rather than directly measured. */
+.bloom-item-derived .bloom-glyph {
+  color: var(--meta);
+}
+
+.bloom-item-derived .bloom-label {
+  font-style: italic;
+}
+
+/* Reveal cadence (slide.active at t=0):
+     0.4s   bloom-opening fades in
+     1.6s   both half headings fade in
+     2.4s   biological item 1 (breath)
+     2.8s   contextual item 1 (time of day)
+     3.2s   biological item 2 (HRV)
+     3.6s   contextual item 2 (location)
+     4.0s   biological item 3 (valence + arousal)
+     4.4s   contextual item 3 (schedule)
+     4.8s   biological item 4 (beta)
+     5.2s   contextual item 4 (environment)
+     ~6.0s  slide rests; presenter advances
+   The alternation between halves visually demonstrates that both
+   categories grow together — neither half is primary. */
+.slide-bloom-cadence.active .bloom-half--biological .bloom-heading,
+.slide-bloom-cadence.active .bloom-half--contextual .bloom-heading {
+  animation: bloom-fade-in 0.6s ease-in forwards 1.6s;
+}
+
+.slide-bloom-cadence.active .bloom-half--biological .bloom-item[data-item="1"] {
+  animation: bloom-fade-in 0.5s ease-in forwards 2.4s;
+}
+.slide-bloom-cadence.active .bloom-half--biological .bloom-item[data-item="2"] {
+  animation: bloom-fade-in 0.5s ease-in forwards 3.2s;
+}
+.slide-bloom-cadence.active .bloom-half--biological .bloom-item[data-item="3"] {
+  animation: bloom-fade-in 0.5s ease-in forwards 4.0s;
+}
+.slide-bloom-cadence.active .bloom-half--biological .bloom-item[data-item="4"] {
+  animation: bloom-fade-in 0.5s ease-in forwards 4.8s;
+}
+
+.slide-bloom-cadence.active .bloom-half--contextual .bloom-item[data-item="1"] {
+  animation: bloom-fade-in 0.5s ease-in forwards 2.8s;
+}
+.slide-bloom-cadence.active .bloom-half--contextual .bloom-item[data-item="2"] {
+  animation: bloom-fade-in 0.5s ease-in forwards 3.6s;
+}
+.slide-bloom-cadence.active .bloom-half--contextual .bloom-item[data-item="3"] {
+  animation: bloom-fade-in 0.5s ease-in forwards 4.4s;
+}
+.slide-bloom-cadence.active .bloom-half--contextual .bloom-item[data-item="4"] {
+  animation: bloom-fade-in 0.5s ease-in forwards 5.2s;
+}
+
+/* === Slide 7b (iii. the build) — Integration ========================
+   The integrated schematic builds at the slide's vertical center,
+   item-by-item left-to-right (each piece + the colon following it
+   appearing together). After the schematic settles the legend joins
+   in subordinated meta-grey, then the question "What is your tempo?"
+   arrives below — typographically identical to slide 1's question so
+   the audience reads it as a callback.
+
+   The two warped carry-over ellipses persist as the geometric frame
+   (handled by the global .warped class).
+
+   Cadence (slide.active at t=0):
+     0.5s   α 10  appears
+     0.9s   first colon  +  β 20
+     1.3s   second colon +  ↟ 2
+     1.7s   third colon  +  1 ♥
+     2.1s   fourth colon +  ◯ ¼   schematic complete
+     3.0s   schematic legend fades in (rests at 0.75 opacity)
+     4.0s   "What is your tempo?" fades in
+     5.5s   slide rests
+   ===================================================================== */
+.slide-integrate-cadence .slide-body-integrate {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 64px;
+}
+
+.integrated-schematic {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.schematic-line-integrated {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  font-family: var(--font-meta);
+  font-size: clamp(28px, 2.8vw, 40px);
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.schematic-piece {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  opacity: 0;
+}
+
+.schematic-piece .glyph {
+  color: var(--ink-blue);
+  font-family: var(--font-body);
+}
+
+.schematic-piece .num {
+  color: var(--meta);
+  font-family: var(--font-meta);
+  font-size: 0.85em;
+}
+
+.schematic-colon {
+  color: var(--meta);
+  font-size: 1.1em;
+  font-weight: 300;
+  opacity: 0;
+}
+
+.schematic-legend-integrated {
+  font-family: var(--font-meta);
+  font-size: clamp(13px, 1.2vw, 16px);
+  color: var(--meta);
+  letter-spacing: 0.16em;
+  opacity: 0;
+}
+
+/* Question — typographically identical to slide 1's question (italic
+   ink-blue EB Garamond) so the audience reads it as the deck's
+   opening question finding its specific form: time → tempo. */
+.integrated-question {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(36px, 4vw, 56px);
+  color: var(--ink-blue);
+  opacity: 0;
+}
+
+/* Reveal — schematic pieces left-to-right at 0.4s intervals. Each
+   colon appears with the piece that follows it, so the visual reads
+   as α : β : ↟ : ♥ : ◯ unfolding as a single line. */
+.slide-integrate-cadence.active .schematic-alpha   { animation: integrate-fade-in 0.6s ease-in forwards 0.5s; }
+.slide-integrate-cadence.active .schematic-beta    { animation: integrate-fade-in 0.6s ease-in forwards 0.9s; }
+.slide-integrate-cadence.active .schematic-stride  { animation: integrate-fade-in 0.6s ease-in forwards 1.3s; }
+.slide-integrate-cadence.active .schematic-pulse   { animation: integrate-fade-in 0.6s ease-in forwards 1.7s; }
+.slide-integrate-cadence.active .schematic-breath  { animation: integrate-fade-in 0.6s ease-in forwards 2.1s; }
+
+.slide-integrate-cadence.active .schematic-colon-1 { animation: integrate-fade-in 0.6s ease-in forwards 0.9s; }
+.slide-integrate-cadence.active .schematic-colon-2 { animation: integrate-fade-in 0.6s ease-in forwards 1.3s; }
+.slide-integrate-cadence.active .schematic-colon-3 { animation: integrate-fade-in 0.6s ease-in forwards 1.7s; }
+.slide-integrate-cadence.active .schematic-colon-4 { animation: integrate-fade-in 0.6s ease-in forwards 2.1s; }
+
+/* Legend rests at 0.75 opacity — visually subordinate to the schematic
+   itself (which is the slide's payload). */
+.slide-integrate-cadence.active .schematic-legend-integrated {
+  animation: integrate-legend-in 0.8s ease-in forwards 3.0s;
+}
+
+.slide-integrate-cadence.active .integrated-question {
+  animation: integrate-fade-in 1.0s ease-in forwards 4.0s;
+}
+
+@keyframes integrate-fade-in {
+  to { opacity: 1; }
+}
+
+@keyframes integrate-legend-in {
+  to { opacity: 0.75; }
+}
+
+.placeholder {
+  margin: 0;
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--meta);
+  font-style: italic;
+  text-align: center;
+}
+
+.headphones-link {
+  display: block;
+  margin-top: 1rem;
+  text-align: center;
+  color: var(--ink-blue);
+  font-style: italic;
+  text-decoration: none;
+  width: fit-content;
+  margin-inline: auto;
+}
+
+.headphones-link:hover,
+.headphones-link:focus-visible {
+  text-decoration: underline;
+}
+
+.progress {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  z-index: 20;
+}
+
+.progress-fill {
+  width: 0;
+  height: 100%;
+  background: var(--ink-blue);
+  transition: width 380ms ease;
+}
+
+.iaf-body {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.iaf-main {
+  display: grid;
+  place-items: center;
+  margin-inline: var(--margin-x);
+  text-align: center;
+}
+
+.iaf-title {
+  margin: 0 0 0.6em;
+  font-size: clamp(2rem, 4.5vw, 3.5rem);
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.iaf-subtitle {
+  margin: 0;
+  font-size: var(--base-content-size);
+  color: var(--ink-blue);
+  font-style: italic;
+}
+
+.iaf-toggle {
+  margin-top: 1.4em;
+  border: 1px solid var(--ink-blue);
+  background: transparent;
+  color: var(--ink-blue);
+  font-family: var(--font-body);
+  font-size: clamp(1.2rem, 1.4vw + 0.6rem, 1.8rem);
+  padding: 0.6em 1.15em;
+  cursor: pointer;
+}
+
+.iaf-toggle:hover,
+.iaf-toggle:focus-visible {
+  background: color-mix(in srgb, var(--ink-blue) 7%, transparent);
+}

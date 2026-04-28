@@ -1,0 +1,507 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Relative Tempo Derivation — Round 2</title>
+  <meta name="description" content="Relative Tempo Derivation presentation deck for Merry Electronics.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=IBM+Plex+Mono:wght@400;500&family=Noto+Serif+TC:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="deck" aria-live="polite">
+    <section class="slide slide-title active" data-slide-index="0" data-section="">
+      <div class="slide-body slide-body-title">
+        <p class="title-en">We hear you.</p>
+        <p class="title-zh">我們聽見你了</p>
+      </div>
+    </section>
+
+    <section class="slide slide-question" data-slide-index="1" data-section="i. the question">
+      <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <ellipse class="orbit orbit-outer"
+                 cx="800" cy="650" rx="920" ry="380"
+                 fill="none"
+                 stroke="var(--ink-blue)" stroke-opacity="0.28" stroke-width="0.8"
+                 vector-effect="non-scaling-stroke" />
+        <ellipse class="orbit orbit-inner"
+                 cx="800" cy="650" rx="720" ry="280"
+                 fill="none"
+                 stroke="var(--ink-blue)" stroke-opacity="0.7" stroke-width="1.2"
+                 vector-effect="non-scaling-stroke" />
+        <g class="dot-wrap dot-wrap-left">
+          <circle class="dot dot-left" cx="137" cy="650" r="5" fill="var(--ink-blue)" opacity="0" />
+        </g>
+        <g class="dot-wrap dot-wrap-right">
+          <circle class="dot dot-right" cx="1463" cy="650" r="5" fill="var(--ink-blue)" opacity="0" />
+        </g>
+      </svg>
+
+      <div class="zh-watermark" aria-hidden="true">時機就是一切</div>
+
+      <div class="slide-meta slide-meta-top">
+        <span>i. the question</span>
+        <span>02 / 14</span>
+      </div>
+
+      <div class="slide-body slide-body-canary">
+        <div class="statement">
+          <p class="line line-1">Time is Everything.</p>
+          <p class="line line-2">And everyone</p>
+          <p class="line line-3">
+            <span class="word w-1">moves</span>
+            <span class="word w-2">to</span>
+            <span class="word w-3">their</span>
+            <span class="word w-4">own</span>
+            <span class="word w-5">beat.</span>
+          </p>
+        </div>
+        <p class="question">
+          <span class="word qw-1">What</span>
+          <span class="word qw-2">does</span>
+          <span class="word qw-3">your</span>
+          <span class="word qw-4">time</span>
+          <span class="word qw-5">sound</span>
+          <span class="word qw-6">like?</span>
+        </p>
+      </div>
+
+      <div class="slide-meta slide-meta-bottom">
+        <span>thomaslistens.github.io/rtd</span>
+        <span>Thomas LeRoy Meier · 2026</span>
+      </div>
+
+    </section>
+
+    <section class="slide slide-method" data-slide-index="2" data-section="ii. the method">
+      <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <ellipse class="orbit-trace orbit-trace-outer"
+                 cx="800" cy="650" rx="920" ry="380"
+                 fill="none"
+                 stroke="var(--ink-blue)" stroke-opacity="0.28" stroke-width="0.8"
+                 vector-effect="non-scaling-stroke" />
+        <ellipse class="orbit-trace orbit-trace-inner"
+                 cx="800" cy="650" rx="720" ry="280"
+                 fill="none"
+                 stroke="var(--ink-blue)" stroke-opacity="0.7" stroke-width="1.2"
+                 vector-effect="non-scaling-stroke" />
+        <g class="echo-dot-wrap">
+          <circle cx="137" cy="650" r="5" fill="var(--ink-blue)" opacity="0.9" />
+        </g>
+        <g class="echo-dot-wrap">
+          <circle cx="1463" cy="650" r="5" fill="var(--ink-blue)" opacity="0.9" />
+        </g>
+      </svg>
+
+      <div class="zh-watermark zh-watermark-method" aria-hidden="true">相對節奏推導</div>
+
+      <div class="slide-meta slide-meta-top"><span>ii. the method</span><span>03 / 14</span></div>
+
+      <div class="slide-body slide-body-method">
+        <div class="collapse-bundle">
+          <div class="echo echo-statement">
+            <p class="line line-1">Time is Everything.</p>
+            <p class="line line-2">And everyone</p>
+            <p class="line line-3">moves to their own beat.</p>
+          </div>
+          <p class="echo echo-question">What does your time sound like?</p>
+        </div>
+        <h1 class="reveal-title">Relative Tempo Derivation</h1>
+      </div>
+
+      <div class="slide-meta slide-meta-bottom"><span>thomaslistens.github.io/rtd</span><span>Thomas LeRoy Meier · 2026</span></div>
+    </section>
+
+    <section class="slide slide-defined" data-slide-index="3" data-section="ii. the method">
+      <div class="zh-watermark zh-watermark-method-rest" aria-hidden="true">相對節奏推導</div>
+
+      <div class="slide-meta slide-meta-top">
+        <span>ii. the method</span>
+        <span>04 / 14</span>
+      </div>
+
+      <div class="slide-body slide-body-defined">
+        <h1 class="title-carry">Relative Tempo Derivation</h1>
+        <p class="definition">meets you where you're at by deriving a musical tempo defined by your temporal experience.</p>
+      </div>
+
+      <div class="slide-meta slide-meta-bottom">
+        <span>thomaslistens.github.io/rtd</span>
+        <span>Thomas LeRoy Meier · 2026</span>
+      </div>
+    </section>
+
+    <section class="slide slide-heart slide-heart-cadence" data-slide-index="4" data-section="iii. the build">
+      <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <ellipse class="trace-ellipse" cx="800" cy="500" rx="400" ry="400" fill="none" stroke="var(--ink-blue)" stroke-width="0.8" vector-effect="non-scaling-stroke" opacity="0.42" />
+      </svg>
+      <div class="slide-meta slide-meta-top"><span>iii. the build</span><span>05 / 14</span></div>
+      <div class="slide-body slide-body-heart">
+        <p class="declaration">It starts with a <span class="accent">pulse</span>.</p>
+        <div class="hero-visual hero-visual--heart" aria-hidden="true">
+          <svg viewBox="0 0 800 240" xmlns="http://www.w3.org/2000/svg">
+            <g transform="translate(310, 30)">
+              <g class="heart-figure" stroke="var(--ink)" stroke-width="1.4" fill="none" stroke-linejoin="round" stroke-linecap="round" opacity="0.85">
+                <path d="M 90 30
+                         C 75 8, 38 4, 22 28
+                         C 6 52, 18 90, 48 118
+                         C 70 138, 90 158, 100 178
+                         C 113 158, 144 132, 165 108
+                         C 190 80, 195 46, 178 26
+                         C 162 6, 128 8, 110 30
+                         C 105 38, 100 44, 100 44
+                         C 100 44, 95 38, 90 30 Z" />
+                <path d="M 55 65 Q 73 73 90 78" opacity="0.35" />
+                <path d="M 115 78 Q 138 82 155 73" opacity="0.35" />
+                <path d="M 80 105 Q 102 114 124 105" opacity="0.35" />
+              </g>
+            </g>
+            <path class="cardiac-wave"
+                  d="M 0 130 L 220 130 L 245 130 L 258 122 L 270 138 L 282 92 L 294 168 L 306 130 L 320 130 L 540 130 L 560 122 L 572 138 L 584 92 L 596 168 L 608 130 L 622 130 L 800 130"
+                  stroke="var(--ink-blue)" stroke-width="1.4" fill="none" vector-effect="non-scaling-stroke" opacity="0.9" />
+          </svg>
+        </div>
+        <div class="research-quote" aria-hidden="false">
+          <p class="quote-text">Wrinkles in time perception are synchronized to the heart.</p>
+          <p class="quote-cite">— Sadeghi et al., 2023</p>
+        </div>
+        <p class="payoff">a 1 of 1.</p>
+      </div>
+      <div class="slide-meta slide-meta-bottom"><span>thomaslistens.github.io/rtd</span><span>Thomas LeRoy Meier · 2026</span></div>
+    </section>
+
+    <section class="slide slide-gait slide-gait-cadence" data-slide-index="5" data-section="iii. the build">
+      <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <!-- Carry-over circle from slide 4 — same geometry, already drawn. -->
+        <ellipse class="trace-ellipse trace-ellipse-inner"
+                 cx="800" cy="500" rx="400" ry="400"
+                 fill="none" stroke="var(--ink-blue)" stroke-width="0.8"
+                 vector-effect="non-scaling-stroke" opacity="0.42" />
+        <!-- New circle drawn on this slide — larger outer ring whose
+             lowest point extends below the viewBox bottom intentionally. -->
+        <ellipse class="trace-ellipse trace-ellipse-outer"
+                 cx="800" cy="500" rx="540" ry="540"
+                 fill="none" stroke="var(--ink-blue)" stroke-width="0.8"
+                 vector-effect="non-scaling-stroke" opacity="0.42" />
+      </svg>
+      <div class="slide-meta slide-meta-top"><span>iii. the build</span><span>06 / 14</span></div>
+      <div class="slide-body slide-body-gait">
+        <p class="personal-top">You set the pace.</p>
+
+        <div class="hero-visual hero-visual--gait" aria-hidden="true">
+          <svg viewBox="0 0 1200 200" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+            <line class="gait-path"
+                  x1="50" y1="100" x2="1150" y2="100"
+                  stroke="var(--ink-blue)" stroke-width="1.0"
+                  vector-effect="non-scaling-stroke"
+                  stroke-dasharray="2,8"
+                  opacity="0.5" />
+            <g class="step-marks">
+              <ellipse class="step step-l" data-step-index="0"  cx="120"  cy="92"  rx="9" ry="14" fill="var(--ink)" />
+              <ellipse class="step step-r" data-step-index="1"  cx="200"  cy="108" rx="9" ry="14" fill="var(--ink)" />
+              <ellipse class="step step-l" data-step-index="2"  cx="280"  cy="92"  rx="9" ry="14" fill="var(--ink)" />
+              <ellipse class="step step-r" data-step-index="3"  cx="360"  cy="108" rx="9" ry="14" fill="var(--ink)" />
+              <ellipse class="step step-l" data-step-index="4"  cx="440"  cy="92"  rx="9" ry="14" fill="var(--ink)" />
+              <ellipse class="step step-r" data-step-index="5"  cx="520"  cy="108" rx="9" ry="14" fill="var(--ink)" />
+              <ellipse class="step step-l" data-step-index="6"  cx="600"  cy="92"  rx="9" ry="14" fill="var(--ink)" />
+              <ellipse class="step step-r" data-step-index="7"  cx="680"  cy="108" rx="9" ry="14" fill="var(--ink)" />
+              <ellipse class="step step-l" data-step-index="8"  cx="760"  cy="92"  rx="9" ry="14" fill="var(--ink)" />
+              <ellipse class="step step-r" data-step-index="9"  cx="840"  cy="108" rx="9" ry="14" fill="var(--ink)" />
+              <ellipse class="step step-l" data-step-index="10" cx="920"  cy="92"  rx="9" ry="14" fill="var(--ink)" />
+              <ellipse class="step step-r" data-step-index="11" cx="1000" cy="108" rx="9" ry="14" fill="var(--ink)" />
+              <ellipse class="step step-l" data-step-index="12" cx="1080" cy="92"  rx="9" ry="14" fill="var(--ink)" />
+            </g>
+          </svg>
+        </div>
+
+        <div class="research-quote" aria-hidden="false">
+          <p class="quote-text">Heart rate and step rate naturally synchronize to a constant ratio at steady state.</p>
+          <p class="quote-cite">— Constantini et al., 2018</p>
+        </div>
+
+        <div class="formula-block">
+          <div class="formula formula-line-main" aria-label="Tempo equals heart rate times 2 times alpha (walking)">
+            <span class="formula-prefix">Tempo&nbsp;=&nbsp;</span><span class="formula-hr">HR</span><span class="formula-mult-2">&nbsp;×&nbsp;2</span><span class="formula-mult-alpha">&nbsp;×&nbsp;α</span>
+            <span class="formula-regime">(walking)</span>
+          </div>
+          <div class="schematic-line" aria-label="stride 2 to 1 pulse">
+            <span class="schematic-ratio">
+              <span class="glyph glyph-stride">↟</span>
+              <span class="num">2</span>
+              <span class="colon">:</span>
+              <span class="num">1</span>
+              <span class="glyph glyph-heart">♥</span>
+            </span>
+            <span class="schematic-legend">stride : pulse</span>
+          </div>
+        </div>
+      </div>
+      <div class="slide-meta slide-meta-bottom"><span>thomaslistens.github.io/rtd</span><span>Thomas LeRoy Meier · 2026</span></div>
+    </section>
+
+    <section class="slide slide-iaf slide-iaf-cadence" data-slide-index="6" data-section="iii. the build">
+      <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <!-- Carry-over inner circle from slide 4 — same geometry, pre-drawn. -->
+        <ellipse class="trace-ellipse trace-ellipse-inner"
+                 cx="800" cy="500" rx="400" ry="400"
+                 fill="none" stroke="var(--ink-blue)" stroke-width="0.8"
+                 vector-effect="non-scaling-stroke" opacity="0.42" />
+        <!-- Carry-over outer circle from slide 5 — same geometry, pre-drawn. -->
+        <ellipse class="trace-ellipse trace-ellipse-outer"
+                 cx="800" cy="500" rx="540" ry="540"
+                 fill="none" stroke="var(--ink-blue)" stroke-width="0.8"
+                 vector-effect="non-scaling-stroke" opacity="0.42" />
+      </svg>
+
+      <div class="slide-meta slide-meta-top"><span>iii. the build</span><span>07 / 14</span></div>
+
+      <div class="slide-body slide-body-iaf">
+        <p class="personal-top">Your perspective makes a difference.</p>
+
+        <div class="hero-visual hero-visual--iaf" aria-hidden="true">
+          <svg viewBox="0 0 800 320" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+            <path class="iaf-curve iaf-curve-left"
+                  d="M 200 30 Q 150 160, 200 290"
+                  fill="none"
+                  stroke="var(--ink)"
+                  stroke-width="1.4"
+                  vector-effect="non-scaling-stroke"
+                  stroke-linecap="round"
+                  opacity="0.85" />
+            <path class="iaf-curve iaf-curve-right"
+                  d="M 600 30 Q 650 160, 600 290"
+                  fill="none"
+                  stroke="var(--ink)"
+                  stroke-width="1.4"
+                  vector-effect="non-scaling-stroke"
+                  stroke-linecap="round"
+                  opacity="0.85" />
+            <path class="iaf-wave"
+                  d="M 220 160 Q 240 150, 260 160 T 300 160 T 340 160 T 380 160 T 420 160 T 460 160 T 500 160 T 540 160 T 580 160"
+                  fill="none"
+                  stroke="var(--ink-blue-2)"
+                  stroke-width="1.3"
+                  vector-effect="non-scaling-stroke"
+                  opacity="0" />
+            <text class="iaf-wave-label"
+                  x="595" y="164"
+                  font-family="var(--font-meta)"
+                  font-size="10"
+                  fill="var(--meta)"
+                  letter-spacing="0.1em"
+                  opacity="0">α</text>
+          </svg>
+        </div>
+
+        <div class="research-quote" aria-hidden="false">
+          <p class="quote-text">Cardiac and respiratory rhythms shape our experience of subjective time.</p>
+          <p class="quote-cite">— Wittmann (2009)</p>
+        </div>
+
+        <p class="bridge">Tempo from your perception of time.</p>
+
+        <div class="formula formula-extended" aria-label="Alpha is in the range 4/5 to 5/4">
+          <div class="formula-line formula-line-main">
+            <span class="formula-prefix">Tempo&nbsp;=&nbsp;</span>
+            <span class="formula-hr">HR</span>
+            <span class="formula-mult-2">&nbsp;×&nbsp;2</span>
+            <span class="formula-mult-alpha">&nbsp;×&nbsp;α</span>
+            <span class="formula-regime">(walking)</span>
+          </div>
+          <div class="formula-line formula-line-alpha">
+            <span class="formula-alpha-def">α ∈ [4/5,&nbsp;5/4]</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="slide-meta slide-meta-bottom"><span>thomaslistens.github.io/rtd</span><span>Thomas LeRoy Meier · 2026</span></div>
+    </section>
+
+    <section class="slide slide-bloom slide-bloom-cadence" data-slide-index="7" data-section="iii. the build">
+      <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <!-- Carry-over inner ellipse from slides 4-5-6, in slide 6's
+             warped end-state. Geometry stays as the original circle
+             (rx=ry=400); the .warped class applies the same scale
+             transform slide 6's final keyframe leaves behind. -->
+        <ellipse class="trace-ellipse trace-ellipse-inner warped"
+                 cx="800" cy="500" rx="400" ry="400"
+                 fill="none" stroke="var(--ink-blue)" stroke-width="0.8"
+                 vector-effect="non-scaling-stroke" opacity="0.42" />
+        <!-- Carry-over outer ellipse from slides 5-6, warped. -->
+        <ellipse class="trace-ellipse trace-ellipse-outer warped"
+                 cx="800" cy="500" rx="540" ry="540"
+                 fill="none" stroke="var(--ink-blue)" stroke-width="0.8"
+                 vector-effect="non-scaling-stroke" opacity="0.42" />
+      </svg>
+
+      <div class="slide-meta slide-meta-top">
+        <span>iii. the build</span>
+        <span>08 / 14</span>
+      </div>
+
+      <div class="slide-body slide-body-bloom">
+        <p class="bloom-opening">The body keeps many clocks. So does the day.</p>
+
+        <div class="bloom-halves">
+          <div class="bloom-half bloom-half--biological" data-half="biological">
+            <div class="bloom-heading">biological</div>
+            <ul class="bloom-list">
+              <li class="bloom-item" data-item="1">
+                <span class="bloom-glyph">◯</span>
+                <span class="bloom-num">¼</span>
+                <span class="bloom-label">breath</span>
+              </li>
+              <li class="bloom-item" data-item="2">
+                <span class="bloom-glyph">+</span>
+                <span class="bloom-label">HRV</span>
+              </li>
+              <li class="bloom-item bloom-item-derived" data-item="3">
+                <span class="bloom-glyph">~</span>
+                <span class="bloom-label">valence + arousal</span>
+              </li>
+              <li class="bloom-item" data-item="4">
+                <span class="bloom-glyph">β</span>
+                <span class="bloom-num">20</span>
+                <span class="bloom-label">beta</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="bloom-half bloom-half--contextual" data-half="contextual">
+            <div class="bloom-heading">contextual</div>
+            <ul class="bloom-list">
+              <li class="bloom-item" data-item="1"><span class="bloom-label">time of day</span></li>
+              <li class="bloom-item" data-item="2"><span class="bloom-label">location</span></li>
+              <li class="bloom-item" data-item="3"><span class="bloom-label">schedule</span></li>
+              <li class="bloom-item" data-item="4"><span class="bloom-label">environment</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="slide-meta slide-meta-bottom">
+        <span>thomaslistens.github.io/rtd</span>
+        <span>Thomas LeRoy Meier · 2026</span>
+      </div>
+    </section>
+
+    <section class="slide slide-integrate slide-integrate-cadence" data-slide-index="8" data-section="iii. the build">
+      <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <!-- Two warped carry-over ellipses persist from slides 6 / 7a.
+             Geometry stays as the original circles; the .warped class
+             applies the same scale transform slide 6 ends in. -->
+        <ellipse class="trace-ellipse trace-ellipse-inner warped"
+                 cx="800" cy="500" rx="400" ry="400"
+                 fill="none" stroke="var(--ink-blue)" stroke-width="0.8"
+                 vector-effect="non-scaling-stroke" opacity="0.42" />
+        <ellipse class="trace-ellipse trace-ellipse-outer warped"
+                 cx="800" cy="500" rx="540" ry="540"
+                 fill="none" stroke="var(--ink-blue)" stroke-width="0.8"
+                 vector-effect="non-scaling-stroke" opacity="0.42" />
+      </svg>
+
+      <div class="slide-meta slide-meta-top">
+        <span>iii. the build</span>
+        <span>09 / 14</span>
+      </div>
+
+      <div class="slide-body slide-body-integrate">
+        <div class="integrated-schematic">
+          <div class="schematic-line-integrated">
+            <span class="schematic-piece schematic-alpha">
+              <span class="glyph">α</span>
+              <span class="num">10</span>
+            </span>
+            <span class="schematic-colon schematic-colon-1">:</span>
+            <span class="schematic-piece schematic-beta">
+              <span class="glyph">β</span>
+              <span class="num">20</span>
+            </span>
+            <span class="schematic-colon schematic-colon-2">:</span>
+            <span class="schematic-piece schematic-stride">
+              <span class="glyph">↟</span>
+              <span class="num">2</span>
+            </span>
+            <span class="schematic-colon schematic-colon-3">:</span>
+            <span class="schematic-piece schematic-pulse">
+              <span class="num">1</span>
+              <span class="glyph">♥</span>
+            </span>
+            <span class="schematic-colon schematic-colon-4">:</span>
+            <span class="schematic-piece schematic-breath">
+              <span class="glyph">◯</span>
+              <span class="num">¼</span>
+            </span>
+          </div>
+          <div class="schematic-legend-integrated">alpha : beta : stride : pulse : breath</div>
+        </div>
+
+        <p class="integrated-question">What is your tempo?</p>
+      </div>
+
+      <div class="slide-meta slide-meta-bottom">
+        <span>thomaslistens.github.io/rtd</span>
+        <span>Thomas LeRoy Meier · 2026</span>
+      </div>
+    </section>
+
+    <section class="slide" data-slide-index="9" data-section="iv. the demo">
+      <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <ellipse cx="800" cy="450" rx="620" ry="300" fill="none" stroke="var(--ink-blue)" stroke-width="1.1" vector-effect="non-scaling-stroke" opacity="0.68" />
+        <ellipse cx="800" cy="450" rx="780" ry="420" fill="none" stroke="var(--ink-blue)" stroke-width="0.8" vector-effect="non-scaling-stroke" opacity="0.25" />
+      </svg>
+      <div class="slide-meta slide-meta-top"><span>iv. the demo</span><span>10 / 14</span></div>
+      <div class="slide-body"><p class="placeholder">Slide 8 — Demo frame, what the demo is and is not</p></div>
+      <div class="slide-meta slide-meta-bottom"><span>thomaslistens.github.io/rtd</span><span>Thomas LeRoy Meier · 2026</span></div>
+    </section>
+
+    <section class="slide" data-slide-index="10" data-section="iv. the demo">
+      <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <ellipse cx="800" cy="450" rx="620" ry="300" fill="none" stroke="var(--ink-blue)" stroke-width="1.1" vector-effect="non-scaling-stroke" opacity="0.68" />
+        <ellipse cx="800" cy="450" rx="780" ry="420" fill="none" stroke="var(--ink-blue)" stroke-width="0.8" vector-effect="non-scaling-stroke" opacity="0.25" />
+      </svg>
+      <div class="slide-meta slide-meta-top"><span>iv. the demo</span><span>11 / 14</span></div>
+      <div class="slide-body"><p class="placeholder">Slide 9 — The live demo</p></div>
+      <div class="slide-meta slide-meta-bottom"><span>thomaslistens.github.io/rtd</span><span>Thomas LeRoy Meier · 2026</span></div>
+    </section>
+
+    <section class="slide" data-slide-index="11" data-section="v. what comes next">
+      <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <ellipse cx="800" cy="450" rx="620" ry="300" fill="none" stroke="var(--ink-blue)" stroke-width="1.1" vector-effect="non-scaling-stroke" opacity="0.68" />
+        <ellipse cx="800" cy="450" rx="780" ry="420" fill="none" stroke="var(--ink-blue)" stroke-width="0.8" vector-effect="non-scaling-stroke" opacity="0.25" />
+      </svg>
+      <div class="slide-meta slide-meta-top"><span>v. what comes next</span><span>12 / 14</span></div>
+      <div class="slide-body"><p class="placeholder">Slide 10 — What becomes buildable, product categories</p></div>
+      <div class="slide-meta slide-meta-bottom"><span>thomaslistens.github.io/rtd</span><span>Thomas LeRoy Meier · 2026</span></div>
+    </section>
+
+    <section class="slide" data-slide-index="12" data-section="v. what comes next">
+      <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <ellipse cx="800" cy="450" rx="620" ry="300" fill="none" stroke="var(--ink-blue)" stroke-width="1.1" vector-effect="non-scaling-stroke" opacity="0.68" />
+        <ellipse cx="800" cy="450" rx="780" ry="420" fill="none" stroke="var(--ink-blue)" stroke-width="0.8" vector-effect="non-scaling-stroke" opacity="0.25" />
+      </svg>
+      <div class="slide-meta slide-meta-top"><span>v. what comes next</span><span>13 / 14</span></div>
+      <div class="slide-body"><p class="placeholder">Slide 11 — Roadmap</p></div>
+      <div class="slide-meta slide-meta-bottom"><span>thomaslistens.github.io/rtd</span><span>Thomas LeRoy Meier · 2026</span></div>
+    </section>
+
+    <section class="slide" data-slide-index="13" data-section="vi. close">
+      <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <ellipse cx="800" cy="450" rx="620" ry="300" fill="none" stroke="var(--ink-blue)" stroke-width="1.1" vector-effect="non-scaling-stroke" opacity="0.68" />
+        <ellipse cx="800" cy="450" rx="780" ry="420" fill="none" stroke="var(--ink-blue)" stroke-width="0.8" vector-effect="non-scaling-stroke" opacity="0.25" />
+      </svg>
+      <div class="slide-meta slide-meta-top"><span>vi. close</span><span>14 / 14</span></div>
+      <div class="slide-body"><p class="placeholder">Slide 12 — Partnership frame</p></div>
+      <div class="slide-meta slide-meta-bottom"><span>thomaslistens.github.io/rtd</span><span>Thomas LeRoy Meier · 2026</span></div>
+    </section>
+  </main>
+
+  <div class="progress" aria-hidden="true">
+    <div class="progress-fill" id="progress-fill"></div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

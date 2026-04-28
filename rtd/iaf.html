@@ -1,0 +1,67 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RTD IAF Listening Moment</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body class="iaf-body">
+  <header class="slide-meta slide-meta-top">
+    <span>iii. the build</span>
+    <span>headphones moment</span>
+  </header>
+
+  <main class="iaf-main">
+    <div>
+      <h1 class="iaf-title">IAF listening frame</h1>
+      <p class="iaf-subtitle">Listen in your headphones.</p>
+      <button type="button" class="iaf-toggle" id="iaf-toggle">play</button>
+    </div>
+  </main>
+
+  <footer class="slide-meta slide-meta-bottom">
+    <span>thomaslistens.github.io/rtd</span>
+    <span>thomas meier · 2026</span>
+  </footer>
+
+  <script>
+    const audio = new Audio('./audio/iaf_shimmer.mp3');
+    audio.loop = true;
+    audio.volume = 0.7;
+
+    const button = document.getElementById('iaf-toggle');
+
+    async function togglePlayback() {
+      if (audio.paused) {
+        try {
+          await audio.play();
+          button.textContent = 'pause';
+        } catch (_error) {
+          button.textContent = 'tap to play';
+        }
+        return;
+      }
+
+      audio.pause();
+      button.textContent = 'play';
+    }
+
+    button.addEventListener('click', togglePlayback);
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        audio.pause();
+        button.textContent = 'play';
+      }
+    });
+
+    window.addEventListener('beforeunload', () => {
+      audio.pause();
+    });
+  </script>
+</body>
+</html>
