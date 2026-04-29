@@ -537,12 +537,108 @@
       width: auto;
       max-width: 100%;
       max-height: 100%;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    body.record-mode.aspect-4-5 #rulerCanvas {
+      aspect-ratio: 4 / 5;
+    }
+
+    body.record-mode.aspect-1-1 #rulerCanvas {
+      aspect-ratio: 1 / 1;
+    }
+
+    body.record-mode #rulerCanvas.dragging {
+      cursor: grabbing;
     }
 
     @media (orientation: portrait) {
       body.record-mode #rulerCanvas {
         width: 100%;
         height: auto;
+      }
+    }
+
+    #recordOverlay .aspect-row {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      max-width: 480px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    #recordOverlay .aspect-btn {
+      flex: 1;
+      max-width: 80px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #333;
+      background: rgba(20, 20, 20, 0.7);
+      color: #aaa;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+    }
+
+    #recordOverlay .aspect-btn.active {
+      background: #fff;
+      color: #000;
+      border-color: #fff;
+    }
+
+    #recordOverlay .reset-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid #444;
+      background: rgba(20, 20, 20, 0.8);
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    #recordOverlay .reset-btn:active {
+      background: rgba(40, 40, 40, 0.9);
+    }
+
+    /* Landscape / wide screens: dock controls to the right of the canvas */
+    @media (orientation: landscape) and (min-width: 768px) {
+      body.record-mode #rulerContainer {
+        padding-right: 280px;
+      }
+
+      body.record-mode #recordOverlay {
+        bottom: 0;
+        top: 0;
+        right: 0;
+        left: auto;
+        width: 280px;
+        height: 100vh;
+        height: 100dvh;
+        background: linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,0.6));
+        flex-direction: column;
+        justify-content: center;
+        align-items: stretch;
+        padding: 24px 20px;
+        gap: 16px;
+        overflow-y: auto;
+      }
+
+      body.record-mode #recordOverlay .feather-row {
+        max-width: none;
+        margin: 0;
+      }
+
+      body.record-mode #recordOverlay .record-row {
+        margin-top: 8px;
       }
     }
   </style>
@@ -744,9 +840,31 @@
   <div id="recIndicator"><span id="recTime">0:00</span></div>
 
   <div id="recordOverlay">
+    <div class="aspect-row">
+      <button class="aspect-btn active" data-aspect="9:16">9:16</button>
+      <button class="aspect-btn" data-aspect="4:5">4:5</button>
+      <button class="aspect-btn" data-aspect="1:1">1:1</button>
+    </div>
+    <div class="feather-row">
+      <label>Zoom</label>
+      <input type="range" id="zoomSlider" min="50" max="250" value="100">
+      <button class="reset-btn" id="resetFramingBtn" title="Reset framing">⟲</button>
+    </div>
     <div class="feather-row">
       <label>Backdrop</label>
       <input type="range" id="featherSlider" min="0" max="100" value="55">
+    </div>
+    <div class="feather-row">
+      <label>Position</label>
+      <input type="range" id="rulerPosSlider" min="5" max="95" value="75">
+    </div>
+    <div class="feather-row">
+      <label>Size</label>
+      <input type="range" id="rulerSizeSlider" min="60" max="200" value="100">
+    </div>
+    <div class="feather-row">
+      <label>Opacity</label>
+      <input type="range" id="rulerOpacitySlider" min="20" max="100" value="100">
     </div>
     <div class="record-row">
       <button class="icon" id="flipCamBtn" title="Flip camera">⟳</button>
@@ -799,6 +917,20 @@
     let recordStartTime = 0;
     let recordTimerId = null;
     let featherAmount = 0.55;
+    let cameraZoom = 1.0;
+    let cameraPanX = 0;
+    let cameraPanY = 0;
+    let isDraggingCamera = false;
+    let suppressNextCanvasClick = false;
+    let recordAspect = '9:16';
+    let rulerScale = 1.0;
+    let rulerOpacity = 1.0;
+
+    const ASPECT_DIMS = {
+      '9:16': [1080, 1920],
+      '4:5':  [1080, 1350],
+      '1:1':  [1080, 1080]
+    };
     
     const noteNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
     const noteNamesFlat = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
@@ -1146,14 +1278,20 @@
     }
     
     function handleCanvasClick(event) {
+      if (suppressNextCanvasClick) {
+        suppressNextCanvasClick = false;
+        return;
+      }
+      if (recordMode) return;
+
       const canvas = document.getElementById('rulerCanvas');
       const rect = canvas.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
-      
+
       const rulerX = rect.width * config.rulerX;
       if (x > rulerX + 50) return;
-      
+
       for (const ratio of config.ratios) {
         const ratioY = droneRatioYPositions[ratio.label];
         if (ratioY !== undefined && Math.abs(y - ratioY) < 20) {
@@ -1162,23 +1300,76 @@
         }
       }
     }
+
+    function setupCameraPan() {
+      const canvas = document.getElementById('rulerCanvas');
+      let pointerDown = false;
+      let dragging = false;
+      let downX = 0, downY = 0;
+      let startPanX = 0, startPanY = 0;
+      const DRAG_THRESHOLD = 5;
+
+      canvas.addEventListener('pointerdown', (e) => {
+        if (!recordMode) return;
+        pointerDown = true;
+        dragging = false;
+        downX = e.clientX;
+        downY = e.clientY;
+        startPanX = cameraPanX;
+        startPanY = cameraPanY;
+        try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+      });
+
+      canvas.addEventListener('pointermove', (e) => {
+        if (!pointerDown || !recordMode) return;
+        const dx = e.clientX - downX;
+        const dy = e.clientY - downY;
+        if (!dragging && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+          dragging = true;
+          isDraggingCamera = true;
+          canvas.classList.add('dragging');
+        }
+        if (dragging) {
+          const rect = canvas.getBoundingClientRect();
+          const sign = cameraFacing === 'user' ? -1 : 1;
+          cameraPanX = Math.max(-1, Math.min(1, startPanX + (dx / rect.width * 2) * sign));
+          cameraPanY = Math.max(-1, Math.min(1, startPanY + dy / rect.height * 2));
+        }
+      });
+
+      const endDrag = (e) => {
+        if (!pointerDown) return;
+        pointerDown = false;
+        if (dragging) {
+          dragging = false;
+          isDraggingCamera = false;
+          canvas.classList.remove('dragging');
+          suppressNextCanvasClick = true;
+        }
+        try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+      };
+
+      canvas.addEventListener('pointerup', endDrag);
+      canvas.addEventListener('pointercancel', endDrag);
+    }
     
     function drawCameraBackground(ctx, W, H) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, W, H);
+
       const video = document.getElementById('cameraFeed');
-      if (!video || video.readyState < 2) {
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, W, H);
-        return;
-      }
+      if (!video || video.readyState < 2) return;
       const vw = video.videoWidth, vh = video.videoHeight;
-      if (!vw || !vh) {
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, W, H);
-        return;
-      }
-      const scale = Math.max(W / vw, H / vh);
+      if (!vw || !vh) return;
+
+      const baseScale = Math.max(W / vw, H / vh);
+      const scale = baseScale * cameraZoom;
       const drawW = vw * scale, drawH = vh * scale;
-      const dx = (W - drawW) / 2, dy = (H - drawH) / 2;
+      const overflowX = Math.max(0, drawW - W);
+      const overflowY = Math.max(0, drawH - H);
+      const dx = (W - drawW) / 2 + cameraPanX * (overflowX / 2);
+      const dy = (H - drawH) / 2 + cameraPanY * (overflowY / 2);
+
       if (cameraFacing === 'user') {
         ctx.save();
         ctx.translate(W, 0);
@@ -1210,8 +1401,9 @@
       let W, H;
 
       if (recordMode) {
-        W = 1080;
-        H = 1920;
+        const dims = ASPECT_DIMS[recordAspect] || ASPECT_DIMS['9:16'];
+        W = dims[0];
+        H = dims[1];
         if (canvas.width !== W || canvas.height !== H) {
           canvas.width = W;
           canvas.height = H;
@@ -1241,15 +1433,19 @@
       }
 
       if (config.ratios.length === 0) return;
-      
+
+      const S = recordMode ? rulerScale : 1;
+      ctx.save();
+      if (recordMode && rulerOpacity < 1) ctx.globalAlpha = rulerOpacity;
+
       const minCents = config.ratios[0].cents;
       const maxCents = config.ratios[config.ratios.length - 1].cents;
       const centsRange = maxCents - minCents;
-      
+
       const paddingCents = centsRange * 0.08;
       const displayMin = minCents - paddingCents;
       const displayMax = maxCents + paddingCents;
-      
+
       const padding = 60;
       const rulerTop = padding;
       const rulerBottom = H - padding;
@@ -1326,7 +1522,7 @@
           ctx.stroke();
           
           ctx.fillStyle = 'rgba(100, 100, 100, 1)';
-          ctx.font = '11px system-ui';
+          ctx.font = `${11 * S}px system-ui`;
           ctx.textAlign = 'right';
           ctx.textBaseline = 'middle';
           
@@ -1365,41 +1561,40 @@
         const alpha = 0.85 + ext * 0.15 + droneBoost;
         const colorStr = hslToString(color, alpha);
         
-        const lineLeft = rulerX - 50 - (ext * 30);
-        const lineRight = rulerX + 25;
-        const lineWidth = 1.5 + ext * 1.5;
-        
+        const lineLeft = rulerX - (50 + ext * 30) * S;
+        const lineRight = rulerX + 25 * S;
+        const lineWidth = (1.5 + ext * 1.5) * S;
+
         ctx.strokeStyle = colorStr;
         ctx.lineWidth = lineWidth;
         ctx.beginPath();
         ctx.moveTo(lineLeft, y);
         ctx.lineTo(lineRight, y);
         ctx.stroke();
-        
-        const fontSize = 15 + ext * 3;
+
+        const fontSize = (15 + ext * 3) * S;
         const fontWeight = ext > 0.5 ? 'bold' : 'normal';
-        
+
         ctx.fillStyle = colorStr;
         ctx.font = `${fontWeight} ${fontSize}px system-ui`;
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
-        ctx.fillText(ratio.label, lineLeft - 12, y);
-        
-        // FIXED positioning: Hz and cents with proper spacing to avoid collision
-        const hzX = rulerX + 38;
-        const centsX = config.showHz ? rulerX + 85 : rulerX + 55;
-        
+        ctx.fillText(ratio.label, lineLeft - 12 * S, y);
+
+        const hzX = rulerX + 38 * S;
+        const centsX = config.showHz ? rulerX + 85 * S : rulerX + 55 * S;
+
         if (config.showHz) {
           const hz = config.refFreq * ratio.ratio;
-          ctx.font = '11px system-ui';
+          ctx.font = `${11 * S}px system-ui`;
           ctx.textAlign = 'left';
           const hzAlpha = 0.35 + ext * 0.55 + droneBoost;
           ctx.fillStyle = hslToString(color, hzAlpha);
           ctx.fillText(`${hz.toFixed(1)}`, hzX, y);
         }
-        
+
         if (config.showCents) {
-          ctx.font = '10px system-ui';
+          ctx.font = `${10 * S}px system-ui`;
           ctx.fillStyle = 'rgba(255,255,255,0.25)';
           ctx.textAlign = 'left';
           ctx.fillText(`${ratio.cents.toFixed(0)}¢`, centsX, y);
@@ -1450,11 +1645,11 @@
         
         const isLockedOn = prox > 0.75 && isActive;
         
-        const baseSize = 16;
-        const bracketSize = baseSize - (prox * 5);
-        const bracketLength = 6 + (prox * 3);
-        const bracketThickness = 1.5 + (prox * 0.5);
-        const armLength = 25 + (prox * 15);
+        const baseSize = 16 * S;
+        const bracketSize = baseSize - (prox * 5 * S);
+        const bracketLength = (6 + prox * 3) * S;
+        const bracketThickness = (1.5 + prox * 0.5) * S;
+        const armLength = (25 + prox * 15) * S;
         
         let crosshairColor;
         if (!isActive) {
@@ -1494,52 +1689,52 @@
         ctx.lineTo(rulerX + bracketSize, y + bracketSize - bracketLength);
         ctx.stroke();
         
-        ctx.lineWidth = 1 + (prox * 1);
+        ctx.lineWidth = (1 + prox * 1) * S;
         ctx.beginPath();
-        ctx.moveTo(rulerX - bracketSize - 6, y);
-        ctx.lineTo(rulerX - bracketSize - 6 - armLength, y);
+        ctx.moveTo(rulerX - bracketSize - 6 * S, y);
+        ctx.lineTo(rulerX - bracketSize - 6 * S - armLength, y);
         ctx.stroke();
-        
+
         ctx.beginPath();
-        ctx.moveTo(rulerX + bracketSize + 6, y);
-        ctx.lineTo(rulerX + bracketSize + 6 + armLength, y);
+        ctx.moveTo(rulerX + bracketSize + 6 * S, y);
+        ctx.lineTo(rulerX + bracketSize + 6 * S + armLength, y);
         ctx.stroke();
-        
-        const dotSize = 2 + (prox * 1);
+
+        const dotSize = (2 + prox * 1) * S;
         ctx.fillStyle = crosshairColor;
         ctx.beginPath();
         ctx.arc(rulerX, y, dotSize, 0, Math.PI * 2);
         ctx.fill();
         
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1 * S;
         const tickAlpha = isActive ? alpha * (0.3 + prox * 0.2) : alpha * 0.2;
         ctx.strokeStyle = isActive ? `rgba(255, 255, 255, ${tickAlpha})` : `rgba(100, 100, 100, ${tickAlpha})`;
-        
+
         for (let i = 1; i <= 2; i++) {
-          const tickX = bracketSize + 6 + (armLength / 3) * i;
+          const tickX = bracketSize + 6 * S + (armLength / 3) * i;
           ctx.beginPath();
-          ctx.moveTo(rulerX - tickX, y - 2);
-          ctx.lineTo(rulerX - tickX, y + 2);
+          ctx.moveTo(rulerX - tickX, y - 2 * S);
+          ctx.lineTo(rulerX - tickX, y + 2 * S);
           ctx.stroke();
           ctx.beginPath();
-          ctx.moveTo(rulerX + tickX, y - 2);
-          ctx.lineTo(rulerX + tickX, y + 2);
+          ctx.moveTo(rulerX + tickX, y - 2 * S);
+          ctx.lineTo(rulerX + tickX, y + 2 * S);
           ctx.stroke();
         }
-        
+
         if (config.showIndicatorHz) {
           ctx.fillStyle = isActive ? `rgba(255, 255, 255, ${alpha})` : `rgba(100, 100, 100, ${alpha * 0.7})`;
-          ctx.font = 'bold 22px system-ui';
+          ctx.font = `bold ${22 * S}px system-ui`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'bottom';
-          ctx.fillText(`${displayFreq.toFixed(1)} Hz`, rulerX, y - bracketSize - 6);
+          ctx.fillText(`${displayFreq.toFixed(1)} Hz`, rulerX, y - bracketSize - 6 * S);
         }
-        
+
         if (nearestRatio && nearestDiff < 50 && (config.showIndicatorDeviation || config.showIndicatorRatio)) {
           const deviation = displayCents - nearestRatio.cents;
           const sign = deviation >= 0 ? '+' : '';
-          
-          ctx.font = '12px system-ui';
+
+          ctx.font = `${12 * S}px system-ui`;
           if (!isActive) {
             ctx.fillStyle = `rgba(100, 100, 100, ${alpha * 0.7})`;
           } else {
@@ -1551,7 +1746,7 @@
             ctx.fillStyle = `hsla(${blendedH}, ${blendedS}%, ${blendedL}%, ${alpha * 0.85})`;
           }
           ctx.textBaseline = 'top';
-          
+
           let infoText = '';
           if (config.showIndicatorRatio && config.showIndicatorDeviation) {
             infoText = `${nearestRatio.label}  ${sign}${deviation.toFixed(1)}¢`;
@@ -1560,10 +1755,12 @@
           } else {
             infoText = `${sign}${deviation.toFixed(1)}¢`;
           }
-          
-          ctx.fillText(infoText, rulerX, y + bracketSize + 8);
+
+          ctx.fillText(infoText, rulerX, y + bracketSize + 8 * S);
         }
       }
+
+      ctx.restore();
     }
     
     function audioLoop() {
@@ -1837,6 +2034,13 @@
 
       recordMode = true;
       document.body.classList.add('record-mode');
+      document.body.classList.add('aspect-' + recordAspect.replace(':', '-'));
+      // Sync record-mode sliders to current config
+      document.getElementById('rulerPosSlider').value = Math.round(config.rulerX * 100);
+      document.getElementById('rulerSizeSlider').value = Math.round(rulerScale * 100);
+      document.getElementById('rulerOpacitySlider').value = Math.round(rulerOpacity * 100);
+      document.getElementById('zoomSlider').value = Math.round(cameraZoom * 100);
+      document.getElementById('featherSlider').value = Math.round(featherAmount * 100);
       // Force canvas to repaint at new dimensions on next frame
       const canvas = document.getElementById('rulerCanvas');
       canvas.width = 0;
@@ -1850,7 +2054,7 @@
         stopRecording();
       }
       recordMode = false;
-      document.body.classList.remove('record-mode');
+      document.body.classList.remove('record-mode', 'aspect-9-16', 'aspect-4-5', 'aspect-1-1');
       if (cameraStream) {
         cameraStream.getTracks().forEach(t => t.stop());
         cameraStream = null;
@@ -1965,22 +2169,47 @@
 
     function setupTitleLongPress() {
       const title = document.getElementById('title');
+      const HOLD_MS = 600;
       let pressTimer = null;
       let triggered = false;
+      let pressStart = 0;
+      let progressRaf = null;
+
+      const animateProgress = () => {
+        const elapsed = performance.now() - pressStart;
+        const t = Math.min(1, elapsed / HOLD_MS);
+        // Fade title from white to red as the press is held
+        const r = 255;
+        const g = Math.round(255 - 187 * t);
+        const b = Math.round(255 - 187 * t);
+        title.style.color = `rgb(${r}, ${g}, ${b})`;
+        if (t < 1) progressRaf = requestAnimationFrame(animateProgress);
+      };
+
+      const resetColor = () => {
+        if (progressRaf) cancelAnimationFrame(progressRaf);
+        progressRaf = null;
+        title.style.color = '';
+      };
 
       const start = (e) => {
         triggered = false;
         clearTimeout(pressTimer);
+        pressStart = performance.now();
+        progressRaf = requestAnimationFrame(animateProgress);
         pressTimer = setTimeout(() => {
           triggered = true;
           if (navigator.vibrate) navigator.vibrate(30);
+          title.style.color = '#ff3b30';
+          setTimeout(resetColor, 200);
           if (recordMode) exitRecordMode();
           else enterRecordMode();
-        }, 700);
+        }, HOLD_MS);
       };
       const cancel = () => {
         clearTimeout(pressTimer);
         pressTimer = null;
+        resetColor();
       };
 
       title.addEventListener('pointerdown', start);
@@ -2245,6 +2474,39 @@
       document.getElementById('featherSlider').addEventListener('input', (e) => {
         featherAmount = parseInt(e.target.value, 10) / 100;
       });
+      document.getElementById('zoomSlider').addEventListener('input', (e) => {
+        cameraZoom = parseInt(e.target.value, 10) / 100;
+      });
+      document.getElementById('resetFramingBtn').addEventListener('click', () => {
+        cameraZoom = 1.0;
+        cameraPanX = 0;
+        cameraPanY = 0;
+        document.getElementById('zoomSlider').value = 100;
+      });
+      document.getElementById('rulerPosSlider').addEventListener('input', (e) => {
+        config.rulerX = parseInt(e.target.value, 10) / 100;
+        document.getElementById('rulerPosition').value = e.target.value;
+        document.getElementById('rulerPosVal').textContent = e.target.value + '%';
+      });
+      document.getElementById('rulerSizeSlider').addEventListener('input', (e) => {
+        rulerScale = parseInt(e.target.value, 10) / 100;
+      });
+      document.getElementById('rulerOpacitySlider').addEventListener('input', (e) => {
+        rulerOpacity = parseInt(e.target.value, 10) / 100;
+      });
+      document.querySelectorAll('.aspect-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const a = btn.dataset.aspect;
+          recordAspect = a;
+          document.body.classList.remove('aspect-9-16', 'aspect-4-5', 'aspect-1-1');
+          document.body.classList.add('aspect-' + a.replace(':', '-'));
+          document.querySelectorAll('.aspect-btn').forEach(b => b.classList.toggle('active', b === btn));
+          // Force canvas to repaint at new internal dims
+          const canvas = document.getElementById('rulerCanvas');
+          canvas.width = 0;
+        });
+      });
+      setupCameraPan();
       
       document.getElementById('saveBtn').addEventListener('click', saveSession);
       document.getElementById('resetBtn').addEventListener('click', resetToDefaults);
