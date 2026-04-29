@@ -855,12 +855,16 @@
       <input type="range" id="featherSlider" min="0" max="100" value="55">
     </div>
     <div class="feather-row">
+      <label>Edge</label>
+      <input type="range" id="backdropEdgeSlider" min="0" max="100" value="75" step="0.5">
+    </div>
+    <div class="feather-row">
       <label>Feather</label>
       <input type="range" id="featherWidthSlider" min="0" max="100" value="25">
     </div>
     <div class="feather-row">
       <label>Position</label>
-      <input type="range" id="rulerPosSlider" min="5" max="95" value="75">
+      <input type="range" id="rulerPosSlider" min="5" max="95" value="75" step="0.5">
     </div>
     <div class="feather-row">
       <label>Size</label>
@@ -869,6 +873,14 @@
     <div class="feather-row">
       <label>Opacity</label>
       <input type="range" id="rulerOpacitySlider" min="20" max="100" value="100">
+    </div>
+    <div class="feather-row">
+      <label>Spread</label>
+      <input type="range" id="rulerZoomSlider" min="100" max="400" value="100">
+    </div>
+    <div class="feather-row">
+      <label>Shift</label>
+      <input type="range" id="rulerPanSlider" min="-100" max="100" value="0">
     </div>
     <div class="record-row">
       <button class="icon" id="flipCamBtn" title="Flip camera">⟳</button>
@@ -922,6 +934,9 @@
     let recordTimerId = null;
     let featherAmount = 0.55;
     let featherWidth = 0.25; // fraction of canvas width for soft transition
+    let backdropEdge = 0.75; // 0..1, x position where solid backdrop starts
+    let rulerZoom = 1.0;     // vertical magnification of cents range
+    let rulerPan = 0.0;      // -1..1 shift of visible cents window
     let cameraZoom = 1.0;
     let cameraPanX = 0;
     let cameraPanY = 0;
@@ -1388,21 +1403,21 @@
 
     function drawRulerBackdrop(ctx, W, H) {
       if (featherAmount <= 0) return;
-      const rulerX = W * config.rulerX;
+      const edgeX = W * backdropEdge;
 
-      // Solid darkening from rulerX rightward
+      // Solid darkening from edgeX rightward
       ctx.fillStyle = `rgba(0,0,0,${featherAmount})`;
-      ctx.fillRect(rulerX, 0, W - rulerX, H);
+      ctx.fillRect(edgeX, 0, W - edgeX, H);
 
-      // Soft feather to the left of rulerX
+      // Soft feather to the left of edgeX
       const fadePixels = featherWidth * W;
       if (fadePixels > 0) {
-        const startX = Math.max(0, rulerX - fadePixels);
-        const grad = ctx.createLinearGradient(startX, 0, rulerX, 0);
+        const startX = Math.max(0, edgeX - fadePixels);
+        const grad = ctx.createLinearGradient(startX, 0, edgeX, 0);
         grad.addColorStop(0, 'rgba(0,0,0,0)');
         grad.addColorStop(1, `rgba(0,0,0,${featherAmount})`);
         ctx.fillStyle = grad;
-        ctx.fillRect(startX, 0, rulerX - startX, H);
+        ctx.fillRect(startX, 0, edgeX - startX, H);
       }
     }
 
@@ -1456,8 +1471,16 @@
       const centsRange = maxCents - minCents;
 
       const paddingCents = centsRange * 0.08;
-      const displayMin = minCents - paddingCents;
-      const displayMax = maxCents + paddingCents;
+      let displayMin = minCents - paddingCents;
+      let displayMax = maxCents + paddingCents;
+
+      if (recordMode && rulerZoom !== 1) {
+        const span = displayMax - displayMin;
+        const visibleSpan = span / rulerZoom;
+        const center = (displayMin + displayMax) / 2 + rulerPan * (span - visibleSpan) / 2;
+        displayMin = center - visibleSpan / 2;
+        displayMax = center + visibleSpan / 2;
+      }
 
       const padding = 60;
       const rulerTop = padding;
@@ -2055,6 +2078,9 @@
       document.getElementById('zoomSlider').value = Math.round(cameraZoom * 100);
       document.getElementById('featherSlider').value = Math.round(featherAmount * 100);
       document.getElementById('featherWidthSlider').value = Math.round(featherWidth * 100);
+      document.getElementById('backdropEdgeSlider').value = (backdropEdge * 100).toFixed(1);
+      document.getElementById('rulerZoomSlider').value = Math.round(rulerZoom * 100);
+      document.getElementById('rulerPanSlider').value = Math.round(rulerPan * 100);
       // Force canvas to repaint at new dimensions on next frame
       const canvas = document.getElementById('rulerCanvas');
       canvas.width = 0;
@@ -2490,6 +2516,15 @@
       });
       document.getElementById('featherWidthSlider').addEventListener('input', (e) => {
         featherWidth = parseInt(e.target.value, 10) / 100;
+      });
+      document.getElementById('backdropEdgeSlider').addEventListener('input', (e) => {
+        backdropEdge = parseFloat(e.target.value) / 100;
+      });
+      document.getElementById('rulerZoomSlider').addEventListener('input', (e) => {
+        rulerZoom = parseInt(e.target.value, 10) / 100;
+      });
+      document.getElementById('rulerPanSlider').addEventListener('input', (e) => {
+        rulerPan = parseInt(e.target.value, 10) / 100;
       });
       document.getElementById('zoomSlider').addEventListener('input', (e) => {
         cameraZoom = parseInt(e.target.value, 10) / 100;
