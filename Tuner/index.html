@@ -2467,9 +2467,34 @@
         responsiveness: document.getElementById('responsiveness').value,
         showIndicatorHz: document.getElementById('showIndicatorHz').checked,
         showIndicatorDeviation: document.getElementById('showIndicatorDeviation').checked,
-        showIndicatorRatio: document.getElementById('showIndicatorRatio').checked
+        showIndicatorRatio: document.getElementById('showIndicatorRatio').checked,
+        video: {
+          recordAspect,
+          featherSlider: document.getElementById('featherSlider').value,
+          backdropEdgeSlider: document.getElementById('backdropEdgeSlider').value,
+          featherWidthSlider: document.getElementById('featherWidthSlider').value,
+          brightSlider: document.getElementById('brightSlider').value,
+          contrastSlider: document.getElementById('contrastSlider').value,
+          saturateSlider: document.getElementById('saturateSlider').value,
+          bwMode,
+          bwToneSlider: document.getElementById('bwToneSlider').value,
+          trailSlider: document.getElementById('trailSlider').value,
+          rulerPosSlider: document.getElementById('rulerPosSlider').value,
+          rulerSizeSlider: document.getElementById('rulerSizeSlider').value,
+          rulerOpacitySlider: document.getElementById('rulerOpacitySlider').value,
+          rulerZoomSlider: document.getElementById('rulerZoomSlider').value,
+          rulerPanSlider: document.getElementById('rulerPanSlider').value,
+          showRatioLabel,
+          ratioXSlider: document.getElementById('ratioXSlider').value,
+          ratioYSlider: document.getElementById('ratioYSlider').value,
+          ratioSizeSlider: document.getElementById('ratioSizeSlider').value,
+          zoomSlider: document.getElementById('zoomSlider').value,
+          cameraPanX,
+          cameraPanY,
+          cameraFacing
+        }
       };
-      
+
       localStorage.setItem('jiPitchRuler_session', JSON.stringify(session));
       
       const btn = document.getElementById('saveBtn');
@@ -2481,10 +2506,10 @@
     function loadSession() {
       const saved = localStorage.getItem('jiPitchRuler_session');
       if (!saved) return false;
-      
+
       try {
         const session = JSON.parse(saved);
-        
+
         document.getElementById('refFreq').value = session.refFreq || DEFAULTS.refFreq;
         document.getElementById('refPreset').value = session.refPreset || '';
         config.refNote = session.refNote || 'C3';
@@ -2501,11 +2526,62 @@
         document.getElementById('showIndicatorHz').checked = session.showIndicatorHz ?? DEFAULTS.showIndicatorHz;
         document.getElementById('showIndicatorDeviation').checked = session.showIndicatorDeviation ?? DEFAULTS.showIndicatorDeviation;
         document.getElementById('showIndicatorRatio').checked = session.showIndicatorRatio ?? DEFAULTS.showIndicatorRatio;
-        
+
+        if (session.video) applyVideoSettings(session.video);
+
         return true;
       } catch (e) {
         console.error('Failed to load session:', e);
         return false;
+      }
+    }
+
+    function setSlider(id, value) {
+      if (value === undefined || value === null) return;
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.value = value;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    function applyVideoSettings(v) {
+      setSlider('featherSlider', v.featherSlider);
+      setSlider('backdropEdgeSlider', v.backdropEdgeSlider);
+      setSlider('featherWidthSlider', v.featherWidthSlider);
+      setSlider('brightSlider', v.brightSlider);
+      setSlider('contrastSlider', v.contrastSlider);
+      setSlider('saturateSlider', v.saturateSlider);
+      setSlider('bwToneSlider', v.bwToneSlider);
+      setSlider('trailSlider', v.trailSlider);
+      setSlider('rulerPosSlider', v.rulerPosSlider);
+      setSlider('rulerSizeSlider', v.rulerSizeSlider);
+      setSlider('rulerOpacitySlider', v.rulerOpacitySlider);
+      setSlider('rulerZoomSlider', v.rulerZoomSlider);
+      setSlider('rulerPanSlider', v.rulerPanSlider);
+      setSlider('ratioXSlider', v.ratioXSlider);
+      setSlider('ratioYSlider', v.ratioYSlider);
+      setSlider('ratioSizeSlider', v.ratioSizeSlider);
+      setSlider('zoomSlider', v.zoomSlider);
+
+      if (typeof v.bwMode === 'boolean') {
+        bwMode = v.bwMode;
+        document.getElementById('bwToggle').classList.toggle('active', bwMode);
+      }
+      if (typeof v.showRatioLabel === 'boolean') {
+        showRatioLabel = v.showRatioLabel;
+        document.getElementById('ratioLabelToggle').classList.toggle('active', showRatioLabel);
+      }
+      if (typeof v.cameraPanX === 'number') cameraPanX = v.cameraPanX;
+      if (typeof v.cameraPanY === 'number') cameraPanY = v.cameraPanY;
+      if (v.cameraFacing === 'user' || v.cameraFacing === 'environment') cameraFacing = v.cameraFacing;
+
+      if (v.recordAspect && ASPECT_DIMS[v.recordAspect]) {
+        recordAspect = v.recordAspect;
+        document.body.classList.remove('aspect-9-16', 'aspect-4-5', 'aspect-1-1');
+        document.body.classList.add('aspect-' + v.recordAspect.replace(':', '-'));
+        document.querySelectorAll('.aspect-btn[data-aspect]').forEach(b => {
+          b.classList.toggle('active', b.dataset.aspect === v.recordAspect);
+        });
       }
     }
     
@@ -2526,7 +2602,33 @@
       document.getElementById('showIndicatorHz').checked = DEFAULTS.showIndicatorHz;
       document.getElementById('showIndicatorDeviation').checked = DEFAULTS.showIndicatorDeviation;
       document.getElementById('showIndicatorRatio').checked = DEFAULTS.showIndicatorRatio;
-      
+
+      applyVideoSettings({
+        recordAspect: '9:16',
+        featherSlider: 80,
+        backdropEdgeSlider: 80,
+        featherWidthSlider: 10,
+        brightSlider: 100,
+        contrastSlider: 100,
+        saturateSlider: 100,
+        bwMode: false,
+        bwToneSlider: 0,
+        trailSlider: 0,
+        rulerPosSlider: 95,
+        rulerSizeSlider: 200,
+        rulerOpacitySlider: 100,
+        rulerZoomSlider: 130,
+        rulerPanSlider: 10,
+        showRatioLabel: true,
+        ratioXSlider: 85,
+        ratioYSlider: 95,
+        ratioSizeSlider: 105,
+        zoomSlider: 100,
+        cameraPanX: 0,
+        cameraPanY: 0,
+        cameraFacing: 'user'
+      });
+
       localStorage.removeItem('jiPitchRuler_session');
       
       const btn = document.getElementById('resetBtn');
@@ -2643,15 +2745,6 @@
         }
       });
       
-      const loaded = loadSession();
-      if (!loaded) {
-        document.getElementById('refFreq').value = DEFAULTS.refFreq;
-        document.getElementById('ratios').value = DEFAULTS.ratios;
-        document.getElementById('showCents').checked = DEFAULTS.showCents;
-        document.getElementById('show12EDO').checked = DEFAULTS.show12EDO;
-        document.getElementById('edoOffset').value = DEFAULTS.edoOffset * 100;
-      }
-      
       document.getElementById('title').addEventListener('click', handleTitleClick);
       document.getElementById('advancedToggle').style.display = 'none';
       
@@ -2755,13 +2848,13 @@
       document.getElementById('rulerOpacitySlider').addEventListener('input', (e) => {
         rulerOpacity = parseInt(e.target.value, 10) / 100;
       });
-      document.querySelectorAll('.aspect-btn').forEach(btn => {
+      document.querySelectorAll('.aspect-btn[data-aspect]').forEach(btn => {
         btn.addEventListener('click', () => {
           const a = btn.dataset.aspect;
           recordAspect = a;
           document.body.classList.remove('aspect-9-16', 'aspect-4-5', 'aspect-1-1');
           document.body.classList.add('aspect-' + a.replace(':', '-'));
-          document.querySelectorAll('.aspect-btn').forEach(b => b.classList.toggle('active', b === btn));
+          document.querySelectorAll('.aspect-btn[data-aspect]').forEach(b => b.classList.toggle('active', b === btn));
           // Force canvas to repaint at new internal dims
           const canvas = document.getElementById('rulerCanvas');
           canvas.width = 0;
@@ -2786,15 +2879,36 @@
         draw();
       });
       
+      const loaded = loadSession();
+      if (!loaded) {
+        document.getElementById('refFreq').value = DEFAULTS.refFreq;
+        document.getElementById('ratios').value = DEFAULTS.ratios;
+        document.getElementById('showCents').checked = DEFAULTS.showCents;
+        document.getElementById('show12EDO').checked = DEFAULTS.show12EDO;
+        document.getElementById('edoOffset').value = DEFAULTS.edoOffset * 100;
+      }
+
       let saveTimeout;
+      function scheduleSave() {
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(saveSession, 500);
+      }
       const autoSaveTriggers = ['ratios', 'refFreq', 'showCents', 'showHz', 'showGhost', 'octaveWrap', 'show12EDO', 'edoOffset', 'rulerPosition', 'smoothing', 'responsiveness', 'showIndicatorHz', 'showIndicatorDeviation', 'showIndicatorRatio'];
       autoSaveTriggers.forEach(id => {
-        document.getElementById(id).addEventListener('change', () => {
-          clearTimeout(saveTimeout);
-          saveTimeout = setTimeout(saveSession, 500);
-        });
+        document.getElementById(id).addEventListener('change', scheduleSave);
       });
-      
+
+      const recordOverlay = document.getElementById('recordOverlay');
+      recordOverlay.addEventListener('input', scheduleSave);
+      recordOverlay.addEventListener('click', (e) => {
+        if (e.target.closest('button.aspect-btn, #ratioLabelToggle, #bwToggle, #resetFramingBtn')) {
+          scheduleSave();
+        }
+      });
+      document.getElementById('rulerCanvas').addEventListener('pointerup', () => {
+        if (recordMode) scheduleSave();
+      });
+
       updateConfig();
     }
     
