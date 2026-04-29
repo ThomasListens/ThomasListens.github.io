@@ -1507,36 +1507,37 @@
       if (featherAmount <= 0) return;
       const edgeX = W * backdropEdge;
       const fadePixels = featherWidth * W;
+      const alpha = featherAmount;
+      const opaque = `rgba(0,0,0,${alpha})`;
+      const clear = 'rgba(0,0,0,0)';
 
-      if (fadePixels >= 0) {
-        // Outward feather: solid from edgeX to W, gradient extending LEFT of edgeX
-        ctx.fillStyle = `rgba(0,0,0,${featherAmount})`;
+      if (fadePixels === 0) {
+        // Hard cliff: single solid fill
+        ctx.fillStyle = opaque;
         ctx.fillRect(edgeX, 0, W - edgeX, H);
-
-        if (fadePixels > 0) {
-          const startX = Math.max(0, edgeX - fadePixels);
-          const grad = ctx.createLinearGradient(startX, 0, edgeX, 0);
-          grad.addColorStop(0, 'rgba(0,0,0,0)');
-          grad.addColorStop(1, `rgba(0,0,0,${featherAmount})`);
-          ctx.fillStyle = grad;
-          ctx.fillRect(startX, 0, edgeX - startX, H);
-        }
+      } else if (fadePixels > 0) {
+        // Outward feather: one gradient covering [startX..W], with feather then solid
+        const startX = Math.max(0, edgeX - fadePixels);
+        const span = W - startX;
+        const tEdge = span > 0 ? (edgeX - startX) / span : 0;
+        const grad = ctx.createLinearGradient(startX, 0, W, 0);
+        grad.addColorStop(0, clear);
+        grad.addColorStop(Math.max(0, Math.min(1, tEdge)), opaque);
+        grad.addColorStop(1, opaque);
+        ctx.fillStyle = grad;
+        ctx.fillRect(startX, 0, span, H);
       } else {
-        // Inward feather: gradient extends RIGHT of edgeX into the solid region
+        // Inward feather: one gradient covering [edgeX..W], with feather then solid
         const innerFade = -fadePixels;
         const solidStart = Math.min(W, edgeX + innerFade);
-
-        if (solidStart < W) {
-          ctx.fillStyle = `rgba(0,0,0,${featherAmount})`;
-          ctx.fillRect(solidStart, 0, W - solidStart, H);
-        }
-        if (solidStart > edgeX) {
-          const grad = ctx.createLinearGradient(edgeX, 0, solidStart, 0);
-          grad.addColorStop(0, 'rgba(0,0,0,0)');
-          grad.addColorStop(1, `rgba(0,0,0,${featherAmount})`);
-          ctx.fillStyle = grad;
-          ctx.fillRect(edgeX, 0, solidStart - edgeX, H);
-        }
+        const span = W - edgeX;
+        const tSolid = span > 0 ? (solidStart - edgeX) / span : 0;
+        const grad = ctx.createLinearGradient(edgeX, 0, W, 0);
+        grad.addColorStop(0, clear);
+        grad.addColorStop(Math.max(0, Math.min(1, tSolid)), opaque);
+        grad.addColorStop(1, opaque);
+        ctx.fillStyle = grad;
+        ctx.fillRect(edgeX, 0, span, H);
       }
     }
 
@@ -1663,11 +1664,14 @@
 
         let edoLineStart, edoLabelX, edoLabelAlign;
         if (recordMode) {
-          // Confine EDO to the backdrop area so it doesn't bleed across the camera
+          // Confine EDO to the backdrop area so it doesn't bleed across the camera.
+          // Start lines past the label width so the dash phases don't align at the backdrop edge.
           const edgeX = W * backdropEdge;
-          edoLineStart = edgeX;
           edoLabelX = edgeX + 8 * S;
           edoLabelAlign = 'left';
+          ctx.font = `${11 * S}px system-ui`;
+          const labelW = ctx.measureText('A♯2').width;
+          edoLineStart = edoLabelX + labelW + 8 * S;
         } else {
           edoLineStart = 0;
           edoLabelX = rulerX - (95 + config.edoOffset * 100) * S;
