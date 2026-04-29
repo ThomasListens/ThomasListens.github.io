@@ -874,6 +874,17 @@
       <label>Saturate</label>
       <input type="range" id="saturateSlider" min="0" max="200" value="100">
     </div>
+    <div class="aspect-row">
+      <button class="aspect-btn" id="bwToggle" style="max-width: none;">B &amp; W</button>
+    </div>
+    <div class="feather-row">
+      <label>Tone</label>
+      <input type="range" id="bwToneSlider" min="-100" max="100" value="0">
+    </div>
+    <div class="feather-row">
+      <label>Trail</label>
+      <input type="range" id="trailSlider" min="0" max="95" value="0">
+    </div>
     <div class="feather-row">
       <label>Position</label>
       <input type="range" id="rulerPosSlider" min="5" max="95" value="95" step="0.5">
@@ -972,6 +983,12 @@
     let videoBrightness = 1.0;
     let videoContrast = 1.0;
     let videoSaturation = 1.0;
+    let bwMode = false;
+    let bwTone = 0; // -1 cool .. 0 neutral .. +1 warm
+    let trailAmount = 0; // 0 = no smear, ~0.95 = very long trail
+    let trailCanvas = null;
+    let trailCtx = null;
+    let trailSeeded = false;
     let cameraZoom = 1.0;
     let cameraPanX = 0;
     let cameraPanY = 0;
@@ -1407,6 +1424,41 @@
       canvas.addEventListener('pointercancel', endDrag);
     }
     
+    function buildCameraFilter() {
+      const parts = [];
+      if (videoBrightness !== 1) parts.push(`brightness(${videoBrightness})`);
+      if (videoContrast !== 1) parts.push(`contrast(${videoContrast})`);
+
+      if (bwMode) {
+        parts.push('grayscale(1)');
+        if (bwTone > 0.01) {
+          parts.push(`sepia(${(bwTone * 0.6).toFixed(3)})`);
+        } else if (bwTone < -0.01) {
+          parts.push(`sepia(${(-bwTone * 0.6).toFixed(3)})`);
+          parts.push('hue-rotate(190deg)');
+        }
+      } else if (videoSaturation !== 1) {
+        parts.push(`saturate(${videoSaturation})`);
+      }
+
+      return parts.length ? parts.join(' ') : 'none';
+    }
+
+    function drawCameraOnto(targetCtx, video, W, H, dx, dy, drawW, drawH, alpha) {
+      targetCtx.save();
+      const filter = buildCameraFilter();
+      if (filter !== 'none') targetCtx.filter = filter;
+      if (alpha !== 1) targetCtx.globalAlpha = alpha;
+      if (cameraFacing === 'user') {
+        targetCtx.translate(W, 0);
+        targetCtx.scale(-1, 1);
+        targetCtx.drawImage(video, W - dx - drawW, dy, drawW, drawH);
+      } else {
+        targetCtx.drawImage(video, dx, dy, drawW, drawH);
+      }
+      targetCtx.restore();
+    }
+
     function drawCameraBackground(ctx, W, H) {
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, W, H);
@@ -1424,18 +1476,30 @@
       const dx = (W - drawW) / 2 + cameraPanX * (overflowX / 2);
       const dy = (H - drawH) / 2 + cameraPanY * (overflowY / 2);
 
-      ctx.save();
-      if (videoBrightness !== 1 || videoContrast !== 1 || videoSaturation !== 1) {
-        ctx.filter = `brightness(${videoBrightness}) contrast(${videoContrast}) saturate(${videoSaturation})`;
-      }
-      if (cameraFacing === 'user') {
-        ctx.translate(W, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(video, W - dx - drawW, dy, drawW, drawH);
+      if (trailAmount > 0.02) {
+        // Lazy-init / resize trail buffer
+        if (!trailCanvas || trailCanvas.width !== W || trailCanvas.height !== H) {
+          trailCanvas = document.createElement('canvas');
+          trailCanvas.width = W;
+          trailCanvas.height = H;
+          trailCtx = trailCanvas.getContext('2d');
+          trailSeeded = false;
+        }
+
+        // First frame: draw fully opaque to seed the buffer (avoid initial black fade-in)
+        if (!trailSeeded) {
+          drawCameraOnto(trailCtx, video, W, H, dx, dy, drawW, drawH, 1);
+          trailSeeded = true;
+        } else {
+          // IIR blend: out = newFrame * (1 - trail) + buffer * trail
+          drawCameraOnto(trailCtx, video, W, H, dx, dy, drawW, drawH, 1 - trailAmount);
+        }
+
+        ctx.drawImage(trailCanvas, 0, 0);
       } else {
-        ctx.drawImage(video, dx, dy, drawW, drawH);
+        trailSeeded = false; // reset so re-enabling trail seeds fresh
+        drawCameraOnto(ctx, video, W, H, dx, dy, drawW, drawH, 1);
       }
-      ctx.restore();
     }
 
     function drawRulerBackdrop(ctx, W, H) {
@@ -2164,6 +2228,9 @@
       document.getElementById('brightSlider').value = Math.round(videoBrightness * 100);
       document.getElementById('contrastSlider').value = Math.round(videoContrast * 100);
       document.getElementById('saturateSlider').value = Math.round(videoSaturation * 100);
+      document.getElementById('bwToneSlider').value = Math.round(bwTone * 100);
+      document.getElementById('trailSlider').value = Math.round(trailAmount * 100);
+      document.getElementById('bwToggle').classList.toggle('active', bwMode);
       // Force canvas to repaint at new dimensions on next frame
       const canvas = document.getElementById('rulerCanvas');
       canvas.width = 0;
@@ -2631,6 +2698,18 @@
       });
       document.getElementById('saturateSlider').addEventListener('input', (e) => {
         videoSaturation = parseInt(e.target.value, 10) / 100;
+      });
+      document.getElementById('bwToggle').addEventListener('click', (e) => {
+        bwMode = !bwMode;
+        e.currentTarget.classList.toggle('active', bwMode);
+      });
+      document.getElementById('bwToneSlider').addEventListener('input', (e) => {
+        bwTone = parseInt(e.target.value, 10) / 100;
+      });
+      document.getElementById('trailSlider').addEventListener('input', (e) => {
+        const next = parseInt(e.target.value, 10) / 100;
+        if (trailAmount === 0 && next > 0) trailSeeded = false;
+        trailAmount = next;
       });
       document.getElementById('zoomSlider').addEventListener('input', (e) => {
         cameraZoom = parseInt(e.target.value, 10) / 100;
