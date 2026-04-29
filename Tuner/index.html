@@ -787,7 +787,7 @@
         
         <label style="margin-top: 8px;">Ruler position</label>
         <div class="slider-row">
-          <input type="range" id="rulerPosition" min="50" max="95" value="75">
+          <input type="range" id="rulerPosition" min="50" max="95" value="95">
           <span id="rulerPosVal">75%</span>
         </div>
         
@@ -852,23 +852,35 @@
     </div>
     <div class="feather-row">
       <label>Backdrop</label>
-      <input type="range" id="featherSlider" min="0" max="100" value="55">
+      <input type="range" id="featherSlider" min="0" max="100" value="80">
     </div>
     <div class="feather-row">
       <label>Edge</label>
-      <input type="range" id="backdropEdgeSlider" min="0" max="100" value="75" step="0.5">
+      <input type="range" id="backdropEdgeSlider" min="0" max="100" value="80" step="0.5">
     </div>
     <div class="feather-row">
       <label>Feather</label>
-      <input type="range" id="featherWidthSlider" min="-100" max="100" value="0">
+      <input type="range" id="featherWidthSlider" min="-100" max="100" value="10">
+    </div>
+    <div class="feather-row">
+      <label>Bright</label>
+      <input type="range" id="brightSlider" min="50" max="200" value="100">
+    </div>
+    <div class="feather-row">
+      <label>Contrast</label>
+      <input type="range" id="contrastSlider" min="50" max="200" value="100">
+    </div>
+    <div class="feather-row">
+      <label>Saturate</label>
+      <input type="range" id="saturateSlider" min="0" max="200" value="100">
     </div>
     <div class="feather-row">
       <label>Position</label>
-      <input type="range" id="rulerPosSlider" min="5" max="95" value="75" step="0.5">
+      <input type="range" id="rulerPosSlider" min="5" max="95" value="95" step="0.5">
     </div>
     <div class="feather-row">
       <label>Size</label>
-      <input type="range" id="rulerSizeSlider" min="60" max="200" value="100">
+      <input type="range" id="rulerSizeSlider" min="60" max="400" value="200">
     </div>
     <div class="feather-row">
       <label>Opacity</label>
@@ -876,26 +888,26 @@
     </div>
     <div class="feather-row">
       <label>Spread</label>
-      <input type="range" id="rulerZoomSlider" min="100" max="400" value="100">
+      <input type="range" id="rulerZoomSlider" min="100" max="400" value="130">
     </div>
     <div class="feather-row">
       <label>Shift</label>
-      <input type="range" id="rulerPanSlider" min="-100" max="100" value="0">
+      <input type="range" id="rulerPanSlider" min="-100" max="100" value="10">
     </div>
     <div class="aspect-row">
-      <button class="aspect-btn" id="ratioLabelToggle" style="max-width: none;">Ratio Label</button>
+      <button class="aspect-btn active" id="ratioLabelToggle" style="max-width: none;">Ratio Label</button>
     </div>
     <div class="feather-row">
       <label>Label X</label>
-      <input type="range" id="ratioXSlider" min="0" max="100" value="88" step="0.5">
+      <input type="range" id="ratioXSlider" min="0" max="100" value="85" step="0.5">
     </div>
     <div class="feather-row">
       <label>Label Y</label>
-      <input type="range" id="ratioYSlider" min="0" max="100" value="92" step="0.5">
+      <input type="range" id="ratioYSlider" min="0" max="100" value="95" step="0.5">
     </div>
     <div class="feather-row">
       <label>Label Sz</label>
-      <input type="range" id="ratioSizeSlider" min="40" max="300" value="100">
+      <input type="range" id="ratioSizeSlider" min="40" max="300" value="105">
     </div>
     <div class="record-row">
       <button class="icon" id="flipCamBtn" title="Flip camera">⟳</button>
@@ -914,7 +926,7 @@
       showGhost: true,
       show12EDO: true,
       edoOffset: 0.15,
-      rulerX: 0.75,
+      rulerX: 0.95,
       smoothing: 8,
       responsiveness: 6,
       octaveWrap: true,
@@ -947,22 +959,25 @@
     let recordedChunks = [];
     let recordStartTime = 0;
     let recordTimerId = null;
-    let featherAmount = 0.55;
-    let featherWidth = 0; // -1..1 of canvas width: positive = feather outward (left), negative = feather inward (right)
-    let backdropEdge = 0.75; // 0..1, x position where solid backdrop starts
-    let rulerZoom = 1.0;     // vertical magnification of cents range
-    let rulerPan = 0.0;      // -1..1 shift of visible cents window
-    let showRatioLabel = false;
-    let ratioLabelX = 0.88;
-    let ratioLabelY = 0.92;
-    let ratioLabelSize = 1.0;
+    let featherAmount = 0.80;
+    let featherWidth = 0.01; // -1..1 of canvas width: positive = feather outward (left), negative = feather inward (right)
+    let backdropEdge = 0.80; // 0..1, x position where solid backdrop starts
+    let rulerZoom = 1.3;     // vertical magnification of cents range
+    let rulerPan = 0.1;      // -1..1 shift of visible cents window
+    let rulerScale = 2.0;
+    let showRatioLabel = true;
+    let ratioLabelX = 0.85;
+    let ratioLabelY = 0.95;
+    let ratioLabelSize = 1.05;
+    let videoBrightness = 1.0;
+    let videoContrast = 1.0;
+    let videoSaturation = 1.0;
     let cameraZoom = 1.0;
     let cameraPanX = 0;
     let cameraPanY = 0;
     let isDraggingCamera = false;
     let suppressNextCanvasClick = false;
     let recordAspect = '9:16';
-    let rulerScale = 1.0;
     let rulerOpacity = 1.0;
 
     const ASPECT_DIMS = {
@@ -1409,15 +1424,18 @@
       const dx = (W - drawW) / 2 + cameraPanX * (overflowX / 2);
       const dy = (H - drawH) / 2 + cameraPanY * (overflowY / 2);
 
+      ctx.save();
+      if (videoBrightness !== 1 || videoContrast !== 1 || videoSaturation !== 1) {
+        ctx.filter = `brightness(${videoBrightness}) contrast(${videoContrast}) saturate(${videoSaturation})`;
+      }
       if (cameraFacing === 'user') {
-        ctx.save();
         ctx.translate(W, 0);
         ctx.scale(-1, 1);
         ctx.drawImage(video, W - dx - drawW, dy, drawW, drawH);
-        ctx.restore();
       } else {
         ctx.drawImage(video, dx, dy, drawW, drawH);
       }
+      ctx.restore();
     }
 
     function drawRulerBackdrop(ctx, W, H) {
@@ -2143,6 +2161,9 @@
       document.getElementById('ratioYSlider').value = (ratioLabelY * 100).toFixed(1);
       document.getElementById('ratioSizeSlider').value = Math.round(ratioLabelSize * 100);
       document.getElementById('ratioLabelToggle').classList.toggle('active', showRatioLabel);
+      document.getElementById('brightSlider').value = Math.round(videoBrightness * 100);
+      document.getElementById('contrastSlider').value = Math.round(videoContrast * 100);
+      document.getElementById('saturateSlider').value = Math.round(videoSaturation * 100);
       // Force canvas to repaint at new dimensions on next frame
       const canvas = document.getElementById('rulerCanvas');
       canvas.width = 0;
@@ -2601,6 +2622,15 @@
       });
       document.getElementById('ratioSizeSlider').addEventListener('input', (e) => {
         ratioLabelSize = parseInt(e.target.value, 10) / 100;
+      });
+      document.getElementById('brightSlider').addEventListener('input', (e) => {
+        videoBrightness = parseInt(e.target.value, 10) / 100;
+      });
+      document.getElementById('contrastSlider').addEventListener('input', (e) => {
+        videoContrast = parseInt(e.target.value, 10) / 100;
+      });
+      document.getElementById('saturateSlider').addEventListener('input', (e) => {
+        videoSaturation = parseInt(e.target.value, 10) / 100;
       });
       document.getElementById('zoomSlider').addEventListener('input', (e) => {
         cameraZoom = parseInt(e.target.value, 10) / 100;
