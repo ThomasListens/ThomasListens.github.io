@@ -855,6 +855,10 @@
       <input type="range" id="featherSlider" min="0" max="100" value="55">
     </div>
     <div class="feather-row">
+      <label>Feather</label>
+      <input type="range" id="featherWidthSlider" min="0" max="100" value="25">
+    </div>
+    <div class="feather-row">
       <label>Position</label>
       <input type="range" id="rulerPosSlider" min="5" max="95" value="75">
     </div>
@@ -917,6 +921,7 @@
     let recordStartTime = 0;
     let recordTimerId = null;
     let featherAmount = 0.55;
+    let featherWidth = 0.25; // fraction of canvas width for soft transition
     let cameraZoom = 1.0;
     let cameraPanX = 0;
     let cameraPanY = 0;
@@ -1384,13 +1389,21 @@
     function drawRulerBackdrop(ctx, W, H) {
       if (featherAmount <= 0) return;
       const rulerX = W * config.rulerX;
-      const fadeWidth = Math.max(80, W * 0.35);
-      const startX = Math.max(0, rulerX - fadeWidth);
-      const grad = ctx.createLinearGradient(startX, 0, W, 0);
-      grad.addColorStop(0, 'rgba(0,0,0,0)');
-      grad.addColorStop(1, `rgba(0,0,0,${featherAmount})`);
-      ctx.fillStyle = grad;
-      ctx.fillRect(startX, 0, W - startX, H);
+
+      // Solid darkening from rulerX rightward
+      ctx.fillStyle = `rgba(0,0,0,${featherAmount})`;
+      ctx.fillRect(rulerX, 0, W - rulerX, H);
+
+      // Soft feather to the left of rulerX
+      const fadePixels = featherWidth * W;
+      if (fadePixels > 0) {
+        const startX = Math.max(0, rulerX - fadePixels);
+        const grad = ctx.createLinearGradient(startX, 0, rulerX, 0);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(1, `rgba(0,0,0,${featherAmount})`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(startX, 0, rulerX - startX, H);
+      }
     }
 
     function draw() {
@@ -1505,7 +1518,7 @@
         const startSemitone = Math.floor(displayMin / 100);
         const endSemitone = Math.ceil(displayMax / 100);
         const isCustomMode = !document.getElementById('refPreset').value;
-        const edoLabelX = rulerX - 95 - (config.edoOffset * 100);
+        const edoLabelX = rulerX - (95 + config.edoOffset * 100) * S;
         
         ctx.setLineDash([4, 6]);
         
@@ -2041,6 +2054,7 @@
       document.getElementById('rulerOpacitySlider').value = Math.round(rulerOpacity * 100);
       document.getElementById('zoomSlider').value = Math.round(cameraZoom * 100);
       document.getElementById('featherSlider').value = Math.round(featherAmount * 100);
+      document.getElementById('featherWidthSlider').value = Math.round(featherWidth * 100);
       // Force canvas to repaint at new dimensions on next frame
       const canvas = document.getElementById('rulerCanvas');
       canvas.width = 0;
@@ -2473,6 +2487,9 @@
       document.getElementById('exitRecBtn').addEventListener('click', exitRecordMode);
       document.getElementById('featherSlider').addEventListener('input', (e) => {
         featherAmount = parseInt(e.target.value, 10) / 100;
+      });
+      document.getElementById('featherWidthSlider').addEventListener('input', (e) => {
+        featherWidth = parseInt(e.target.value, 10) / 100;
       });
       document.getElementById('zoomSlider').addEventListener('input', (e) => {
         cameraZoom = parseInt(e.target.value, 10) / 100;
