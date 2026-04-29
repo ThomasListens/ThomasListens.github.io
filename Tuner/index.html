@@ -860,7 +860,7 @@
     </div>
     <div class="feather-row">
       <label>Feather</label>
-      <input type="range" id="featherWidthSlider" min="0" max="100" value="25">
+      <input type="range" id="featherWidthSlider" min="-100" max="100" value="0">
     </div>
     <div class="feather-row">
       <label>Position</label>
@@ -881,6 +881,21 @@
     <div class="feather-row">
       <label>Shift</label>
       <input type="range" id="rulerPanSlider" min="-100" max="100" value="0">
+    </div>
+    <div class="aspect-row">
+      <button class="aspect-btn" id="ratioLabelToggle" style="max-width: none;">Ratio Label</button>
+    </div>
+    <div class="feather-row">
+      <label>Label X</label>
+      <input type="range" id="ratioXSlider" min="0" max="100" value="88" step="0.5">
+    </div>
+    <div class="feather-row">
+      <label>Label Y</label>
+      <input type="range" id="ratioYSlider" min="0" max="100" value="8" step="0.5">
+    </div>
+    <div class="feather-row">
+      <label>Label Sz</label>
+      <input type="range" id="ratioSizeSlider" min="40" max="300" value="100">
     </div>
     <div class="record-row">
       <button class="icon" id="flipCamBtn" title="Flip camera">⟳</button>
@@ -933,10 +948,14 @@
     let recordStartTime = 0;
     let recordTimerId = null;
     let featherAmount = 0.55;
-    let featherWidth = 0.25; // fraction of canvas width for soft transition
+    let featherWidth = 0; // -1..1 of canvas width: positive = feather outward (left), negative = feather inward (right)
     let backdropEdge = 0.75; // 0..1, x position where solid backdrop starts
     let rulerZoom = 1.0;     // vertical magnification of cents range
     let rulerPan = 0.0;      // -1..1 shift of visible cents window
+    let showRatioLabel = false;
+    let ratioLabelX = 0.88;
+    let ratioLabelY = 0.08;
+    let ratioLabelSize = 1.0;
     let cameraZoom = 1.0;
     let cameraPanX = 0;
     let cameraPanY = 0;
@@ -1404,20 +1423,37 @@
     function drawRulerBackdrop(ctx, W, H) {
       if (featherAmount <= 0) return;
       const edgeX = W * backdropEdge;
-
-      // Solid darkening from edgeX rightward
-      ctx.fillStyle = `rgba(0,0,0,${featherAmount})`;
-      ctx.fillRect(edgeX, 0, W - edgeX, H);
-
-      // Soft feather to the left of edgeX
       const fadePixels = featherWidth * W;
-      if (fadePixels > 0) {
-        const startX = Math.max(0, edgeX - fadePixels);
-        const grad = ctx.createLinearGradient(startX, 0, edgeX, 0);
-        grad.addColorStop(0, 'rgba(0,0,0,0)');
-        grad.addColorStop(1, `rgba(0,0,0,${featherAmount})`);
-        ctx.fillStyle = grad;
-        ctx.fillRect(startX, 0, edgeX - startX, H);
+
+      if (fadePixels >= 0) {
+        // Outward feather: solid from edgeX to W, gradient extending LEFT of edgeX
+        ctx.fillStyle = `rgba(0,0,0,${featherAmount})`;
+        ctx.fillRect(edgeX, 0, W - edgeX, H);
+
+        if (fadePixels > 0) {
+          const startX = Math.max(0, edgeX - fadePixels);
+          const grad = ctx.createLinearGradient(startX, 0, edgeX, 0);
+          grad.addColorStop(0, 'rgba(0,0,0,0)');
+          grad.addColorStop(1, `rgba(0,0,0,${featherAmount})`);
+          ctx.fillStyle = grad;
+          ctx.fillRect(startX, 0, edgeX - startX, H);
+        }
+      } else {
+        // Inward feather: gradient extends RIGHT of edgeX into the solid region
+        const innerFade = -fadePixels;
+        const solidStart = Math.min(W, edgeX + innerFade);
+
+        if (solidStart < W) {
+          ctx.fillStyle = `rgba(0,0,0,${featherAmount})`;
+          ctx.fillRect(solidStart, 0, W - solidStart, H);
+        }
+        if (solidStart > edgeX) {
+          const grad = ctx.createLinearGradient(edgeX, 0, solidStart, 0);
+          grad.addColorStop(0, 'rgba(0,0,0,0)');
+          grad.addColorStop(1, `rgba(0,0,0,${featherAmount})`);
+          ctx.fillStyle = grad;
+          ctx.fillRect(edgeX, 0, solidStart - edgeX, H);
+        }
       }
     }
 
@@ -1797,6 +1833,24 @@
       }
 
       ctx.restore();
+
+      if (recordMode && showRatioLabel && nearestRatio && indicatorOpacity > 0.02) {
+        const x = W * ratioLabelX;
+        const y = H * ratioLabelY;
+        const fontSize = 96 * ratioLabelSize;
+
+        ctx.save();
+        ctx.globalAlpha = indicatorOpacity;
+        ctx.font = `bold ${fontSize}px system-ui`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0,0,0,0.7)';
+        ctx.shadowBlur = fontSize * 0.18;
+        ctx.shadowOffsetY = Math.max(2, fontSize * 0.04);
+        ctx.fillStyle = hslToString(nearestRatio.color, 1);
+        ctx.fillText(nearestRatio.label, x, y);
+        ctx.restore();
+      }
     }
     
     function audioLoop() {
@@ -2081,6 +2135,10 @@
       document.getElementById('backdropEdgeSlider').value = (backdropEdge * 100).toFixed(1);
       document.getElementById('rulerZoomSlider').value = Math.round(rulerZoom * 100);
       document.getElementById('rulerPanSlider').value = Math.round(rulerPan * 100);
+      document.getElementById('ratioXSlider').value = (ratioLabelX * 100).toFixed(1);
+      document.getElementById('ratioYSlider').value = (ratioLabelY * 100).toFixed(1);
+      document.getElementById('ratioSizeSlider').value = Math.round(ratioLabelSize * 100);
+      document.getElementById('ratioLabelToggle').classList.toggle('active', showRatioLabel);
       // Force canvas to repaint at new dimensions on next frame
       const canvas = document.getElementById('rulerCanvas');
       canvas.width = 0;
@@ -2525,6 +2583,19 @@
       });
       document.getElementById('rulerPanSlider').addEventListener('input', (e) => {
         rulerPan = parseInt(e.target.value, 10) / 100;
+      });
+      document.getElementById('ratioLabelToggle').addEventListener('click', (e) => {
+        showRatioLabel = !showRatioLabel;
+        e.currentTarget.classList.toggle('active', showRatioLabel);
+      });
+      document.getElementById('ratioXSlider').addEventListener('input', (e) => {
+        ratioLabelX = parseFloat(e.target.value) / 100;
+      });
+      document.getElementById('ratioYSlider').addEventListener('input', (e) => {
+        ratioLabelY = parseFloat(e.target.value) / 100;
+      });
+      document.getElementById('ratioSizeSlider').addEventListener('input', (e) => {
+        ratioLabelSize = parseInt(e.target.value, 10) / 100;
       });
       document.getElementById('zoomSlider').addEventListener('input', (e) => {
         cameraZoom = parseInt(e.target.value, 10) / 100;
