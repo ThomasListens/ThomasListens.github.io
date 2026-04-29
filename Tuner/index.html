@@ -876,6 +876,7 @@
     </div>
     <div class="aspect-row">
       <button class="aspect-btn" id="bwToggle" style="max-width: none;">B &amp; W</button>
+      <button class="aspect-btn active" id="edoToggle" style="max-width: none;">EDO Grid</button>
     </div>
     <div class="feather-row">
       <label>Tone</label>
@@ -1659,27 +1660,39 @@
         const startSemitone = Math.floor(displayMin / 100);
         const endSemitone = Math.ceil(displayMax / 100);
         const isCustomMode = !document.getElementById('refPreset').value;
-        const edoLabelX = rulerX - (95 + config.edoOffset * 100) * S;
-        
+
+        let edoLineStart, edoLabelX, edoLabelAlign;
+        if (recordMode) {
+          // Confine EDO to the backdrop area so it doesn't bleed across the camera
+          const edgeX = W * backdropEdge;
+          edoLineStart = edgeX;
+          edoLabelX = edgeX + 8 * S;
+          edoLabelAlign = 'left';
+        } else {
+          edoLineStart = 0;
+          edoLabelX = rulerX - (95 + config.edoOffset * 100) * S;
+          edoLabelAlign = 'right';
+        }
+
         ctx.setLineDash([4, 6]);
-        
+
         for (let semi = startSemitone; semi <= endSemitone; semi++) {
           const cents = semi * 100;
           if (cents < displayMin || cents > displayMax) continue;
-          
+
           const y = centsToY(cents);
           ctx.strokeStyle = 'rgba(70, 70, 70, 0.7)';
           ctx.lineWidth = 1;
           ctx.beginPath();
-          ctx.moveTo(0, y);
+          ctx.moveTo(edoLineStart, y);
           ctx.lineTo(W, y);
           ctx.stroke();
-          
+
           ctx.fillStyle = 'rgba(100, 100, 100, 1)';
           ctx.font = `${11 * S}px system-ui`;
-          ctx.textAlign = 'right';
+          ctx.textAlign = edoLabelAlign;
           ctx.textBaseline = 'middle';
-          
+
           let label;
           if (isCustomMode) {
             const degree = ((semi % 12) + 12) % 12;
@@ -1689,10 +1702,10 @@
             const noteInfo = getNoteAtCents(cents, config.refNote);
             label = `${noteInfo.name}${noteInfo.octave}`;
           }
-          
+
           ctx.fillText(label, edoLabelX, y);
         }
-        
+
         ctx.setLineDash([]);
       }
       
@@ -2231,6 +2244,7 @@
       document.getElementById('bwToneSlider').value = Math.round(bwTone * 100);
       document.getElementById('trailSlider').value = Math.round(trailAmount * 100);
       document.getElementById('bwToggle').classList.toggle('active', bwMode);
+      document.getElementById('edoToggle').classList.toggle('active', config.show12EDO);
       // Force canvas to repaint at new dimensions on next frame
       const canvas = document.getElementById('rulerCanvas');
       canvas.width = 0;
@@ -2702,6 +2716,12 @@
       document.getElementById('bwToggle').addEventListener('click', (e) => {
         bwMode = !bwMode;
         e.currentTarget.classList.toggle('active', bwMode);
+      });
+      document.getElementById('edoToggle').addEventListener('click', (e) => {
+        config.show12EDO = !config.show12EDO;
+        e.currentTarget.classList.toggle('active', config.show12EDO);
+        const cb = document.getElementById('show12EDO');
+        if (cb) cb.checked = config.show12EDO;
       });
       document.getElementById('bwToneSlider').addEventListener('input', (e) => {
         bwTone = parseInt(e.target.value, 10) / 100;
