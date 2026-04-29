@@ -891,7 +891,7 @@
     </div>
     <div class="feather-row">
       <label>Label Y</label>
-      <input type="range" id="ratioYSlider" min="0" max="100" value="8" step="0.5">
+      <input type="range" id="ratioYSlider" min="0" max="100" value="92" step="0.5">
     </div>
     <div class="feather-row">
       <label>Label Sz</label>
@@ -954,7 +954,7 @@
     let rulerPan = 0.0;      // -1..1 shift of visible cents window
     let showRatioLabel = false;
     let ratioLabelX = 0.88;
-    let ratioLabelY = 0.08;
+    let ratioLabelY = 0.92;
     let ratioLabelSize = 1.0;
     let cameraZoom = 1.0;
     let cameraPanX = 0;
@@ -1674,21 +1674,25 @@
       }
       
       if (config.showGhost && ghostTrail.length > 0) {
+        const ghostColor = (recordMode && nearestRatio) ? nearestRatio.color : null;
         for (let i = 0; i < ghostTrail.length; i++) {
           const ghost = ghostTrail[i];
           const age = ghostTrail.length - i;
           const alpha = Math.pow(1 - age / 20, 1.5) * 0.5;
           const size = 10 - age * 0.3;
-          
+
           if (ghost.cents >= displayMin && ghost.cents <= displayMax && size > 2) {
             const y = centsToY(ghost.cents);
-            
-            ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.4})`;
+
+            const haloColor = ghostColor ? hslToString(ghostColor, alpha * 0.4) : `rgba(255, 255, 255, ${alpha * 0.4})`;
+            const coreColor = ghostColor ? hslToString(ghostColor, alpha) : `rgba(255, 255, 255, ${alpha})`;
+
+            ctx.fillStyle = haloColor;
             ctx.beginPath();
             ctx.arc(rulerX, y, size + 3, 0, Math.PI * 2);
             ctx.fill();
-            
-            ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+
+            ctx.fillStyle = coreColor;
             ctx.beginPath();
             ctx.arc(rulerX, y, size / 2, 0, Math.PI * 2);
             ctx.fill();
@@ -2131,7 +2135,7 @@
       document.getElementById('rulerOpacitySlider').value = Math.round(rulerOpacity * 100);
       document.getElementById('zoomSlider').value = Math.round(cameraZoom * 100);
       document.getElementById('featherSlider').value = Math.round(featherAmount * 100);
-      document.getElementById('featherWidthSlider').value = Math.round(featherWidth * 100);
+      document.getElementById('featherWidthSlider').value = Math.round(Math.sign(featherWidth) * Math.sqrt(Math.abs(featherWidth)) * 100);
       document.getElementById('backdropEdgeSlider').value = (backdropEdge * 100).toFixed(1);
       document.getElementById('rulerZoomSlider').value = Math.round(rulerZoom * 100);
       document.getElementById('rulerPanSlider').value = Math.round(rulerPan * 100);
@@ -2573,7 +2577,8 @@
         featherAmount = parseInt(e.target.value, 10) / 100;
       });
       document.getElementById('featherWidthSlider').addEventListener('input', (e) => {
-        featherWidth = parseInt(e.target.value, 10) / 100;
+        const s = parseInt(e.target.value, 10) / 100;
+        featherWidth = Math.sign(s) * s * s;
       });
       document.getElementById('backdropEdgeSlider').addEventListener('input', (e) => {
         backdropEdge = parseFloat(e.target.value) / 100;
