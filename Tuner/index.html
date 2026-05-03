@@ -1860,20 +1860,48 @@
       return ratios;
     }
     
-    // Lazy getter for the shared AudioContext. Both mic toggle and drone
-    // toggle call this from a user-gesture handler, so the context can be
-    // created on whichever path runs first. If the context was previously
-    // closed (e.g. mic toggled off), a fresh one is created. If the
-    // context is suspended (autoplay policy or backgrounding), this
-    // resumes it.
+    // Lazy getter for the shared AudioContext. Created lazily on the
+    // first user gesture (via bootstrapAudio), then never closed for the
+    // page lifetime. Backgrounding may suspend it; we resume here and on
+    // visibilitychange. The previous "if closed, recreate" branch is
+    // gone — nothing closes the context anymore.
     function getAudioContext() {
-      if (!audioContext || audioContext.state === 'closed') {
+      if (!audioContext) {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
       }
       if (audioContext.state === 'suspended') {
         audioContext.resume().catch(() => {});
       }
       return audioContext;
+    }
+
+    // One-time audio graph construction. Idempotent — every entry point
+    // that needs audio (drone toggle, mic toggle, record start, per-ratio
+    // drone tap) calls this first; first call builds the full permanent
+    // graph (mic-processing scaffold + tanpura at master gain 0), every
+    // subsequent call is a no-op. Must be invoked from a user gesture so
+    // the AudioContext can autoplay on mobile. After this returns, the
+    // graph never gets torn down — toggling state becomes parameter-only
+    // (gain ramps and source connect/disconnect), no node creation or
+    // destruction. Eliminates the rebuild churn that was causing
+    // crackling and racing with the recorder.
+    let audioBootstrapped = false;
+    function bootstrapAudio() {
+      const ctx = getAudioContext();
+      if (audioBootstrapped) return ctx;
+      // Build the mic-side bus FIRST so buildTanpura can wire its master
+      // gain into micProcessing.dest at construction time.
+      if (!micProcessing) {
+        micProcessing = buildMicProcessing(ctx);
+        if (micProcessing) {
+          applyVoiceFX({ smooth: false });
+        }
+      }
+      if (!tanpuraNodes) {
+        buildTanpura(ctx);
+      }
+      audioBootstrapped = true;
+      return ctx;
     }
 
     // Resume the shared context when the page becomes visible again.
@@ -1896,7 +1924,9 @@
         return;
       }
 
-      const ctx = getAudioContext();
+      // Bootstraps the shared graph on the first audio gesture; after
+      // that this is just a context-resume + return.
+      const ctx = bootstrapAudio();
 
       const now = ctx.currentTime;
       const osc = ctx.createOscillator();
@@ -3288,10 +3318,10 @@
 
       if (!isListening) {
         try {
-          // Reuse the shared AudioContext (created earlier if drone was
-          // enabled before the mic). getAudioContext() also resumes it
-          // if it was suspended.
-          getAudioContext();
+          // Build (idempotent) the permanent audio graph — micProcessing
+          // and tanpura are guaranteed to exist after this returns.
+          // Also resumes the context if it was suspended.
+          bootstrapAudio();
           console.log('[input] toggleListening: requesting deviceId=', selectedInputDeviceId);
           let stream;
           try {
@@ -3318,14 +3348,11 @@
           // Idle/preview fftSize. enterRecordMode() drops this to
           // ANALYSER_FFT_RECORD to cut YIN cost ~4x while recording.
           analyser.fftSize = recordMode ? ANALYSER_FFT_RECORD : ANALYSER_FFT_IDLE;
-          // Build (or rebuild) the recording-only processing chain on
-          // this AudioContext, then route source → analyser AND
-          // source → processing chain. Pitch detection still reads the
-          // raw source via analyser.
-          if (!micProcessing) {
-            micProcessing = buildMicProcessing(audioContext);
-            applyVoiceFX({ smooth: false });
-          }
+          // micProcessing was built once in bootstrapAudio(); it lives
+          // forever. Just attach the new mic source to the head of the
+          // permanent chain. analyser also gets the raw source for pitch
+          // detection (parallel — the FX chain feeds the recorder, never
+          // the analyser).
           attachMicSource(source);
 
           isListening = true;
@@ -3345,31 +3372,15 @@
         if (animationId) cancelAnimationFrame(animationId);
         tearDownAudioStream(currentAudioStream);
         currentAudioStream = null;
-        // Drop mic-processing references — disconnect from the shared
-        // context, but DO NOT close the context: tanpura and per-ratio
-        // drones may still be live on it.
+        // Disconnect the mic SOURCE from the permanent micProcessing
+        // chain. The chain itself (highpass, compressor, makeup, optional
+        // reverb, micOut, MediaStreamDestination) stays — it's permanent.
+        // Tanpura is still routed through the recorder bus; if recording
+        // continues it captures the drone alone.
         if (currentMicSource) {
           try { currentMicSource.disconnect(); } catch (_) {}
           currentMicSource = null;
         }
-        // Stop the reverb's running LFO oscillators before dropping
-        // the chain. Without this, the LFOs would linger inside the
-        // context.
-        if (micProcessing && micProcessing.reverb) {
-          try { micProcessing.reverb.dispose(); } catch (_) {}
-        }
-        // If tanpura was wired into the recorder bus, drop that link
-        // before tearing down micProcessing — its dest is going away.
-        if (tanpuraNodes && micProcessing && micProcessing.dest) {
-          try { tanpuraNodes.masterGain.disconnect(micProcessing.dest); } catch (_) {}
-        }
-        if (micProcessing) {
-          try { micProcessing.micOut.disconnect(); } catch (_) {}
-          for (const n of (micProcessing.chain || [])) { try { n.disconnect(); } catch (_) {} }
-        }
-        micProcessing = null;
-        // Shared context stays alive for drone use. It's closed only
-        // when the page unloads.
         analyser = null;
         smoothedFreq = null;
         smoothedCents = null;
@@ -3423,11 +3434,10 @@
     async function enterRecordMode() {
       if (recordMode) return;
 
-      if (!isListening) {
-        await toggleListening();
-        if (!isListening) return; // mic permission failed
-      }
-
+      // No mic activation here — entering record mode is mic-agnostic so
+      // the user can frame, monitor the drone, or just look at the
+      // ruler before deciding to record. The mic is only requested when
+      // they actually press the record button (see startRecording).
       const ok = await setupCamera(cameraFacing);
       if (!ok) return;
 
@@ -3519,9 +3529,22 @@
       return '';
     }
 
-    function startRecording() {
+    async function startRecording() {
       if (!recordMode) return;
       if (mediaRecorder && mediaRecorder.state === 'recording') return;
+
+      // Auto-activate the mic on first record press if the user hasn't
+      // turned it on manually. Built-in mic is preferred when BT
+      // headphones are connected (smart default in pickSmartDefaultInput).
+      // This is the ONLY place that activates the mic on record-mode
+      // entry — enterRecordMode no longer touches getUserMedia, so the
+      // user can drone-monitor before deciding to record.
+      if (!currentMicSource && !isListening) {
+        await toggleListening();
+        // Give the source a tick to settle before grabbing tracks.
+        await new Promise(r => setTimeout(r, 30));
+      }
+
       if (!currentAudioStream) {
         alert('Microphone not active.');
         return;
@@ -3722,6 +3745,31 @@
     }
 
     // -------- Feature 3: Audio input device picker --------
+
+    // Smart default for the input picker. Returns a deviceId to bind, or
+    // null to leave the current selection alone.
+    //
+    // Rules:
+    //   - If the user has a saved preference (localStorage), respect it
+    //     — never override.
+    //   - Otherwise, if we can see BOTH a built-in mic AND a Bluetooth
+    //     mic in the device list, prefer the built-in. This sidesteps
+    //     Android's Hands-Free Profile (HFP) routing, which forces BT
+    //     headphones into mono and breaks the system volume rocker.
+    //   - Otherwise, return null (browser default is fine).
+    function pickSmartDefaultInput(inputs) {
+      try {
+        if (localStorage.getItem('tuner.inputDeviceId')) return null;
+      } catch (_) {}
+
+      const list = (inputs || []).filter(d => d && d.kind === 'audioinput' && d.deviceId && d.label);
+      const builtIn = list.find(d => /built[\s-]?in|internal|microphone \(built-in\)/i.test(d.label));
+      const btMic = list.find(d => /bluetooth|airpods|hands[\s-]?free|headset|hfp/i.test(d.label));
+
+      if (builtIn && btMic) return builtIn.deviceId;
+      return null;
+    }
+
     async function refreshAudioInputList() {
       const sel = document.getElementById('audioInputDevice');
       if (!sel) return;
@@ -3775,7 +3823,20 @@
         }
 
         // Mark as ready once we've populated with labels (post-permission)
-        if (inputs.some(d => d.label)) audioInputListReady = true;
+        if (inputs.some(d => d.label)) {
+          audioInputListReady = true;
+          // First time we see real labels: if the user has no saved
+          // preference and we can see both a built-in mic and a BT mic,
+          // prefer built-in to avoid HFP routing on Android.
+          const smartId = pickSmartDefaultInput(inputs);
+          if (smartId && smartId !== selectedInputDeviceId) {
+            console.log('[input] smart default → built-in mic:', smartId);
+            sel.value = smartId;
+            // applyAudioInputDevice persists to localStorage and rebinds
+            // getUserMedia to the picked device.
+            applyAudioInputDevice(smartId);
+          }
+        }
       } catch (e) {
         console.warn('[input] enumerateDevices failed:', e);
       }
@@ -3829,13 +3890,10 @@
         verifyAudioInputBinding(newStream, requestedId);
 
         const source = audioContext.createMediaStreamSource(newStream);
-        // Re-route source through analyser AND the recording processing
-        // chain. attachMicSource also disconnects the prior source so
-        // we don't double-feed the recorder bus.
-        if (!micProcessing) {
-          micProcessing = buildMicProcessing(audioContext);
-          applyVoiceFX({ smooth: false });
-        }
+        // Re-route source through analyser AND the (permanent) recording
+        // processing chain. attachMicSource also disconnects the prior
+        // source so we don't double-feed the recorder bus. The chain
+        // itself was built once in bootstrapAudio() and never rebuilds.
         attachMicSource(source);
 
         // Reset analyzer-side smoothing so we don't carry stale state
@@ -4157,57 +4215,13 @@
       };
     }
 
-    function teardownTanpura() {
-      if (!tanpuraNodes) return;
-      const ctx = audioContext;
-      const t = ctx ? ctx.currentTime : 0;
-
-      // Fade out then stop to avoid clicks
-      try {
-        tanpuraNodes.masterGain.gain.cancelScheduledValues(t);
-        tanpuraNodes.masterGain.gain.setValueAtTime(tanpuraNodes.masterGain.gain.value, t);
-        tanpuraNodes.masterGain.gain.linearRampToValueAtTime(0, t + 0.08);
-      } catch (_) {}
-
-      const nodes = tanpuraNodes;
-      tanpuraNodes = null;
-
-      setTimeout(() => {
-        try {
-          for (const o of nodes.oscs) { try { o.stop(); } catch (_) {} try { o.disconnect(); } catch (_) {} }
-          for (const n of nodes.lfoSources) { try { n.stop(); } catch (_) {} try { n.disconnect(); } catch (_) {} }
-          if (nodes.tremGains) { for (const g of nodes.tremGains) { try { g.disconnect(); } catch (_) {} } }
-          if (nodes.panners) { for (const p of nodes.panners) { try { p.disconnect(); } catch (_) {} } }
-          try { nodes.octOsc.stop(); } catch (_) {}
-          try { nodes.octOsc.disconnect(); } catch (_) {}
-          if (nodes.lpfLfo) { try { nodes.lpfLfo.stop(); } catch (_) {} try { nodes.lpfLfo.disconnect(); } catch (_) {} }
-          if (nodes.lpfLfoGain) { try { nodes.lpfLfoGain.disconnect(); } catch (_) {} }
-          try { nodes.sumGain.disconnect(); } catch (_) {}
-          try { nodes.lpf.disconnect(); } catch (_) {}
-          try { nodes.shelf.disconnect(); } catch (_) {}
-          if (nodes.droneComp) { try { nodes.droneComp.disconnect(); } catch (_) {} }
-          // FDN reverb teardown
-          if (nodes.droneAp1) { try { nodes.droneAp1.disconnect(); } catch (_) {} }
-          if (nodes.droneAp2) { try { nodes.droneAp2.disconnect(); } catch (_) {} }
-          if (nodes.droneAp3) { try { nodes.droneAp3.disconnect(); } catch (_) {} }
-          if (nodes.droneFdnIn) { try { nodes.droneFdnIn.disconnect(); } catch (_) {} }
-          if (nodes.droneLfos) { for (const o of nodes.droneLfos) { try { o.stop(); } catch (_) {} try { o.disconnect(); } catch (_) {} } }
-          if (nodes.droneLfoGains) { for (const g of nodes.droneLfoGains) { try { g.disconnect(); } catch (_) {} } }
-          if (nodes.droneDelayNodes) { for (const d of nodes.droneDelayNodes) { try { d.disconnect(); } catch (_) {} } }
-          if (nodes.droneLpfs) { for (const l of nodes.droneLpfs) { try { l.disconnect(); } catch (_) {} } }
-          if (nodes.droneFbGains) { for (const g of nodes.droneFbGains) { try { g.disconnect(); } catch (_) {} } }
-          if (nodes.dronePanners) { for (const p of nodes.dronePanners) { try { p.disconnect(); } catch (_) {} } }
-          if (nodes.droneXfeeds) { for (const x of nodes.droneXfeeds) { try { x.disconnect(); } catch (_) {} } }
-          try { nodes.dryGain.disconnect(); } catch (_) {}
-          try { nodes.wetGain.disconnect(); } catch (_) {}
-          try { nodes.masterGain.disconnect(); } catch (_) {}
-        } catch (_) {}
-
-        // No more droneAudioCtx.suspend() — the shared context is also
-        // hosting the mic and the recorder bus, so suspending it would
-        // kill those too. Tanpura nodes are gone; CPU drops accordingly.
-      }, 120);
-    }
+    // The tanpura graph is PERMANENT — built once in bootstrapAudio() on
+    // the first user gesture, then it lives forever. Toggling drone
+    // on/off is now a pure parameter change: applyTanpuraVolume() ramps
+    // masterGain to its target via setTargetAtTime, no node creation or
+    // destruction. Eliminates the ~75-node rebuild that previously
+    // raced with the recorder and caused crackling. The previous
+    // teardownTanpura() function has been deleted.
 
     function applyTanpuraVolume() {
       if (!tanpuraNodes || !audioContext) return;
@@ -4238,30 +4252,26 @@
       }
     }
 
-    async function setTanpuraEnabled(on) {
+    function setTanpuraEnabled(on) {
       tanpuraEnabled = !!on;
       try { localStorage.setItem('tuner.drone.enabled', tanpuraEnabled ? '1' : '0'); } catch (_) {}
 
-      const recActive = mediaRecorder && mediaRecorder.state === 'recording';
-      if (recActive) {
-        // Drone now runs on the SAME shared AudioContext as the mic and
-        // recorder bus — its master gain is wired to micProcessing.dest
-        // when buildTanpura() runs, so the drone is sample-accurate in
-        // the recording (no acoustic-bleed dependency).
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
         console.log('[record] drone toggled mid-recording:',
           'on=', tanpuraEnabled,
           'ctxState=', audioContext && audioContext.state);
       }
 
+      // First call (typically a user enabling the drone) builds the
+      // permanent audio graph; subsequent calls just re-target the master
+      // gain via applyTanpuraVolume(). No teardown, no rebuild churn.
+      // If the user toggles off before any audio gesture has bootstrapped
+      // the graph, do nothing — there's nothing to silence.
       if (tanpuraEnabled) {
-        const ctx = getAudioContext();
-        if (!tanpuraNodes) buildTanpura(ctx);
+        bootstrapAudio();
+      }
+      if (tanpuraNodes) {
         applyTanpuraVolume();
-      } else {
-        if (tanpuraNodes) {
-          // Fade out, then teardown to free CPU
-          teardownTanpura();
-        }
       }
     }
 
