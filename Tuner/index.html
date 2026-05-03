@@ -698,7 +698,8 @@
     body.settings-hidden #controls,        /* main settings side panel */
     body.settings-hidden #mobileToggle,    /* mobile hamburger */
     body.settings-hidden #recordOverlay,   /* record dock: every video-overlay control */
-    body.settings-hidden #recIndicator {   /* "● 0:00" recording timer pill */
+    body.settings-hidden #recIndicator,    /* "● 0:00" recording timer pill */
+    body.settings-hidden #droneRecordStrip { /* floating drone strip (record mode) */
       display: none !important;
     }
 
@@ -792,6 +793,140 @@
       border-left: 2px solid rgba(255, 153, 0, 0.4);
       border-radius: 3px;
     }
+
+    /* Audio input diagnostic readout — shows actual bound device so the
+       user can see whether their pick took effect. Critical scouting info
+       on Pixel 7 Chrome where the picker has been routing to default. */
+    #audioInputControls {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+      align-items: center;
+    }
+    #audioInputRefresh {
+      flex: 0 0 auto;
+      padding: 8px 12px;
+      border: 1px solid #333;
+      background: #111;
+      color: #ccc;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #audioInputRefresh:hover { background: #181818; color: #fff; }
+    #audioInputRefresh:active { background: #222; }
+    #audioInputActive {
+      font-size: 11px;
+      color: #888;
+      margin-top: 4px;
+      line-height: 1.4;
+      word-break: break-all;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    #audioInputActive.warn { color: #d6a35c; }
+
+    /* ====================================================================
+       Floating drone strip — visible in record mode so the user can
+       toggle the drone and adjust volume / cutoff mid-take without
+       opening the side panel. Bundled under settings-hidden so the
+       master "clean my screen" toggle still nukes it.
+       Placed top-left to avoid the record dock (right in landscape,
+       bottom in portrait) and the settingsToggle (top-right).
+       ==================================================================== */
+    #droneRecordStrip {
+      display: none;
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 200;
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: rgba(20, 20, 20, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 8px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    body.record-mode #droneRecordStrip {
+      display: flex;
+    }
+    #droneRecordStrip button#droneRecordToggle {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      background: transparent;
+      color: rgba(255, 255, 255, 0.75);
+      font-size: 17px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      flex-shrink: 0;
+      font-family: inherit;
+    }
+    #droneRecordStrip button#droneRecordToggle.on {
+      background: rgba(255, 255, 255, 0.9);
+      color: #000;
+      border-color: #fff;
+    }
+    #droneRecordStrip button#droneRecordToggle:active {
+      transform: scale(0.92);
+    }
+    #droneRecordStrip .dr-label {
+      font-size: 10px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.55);
+      flex-shrink: 0;
+    }
+    #droneRecordStrip input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 36px;
+      background: transparent;
+      outline: none;
+      flex-shrink: 0;
+      margin: 0;
+    }
+    #droneRecordStrip input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.25);
+      border-radius: 2px;
+    }
+    #droneRecordStrip input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #fff;
+      margin-top: -9px;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+    #droneRecordStrip input[type="range"]::-moz-range-track {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.25);
+      border-radius: 2px;
+    }
+    #droneRecordStrip input[type="range"]::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #fff;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+    #droneRecordStrip #droneRecordVolume { width: 120px; }
+    #droneRecordStrip #droneRecordCutoff { width: 80px; }
   </style>
 </head>
 <body>
@@ -808,6 +943,10 @@
         <select id="audioInputDevice">
           <option value="">Default</option>
         </select>
+        <div id="audioInputControls">
+          <button type="button" id="audioInputRefresh" title="Re-scan input devices">⟳ Refresh</button>
+        </div>
+        <div id="audioInputActive" aria-live="polite"></div>
         <div id="iosInputNote" style="display: none;">
           On iOS, audio input is controlled by the system. If your AirPods aren't being picked up correctly, set them to "Listen only" in iOS Bluetooth settings, or disconnect them while tuning.
         </div>
@@ -1018,6 +1157,15 @@
   <video id="cameraFeed" autoplay playsinline muted></video>
 
   <div id="recIndicator"><span id="recTime">0:00</span></div>
+
+  <!-- Floating drone strip — only rendered (display:flex) in record mode.
+       Mirrors state of the main panel's drone controls. -->
+  <div id="droneRecordStrip" aria-label="Drone controls">
+    <button type="button" id="droneRecordToggle" title="Drone on/off" aria-label="Toggle drone">⏻</button>
+    <input type="range" id="droneRecordVolume" min="0" max="100" value="30" aria-label="Drone volume">
+    <span class="dr-label" title="Filter cutoff">filter</span>
+    <input type="range" id="droneRecordCutoff" min="0" max="100" value="56" step="0.5" aria-label="Drone filter cutoff">
+  </div>
 
   <div id="recordOverlay">
     <div class="aspect-row">
@@ -2350,9 +2498,73 @@
         autoGainControl: false
       };
       if (deviceId) {
-        audio.deviceId = { exact: deviceId };
+        // Use `ideal` (not `exact`) so the browser doesn't throw when
+        // the saved deviceId is stale — common on Android Chrome where
+        // device IDs rotate. We verify the actual binding after the
+        // stream resolves via getSettings() and surface mismatches.
+        audio.deviceId = { ideal: deviceId };
       }
       return { audio };
+    }
+
+    // Update the diagnostic readout under the input picker. `mismatch`
+    // means the requested deviceId did not bind — the browser fell back
+    // to default. This is the scouting tool for the Pixel 7 issue.
+    function updateAudioInputDiagnostic(label, deviceId, requestedId, mismatch) {
+      const el = document.getElementById('audioInputActive');
+      if (!el) return;
+      if (!label && !deviceId) {
+        el.textContent = '';
+        el.classList.remove('warn');
+        return;
+      }
+      const idShort = deviceId ? (deviceId.length > 12 ? deviceId.slice(0, 8) + '…' + deviceId.slice(-4) : deviceId) : '(none)';
+      let msg = `Active: ${label || '(unknown)'} [${idShort}]`;
+      if (mismatch) {
+        const reqShort = requestedId ? (requestedId.length > 12 ? requestedId.slice(0, 8) + '…' + requestedId.slice(-4) : requestedId) : '(none)';
+        msg += `  ⚠ requested ${reqShort} but bound to default`;
+        el.classList.add('warn');
+      } else {
+        el.classList.remove('warn');
+      }
+      el.textContent = msg;
+    }
+
+    // After getUserMedia resolves, inspect the actual audio track to
+    // confirm it bound to the device the user picked. Returns the bound
+    // deviceId (or null) and updates the diagnostic UI.
+    function verifyAudioInputBinding(stream, requestedId) {
+      try {
+        const track = stream && stream.getAudioTracks ? stream.getAudioTracks()[0] : null;
+        if (!track) {
+          console.warn('[input] verify: no audio track on stream');
+          updateAudioInputDiagnostic('(no track)', null, requestedId, !!requestedId);
+          return null;
+        }
+        const settings = (track.getSettings ? track.getSettings() : {}) || {};
+        const boundId = settings.deviceId || null;
+        const label = track.label || '';
+        const mismatch = !!(requestedId && boundId && requestedId !== boundId);
+        console.log('[input] verify: requested=', requestedId, 'bound=', boundId, 'label=', label, 'settings=', settings);
+        updateAudioInputDiagnostic(label, boundId, requestedId, mismatch);
+        return boundId;
+      } catch (e) {
+        console.warn('[input] verify failed:', e);
+        return null;
+      }
+    }
+
+    // Stop and disconnect every track on a stream so the device is
+    // released cleanly before requesting a new one. Some Android Chrome
+    // versions hand back the same stream if the previous one wasn't
+    // fully torn down.
+    function tearDownAudioStream(stream) {
+      if (!stream) return;
+      try {
+        stream.getTracks().forEach(t => {
+          try { t.stop(); } catch (_) {}
+        });
+      } catch (_) {}
     }
 
     async function toggleListening() {
@@ -2361,13 +2573,14 @@
       if (!isListening) {
         try {
           audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          console.log('[input] toggleListening: requesting deviceId=', selectedInputDeviceId);
           let stream;
           try {
             stream = await navigator.mediaDevices.getUserMedia(buildAudioConstraints(selectedInputDeviceId));
           } catch (err) {
             // Selected device may no longer be available — fall back to default
             if (selectedInputDeviceId) {
-              console.warn('Falling back to default audio input:', err);
+              console.warn('[input] toggleListening: falling back to default after error:', err);
               selectedInputDeviceId = null;
               try { localStorage.removeItem('tuner.inputDeviceId'); } catch (_) {}
               stream = await navigator.mediaDevices.getUserMedia(buildAudioConstraints(null));
@@ -2375,7 +2588,12 @@
               throw err;
             }
           }
+          // Tiny await for the stream to deliver its first frame so the
+          // analyzer doesn't briefly read silence from an empty source.
+          await new Promise(r => setTimeout(r, 30));
           currentAudioStream = stream;
+          verifyAudioInputBinding(stream, selectedInputDeviceId);
+
           const source = audioContext.createMediaStreamSource(stream);
           analyser = audioContext.createAnalyser();
           analyser.fftSize = 4096;
@@ -2390,16 +2608,14 @@
           // Now that permission is granted, device labels are populated
           refreshAudioInputList();
         } catch (err) {
-          console.error('Microphone error:', err);
+          console.error('[input] Microphone error:', err);
           alert('Could not access microphone.');
         }
       } else {
         isListening = false;
         if (animationId) cancelAnimationFrame(animationId);
-        if (currentAudioStream) {
-          currentAudioStream.getTracks().forEach(t => t.stop());
-          currentAudioStream = null;
-        }
+        tearDownAudioStream(currentAudioStream);
+        currentAudioStream = null;
         if (audioContext) audioContext.close();
         audioContext = null;
         analyser = null;
@@ -2409,6 +2625,7 @@
 
         btn.innerHTML = 'Microphone';
         btn.classList.remove('listening');
+        updateAudioInputDiagnostic('', null, null, false);
 
         fadeOutIndicator();
       }
@@ -2712,6 +2929,11 @@
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const inputs = devices.filter(d => d.kind === 'audioinput');
+        console.log('[input] enumerateDevices →', inputs.map(d => ({
+          deviceId: d.deviceId,
+          label: d.label,
+          groupId: d.groupId
+        })));
 
         // Preserve current selection
         const prev = selectedInputDeviceId || sel.value;
@@ -2724,9 +2946,11 @@
         sel.appendChild(defaultOpt);
 
         let count = 0;
+        const usableIds = new Set();
         for (const d of inputs) {
           if (!d.deviceId || d.deviceId === 'default' || d.deviceId === 'communications') continue;
           count++;
+          usableIds.add(d.deviceId);
           const o = document.createElement('option');
           o.value = d.deviceId;
           o.textContent = d.label || `Input ${count}`;
@@ -2734,25 +2958,36 @@
         }
 
         // Restore prior selection if still available
-        if (prev && [...sel.options].some(o => o.value === prev)) {
+        if (prev && usableIds.has(prev)) {
           sel.value = prev;
         } else if (prev) {
-          // Selected device disappeared — fall back to default
+          // Selected device disappeared. Only clear localStorage once
+          // labels are populated (post-permission) — pre-permission the
+          // device list is unreliable so a missing match isn't conclusive.
+          const labelsReady = inputs.some(d => d.label);
+          if (labelsReady) {
+            console.warn('[input] stored deviceId not in current list — clearing.', { stored: prev });
+            try { localStorage.removeItem('tuner.inputDeviceId'); } catch (_) {}
+            selectedInputDeviceId = null;
+          }
           sel.value = '';
         }
 
         // Mark as ready once we've populated with labels (post-permission)
         if (inputs.some(d => d.label)) audioInputListReady = true;
       } catch (e) {
-        console.warn('enumerateDevices failed:', e);
+        console.warn('[input] enumerateDevices failed:', e);
       }
     }
 
     async function applyAudioInputDevice(deviceId) {
+      const requestedId = deviceId || null;
+      console.log('[input] applyAudioInputDevice: requested=', requestedId);
+
       // Persist regardless of whether we can apply right now
-      selectedInputDeviceId = deviceId || null;
+      selectedInputDeviceId = requestedId;
       try {
-        if (deviceId) localStorage.setItem('tuner.inputDeviceId', deviceId);
+        if (requestedId) localStorage.setItem('tuner.inputDeviceId', requestedId);
         else localStorage.removeItem('tuner.inputDeviceId');
       } catch (_) {}
 
@@ -2770,16 +3005,28 @@
 
       if (!isListening || !audioContext || !analyser) {
         // Will be applied on next mic start
+        console.log('[input] not listening yet — will apply on next mic start');
         return;
       }
 
+      // Tear down the prior stream's tracks BEFORE asking for the new
+      // one. Some Android Chrome versions otherwise hand back the same
+      // stream or fail silently.
+      tearDownAudioStream(currentAudioStream);
+      currentAudioStream = null;
+
       try {
-        const newStream = await navigator.mediaDevices.getUserMedia(buildAudioConstraints(deviceId));
-        // Tear down the prior stream's tracks
-        if (currentAudioStream) {
-          currentAudioStream.getTracks().forEach(t => t.stop());
-        }
+        console.log('[input] getUserMedia with constraints=', buildAudioConstraints(requestedId));
+        const newStream = await navigator.mediaDevices.getUserMedia(buildAudioConstraints(requestedId));
+        // Brief pause so the source has produced its first frame before
+        // the analyzer reads from it.
+        await new Promise(r => setTimeout(r, 30));
         currentAudioStream = newStream;
+
+        // Verify what we actually got. If the browser bound to default
+        // instead of the requested device, the diagnostic UI surfaces it.
+        verifyAudioInputBinding(newStream, requestedId);
+
         const source = audioContext.createMediaStreamSource(newStream);
         source.connect(analyser);
 
@@ -2788,7 +3035,8 @@
         smoothedCents = null;
         lastDetectTime = 0;
       } catch (err) {
-        console.error('Could not switch audio input:', err);
+        console.error('[input] Could not switch audio input:', err);
+        updateAudioInputDiagnostic('(switch failed)', null, requestedId, true);
         alert('Could not switch to that input device.');
       }
     }
@@ -2862,9 +3110,12 @@
       lpfLfoGain.connect(lpf.frequency);
       try { lpfLfo.start(); } catch (_) {}
 
-      // Sum bus — keep some headroom before reverb
+      // Sum bus — gain raised from 0.18 to 0.32 so the drone is audibly
+      // present on phone speakers. Voice gains sum to ≈1.23 worst-case;
+      // post-LPF and 0.85 master ceiling, peak output stays ≲0.5 of full
+      // scale even with constructive interference + reverb tail.
       const sumGain = ctx.createGain();
-      sumGain.gain.value = 0.18;
+      sumGain.gain.value = 0.32;
       sumGain.connect(lpf);
 
       // -- Voices --
@@ -3069,9 +3320,12 @@
     function applyTanpuraVolume() {
       if (!tanpuraNodes || !droneAudioCtx) return;
       const ctx = droneAudioCtx;
-      // Log-ish curve (square) so the slider feels more linear perceptually
+      // Square-law slider mapping kept (smooth quiet end). Ceiling raised
+      // from 0.35 → 0.85 so slider=100 is meaningfully loud on a phone
+      // speaker. End-to-end peak (sumGain × master) ≈ 0.85·0.32·~1 ≈ 0.27,
+      // with reverb adding a fractional tail; safely under 0.95 clipping.
       const linear = Math.max(0, Math.min(1, tanpuraVolume));
-      const target = tanpuraEnabled ? Math.pow(linear, 2) * 0.35 : 0;
+      const target = tanpuraEnabled ? Math.pow(linear, 2) * 0.85 : 0;
       tanpuraNodes.masterGain.gain.setTargetAtTime(target, ctx.currentTime, 0.05);
     }
 
@@ -3130,6 +3384,33 @@
           tanpuraNodes.lpf.frequency.setTargetAtTime(droneCutoff, droneAudioCtx.currentTime, 0.05);
         } catch (_) {}
       }
+    }
+
+    // Mirror the drone UI state across the side panel and the floating
+    // record strip. Single source of truth: tanpuraEnabled, tanpuraVolume,
+    // droneCutoff. Call after any state change.
+    function syncDroneUI() {
+      const cb       = document.getElementById('tanpuraEnabled');
+      const volMain  = document.getElementById('tanpuraVolume');
+      const volLbl   = document.getElementById('tanpuraVolumeVal');
+      const cutMain  = document.getElementById('droneCutoff');
+      const cutLbl   = document.getElementById('droneCutoffVal');
+      const togStrip = document.getElementById('droneRecordToggle');
+      const volStrip = document.getElementById('droneRecordVolume');
+      const cutStrip = document.getElementById('droneRecordCutoff');
+
+      const volPct = Math.round(tanpuraVolume * 100);
+      const cutSlider = droneCutoffToSlider(droneCutoff).toFixed(1);
+
+      if (cb)       cb.checked = tanpuraEnabled;
+      if (volMain)  volMain.value = volPct;
+      if (volLbl)   volLbl.textContent = volPct + '%';
+      if (cutMain)  cutMain.value = cutSlider;
+      if (cutLbl)   cutLbl.textContent = (droneCutoff / 1000).toFixed(1) + ' kHz';
+
+      if (togStrip) togStrip.classList.toggle('on', tanpuraEnabled);
+      if (volStrip) volStrip.value = volPct;
+      if (cutStrip) cutStrip.value = cutSlider;
     }
 
     // -------- Feature 1: Settings hide toggle --------
@@ -3692,10 +3973,27 @@
       // Initial enumeration (labels likely empty until permission granted)
       refreshAudioInputList();
       if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
-        navigator.mediaDevices.addEventListener('devicechange', refreshAudioInputList);
+        navigator.mediaDevices.addEventListener('devicechange', () => {
+          console.log('[input] devicechange fired');
+          refreshAudioInputList();
+        });
       }
       // Pre-select stored device in dropdown if present
       if (selectedInputDeviceId) audioInputSel.value = selectedInputDeviceId;
+      // Manual re-scan — Chrome's device list goes stale after permission
+      // changes; this gives the user a way to force a fresh enumerate.
+      const refreshBtn = document.getElementById('audioInputRefresh');
+      if (refreshBtn) {
+        refreshBtn.addEventListener('click', async () => {
+          console.log('[input] manual refresh clicked');
+          await refreshAudioInputList();
+          // If currently listening, also re-verify the bound device so
+          // the diagnostic stays honest.
+          if (currentAudioStream) {
+            verifyAudioInputBinding(currentAudioStream, selectedInputDeviceId);
+          }
+        });
+      }
 
       // -------- Feature 4: Tanpura drone --------
       try {
@@ -3722,20 +4020,50 @@
         const cVal = document.getElementById('droneCutoffVal');
         if (cVal) cVal.textContent = (droneCutoff / 1000).toFixed(1) + ' kHz';
       } catch (_) {}
-      document.getElementById('tanpuraEnabled').addEventListener('change', (e) => {
-        setTanpuraEnabled(e.target.checked);
+      document.getElementById('tanpuraEnabled').addEventListener('change', async (e) => {
+        await setTanpuraEnabled(e.target.checked);
+        syncDroneUI();
       });
       document.getElementById('tanpuraVolume').addEventListener('input', (e) => {
         const v = parseInt(e.target.value, 10) / 100;
-        document.getElementById('tanpuraVolumeVal').textContent = e.target.value + '%';
         setTanpuraVolume(v);
+        syncDroneUI();
       });
       document.getElementById('droneCutoff').addEventListener('input', (e) => {
         const sliderVal = parseFloat(e.target.value);
         const hz = droneSliderToCutoff(sliderVal);
-        document.getElementById('droneCutoffVal').textContent = (hz / 1000).toFixed(1) + ' kHz';
         setDroneCutoff(hz);
+        syncDroneUI();
       });
+
+      // Floating drone strip — mirrors the side panel. State is shared
+      // (tanpuraEnabled / tanpuraVolume / droneCutoff), syncDroneUI keeps
+      // both UIs in lockstep regardless of which one moved.
+      const droneStripToggle = document.getElementById('droneRecordToggle');
+      const droneStripVolume = document.getElementById('droneRecordVolume');
+      const droneStripCutoff = document.getElementById('droneRecordCutoff');
+      if (droneStripToggle) {
+        droneStripToggle.addEventListener('click', async () => {
+          await setTanpuraEnabled(!tanpuraEnabled);
+          syncDroneUI();
+        });
+      }
+      if (droneStripVolume) {
+        droneStripVolume.addEventListener('input', (e) => {
+          const v = parseInt(e.target.value, 10) / 100;
+          setTanpuraVolume(v);
+          syncDroneUI();
+        });
+      }
+      if (droneStripCutoff) {
+        droneStripCutoff.addEventListener('input', (e) => {
+          const hz = droneSliderToCutoff(parseFloat(e.target.value));
+          setDroneCutoff(hz);
+          syncDroneUI();
+        });
+      }
+      // Initial sync so the strip reflects restored state from localStorage
+      syncDroneUI();
 
       const loaded = loadSession();
       if (!loaded) {
