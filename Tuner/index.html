@@ -561,13 +561,11 @@
     }
 
     /* Ruler hide — toggle in the floating audio-FX strip (record-mode
-       only). visibility:hidden (not display:none) so the canvas keeps
-       its drawing buffer alive — the user can flip it back on without
-       a layout reflow / canvas reset. Pitch detection keeps running. */
-    body.ruler-hidden #rulerContainer,
-    body.ruler-hidden #rulerCanvas {
-      visibility: hidden !important;
-    }
+       only). The canvas itself stays VISIBLE because the camera frame
+       is drawn into it; only the ruler/backdrop overlay is suppressed,
+       which is gated inside draw() via this body class. Pitch detection
+       keeps running. No CSS visibility rule here — hiding the canvas
+       would also hide the camera feed. */
 
     #recordOverlay .aspect-row {
       display: flex;
@@ -2133,12 +2131,28 @@
       }
     }
 
+    // Throttle the draw() body to ~30 FPS while record-mode is on, to
+     // match canvas.captureStream(30) and the halved pitch-detection
+     // rate. Outside record mode, run every rAF tick (full ~60 Hz) for
+     // maximum visual responsiveness. The rAF loop in audioLoop() always
+     // schedules the next frame regardless — this only skips the actual
+     // rendering work on intervening ticks.
+    let lastDrawTime = 0;
+    const RECORD_DRAW_INTERVAL_MS = 33;
+
     function draw() {
+      if (recordMode) {
+        const t = performance.now();
+        if (t - lastDrawTime < RECORD_DRAW_INTERVAL_MS) return;
+        lastDrawTime = t;
+      }
+
       const canvas = document.getElementById('rulerCanvas');
       const ctx = canvas.getContext('2d');
       const dpr = window.devicePixelRatio || 1;
 
       let W, H;
+      const rulerHidden = document.body.classList.contains('ruler-hidden');
 
       if (recordMode) {
         const dims = ASPECT_DIMS[recordAspect] || ASPECT_DIMS['9:16'];
@@ -2152,6 +2166,9 @@
         }
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         drawCameraBackground(ctx, W, H);
+        // Skip the dark vertical backdrop and all overlay drawing when
+        // the user toggled the ruler off — leave the camera feed clean.
+        if (rulerHidden) return;
         drawRulerBackdrop(ctx, W, H);
       } else {
         const rect = canvas.parentElement.getBoundingClientRect();
@@ -2170,6 +2187,7 @@
         H = rect.height;
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, W, H);
+        if (rulerHidden) return;
       }
 
       if (config.ratios.length === 0) return;
