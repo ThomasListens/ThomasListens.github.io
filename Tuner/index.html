@@ -1485,6 +1485,15 @@
 
     let recordMode = false;
     let recordHintShown = false;
+
+    // Analyser FFT sizes. YIN autocorrelation cost is O((fftSize/2)²),
+    // so halving fftSize ≈ quarters CPU per detection cycle. At 48 kHz
+    // sample rate, fftSize=2048 → halfBuffer=1024 → lowest detectable
+    // freq ≈ 47 Hz, which is well below normal voice range. Outside
+    // record mode we keep the larger 4096 buffer for maximum precision.
+    const ANALYSER_FFT_IDLE   = 4096;
+    const ANALYSER_FFT_RECORD = 2048;
+
     let cameraStream = null;
     let cameraFacing = 'user';
     let currentAudioStream = null;
@@ -2165,12 +2174,30 @@
           canvas.style.height = '';
         }
         ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+        // ===== INVARIANT: camera ALWAYS renders in record mode =====
+        // Hide-ruler must NEVER hide the camera frame. The user expects
+        // to see themselves recording even with the ruler overlay off.
+        // drawCameraBackground() owns the full canvas clear + video
+        // blit (with brightness/contrast/saturate/B&W filters applied).
+        // Nothing above this line, and nothing in the rulerHidden=true
+        // branch below, may skip this call.
         drawCameraBackground(ctx, W, H);
-        // Skip the dark vertical backdrop and all overlay drawing when
-        // the user toggled the ruler off — leave the camera feed clean.
-        if (rulerHidden) return;
+
+        if (rulerHidden) {
+          // Camera is now on the canvas. Skip every overlay: dark vertical
+          // backdrop, ruler ticks, ratio lines, EDO grid, ghost trail,
+          // crosshair, ratio labels — everything that paints on top of
+          // the camera. Pitch detection keeps running (it's in audioLoop,
+          // not draw()).
+          return;
+        }
         drawRulerBackdrop(ctx, W, H);
       } else {
+        // Non-record mode: no camera preview here. The <video> element
+        // is parked off-screen; only record mode composites it onto the
+        // canvas. So when ruler is hidden in non-record mode, we just
+        // leave a black canvas — there's no camera to preserve.
         const rect = canvas.parentElement.getBoundingClientRect();
         const targetWidth = rect.width * dpr;
         const targetHeight = rect.height * dpr;
@@ -3080,6 +3107,12 @@
       const smooth = !(opts && opts.smooth === false);
 
       const doRebuild = () => {
+        // TRUE BYPASS: every FX node here is created only when its
+        // toggle is on. disposeVoiceChain() above disconnected the old
+        // graph — disabled FX no longer exist as nodes, no gain-to-zero
+        // tricks. When all toggles are off, the chain collapses to
+        // source → micOut → MediaStreamDestination (no makeup, no
+        // filters, no compressor, no reverb network).
         disposeVoiceChain();
         const stages = [];
 
@@ -3099,12 +3132,15 @@
           co.attack.value = 0.003;
           co.release.value = 0.12;
           stages.push(co);
-        }
 
-        // Always-on makeup gain (+4 dB)
-        const makeup = ctx.createGain();
-        makeup.gain.value = 1.585;
-        stages.push(makeup);
+          // Makeup gain (+4 dB) only when compressor is in the chain —
+          // it's there to compensate for compression-induced loudness
+          // loss. With no compressor running, no makeup needed (and
+          // skipping it gives true source → micOut when all FX off).
+          const makeup = ctx.createGain();
+          makeup.gain.value = 1.585;
+          stages.push(makeup);
+        }
 
         // Series-connect dry stages
         for (let i = 0; i < stages.length - 1; i++) {
@@ -3133,6 +3169,9 @@
         } else if (chainEnd) {
           chainEnd.connect(micProcessing.micOut);
         }
+        // If chainEnd is null (all FX off, no makeup), nothing else
+        // needs connecting — the mic source connects directly to
+        // micProcessing.head (which is micOut) via attachMicSource.
 
         micProcessing.chain = stages;
         micProcessing.head = stages[0] || micProcessing.micOut;
@@ -3258,7 +3297,9 @@
 
           const source = audioContext.createMediaStreamSource(stream);
           analyser = audioContext.createAnalyser();
-          analyser.fftSize = 4096;
+          // Idle/preview fftSize. enterRecordMode() drops this to
+          // ANALYSER_FFT_RECORD to cut YIN cost ~4x while recording.
+          analyser.fftSize = recordMode ? ANALYSER_FFT_RECORD : ANALYSER_FFT_IDLE;
           // Build (or rebuild) the recording-only processing chain on
           // this AudioContext, then route source → analyser AND
           // source → processing chain. Pitch detection still reads the
@@ -3364,6 +3405,12 @@
       if (!ok) return;
 
       recordMode = true;
+      // Drop analyser FFT to halve YIN's quadratic cost while the
+      // recorder + camera + drone are competing for CPU on Pixel 7.
+      // 2048 still resolves down to ~47 Hz at 48 kHz, fine for voice.
+      if (analyser) {
+        try { analyser.fftSize = ANALYSER_FFT_RECORD; } catch (_) {}
+      }
       document.body.classList.add('record-mode');
       document.body.classList.add('aspect-' + recordAspect.replace(':', '-'));
       // First-time hint: pulse the settings toggle once per page load so
@@ -3413,6 +3460,11 @@
         stopRecording();
       }
       recordMode = false;
+      // Restore the larger FFT for maximum pitch precision when not
+      // bottlenecked by the recorder.
+      if (analyser) {
+        try { analyser.fftSize = ANALYSER_FFT_IDLE; } catch (_) {}
+      }
       document.body.classList.remove('record-mode', 'aspect-9-16', 'aspect-4-5', 'aspect-1-1');
       if (cameraStream) {
         cameraStream.getTracks().forEach(t => t.stop());
@@ -4109,6 +4161,17 @@
           try { nodes.wetGain.disconnect(); } catch (_) {}
           try { nodes.masterGain.disconnect(); } catch (_) {}
         } catch (_) {}
+
+        // Suspend the drone's AudioContext so its audio worker thread
+        // stops competing with the mic-side context for CPU on Pixel 7.
+        // Resume happens automatically in setTanpuraEnabled(true) on
+        // the next user gesture. Skip suspend if the user re-enabled
+        // the drone during the 120 ms teardown delay (tanpuraNodes
+        // would be non-null).
+        if (!tanpuraEnabled && !tanpuraNodes && droneAudioCtx
+            && droneAudioCtx.state === 'running') {
+          droneAudioCtx.suspend().catch(() => {});
+        }
       }, 120);
     }
 
