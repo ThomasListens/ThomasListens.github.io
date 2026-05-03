@@ -975,9 +975,38 @@
           <button type="button" id="audioInputRefresh" title="Re-scan input devices">⟳ Refresh</button>
         </div>
         <div id="audioInputActive" aria-live="polite"></div>
-        <div id="voiceProcNote">Recording voice: lo-cut + compression</div>
+        <div id="voiceProcNote">Voice: lo-cut + compression</div>
         <div id="iosInputNote" style="display: none;">
           On iOS, audio input is controlled by the system. If your AirPods aren't being picked up correctly, set them to "Listen only" in iOS Bluetooth settings, or disconnect them while tuning.
+        </div>
+      </div>
+
+      <!-- Voice processing toggles. Only the recorded mic stream is
+           affected — the analyser still receives the raw mic signal
+           untouched, so pitch detection is never coloured by these. -->
+      <div class="control-section">
+        <div class="section-header">Voice processing</div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="voiceLowcut" checked>
+          <label for="voiceLowcut">Lo-cut (90 Hz)</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="voiceCompression" checked>
+          <label for="voiceCompression">Compression</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="voiceReverb">
+          <label for="voiceReverb">Shimmer reverb</label>
+        </div>
+        <div id="voiceReverbControls" style="display: none; padding-left: 4px;">
+          <label style="font-size: 12px; color: #888; margin-bottom: 2px;">Mix <span id="voiceReverbMixVal" style="color: #aaa;">50%</span></label>
+          <div class="slider-row" style="margin-bottom: 8px;">
+            <input type="range" id="voiceReverbMix" min="0" max="100" value="50">
+          </div>
+          <label style="font-size: 12px; color: #888; margin-bottom: 2px;">Tail <span id="voiceReverbTailVal" style="color: #aaa;">60%</span></label>
+          <div class="slider-row">
+            <input type="range" id="voiceReverbTail" min="0" max="100" value="60">
+          </div>
         </div>
       </div>
 
@@ -1331,13 +1360,31 @@
     let recordStartTime = 0;
     let recordTimerId = null;
 
-    // Voice processing for recording (always on). Built lazily once an
-    // audioContext exists. Raw mic still feeds the analyser unmodified —
-    // pitch detection MUST stay on the unprocessed signal.
-    //   sourceNode → highpass(90Hz) → compressor(-24,3:1) → +4dB gain →
-    //   MediaStreamAudioDestinationNode → captured by MediaRecorder.
-    let micProcessing = null;       // { highpass, compressor, gain, dest }
+    // Voice processing for recording. Built lazily once an audioContext
+    // exists. Raw mic still feeds the analyser unmodified — pitch
+    // detection MUST stay on the unprocessed signal. The recording
+    // chain branches off the same source. Stages are individually
+    // togglable (see voiceFX); the chain rebuilds in place when any
+    // toggle changes, while the persistent micOut → dest tail keeps the
+    // recorder's stream identity stable across rebuilds.
+    //
+    //   source → analyser                                  (always)
+    //   source → micProcessing.head → … → micProcessing.micOut → dest
+    //                                       ↑
+    //                       optional [highpass][compressor][reverb]
+    let micProcessing = null;       // { ctx, dest, micOut, head, chain, reverb }
     let currentMicSource = null;    // current MediaStreamAudioSourceNode
+
+    // Voice FX state — persists in localStorage. Defaults: clean speech
+    // (lowcut + compression on, shimmer reverb off).
+    let voiceFX = { lowcut: true, compression: true, reverb: false };
+    let voiceFXMix = 0.5;     // 0..1 wet/dry blend (50% default)
+    let voiceFXTail = 0.6;    // 0..1 → mapped to feedback 0.5..0.92
+
+    function voiceFXTailToFeedback(t) {
+      const x = Math.max(0, Math.min(1, t));
+      return 0.5 + x * 0.42; // 0 → 0.50, 1 → 0.92
+    }
     let featherAmount = 0.80;
     let featherWidth = 0.01; // -1..1 of canvas width: positive = feather outward (left), negative = feather inward (right)
     let backdropEdge = 0.80; // 0..1, x position where solid backdrop starts
@@ -2604,39 +2651,336 @@
       } catch (_) {}
     }
 
-    // Build the (one-time, per-AudioContext) voice processing chain that
-    // feeds the recorder. The chain is intentionally simple: highpass to
-    // kill HVAC rumble + AirPods proximity bass, compressor to even out
-    // the voice, +4 dB makeup. The output is a MediaStreamAudioDestination
-    // whose .stream is what MediaRecorder captures.
+    // ----------------------------------------------------------------
+    // Shimmer / future reverb — dramatic, AI-style, dimensional.
+    // FDN-only (no convolution). Architecture:
+    //   input → preShelf(+3 dB @ 4 kHz)  ──────────────► fdnIn
+    //                                                      │
+    //   fdnIn ─► 4 delay lines (211, 307, 401, 503 ms) ─► fdnSum
+    //              each:  delay → BPF (LFO-swept 800-3500 Hz)
+    //                       ↳ feedback (gain) → back into own delay
+    //                       ↳ panner [-0.55,+0.30,-0.15,+0.55] → fdnSum
+    //   fdnSum → shimmerBPF(2 kHz, Q 1.2) → shimmerFB(0.25) ─► back into fdnIn
+    //   fdnSum → 3 modulated short delays (8/13/19 ms, ±2 ms LFO 0.6 Hz)
+    //          → output
+    //
+    // The LFO-modulated bandpass per line is what gives this its
+    // chime/AI flavour — instead of a static damping LP, the spectral
+    // peak walks slowly through the upper mids, so each successive
+    // reflection has a slightly different EQ. Combined with the
+    // shimmerFB self-loop at 2 kHz it builds an upper-register halo.
+    // The 4 LFOs run at slightly different rates (0.071/0.073/0.077/
+    // 0.083 Hz) so they slowly drift out of phase — never repeats.
+    function buildShimmerReverb(ctx, opts) {
+      const o = opts || {};
+      const feedback = o.feedback != null ? o.feedback : 0.82;
+      const delays = [0.211, 0.307, 0.401, 0.503];
+      const pans = [-0.55, 0.30, -0.15, 0.55];
+      const lfoRates = [0.071, 0.073, 0.077, 0.083];
+
+      const input = ctx.createGain();   input.gain.value = 1;
+      const output = ctx.createGain();  output.gain.value = 1;
+
+      // Pre-verb high-shelf so the verb itself is brighter than the dry
+      const preShelf = ctx.createBiquadFilter();
+      preShelf.type = 'highshelf';
+      preShelf.frequency.value = 4000;
+      preShelf.gain.value = 3;
+
+      const fdnSum = ctx.createGain();
+      fdnSum.gain.value = 1;
+
+      input.connect(preShelf);
+
+      const delayNodes = [];
+      const bpfs = [];
+      const bpfLfos = [];
+      const bpfLfoGains = [];
+      const fbGains = [];
+      const panners = [];
+
+      for (let i = 0; i < 4; i++) {
+        const d = ctx.createDelay(2.0);
+        d.delayTime.value = delays[i];
+
+        const bpf = ctx.createBiquadFilter();
+        bpf.type = 'bandpass';
+        bpf.frequency.value = 2150; // sweep centre (mid of 800-3500)
+        bpf.Q.value = 0.6;
+
+        // LFO sweep: ±1350 Hz around 2150 Hz → 800-3500 Hz range
+        const lfo = ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = lfoRates[i];
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.value = 1350;
+        lfo.connect(lfoGain);
+        lfoGain.connect(bpf.frequency);
+
+        const fb = ctx.createGain();
+        fb.gain.value = feedback;
+
+        const p = ctx.createStereoPanner();
+        p.pan.value = pans[i];
+
+        // preShelf → delay → bpf → (feedback into delay) + (pan → sum)
+        preShelf.connect(d);
+        d.connect(bpf);
+        bpf.connect(fb);
+        fb.connect(d);
+        bpf.connect(p);
+        p.connect(fdnSum);
+
+        try { lfo.start(ctx.currentTime + i * 0.31); } catch (_) {}
+
+        delayNodes.push(d);
+        bpfs.push(bpf);
+        bpfLfos.push(lfo);
+        bpfLfoGains.push(lfoGain);
+        fbGains.push(fb);
+        panners.push(p);
+      }
+
+      // Shimmer self-loop: tap fdnSum, narrow BPF at 2 kHz, fold back in.
+      // This is what builds the chime/halo on top of the FDN tail.
+      const shimmerBPF = ctx.createBiquadFilter();
+      shimmerBPF.type = 'bandpass';
+      shimmerBPF.frequency.value = 2000;
+      shimmerBPF.Q.value = 1.2;
+      const shimmerFB = ctx.createGain();
+      shimmerFB.gain.value = 0.25;
+      fdnSum.connect(shimmerBPF);
+      shimmerBPF.connect(shimmerFB);
+      shimmerFB.connect(preShelf); // re-enter the FDN front
+
+      // Output chorus — 3 short modulated delays for organic motion
+      const chorusBaseDelays = [0.008, 0.013, 0.019];
+      const chorusDelays = [];
+      const chorusLfos = [];
+      const chorusLfoGains = [];
+      const chorusOut = ctx.createGain();
+      chorusOut.gain.value = 1 / 3;
+
+      for (let i = 0; i < 3; i++) {
+        const cd = ctx.createDelay(0.05);
+        cd.delayTime.value = chorusBaseDelays[i];
+        const clfo = ctx.createOscillator();
+        clfo.type = 'sine';
+        clfo.frequency.value = 0.6;
+        const clfoGain = ctx.createGain();
+        clfoGain.gain.value = 0.002; // ±2 ms
+        clfo.connect(clfoGain);
+        clfoGain.connect(cd.delayTime);
+        fdnSum.connect(cd);
+        cd.connect(chorusOut);
+        try { clfo.start(ctx.currentTime + i * 0.21); } catch (_) {}
+        chorusDelays.push(cd);
+        chorusLfos.push(clfo);
+        chorusLfoGains.push(clfoGain);
+      }
+
+      chorusOut.connect(output);
+
+      return {
+        input, output,
+        setFeedback(fb) {
+          const t = ctx.currentTime;
+          for (const g of fbGains) {
+            try { g.gain.setTargetAtTime(fb, t, 0.05); } catch (_) {}
+          }
+        },
+        dispose() {
+          for (const o of bpfLfos) { try { o.stop(); } catch (_) {} try { o.disconnect(); } catch (_) {} }
+          for (const o of chorusLfos) { try { o.stop(); } catch (_) {} try { o.disconnect(); } catch (_) {} }
+          const all = [input, output, preShelf, fdnSum, shimmerBPF, shimmerFB, chorusOut]
+            .concat(delayNodes, bpfs, bpfLfoGains, fbGains, panners, chorusDelays, chorusLfoGains);
+          for (const n of all) { try { n.disconnect(); } catch (_) {} }
+        }
+      };
+    }
+
+    // Build the persistent voice-processing scaffold (one per AudioContext).
+    // Holds the MediaStreamDestination and the always-present micOut tail
+    // so the recorder's stream identity survives chain rebuilds. The
+    // togglable stages live in micProcessing.chain and rebuild via
+    // applyVoiceFX().
     function buildMicProcessing(ctx) {
       if (!ctx) return null;
       try {
-        const highpass = ctx.createBiquadFilter();
-        highpass.type = 'highpass';
-        highpass.frequency.value = 90;
-        highpass.Q.value = 0.707;
-
-        const compressor = ctx.createDynamicsCompressor();
-        compressor.threshold.value = -24;
-        compressor.knee.value = 10;
-        compressor.ratio.value = 3;
-        compressor.attack.value = 0.003;
-        compressor.release.value = 0.12;
-
-        const gain = ctx.createGain();
-        gain.gain.value = 1.585; // +4 dB makeup (10^(4/20))
-
         const dest = ctx.createMediaStreamDestination();
-
-        highpass.connect(compressor);
-        compressor.connect(gain);
-        gain.connect(dest);
-        return { highpass, compressor, gain, dest };
+        const micOut = ctx.createGain();
+        micOut.gain.value = 1.0;
+        micOut.connect(dest);
+        return {
+          ctx,
+          dest,
+          micOut,
+          head: micOut,    // first node mic-source connects to; updated by applyVoiceFX
+          chain: [],       // disposable nodes in the active chain
+          reverb: null,    // shimmer FDN handle, if active
+          wetGain: null,
+          dryGain: null
+        };
       } catch (e) {
         console.warn('[record] buildMicProcessing failed:', e);
         return null;
       }
+    }
+
+    // Tear down only the togglable inner stages — preserves dest+micOut
+    // so the recorder's MediaStream identity is stable across rebuilds.
+    function disposeVoiceChain() {
+      if (!micProcessing) return;
+      if (micProcessing.reverb) {
+        try { micProcessing.reverb.dispose(); } catch (_) {}
+        micProcessing.reverb = null;
+      }
+      for (const n of micProcessing.chain) {
+        try { n.disconnect(); } catch (_) {}
+      }
+      micProcessing.chain = [];
+      micProcessing.wetGain = null;
+      micProcessing.dryGain = null;
+      micProcessing.head = micProcessing.micOut;
+    }
+
+    // Rebuild the voice chain to match voiceFX state. Smooth: ramp
+    // micOut.gain to 0, swap, ramp back up — avoids pop on toggle.
+    function applyVoiceFX(opts) {
+      if (!micProcessing) { updateVoiceProcNote(); return; }
+      const ctx = micProcessing.ctx;
+      const smooth = !(opts && opts.smooth === false);
+
+      const doRebuild = () => {
+        disposeVoiceChain();
+        const stages = [];
+
+        if (voiceFX.lowcut) {
+          const hp = ctx.createBiquadFilter();
+          hp.type = 'highpass';
+          hp.frequency.value = 90;
+          hp.Q.value = 0.707;
+          stages.push(hp);
+        }
+
+        if (voiceFX.compression) {
+          const co = ctx.createDynamicsCompressor();
+          co.threshold.value = -24;
+          co.knee.value = 10;
+          co.ratio.value = 3;
+          co.attack.value = 0.003;
+          co.release.value = 0.12;
+          stages.push(co);
+        }
+
+        // Always-on makeup gain (+4 dB)
+        const makeup = ctx.createGain();
+        makeup.gain.value = 1.585;
+        stages.push(makeup);
+
+        // Series-connect dry stages
+        for (let i = 0; i < stages.length - 1; i++) {
+          stages[i].connect(stages[i + 1]);
+        }
+        const chainEnd = stages[stages.length - 1] || null;
+
+        if (voiceFX.reverb && chainEnd) {
+          const reverb = buildShimmerReverb(ctx, {
+            feedback: voiceFXTailToFeedback(voiceFXTail)
+          });
+          const wet = ctx.createGain();
+          const dry = ctx.createGain();
+          const m = Math.max(0, Math.min(1, voiceFXMix));
+          wet.gain.value = m;
+          dry.gain.value = 1 - m;
+          chainEnd.connect(reverb.input);
+          chainEnd.connect(dry);
+          reverb.output.connect(wet);
+          dry.connect(micProcessing.micOut);
+          wet.connect(micProcessing.micOut);
+          stages.push(reverb.input, reverb.output, wet, dry);
+          micProcessing.reverb = reverb;
+          micProcessing.wetGain = wet;
+          micProcessing.dryGain = dry;
+        } else if (chainEnd) {
+          chainEnd.connect(micProcessing.micOut);
+        }
+
+        micProcessing.chain = stages;
+        micProcessing.head = stages[0] || micProcessing.micOut;
+
+        // Re-route the live mic source through the rebuilt head.
+        if (currentMicSource) {
+          try { currentMicSource.disconnect(); } catch (_) {}
+          if (analyser) { try { currentMicSource.connect(analyser); } catch (_) {} }
+          try { currentMicSource.connect(micProcessing.head); } catch (_) {}
+        }
+
+        updateVoiceProcNote();
+        updateVoiceReverbControlsVisibility();
+      };
+
+      if (!smooth || !ctx) {
+        doRebuild();
+        return;
+      }
+      try {
+        const t = ctx.currentTime;
+        micProcessing.micOut.gain.cancelScheduledValues(t);
+        micProcessing.micOut.gain.setValueAtTime(micProcessing.micOut.gain.value, t);
+        micProcessing.micOut.gain.linearRampToValueAtTime(0, t + 0.03);
+      } catch (_) {}
+      setTimeout(() => {
+        doRebuild();
+        try {
+          const t2 = ctx.currentTime;
+          micProcessing.micOut.gain.cancelScheduledValues(t2);
+          micProcessing.micOut.gain.setValueAtTime(0, t2);
+          micProcessing.micOut.gain.linearRampToValueAtTime(1, t2 + 0.03);
+        } catch (_) {}
+      }, 40);
+    }
+
+    // Live update of mix/tail without rebuilding the graph.
+    function setVoiceReverbMix(v) {
+      voiceFXMix = Math.max(0, Math.min(1, v));
+      try { localStorage.setItem('tuner.voice.reverbMix', String(voiceFXMix)); } catch (_) {}
+      const lbl = document.getElementById('voiceReverbMixVal');
+      if (lbl) lbl.textContent = Math.round(voiceFXMix * 100) + '%';
+      if (micProcessing && micProcessing.wetGain && micProcessing.dryGain && micProcessing.ctx) {
+        const t = micProcessing.ctx.currentTime;
+        try {
+          micProcessing.wetGain.gain.setTargetAtTime(voiceFXMix, t, 0.03);
+          micProcessing.dryGain.gain.setTargetAtTime(1 - voiceFXMix, t, 0.03);
+        } catch (_) {}
+      }
+    }
+
+    function setVoiceReverbTail(v) {
+      voiceFXTail = Math.max(0, Math.min(1, v));
+      try { localStorage.setItem('tuner.voice.reverbTail', String(voiceFXTail)); } catch (_) {}
+      const lbl = document.getElementById('voiceReverbTailVal');
+      if (lbl) lbl.textContent = Math.round(voiceFXTail * 100) + '%';
+      if (micProcessing && micProcessing.reverb) {
+        try { micProcessing.reverb.setFeedback(voiceFXTailToFeedback(voiceFXTail)); } catch (_) {}
+      }
+    }
+
+    function updateVoiceReverbControlsVisibility() {
+      const ctrl = document.getElementById('voiceReverbControls');
+      if (ctrl) ctrl.style.display = voiceFX.reverb ? 'block' : 'none';
+    }
+
+    function updateVoiceProcNote() {
+      const note = document.getElementById('voiceProcNote');
+      if (!note) return;
+      const parts = [];
+      if (voiceFX.lowcut) parts.push('lo-cut');
+      if (voiceFX.compression) parts.push('compression');
+      if (voiceFX.reverb) parts.push('shimmer reverb');
+      note.textContent = parts.length
+        ? 'Voice: ' + parts.join(' + ')
+        : 'Voice: clean (no processing)';
     }
 
     // Wire (or rewire) a freshly-created mic source into the analyser
@@ -2652,8 +2996,8 @@
       }
       currentMicSource = source;
       try { source.connect(analyser); } catch (_) {}
-      if (micProcessing && micProcessing.highpass) {
-        try { source.connect(micProcessing.highpass); } catch (_) {}
+      if (micProcessing && micProcessing.head) {
+        try { source.connect(micProcessing.head); } catch (_) {}
       }
     }
 
@@ -2691,7 +3035,10 @@
           // this AudioContext, then route source → analyser AND
           // source → processing chain. Pitch detection still reads the
           // raw source via analyser.
-          if (!micProcessing) micProcessing = buildMicProcessing(audioContext);
+          if (!micProcessing) {
+            micProcessing = buildMicProcessing(audioContext);
+            applyVoiceFX({ smooth: false });
+          }
           attachMicSource(source);
 
           isListening = true;
@@ -2717,6 +3064,12 @@
         if (currentMicSource) {
           try { currentMicSource.disconnect(); } catch (_) {}
           currentMicSource = null;
+        }
+        // Stop the reverb's running LFO oscillators before dropping
+        // the chain. Without this, the LFOs would linger inside a
+        // closing AudioContext and (occasionally) throw on close().
+        if (micProcessing && micProcessing.reverb) {
+          try { micProcessing.reverb.dispose(); } catch (_) {}
         }
         micProcessing = null;
         if (audioContext) audioContext.close();
@@ -3173,7 +3526,10 @@
         // Re-route source through analyser AND the recording processing
         // chain. attachMicSource also disconnects the prior source so
         // we don't double-feed the recorder bus.
-        if (!micProcessing) micProcessing = buildMicProcessing(audioContext);
+        if (!micProcessing) {
+          micProcessing = buildMicProcessing(audioContext);
+          applyVoiceFX({ smooth: false });
+        }
         attachMicSource(source);
 
         // Reset analyzer-side smoothing so we don't carry stale state
@@ -4149,6 +4505,65 @@
           if (currentAudioStream) {
             verifyAudioInputBinding(currentAudioStream, selectedInputDeviceId);
           }
+        });
+      }
+
+      // -------- Voice processing: lo-cut / compression / shimmer reverb --------
+      try {
+        const lc = localStorage.getItem('tuner.voice.lowcut');
+        const cm = localStorage.getItem('tuner.voice.compression');
+        const rv = localStorage.getItem('tuner.voice.reverb');
+        if (lc !== null) voiceFX.lowcut = lc === '1';
+        if (cm !== null) voiceFX.compression = cm === '1';
+        if (rv !== null) voiceFX.reverb = rv === '1';
+        const mix = localStorage.getItem('tuner.voice.reverbMix');
+        if (mix !== null && !isNaN(parseFloat(mix))) {
+          voiceFXMix = Math.max(0, Math.min(1, parseFloat(mix)));
+        }
+        const tail = localStorage.getItem('tuner.voice.reverbTail');
+        if (tail !== null && !isNaN(parseFloat(tail))) {
+          voiceFXTail = Math.max(0, Math.min(1, parseFloat(tail)));
+        }
+      } catch (_) {}
+      const lowcutCb = document.getElementById('voiceLowcut');
+      const compressCb = document.getElementById('voiceCompression');
+      const reverbCb = document.getElementById('voiceReverb');
+      const reverbMixSlider = document.getElementById('voiceReverbMix');
+      const reverbTailSlider = document.getElementById('voiceReverbTail');
+      const reverbMixLbl = document.getElementById('voiceReverbMixVal');
+      const reverbTailLbl = document.getElementById('voiceReverbTailVal');
+      if (lowcutCb) lowcutCb.checked = voiceFX.lowcut;
+      if (compressCb) compressCb.checked = voiceFX.compression;
+      if (reverbCb) reverbCb.checked = voiceFX.reverb;
+      if (reverbMixSlider) reverbMixSlider.value = Math.round(voiceFXMix * 100);
+      if (reverbTailSlider) reverbTailSlider.value = Math.round(voiceFXTail * 100);
+      if (reverbMixLbl) reverbMixLbl.textContent = Math.round(voiceFXMix * 100) + '%';
+      if (reverbTailLbl) reverbTailLbl.textContent = Math.round(voiceFXTail * 100) + '%';
+      updateVoiceReverbControlsVisibility();
+      updateVoiceProcNote();
+
+      function onVoiceFXToggle() {
+        voiceFX.lowcut = !!(lowcutCb && lowcutCb.checked);
+        voiceFX.compression = !!(compressCb && compressCb.checked);
+        voiceFX.reverb = !!(reverbCb && reverbCb.checked);
+        try {
+          localStorage.setItem('tuner.voice.lowcut', voiceFX.lowcut ? '1' : '0');
+          localStorage.setItem('tuner.voice.compression', voiceFX.compression ? '1' : '0');
+          localStorage.setItem('tuner.voice.reverb', voiceFX.reverb ? '1' : '0');
+        } catch (_) {}
+        applyVoiceFX();
+      }
+      if (lowcutCb) lowcutCb.addEventListener('change', onVoiceFXToggle);
+      if (compressCb) compressCb.addEventListener('change', onVoiceFXToggle);
+      if (reverbCb) reverbCb.addEventListener('change', onVoiceFXToggle);
+      if (reverbMixSlider) {
+        reverbMixSlider.addEventListener('input', (e) => {
+          setVoiceReverbMix(parseInt(e.target.value, 10) / 100);
+        });
+      }
+      if (reverbTailSlider) {
+        reverbTailSlider.addEventListener('input', (e) => {
+          setVoiceReverbTail(parseInt(e.target.value, 10) / 100);
         });
       }
 
