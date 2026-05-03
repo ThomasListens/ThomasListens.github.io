@@ -753,13 +753,25 @@
       display: none !important;
     }
 
-    /* In record mode the toggle stays available so the user can hide
-       the side panel to see the framed shot — but it's smaller, more
-       transparent, and tucked further into the corner so it doesn't
-       dominate the recorded frame. */
+    /* The hide-controls toggle is meaningful only in record mode. On the
+       main pitch-ruler screen we never need to hide the side panel, and
+       leaving the toggle visible there caused a layout glitch where a
+       persisted "hidden" state from a previous record session would
+       partially collapse the panel. Just hide the button outside record
+       mode — the user only needs it for framing a shot. */
+    body:not(.record-mode) #settingsToggle {
+      display: none !important;
+    }
+
+    /* In record mode the toggle is the user's "clean my screen" lever:
+       smaller, more transparent, parked on the centre-right edge so the
+       right thumb can reach it while holding the phone. The exit-record
+       button (#exitRecBtn) sits in the opposite corner (top-right) so
+       the two never compete. */
     body.record-mode #settingsToggle {
-      top: 8px;
-      right: 8px;
+      top: 50%;
+      right: 12px;
+      transform: translateY(-50%);
       width: 30px;
       height: 30px;
       font-size: 13px;
@@ -770,6 +782,27 @@
 
     body.record-mode #settingsToggle:hover {
       opacity: 1;
+      background: rgba(40, 40, 40, 0.85);
+    }
+
+    /* Exit-record button: lifted out of the bottom record-row in
+       record mode and pinned to the top-right corner. Stays visible
+       even when settings-hidden is on (it's still inside .record-row,
+       which the settings-hidden rule preserves as essential). */
+    body.record-mode #exitRecBtn {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 201;
+      width: 36px;
+      height: 36px;
+      background: rgba(20, 20, 20, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    body.record-mode #exitRecBtn:hover {
       background: rgba(40, 40, 40, 0.85);
     }
 
@@ -3565,6 +3598,15 @@
       }
       const video = document.getElementById('cameraFeed');
       video.srcObject = null;
+      // Force the controls panel back when returning to the main screen.
+      // The settings-hidden state is record-mode-only now — without this
+      // reset, a hide click during a record session would leak into the
+      // main screen and squash the panel layout next page load.
+      if (settingsHidden) {
+        settingsHidden = false;
+        try { localStorage.removeItem('tuner.settingsHidden'); } catch (_) {}
+        applySettingsHidden();
+      }
       // Force canvas to repaint at normal dimensions
       const canvas = document.getElementById('rulerCanvas');
       canvas.width = 0;
@@ -4317,11 +4359,12 @@
         renderedRefFreq: null
       };
 
-      // Kick the first offline render in the background. Until it
-      // resolves the drone is silent (masterGain at 0). After resolve
-      // a looping BufferSource starts feeding userLpf — applyTanpuraVolume
-      // ramps masterGain to audible when the user enables the drone.
-      rerenderTanpura(config.refFreq);
+      // Render is deferred until the drone is actually enabled. The
+      // offline render takes ~500 ms of audio-thread work; running it
+      // unconditionally at bootstrap was racing with the user's first
+      // recording and causing audible clicks/buffer underruns even when
+      // the drone was never toggled on. setTanpuraEnabled(true) kicks
+      // the render on demand.
     }
 
     // Drone enable/disable and volume both reduce to a masterGain ramp.
@@ -4337,13 +4380,19 @@
       tanpuraNodes.masterGain.gain.setTargetAtTime(target, ctx.currentTime, 0.05);
     }
 
-    // Tuning change → re-render at new fundamental. While the render is
-    // in flight, the existing buffer keeps playing (out of tune until the
-    // swap lands ~300-500 ms later).
+    // Tuning change → mark the buffer stale; the next time the drone
+    // is enabled (or if it's already enabled) we re-render. We never
+    // kick a render with the drone disabled — there's no point spending
+    // ~500 ms of audio-thread work on a buffer that won't be heard, and
+    // doing so during a silent recording was the source of the clicks.
     function setTanpuraTuning(refFreq) {
       if (!tanpuraNodes || !audioContext) return;
       if (tanpuraNodes.renderedRefFreq === refFreq) return;
-      rerenderTanpura(refFreq);
+      // Mark stale so the next enable picks up the new freq.
+      tanpuraNodes.renderedRefFreq = null;
+      if (tanpuraEnabled) {
+        rerenderTanpura(refFreq);
+      }
     }
 
     function setTanpuraEnabled(on) {
@@ -4358,6 +4407,13 @@
 
       if (tanpuraEnabled) {
         bootstrapAudio();
+        // Lazy first render: only kick if no buffer yet, or the buffer
+        // is stale from a tuning change while the drone was off. The
+        // render runs offline (~500 ms) and the BufferSource starts
+        // looping when it lands.
+        if (tanpuraNodes && tanpuraNodes.renderedRefFreq !== config.refFreq) {
+          rerenderTanpura(config.refFreq);
+        }
       }
       if (tanpuraNodes) {
         applyTanpuraVolume();
@@ -4980,9 +5036,13 @@
       });
       
       // -------- Feature 1: Settings hide toggle --------
-      try {
-        settingsHidden = localStorage.getItem('tuner.settingsHidden') === '1';
-      } catch (_) {}
+      // Settings-hidden is now a record-mode-only state — the toggle
+      // button is hidden on the main pitch-ruler screen via CSS, and we
+      // don't want a persisted "hidden" state from a previous record
+      // session to leak in here. Always start with the panel visible
+      // and clear any stale flag that lingers from older builds.
+      settingsHidden = false;
+      try { localStorage.removeItem('tuner.settingsHidden'); } catch (_) {}
       document.getElementById('settingsToggle').addEventListener('click', toggleSettingsHidden);
       applySettingsHidden();
 
