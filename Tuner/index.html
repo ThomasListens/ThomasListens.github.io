@@ -674,9 +674,40 @@
       transform: scale(0.95);
     }
 
-    body.settings-hidden #controls,
-    body.settings-hidden #mobileToggle {
+    /* ====================================================================
+       Settings-hidden master "clear my screen" rule.
+       The ✕ / ⚙ button (#settingsToggle) toggles body.settings-hidden.
+       When on, EVERY floating UI element disappears so the pitch ruler
+       has the screen to itself. Add new floating overlays here.
+
+       Stays visible:
+         - #settingsToggle (the button itself — the way back)
+         - #rulerContainer / #rulerCanvas (the pitch display the user is
+           recording / watching)
+       Hidden:
+         - the side/top settings panel
+         - the mobile hamburger
+         - the entire record dock (sliders, trail, frame, buttons,
+           discard, record button, exit, flip, aspect, ratio label,
+           position/size/opacity/spread/shift, label x/y/size, B&W,
+           EDO grid, brightness/contrast/saturate, backdrop, edge,
+           feather, zoom, trail, etc.)
+         - the "● 0:00" recording timer pill at top
+       Works whether or not record-mode is active.
+       ==================================================================== */
+    body.settings-hidden #controls,        /* main settings side panel */
+    body.settings-hidden #mobileToggle,    /* mobile hamburger */
+    body.settings-hidden #recordOverlay,   /* record dock: every video-overlay control */
+    body.settings-hidden #recIndicator {   /* "● 0:00" recording timer pill */
       display: none !important;
+    }
+
+    /* When the dock is hidden in landscape record mode, reclaim the
+       280px gutter the dock normally occupies on the right. */
+    @media (orientation: landscape) and (min-width: 768px) {
+      body.record-mode.settings-hidden #rulerContainer {
+        padding-right: 0;
+      }
     }
 
     /* OBS mode hides everything for clean capture */
@@ -946,6 +977,11 @@
           <input type="range" id="tanpuraVolume" min="0" max="100" value="30">
           <span id="tanpuraVolumeVal">30%</span>
         </div>
+        <label style="margin-top: 4px;">Cutoff</label>
+        <div class="slider-row">
+          <input type="range" id="droneCutoff" min="0" max="100" value="56" step="0.5">
+          <span id="droneCutoffVal">2.5 kHz</span>
+        </div>
       </div>
 
       <button id="stopDronesBtn">🔇 Stop All Drones</button>
@@ -1162,6 +1198,20 @@
     let tanpuraEnabled = false;
     let tanpuraVolume = 0.30;
     let tanpuraNodes = null;
+    // Drone master-lowpass centre frequency (Hz). The LFO sweeps
+    // ±400 Hz around this value. Default 2500 Hz matches the
+    // pre-cutoff-slider behaviour. Slider 0–100 maps log-scale to
+    // 800 Hz (warm/dark) … 6000 Hz (bright/buzzy).
+    let droneCutoff = 2500;
+    const DRONE_CUTOFF_MIN = 800;
+    const DRONE_CUTOFF_MAX = 6000;
+    const DRONE_LFO_DEPTH = 400; // Hz, ±depth around droneCutoff
+    function droneSliderToCutoff(s) {
+      return Math.exp((s / 100) * Math.log(DRONE_CUTOFF_MAX / DRONE_CUTOFF_MIN)) * DRONE_CUTOFF_MIN;
+    }
+    function droneCutoffToSlider(hz) {
+      return 100 * Math.log(hz / DRONE_CUTOFF_MIN) / Math.log(DRONE_CUTOFF_MAX / DRONE_CUTOFF_MIN);
+    }
 
     const ASPECT_DIMS = {
       '9:16': [1080, 1920],
@@ -2792,11 +2842,14 @@
       shelf.connect(dryGain);
       shelf.connect(preDelay);
 
-      // Lowpass to tame saw harshness — its cutoff is modulated slowly so
-      // the timbre swells and recedes (1800–3200 Hz, ~30 s period).
+      // Lowpass to tame saw harshness. The base cutoff is set by the
+      // user (droneCutoff, default 2500 Hz, log-mapped slider 800-6000)
+      // and a slow sine LFO sweeps ±DRONE_LFO_DEPTH Hz around it
+      // (~30 s period) — motion around the user's value, no longer
+      // dominating it.
       const lpf = ctx.createBiquadFilter();
       lpf.type = 'lowpass';
-      lpf.frequency.value = 2500;
+      lpf.frequency.value = droneCutoff;
       lpf.Q.value = 0.7;
       lpf.connect(shelf);
 
@@ -2804,7 +2857,7 @@
       lpfLfo.type = 'sine';
       lpfLfo.frequency.value = 1 / 30; // ≈0.033 Hz, 30 s period
       const lpfLfoGain = ctx.createGain();
-      lpfLfoGain.gain.value = 700; // ±700 Hz around 2500 Hz centre
+      lpfLfoGain.gain.value = DRONE_LFO_DEPTH; // ±Hz around droneCutoff centre
       lpfLfo.connect(lpfLfoGain);
       lpfLfoGain.connect(lpf.frequency);
       try { lpfLfo.start(); } catch (_) {}
@@ -3064,6 +3117,19 @@
       tanpuraVolume = Math.max(0, Math.min(1, v));
       try { localStorage.setItem('tuner.drone.volume', String(tanpuraVolume)); } catch (_) {}
       applyTanpuraVolume();
+    }
+
+    // Smoothly retarget the drone master lowpass centre. The LFO is
+    // wired to the same AudioParam, so it keeps adding ±DRONE_LFO_DEPTH
+    // motion on top of whatever base we set here.
+    function setDroneCutoff(hz) {
+      droneCutoff = Math.max(DRONE_CUTOFF_MIN, Math.min(DRONE_CUTOFF_MAX, hz));
+      try { localStorage.setItem('tuner.drone.cutoff', String(droneCutoff)); } catch (_) {}
+      if (tanpuraNodes && tanpuraNodes.lpf && droneAudioCtx) {
+        try {
+          tanpuraNodes.lpf.frequency.setTargetAtTime(droneCutoff, droneAudioCtx.currentTime, 0.05);
+        } catch (_) {}
+      }
     }
 
     // -------- Feature 1: Settings hide toggle --------
@@ -3644,6 +3710,17 @@
         if (slider) slider.value = Math.round(tanpuraVolume * 100);
         const valSpan = document.getElementById('tanpuraVolumeVal');
         if (valSpan) valSpan.textContent = Math.round(tanpuraVolume * 100) + '%';
+
+        // Restore drone cutoff
+        const c = localStorage.getItem('tuner.drone.cutoff');
+        const parsedC = c !== null ? parseFloat(c) : NaN;
+        if (!isNaN(parsedC)) {
+          droneCutoff = Math.max(DRONE_CUTOFF_MIN, Math.min(DRONE_CUTOFF_MAX, parsedC));
+        }
+        const cSlider = document.getElementById('droneCutoff');
+        if (cSlider) cSlider.value = droneCutoffToSlider(droneCutoff).toFixed(1);
+        const cVal = document.getElementById('droneCutoffVal');
+        if (cVal) cVal.textContent = (droneCutoff / 1000).toFixed(1) + ' kHz';
       } catch (_) {}
       document.getElementById('tanpuraEnabled').addEventListener('change', (e) => {
         setTanpuraEnabled(e.target.checked);
@@ -3652,6 +3729,12 @@
         const v = parseInt(e.target.value, 10) / 100;
         document.getElementById('tanpuraVolumeVal').textContent = e.target.value + '%';
         setTanpuraVolume(v);
+      });
+      document.getElementById('droneCutoff').addEventListener('input', (e) => {
+        const sliderVal = parseFloat(e.target.value);
+        const hz = droneSliderToCutoff(sliderVal);
+        document.getElementById('droneCutoffVal').textContent = (hz / 1000).toFixed(1) + ' kHz';
+        setDroneCutoff(hz);
       });
 
       const loaded = loadSession();
