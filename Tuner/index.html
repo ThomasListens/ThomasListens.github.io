@@ -2256,10 +2256,16 @@
     let lastDrawTime = 0;
     const RECORD_DRAW_INTERVAL_MS = 33;
 
+    // Returns whether the canvas pixels were updated this call. Used so
+    // recordVideoTrack.requestFrame() only runs on real paints — the
+    // record-mode draw throttle skips ~half of rAF ticks, but calling
+    // requestFrame on those skips doubled the video clock vs audio and
+    // caused mux resync artefacts (fast crackle/clicks) even on the raw
+    // mic track.
     function draw() {
       if (recordMode) {
         const t = performance.now();
-        if (t - lastDrawTime < RECORD_DRAW_INTERVAL_MS) return;
+        if (t - lastDrawTime < RECORD_DRAW_INTERVAL_MS) return false;
         lastDrawTime = t;
       }
 
@@ -2297,7 +2303,7 @@
           // crosshair, ratio labels — everything that paints on top of
           // the camera. Pitch detection keeps running (it's in audioLoop,
           // not draw()).
-          return;
+          return true;
         }
         drawRulerBackdrop(ctx, W, H);
       } else {
@@ -2321,10 +2327,10 @@
         H = rect.height;
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, W, H);
-        if (rulerHidden) return;
+        if (rulerHidden) return true;
       }
 
-      if (config.ratios.length === 0) return;
+      if (config.ratios.length === 0) return true;
 
       const S = recordMode ? rulerScale : 1;
       ctx.save();
@@ -2698,6 +2704,8 @@
         ctx.fillText(nearestRatio.label, x, y);
         ctx.restore();
       }
+
+      return true;
     }
     
     function audioLoop() {
@@ -2768,13 +2776,16 @@
         if (currentTime >= duration) stopFilePlayback();
       }
 
-      draw();
+      const didPaint = draw();
 
       // Sync the recording's video track to the actual paint we just
       // performed. captureStream(0) only emits a video frame when this
       // is called — pinning timestamps to paints, not to a polled clock,
       // is what eliminates the rhythmic clicks in the recorded audio.
-      if (recordVideoTrack && mediaRecorder && mediaRecorder.state === 'recording') {
+      // Must gate on didPaint: draw() skips work on alternating rAF ticks
+      // in record mode (~30 FPS), but requestFrame here used to run every
+      // tick (~60 Hz), confusing the muxer vs continuous mic audio.
+      if (recordVideoTrack && mediaRecorder && mediaRecorder.state === 'recording' && didPaint) {
         try { recordVideoTrack.requestFrame(); } catch (_) {}
       }
 
@@ -3696,7 +3707,7 @@
       const canvas = document.getElementById('rulerCanvas');
       // captureStream(0) means "no automatic capture" — frames are only
       // emitted when we explicitly call track.requestFrame(). audioLoop
-      // calls requestFrame at the end of every draw() while recording,
+      // calls requestFrame after each successful draw() paint while recording,
       // so the video track's timestamps land exactly on our paints
       // instead of on the browser's internal polling grid. Both the
       // fixed-rate form (captureStream(30)) and the on-update form
