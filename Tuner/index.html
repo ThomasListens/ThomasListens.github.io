@@ -2771,10 +2771,14 @@
       smoothedCents = null;
       ghostTrail = [];
       lastDetectTime = 0;
-      
-      audioLoop();
+
+      // Only start a new rAF chain if one isn't already running (record
+      // mode may have kicked one already). Without this guard, two
+      // parallel audioLoop chains both call draw() every frame and
+      // starve the audio thread, causing recording stutter.
+      if (!animationId) audioLoop();
     }
-    
+
     function stopFilePlayback() {
       if (sourceNode) {
         sourceNode.stop();
@@ -3400,7 +3404,11 @@
           btn.innerHTML = 'Listening';
           btn.classList.add('listening');
           lastDetectTime = 0;
-          audioLoop();
+          // Guard against double rAF chains. enterRecordMode may have
+          // already started a loop for the camera; starting another here
+          // would cause draw() to fire twice per frame and stutter the
+          // recording's audio.
+          if (!animationId) audioLoop();
 
           // Now that permission is granted, device labels are populated
           refreshAudioInputList();
