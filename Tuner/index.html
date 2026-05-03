@@ -2783,70 +2783,89 @@
     }
 
     // ----------------------------------------------------------------
-    // Shimmer / future reverb — dramatic, AI-style, dimensional.
-    // FDN-only (no convolution). Architecture:
-    //   input → preShelf(+3 dB @ 4 kHz)  ──────────────► fdnIn
-    //                                                      │
+    // Smooth digital reverb — AI-style, pleasant, no phasey artefacts.
+    // FDN with all-pass diffusion (Lexicon/Eventide-style). Architecture:
+    //   input ─► AP1(700) ─► AP2(1700) ─► AP3(3300) ─► fdnIn
+    //                                                    │
     //   fdnIn ─► 4 delay lines (211, 307, 401, 503 ms) ─► fdnSum
-    //              each:  delay → BPF (LFO-swept 800-3500 Hz)
-    //                       ↳ feedback (gain) → back into own delay
+    //              each:  delay → LPF(5 kHz, Q 0.7)
+    //                       ↳ feedback (gain ≤ 0.78) → back into own delay
     //                       ↳ panner [-0.55,+0.30,-0.15,+0.55] → fdnSum
+    //                       ↳ cross-feed (0.3) → next line's delay input
+    //                     each delay's delayTime is modulated by a slow
+    //                     ±0.5 ms sine LFO (0.04 / 0.06 / 0.085 / 0.11 Hz)
     //   fdnSum → shimmerBPF(2 kHz, Q 0.6) → shimmerFB(0.08) ─► back into fdnIn
-    //   fdnSum → 3 modulated short delays (8/13/19 ms, ±2 ms LFO 0.6 Hz)
-    //          → output
+    //   fdnSum → postShelf(+4 dB @ 5 kHz) → wetComp(-18 dB, 4:1)
+    //          → wetLimiter(-6 dB, 20:1) → output
     //
-    // The LFO-modulated bandpass per line is what gives this its
-    // chime/AI flavour — instead of a static damping LP, the spectral
-    // peak walks slowly through the upper mids, so each successive
-    // reflection has a slightly different EQ. Combined with the
-    // shimmerFB self-loop at 2 kHz it builds an upper-register halo.
-    // The 4 LFOs run at slightly different rates (0.071/0.073/0.077/
-    // 0.083 Hz) so they slowly drift out of phase — never repeats.
+    // What replaced what (vs. the previous chorus-flanger-y version):
+    //   - Pre-FDN cascaded ALL-PASS diffusion (phase-only, amplitude-flat)
+    //     replaces the +3 dB pre-shelf as the smoothing trick.
+    //   - Per-line LOWPASS damping replaces the LFO-swept BANDPASS — no
+    //     more "swept formant" coloration.
+    //   - Tiny per-line DELAY-TIME LFOs replace the bandpass-centre LFOs —
+    //     natural breath instead of moving comb notches.
+    //   - The output stage drops the 3-tap modulated chorus entirely
+    //     (that was the flanger that produced the phasey/comb sound)
+    //     and the tanh waveshaper (no harmonic muck on top of the verb).
+    //   - The high-shelf brightness moved from PRE-FDN to POST-FDN so
+    //     it doesn't get re-amplified by feedback.
     function buildShimmerReverb(ctx, opts) {
       const o = opts || {};
-      const feedback = o.feedback != null ? o.feedback : 0.82;
+      const feedback = o.feedback != null ? o.feedback : 0.668;
       const delays = [0.211, 0.307, 0.401, 0.503];
       const pans = [-0.55, 0.30, -0.15, 0.55];
-      const lfoRates = [0.071, 0.073, 0.077, 0.083];
+      // Per-line delay-time LFO rates (Hz). Slow, mutually prime-ish so
+      // the four breaths slowly drift out of phase and never repeat.
+      const lfoRates = [0.04, 0.06, 0.085, 0.11];
 
       const input = ctx.createGain();   input.gain.value = 1;
       const output = ctx.createGain();  output.gain.value = 1;
 
-      // Pre-verb high-shelf so the verb itself is brighter than the dry
-      const preShelf = ctx.createBiquadFilter();
-      preShelf.type = 'highshelf';
-      preShelf.frequency.value = 4000;
-      preShelf.gain.value = 3;
+      // -------- Pre-FDN diffusion: 3-stage all-pass cascade --------
+      // All-pass biquads change phase but NOT amplitude, so they smear
+      // the input across time without creating amplitude notches. This
+      // is the classical Lexicon/Eventide trick for smooth tails.
+      const ap1 = ctx.createBiquadFilter();
+      ap1.type = 'allpass'; ap1.frequency.value = 700;  ap1.Q.value = 0.5;
+      const ap2 = ctx.createBiquadFilter();
+      ap2.type = 'allpass'; ap2.frequency.value = 1700; ap2.Q.value = 0.5;
+      const ap3 = ctx.createBiquadFilter();
+      ap3.type = 'allpass'; ap3.frequency.value = 3300; ap3.Q.value = 0.5;
+
+      // fdnIn is the node that feeds the FDN delays (post-diffusion).
+      // The shimmer self-loop also re-enters here.
+      const fdnIn = ctx.createGain();
+      fdnIn.gain.value = 1;
+
+      input.connect(ap1);
+      ap1.connect(ap2);
+      ap2.connect(ap3);
+      ap3.connect(fdnIn);
 
       const fdnSum = ctx.createGain();
       fdnSum.gain.value = 1;
 
-      input.connect(preShelf);
-
+      // -------- 4-line FDN with lowpass damping --------
       const delayNodes = [];
-      const bpfs = [];
-      const bpfLfos = [];
-      const bpfLfoGains = [];
+      const lpfs = [];
       const fbGains = [];
       const panners = [];
+      const lfos = [];
+      const lfoGains = [];
+      const xfeeds = [];
 
       for (let i = 0; i < 4; i++) {
         const d = ctx.createDelay(2.0);
         d.delayTime.value = delays[i];
 
-        const bpf = ctx.createBiquadFilter();
-        bpf.type = 'bandpass';
-        bpf.frequency.value = 2150; // sweep centre (mid of 800-3500)
-        bpf.Q.value = 0.6;
-
-        // LFO sweep: ±1350 Hz around 2150 Hz → 800-3500 Hz range
-        const lfo = ctx.createOscillator();
-        lfo.type = 'sine';
-        lfo.frequency.value = lfoRates[i];
-        const lfoGain = ctx.createGain();
-        lfoGain.gain.value = 1350;
-        lfo.connect(lfoGain);
-        lfoGain.connect(bpf.frequency);
+        // Lowpass damping (replaces the swept bandpass): -3 dB @ 5 kHz,
+        // gently attenuates HF energy on each loop iteration so the tail
+        // darkens naturally without imposing a moving spectral notch.
+        const lpf = ctx.createBiquadFilter();
+        lpf.type = 'lowpass';
+        lpf.frequency.value = 5000;
+        lpf.Q.value = 0.7;
 
         const fb = ctx.createGain();
         fb.gain.value = feedback;
@@ -2854,87 +2873,71 @@
         const p = ctx.createStereoPanner();
         p.pan.value = pans[i];
 
-        // preShelf → delay → bpf → (feedback into delay) + (pan → sum)
-        preShelf.connect(d);
-        d.connect(bpf);
-        bpf.connect(fb);
+        // Subtle delay-time LFO: ±0.5 ms breath, no formant sweep.
+        // OscillatorNode (sine) → gain (0.0005 = 0.5 ms in seconds) →
+        // delay.delayTime AudioParam. Very slow rates (sub-Hz) so each
+        // line breathes independently.
+        const lfo = ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = lfoRates[i];
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.value = 0.0005; // ±0.5 ms
+        lfo.connect(lfoGain);
+        lfoGain.connect(d.delayTime);
+
+        // fdnIn → delay → lpf → (feedback into delay) + (pan → fdnSum)
+        fdnIn.connect(d);
+        d.connect(lpf);
+        lpf.connect(fb);
         fb.connect(d);
-        bpf.connect(p);
+        lpf.connect(p);
         p.connect(fdnSum);
 
-        try { lfo.start(ctx.currentTime + i * 0.31); } catch (_) {}
+        try { lfo.start(ctx.currentTime + i * 0.27); } catch (_) {}
 
         delayNodes.push(d);
-        bpfs.push(bpf);
-        bpfLfos.push(lfo);
-        bpfLfoGains.push(lfoGain);
+        lpfs.push(lpf);
         fbGains.push(fb);
         panners.push(p);
+        lfos.push(lfo);
+        lfoGains.push(lfoGain);
       }
 
-      // Shimmer self-loop: tap fdnSum, narrow BPF at 2 kHz, fold back in.
-      // This is what builds the chime/halo on top of the FDN tail.
+      // Cross-feed ring: each line's lpf output → next line's delay
+      // input at 0.3 gain. Hadamard-style mixing simplification — adds
+      // echo density without per-line resonant coloration.
+      for (let i = 0; i < 4; i++) {
+        const xf = ctx.createGain();
+        xf.gain.value = 0.3;
+        lpfs[i].connect(xf);
+        xf.connect(delayNodes[(i + 1) % 4]);
+        xfeeds.push(xf);
+      }
+
+      // -------- Shimmer self-loop (kept) --------
+      // Tap fdnSum, narrow BPF at 2 kHz (Q 0.6), fold back into fdnIn.
+      // Builds the AI-style upper-register halo without phasing.
       const shimmerBPF = ctx.createBiquadFilter();
       shimmerBPF.type = 'bandpass';
       shimmerBPF.frequency.value = 2000;
-      // Lowered Q from 1.2 → 0.6: a narrower, higher-Q resonance was
-      // amplifying the 2 kHz region enough that the closed-loop gain
-      // through the self-loop exceeded 1.0 at the resonant frequency.
-      // Broader band = lower per-frequency peak = stable.
       shimmerBPF.Q.value = 0.6;
       const shimmerFB = ctx.createGain();
-      // Lowered from 0.25 → 0.08: the 2 kHz self-loop, combined with
-      // the per-line FDN feedback and the BPF resonance peak, was
-      // self-oscillating and producing an audible "feedback howl".
-      // At 0.08 with Q 0.6 the closed-loop gain through this path is
-      // well below 1.0 across all frequencies. Halo is fainter but
-      // present, and the system can no longer ring up.
+      // Stability (worst case @ 2 kHz):
+      //   shimmerFB × |H_BPF|_peak × |H_FDN_at_2kHz|_peak
+      //   ≈ 0.08 × 1.0 × (per-line peak ~4.5 × sum gain ~1.5) ≈ 0.54 < 1.0.
       shimmerFB.gain.value = 0.08;
       fdnSum.connect(shimmerBPF);
       shimmerBPF.connect(shimmerFB);
-      shimmerFB.connect(preShelf); // re-enter the FDN front
+      shimmerFB.connect(fdnIn); // re-enter post-diffusion FDN front
 
-      // Output chorus — 3 short modulated delays for organic motion
-      const chorusBaseDelays = [0.008, 0.013, 0.019];
-      const chorusDelays = [];
-      const chorusLfos = [];
-      const chorusLfoGains = [];
-      const chorusOut = ctx.createGain();
-      chorusOut.gain.value = 1 / 3;
-
-      for (let i = 0; i < 3; i++) {
-        const cd = ctx.createDelay(0.05);
-        cd.delayTime.value = chorusBaseDelays[i];
-        const clfo = ctx.createOscillator();
-        clfo.type = 'sine';
-        clfo.frequency.value = 0.6;
-        const clfoGain = ctx.createGain();
-        clfoGain.gain.value = 0.002; // ±2 ms
-        clfo.connect(clfoGain);
-        clfoGain.connect(cd.delayTime);
-        fdnSum.connect(cd);
-        cd.connect(chorusOut);
-        try { clfo.start(ctx.currentTime + i * 0.21); } catch (_) {}
-        chorusDelays.push(cd);
-        chorusLfos.push(clfo);
-        chorusLfoGains.push(clfoGain);
-      }
-
-      // Soft-saturator on the wet bus — tanh(x * 0.7). Harmonic and
-      // musical; rounds off any peak before the limiter has to act.
-      // Acts as a gentle gain ceiling: |tanh| < 1 always, so even an
-      // un-bounded input is bounded at the saturator's output.
-      const wetSat = ctx.createWaveShaper();
-      {
-        const N = 1024;
-        const curve = new Float32Array(N);
-        for (let i = 0; i < N; i++) {
-          const x = (i / (N - 1)) * 2 - 1; // -1..1
-          curve[i] = Math.tanh(x * 0.7);
-        }
-        wetSat.curve = curve;
-        wetSat.oversample = '2x';
-      }
+      // -------- Output stage: shelf, comp, limiter --------
+      // High-shelf moved POST-FDN (was pre): the wet path gets sparkle
+      // without re-amplifying the boost on each feedback iteration.
+      const postShelf = ctx.createBiquadFilter();
+      postShelf.type = 'highshelf';
+      postShelf.frequency.value = 5000;
+      postShelf.gain.value = 4;
+      postShelf.Q.value = 0.7;
 
       // Safety net: moderate compressor catches sustained energy build-up.
       // -18 dB threshold, 4:1, 1 ms attack, 100 ms release.
@@ -2955,9 +2958,10 @@
       wetLimiter.attack.value = 0.001;
       wetLimiter.release.value = 0.05;
 
-      // chorusOut → tanh saturator → 4:1 compressor → 20:1 brick-wall → output
-      chorusOut.connect(wetSat);
-      wetSat.connect(wetComp);
+      // fdnSum → postShelf → wetComp → wetLimiter → output
+      // (no chorus, no waveshaper — those were the phasing/grit culprits)
+      fdnSum.connect(postShelf);
+      postShelf.connect(wetComp);
       wetComp.connect(wetLimiter);
       wetLimiter.connect(output);
 
@@ -2973,10 +2977,9 @@
           }
         },
         dispose() {
-          for (const o of bpfLfos) { try { o.stop(); } catch (_) {} try { o.disconnect(); } catch (_) {} }
-          for (const o of chorusLfos) { try { o.stop(); } catch (_) {} try { o.disconnect(); } catch (_) {} }
-          const all = [input, output, preShelf, fdnSum, shimmerBPF, shimmerFB, chorusOut, wetSat, wetComp, wetLimiter]
-            .concat(delayNodes, bpfs, bpfLfoGains, fbGains, panners, chorusDelays, chorusLfoGains);
+          for (const o of lfos) { try { o.stop(); } catch (_) {} try { o.disconnect(); } catch (_) {} }
+          const all = [input, output, ap1, ap2, ap3, fdnIn, fdnSum, shimmerBPF, shimmerFB, postShelf, wetComp, wetLimiter]
+            .concat(delayNodes, lpfs, fbGains, panners, lfoGains, xfeeds);
           for (const n of all) { try { n.disconnect(); } catch (_) {} }
         }
       };
