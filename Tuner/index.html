@@ -3953,8 +3953,36 @@
       wetGain.gain.value = 0.55;
       const dryGain = ctx.createGain();
       dryGain.gain.value = 0.45;
-      wetGain.connect(masterGain);
-      dryGain.connect(masterGain);
+
+      // ---- Safety net (DC blocker + brick-wall limiter) ----
+      // Wet+dry sum → mixGain → dcBlocker (HPF 10 Hz, Q 0.5) →
+      // limiter (-6 dB, 20:1, 1 ms attack, 50 ms release) → masterGain.
+      // The dcBlocker kills sub-audio drift/DC that would otherwise compound
+      // over minutes of FDN feedback (per-line fb=0.78, cross-feed 0.3).
+      // The limiter is the same pattern proven on the voice wet bus —
+      // even if a resonance starts to ring, peaks are clamped before they
+      // reach EITHER speakers OR the recorder bus, since masterGain (the
+      // post-limiter node) is what feeds both destinations.
+      const mixGain = ctx.createGain();
+      mixGain.gain.value = 1;
+
+      const dcBlocker = ctx.createBiquadFilter();
+      dcBlocker.type = 'highpass';
+      dcBlocker.frequency.value = 10;
+      dcBlocker.Q.value = 0.5;
+
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -6;
+      limiter.knee.value = 0;
+      limiter.ratio.value = 20;
+      limiter.attack.value = 0.001;
+      limiter.release.value = 0.05;
+
+      wetGain.connect(mixGain);
+      dryGain.connect(mixGain);
+      mixGain.connect(dcBlocker);
+      dcBlocker.connect(limiter);
+      limiter.connect(masterGain);
 
       // Pre-FDN diffusion: 3-stage all-pass cascade. Phase-only,
       // amplitude-flat — smears transients before the FDN, smoother tail.
@@ -4066,7 +4094,11 @@
       const lpf = ctx.createBiquadFilter();
       lpf.type = 'lowpass';
       lpf.frequency.value = droneCutoff;
-      lpf.Q.value = 0.7;
+      // Q lowered from 0.7 → 0.3 to broaden the response and kill the
+      // resonant peak right at the LFO-swept cutoff. The narrower peak
+      // was feeding the FDN a steady stream of energy at one frequency,
+      // which is what built up to clicks after ~1 minute.
+      lpf.Q.value = 0.3;
       lpf.connect(shelf);
 
       const lpfLfo = ctx.createOscillator();
@@ -4208,6 +4240,9 @@
         lfoSources, tremGains, panners,
         masterGain, lpf, lpfLfo, lpfLfoGain,
         shelf, droneComp, sumGain, dryGain, wetGain,
+        // Safety nets between wet/dry mix and masterGain — guards both
+        // speakers AND recorder bus (both are fed off masterGain).
+        mixGain, dcBlocker, limiter,
         // FDN reverb (replaced ConvolverNode + preDelay)
         droneAp1, droneAp2, droneAp3, droneFdnIn,
         droneDelayNodes, droneLpfs, droneFbGains, dronePanners,
