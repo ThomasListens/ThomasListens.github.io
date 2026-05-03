@@ -679,9 +679,40 @@
       display: none !important;
     }
 
-    body.record-mode #settingsToggle,
+    /* OBS mode hides everything for clean capture */
     body.obs #settingsToggle {
       display: none !important;
+    }
+
+    /* In record mode the toggle stays available so the user can hide
+       the side panel to see the framed shot — but it's smaller, more
+       transparent, and tucked further into the corner so it doesn't
+       dominate the recorded frame. */
+    body.record-mode #settingsToggle {
+      top: 8px;
+      right: 8px;
+      width: 30px;
+      height: 30px;
+      font-size: 13px;
+      opacity: 0.7;
+      background: rgba(20, 20, 20, 0.55);
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+
+    body.record-mode #settingsToggle:hover {
+      opacity: 1;
+      background: rgba(40, 40, 40, 0.85);
+    }
+
+    /* One-shot pulse to draw attention the first time the user enters
+       record mode in a fresh page load, so they discover the hide button. */
+    @keyframes settingsTogglePulse {
+      0%   { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.45); }
+      60%  { box-shadow: 0 0 0 12px rgba(255, 255, 255, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+    }
+    body.record-mode #settingsToggle.pulse-hint {
+      animation: settingsTogglePulse 1s ease-out 1;
     }
 
     /* Discard recording button (Feature 2) */
@@ -1078,6 +1109,7 @@
     let fileUploadUnlocked = false;
 
     let recordMode = false;
+    let recordHintShown = false;
     let cameraStream = null;
     let cameraFacing = 'user';
     let currentAudioStream = null;
@@ -2383,6 +2415,19 @@
       recordMode = true;
       document.body.classList.add('record-mode');
       document.body.classList.add('aspect-' + recordAspect.replace(':', '-'));
+      // First-time hint: pulse the settings toggle once per page load so
+      // users discover they can hide the panel while recording.
+      if (!recordHintShown) {
+        recordHintShown = true;
+        const stBtn = document.getElementById('settingsToggle');
+        if (stBtn) {
+          stBtn.classList.remove('pulse-hint');
+          // Force reflow so the animation restarts cleanly
+          void stBtn.offsetWidth;
+          stBtn.classList.add('pulse-hint');
+          setTimeout(() => { stBtn.classList.remove('pulse-hint'); }, 1100);
+        }
+      }
       // Sync record-mode sliders to current config
       document.getElementById('rulerPosSlider').value = Math.round(config.rulerX * 100);
       document.getElementById('rulerSizeSlider').value = Math.round(rulerScale * 100);
@@ -2706,8 +2751,8 @@
         const data = buf.getChannelData(ch);
         for (let i = 0; i < len; i++) {
           const t = i / len;
-          // Exponential decay; slight low-passing via averaging avoided for simplicity
-          const env = Math.exp(-t * 4);
+          // Slower decay (exp(-2.5*t)) gives a longer, more spacious tail.
+          const env = Math.exp(-t * 2.5);
           data[i] = (Math.random() * 2 - 1) * env;
         }
       }
@@ -2724,13 +2769,17 @@
       masterGain.gain.value = 0;
       masterGain.connect(droneAudioCtx.destination);
 
-      // Reverb path
+      // Reverb path with a 25 ms pre-delay so the dry signal blooms
+      // for a moment before the long tail arrives. Wet/dry 70/30.
       const convolver = ctx.createConvolver();
-      convolver.buffer = buildTanpuraImpulseResponse(ctx, 3);
+      convolver.buffer = buildTanpuraImpulseResponse(ctx, 5.5);
+      const preDelay = ctx.createDelay(0.5);
+      preDelay.delayTime.value = 0.025;
       const wetGain = ctx.createGain();
-      wetGain.gain.value = 0.6;
+      wetGain.gain.value = 0.7;
       const dryGain = ctx.createGain();
-      dryGain.gain.value = 0.4;
+      dryGain.gain.value = 0.3;
+      preDelay.connect(convolver);
       convolver.connect(wetGain);
       wetGain.connect(masterGain);
       dryGain.connect(masterGain);
@@ -2741,71 +2790,132 @@
       shelf.frequency.value = 6000;
       shelf.gain.value = 2;
       shelf.connect(dryGain);
-      shelf.connect(convolver);
+      shelf.connect(preDelay);
 
-      // Lowpass to tame saw harshness
+      // Lowpass to tame saw harshness — its cutoff is modulated slowly so
+      // the timbre swells and recedes (1800–3200 Hz, ~30 s period).
       const lpf = ctx.createBiquadFilter();
       lpf.type = 'lowpass';
       lpf.frequency.value = 2500;
       lpf.Q.value = 0.7;
       lpf.connect(shelf);
 
-      // Sum bus — keep some headroom before convolver
+      const lpfLfo = ctx.createOscillator();
+      lpfLfo.type = 'sine';
+      lpfLfo.frequency.value = 1 / 30; // ≈0.033 Hz, 30 s period
+      const lpfLfoGain = ctx.createGain();
+      lpfLfoGain.gain.value = 700; // ±700 Hz around 2500 Hz centre
+      lpfLfo.connect(lpfLfoGain);
+      lpfLfoGain.connect(lpf.frequency);
+      try { lpfLfo.start(); } catch (_) {}
+
+      // Sum bus — keep some headroom before reverb
       const sumGain = ctx.createGain();
-      sumGain.gain.value = 0.22;
+      sumGain.gain.value = 0.18;
       sumGain.connect(lpf);
 
-      const detunes = [-3, 0, 3];
-      const oscs = [];
-      const lfoSources = [];
+      // -- Voices --
+      // Three unison saws (mild static detune) plus a sub-octave voice
+      // make up the four "fundamental" voices that get random-walk detune
+      // and tremolo. Frequencies vary per voice so they never lock in phase.
+      // mul = freq multiplier vs refFreq, det = static detune in cents,
+      // pan = stereo position, gain = static voice gain,
+      // detLfo = detune LFO cutoff (Hz), tremLfo = tremolo LFO cutoff (Hz)
+      const voiceSpecs = [
+        { mul: 0.5, det:  0, pan:  0.00, gain: 0.20, detLfo: 0.15, tremLfo: 0.08 }, // sub octave
+        { mul: 1.0, det: -3, pan: -0.25, gain: 0.28, detLfo: 0.27, tremLfo: 0.13 },
+        { mul: 1.0, det:  0, pan:  0.00, gain: 0.28, detLfo: 0.41, tremLfo: 0.19 },
+        { mul: 1.0, det:  3, pan:  0.25, gain: 0.28, detLfo: 0.55, tremLfo: 0.24 },
+      ];
 
-      for (let i = 0; i < detunes.length; i++) {
+      const oscs = [];
+      const oscMuls = [];
+      const lfoSources = [];
+      const tremGains = [];
+      const panners = [];
+
+      const noiseLen = Math.floor(ctx.sampleRate * 4);
+
+      for (let i = 0; i < voiceSpecs.length; i++) {
+        const v = voiceSpecs[i];
+
         const osc = ctx.createOscillator();
         osc.type = 'sawtooth';
-        osc.frequency.value = config.refFreq;
-        osc.detune.value = detunes[i];
+        osc.frequency.value = config.refFreq * v.mul;
+        osc.detune.value = v.det;
 
         const oscGain = ctx.createGain();
-        oscGain.gain.value = 0.33;
+        oscGain.gain.value = v.gain;
 
-        // LFO via noise → heavy lowpass → scale into detune cents
-        const noiseLen = Math.floor(ctx.sampleRate * 4);
+        // Tremolo VCA — its gain breathes around 1.0 by ±8%.
+        const tremGain = ctx.createGain();
+        tremGain.gain.value = 1.0;
+
+        const panner = ctx.createStereoPanner();
+        panner.pan.value = v.pan;
+
+        // Detune LFO via low-passed noise scaled to ±7 cents
         const noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
         const noiseData = noiseBuf.getChannelData(0);
         for (let j = 0; j < noiseLen; j++) noiseData[j] = Math.random() * 2 - 1;
-
         const noiseSrc = ctx.createBufferSource();
         noiseSrc.buffer = noiseBuf;
         noiseSrc.loop = true;
 
-        const lfoFilter = ctx.createBiquadFilter();
-        lfoFilter.type = 'lowpass';
-        // Different cutoff per oscillator so they don't move in lockstep
-        lfoFilter.frequency.value = 0.30 + i * 0.08;
-        lfoFilter.Q.value = 0.7;
+        const detLfoFilter = ctx.createBiquadFilter();
+        detLfoFilter.type = 'lowpass';
+        detLfoFilter.frequency.value = v.detLfo;
+        detLfoFilter.Q.value = 0.7;
 
-        const lfoGain = ctx.createGain();
-        lfoGain.gain.value = 3.5; // ±~3.5 cents
+        const detLfoGain = ctx.createGain();
+        detLfoGain.gain.value = 7; // ±~7 cents
 
-        noiseSrc.connect(lfoFilter);
-        lfoFilter.connect(lfoGain);
-        lfoGain.connect(osc.detune);
+        noiseSrc.connect(detLfoFilter);
+        detLfoFilter.connect(detLfoGain);
+        detLfoGain.connect(osc.detune);
 
+        // Independent tremolo LFO (random-walk style via noise → lowpass)
+        const tremNoiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
+        const tremData = tremNoiseBuf.getChannelData(0);
+        for (let j = 0; j < noiseLen; j++) tremData[j] = Math.random() * 2 - 1;
+        const tremNoiseSrc = ctx.createBufferSource();
+        tremNoiseSrc.buffer = tremNoiseBuf;
+        tremNoiseSrc.loop = true;
+
+        const tremLfoFilter = ctx.createBiquadFilter();
+        tremLfoFilter.type = 'lowpass';
+        tremLfoFilter.frequency.value = v.tremLfo;
+        tremLfoFilter.Q.value = 0.7;
+
+        const tremLfoGain = ctx.createGain();
+        tremLfoGain.gain.value = 0.08; // ±8% gain swing
+
+        tremNoiseSrc.connect(tremLfoFilter);
+        tremLfoFilter.connect(tremLfoGain);
+        tremLfoGain.connect(tremGain.gain);
+
+        // Signal chain: osc → oscGain → tremGain → panner → sumGain
         osc.connect(oscGain);
-        oscGain.connect(sumGain);
+        oscGain.connect(tremGain);
+        tremGain.connect(panner);
+        panner.connect(sumGain);
 
         const startAt = ctx.currentTime + 0.02;
         try {
           osc.start(startAt);
-          // Slight stagger so noise sources don't share identical phase histories
-          noiseSrc.start(startAt + i * 0.01);
+          noiseSrc.start(startAt + i * 0.013);
+          tremNoiseSrc.start(startAt + i * 0.017 + 0.005);
         } catch (e) { /* already started */ }
 
         oscs.push(osc);
+        oscMuls.push(v.mul);
         lfoSources.push(noiseSrc);
+        lfoSources.push(tremNoiseSrc);
+        tremGains.push(tremGain);
+        panners.push(panner);
       }
 
-      // Octave-up for sparkle
+      // Octave-up for sparkle (stays centered, no tremolo — keeps the air bright)
       const octOsc = ctx.createOscillator();
       octOsc.type = 'sawtooth';
       octOsc.frequency.value = config.refFreq * 2;
@@ -2815,7 +2925,51 @@
       octGain.connect(sumGain);
       try { octOsc.start(); } catch (e) {}
 
-      tanpuraNodes = { oscs, octOsc, lfoSources, masterGain, lpf, shelf, sumGain, dryGain, wetGain, convolver };
+      // Tanpura-style fifth-above voice, slightly detuned off pure 3:2.
+      // Sits at ≈ -8 dB relative to the unison saws so it perfumes the
+      // chord without dominating it.
+      const fifthOsc = ctx.createOscillator();
+      fifthOsc.type = 'sawtooth';
+      fifthOsc.frequency.value = config.refFreq * 1.5;
+      fifthOsc.detune.value = 5;
+      const fifthGain = ctx.createGain();
+      fifthGain.gain.value = 0.11;
+      const fifthPanner = ctx.createStereoPanner();
+      fifthPanner.pan.value = 0.15;
+
+      const fifthNoiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
+      const fifthNoiseData = fifthNoiseBuf.getChannelData(0);
+      for (let j = 0; j < noiseLen; j++) fifthNoiseData[j] = Math.random() * 2 - 1;
+      const fifthNoiseSrc = ctx.createBufferSource();
+      fifthNoiseSrc.buffer = fifthNoiseBuf;
+      fifthNoiseSrc.loop = true;
+      const fifthLfoFilter = ctx.createBiquadFilter();
+      fifthLfoFilter.type = 'lowpass';
+      fifthLfoFilter.frequency.value = 0.22;
+      fifthLfoFilter.Q.value = 0.7;
+      const fifthLfoGain = ctx.createGain();
+      fifthLfoGain.gain.value = 5;
+      fifthNoiseSrc.connect(fifthLfoFilter);
+      fifthLfoFilter.connect(fifthLfoGain);
+      fifthLfoGain.connect(fifthOsc.detune);
+
+      fifthOsc.connect(fifthGain);
+      fifthGain.connect(fifthPanner);
+      fifthPanner.connect(sumGain);
+      try {
+        fifthOsc.start();
+        fifthNoiseSrc.start();
+      } catch (e) {}
+      lfoSources.push(fifthNoiseSrc);
+
+      tanpuraNodes = {
+        oscs, oscMuls,
+        octOsc, fifthOsc,
+        lfoSources, tremGains, panners,
+        masterGain, lpf, lpfLfo, lpfLfoGain,
+        shelf, sumGain, dryGain, wetGain,
+        convolver, preDelay
+      };
     }
 
     function teardownTanpura() {
@@ -2837,11 +2991,20 @@
         try {
           for (const o of nodes.oscs) { try { o.stop(); } catch (_) {} try { o.disconnect(); } catch (_) {} }
           for (const n of nodes.lfoSources) { try { n.stop(); } catch (_) {} try { n.disconnect(); } catch (_) {} }
+          if (nodes.tremGains) { for (const g of nodes.tremGains) { try { g.disconnect(); } catch (_) {} } }
+          if (nodes.panners) { for (const p of nodes.panners) { try { p.disconnect(); } catch (_) {} } }
           try { nodes.octOsc.stop(); } catch (_) {}
           try { nodes.octOsc.disconnect(); } catch (_) {}
+          if (nodes.fifthOsc) {
+            try { nodes.fifthOsc.stop(); } catch (_) {}
+            try { nodes.fifthOsc.disconnect(); } catch (_) {}
+          }
+          if (nodes.lpfLfo) { try { nodes.lpfLfo.stop(); } catch (_) {} try { nodes.lpfLfo.disconnect(); } catch (_) {} }
+          if (nodes.lpfLfoGain) { try { nodes.lpfLfoGain.disconnect(); } catch (_) {} }
           try { nodes.sumGain.disconnect(); } catch (_) {}
           try { nodes.lpf.disconnect(); } catch (_) {}
           try { nodes.shelf.disconnect(); } catch (_) {}
+          if (nodes.preDelay) { try { nodes.preDelay.disconnect(); } catch (_) {} }
           try { nodes.dryGain.disconnect(); } catch (_) {}
           try { nodes.wetGain.disconnect(); } catch (_) {}
           try { nodes.convolver.disconnect(); } catch (_) {}
@@ -2864,11 +3027,17 @@
       const ctx = droneAudioCtx;
       const t = ctx.currentTime;
       const TAU = 0.04;
-      for (const o of tanpuraNodes.oscs) {
-        try { o.frequency.setTargetAtTime(refFreq, t, TAU); } catch (_) {}
+      const muls = tanpuraNodes.oscMuls || [];
+      for (let i = 0; i < tanpuraNodes.oscs.length; i++) {
+        const o = tanpuraNodes.oscs[i];
+        const m = muls[i] != null ? muls[i] : 1;
+        try { o.frequency.setTargetAtTime(refFreq * m, t, TAU); } catch (_) {}
       }
       if (tanpuraNodes.octOsc) {
         try { tanpuraNodes.octOsc.frequency.setTargetAtTime(refFreq * 2, t, TAU); } catch (_) {}
+      }
+      if (tanpuraNodes.fifthOsc) {
+        try { tanpuraNodes.fifthOsc.frequency.setTargetAtTime(refFreq * 1.5, t, TAU); } catch (_) {}
       }
     }
 
