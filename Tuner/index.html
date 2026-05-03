@@ -1477,7 +1477,9 @@
     let indicatorY = null, indicatorOpacity = 0;
     let lastDisplayCents = null, lastDisplayFreq = null, smoothedProximity = 0;
     let droneOscillators = {}, droneRatioYPositions = {};
-    let droneAudioCtx = null, droneMasterGain = null, droneDCBlock = null, droneLimiter = null;
+    // Single shared AudioContext (audioContext) hosts mic, recorder bus,
+    // tanpura, and per-ratio drones. droneAudioCtx is gone — see
+    // getAudioContext() below.
     let audioBuffer = null, sourceNode = null, isPlaying = false;
     let startTime = 0, pauseTime = 0, fileMode = false;
     let advancedVisible = false;
@@ -1858,58 +1860,60 @@
       return ratios;
     }
     
-    function initDroneAudio() {
-      if (droneAudioCtx) return;
-      
-      droneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      droneMasterGain = droneAudioCtx.createGain();
-      droneMasterGain.gain.value = 0.3;
-      
-      droneDCBlock = droneAudioCtx.createBiquadFilter();
-      droneDCBlock.type = 'highpass';
-      droneDCBlock.frequency.value = 10;
-      droneDCBlock.Q.value = 0.7;
-      
-      droneLimiter = droneAudioCtx.createDynamicsCompressor();
-      droneLimiter.threshold.value = -6;
-      droneLimiter.ratio.value = 20;
-      droneLimiter.attack.value = 0.003;
-      droneLimiter.release.value = 0.05;
-      
-      droneDCBlock.connect(droneLimiter);
-      droneLimiter.connect(droneMasterGain);
-      droneMasterGain.connect(droneAudioCtx.destination);
+    // Lazy getter for the shared AudioContext. Both mic toggle and drone
+    // toggle call this from a user-gesture handler, so the context can be
+    // created on whichever path runs first. If the context was previously
+    // closed (e.g. mic toggled off), a fresh one is created. If the
+    // context is suspended (autoplay policy or backgrounding), this
+    // resumes it.
+    function getAudioContext() {
+      if (!audioContext || audioContext.state === 'closed') {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioContext.state === 'suspended') {
+        audioContext.resume().catch(() => {});
+      }
+      return audioContext;
     }
-    
+
+    // Resume the shared context when the page becomes visible again.
+    // Mobile browsers (esp. Pixel) auto-suspend AudioContexts when the
+    // tab loses focus or the screen turns off; without this, the drone
+    // doesn't come back when the user returns.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && audioContext && audioContext.state === 'suspended') {
+        audioContext.resume().catch(() => {});
+      }
+    });
+
     function toggleDrone(ratio) {
       const label = ratio.label;
       const freq = config.refFreq * ratio.ratio;
-      
+
       if (droneOscillators[label]) {
         stopDrone(label);
         updateStopButton();
         return;
       }
-      
-      initDroneAudio();
-      if (droneAudioCtx.state === 'suspended') droneAudioCtx.resume();
-      
-      const now = droneAudioCtx.currentTime;
-      const osc = droneAudioCtx.createOscillator();
+
+      const ctx = getAudioContext();
+
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, now);
-      
-      const gain = droneAudioCtx.createGain();
+
+      const gain = ctx.createGain();
       gain.gain.setValueAtTime(0, now);
-      
+
       osc.connect(gain);
-      gain.connect(droneDCBlock);
-      
+      gain.connect(ctx.destination);
+
       const startDelay = 0.01;
       osc.start(now + startDelay);
       gain.gain.setValueAtTime(0, now + startDelay);
       gain.gain.linearRampToValueAtTime(0.12, now + startDelay + 0.02);
-      
+
       droneOscillators[label] = { osc, gain, freq };
       updateStopButton();
       draw();
@@ -1923,9 +1927,15 @@
     
     function stopDrone(label) {
       if (!droneOscillators[label]) return;
-      
+
       const { osc, gain } = droneOscillators[label];
-      const now = droneAudioCtx.currentTime;
+      if (!audioContext) {
+        // Context was already closed; just drop the reference.
+        delete droneOscillators[label];
+        draw();
+        return;
+      }
+      const now = audioContext.currentTime;
       
       gain.gain.cancelScheduledValues(now);
       gain.gain.setValueAtTime(gain.gain.value, now);
@@ -2658,11 +2668,9 @@
       
       if (isListening) await toggleListening();
       if (isPlaying) stopFilePlayback();
-      
-      if (!audioContext) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      
+
+      getAudioContext();
+
       try {
         const arrayBuffer = await file.arrayBuffer();
         audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
@@ -3066,7 +3074,7 @@
         const micOut = ctx.createGain();
         micOut.gain.value = 1.0;
         micOut.connect(dest);
-        return {
+        const mp = {
           ctx,
           dest,
           micOut,
@@ -3076,6 +3084,13 @@
           wetGain: null,
           dryGain: null
         };
+        // If tanpura is already running on the shared context, wire its
+        // master gain into this fresh recorder bus so the drone shows up
+        // in recordings.
+        if (tanpuraNodes && tanpuraNodes.masterGain) {
+          try { tanpuraNodes.masterGain.connect(dest); } catch (_) {}
+        }
+        return mp;
       } catch (e) {
         console.warn('[record] buildMicProcessing failed:', e);
         return null;
@@ -3273,7 +3288,10 @@
 
       if (!isListening) {
         try {
-          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          // Reuse the shared AudioContext (created earlier if drone was
+          // enabled before the mic). getAudioContext() also resumes it
+          // if it was suspended.
+          getAudioContext();
           console.log('[input] toggleListening: requesting deviceId=', selectedInputDeviceId);
           let stream;
           try {
@@ -3327,22 +3345,31 @@
         if (animationId) cancelAnimationFrame(animationId);
         tearDownAudioStream(currentAudioStream);
         currentAudioStream = null;
-        // Drop mic-processing references — they belong to audioContext
-        // and become invalid after .close(). They'll be rebuilt next
-        // time the user starts listening.
+        // Drop mic-processing references — disconnect from the shared
+        // context, but DO NOT close the context: tanpura and per-ratio
+        // drones may still be live on it.
         if (currentMicSource) {
           try { currentMicSource.disconnect(); } catch (_) {}
           currentMicSource = null;
         }
         // Stop the reverb's running LFO oscillators before dropping
-        // the chain. Without this, the LFOs would linger inside a
-        // closing AudioContext and (occasionally) throw on close().
+        // the chain. Without this, the LFOs would linger inside the
+        // context.
         if (micProcessing && micProcessing.reverb) {
           try { micProcessing.reverb.dispose(); } catch (_) {}
         }
+        // If tanpura was wired into the recorder bus, drop that link
+        // before tearing down micProcessing — its dest is going away.
+        if (tanpuraNodes && micProcessing && micProcessing.dest) {
+          try { tanpuraNodes.masterGain.disconnect(micProcessing.dest); } catch (_) {}
+        }
+        if (micProcessing) {
+          try { micProcessing.micOut.disconnect(); } catch (_) {}
+          for (const n of (micProcessing.chain || [])) { try { n.disconnect(); } catch (_) {} }
+        }
         micProcessing = null;
-        if (audioContext) audioContext.close();
-        audioContext = null;
+        // Shared context stays alive for drone use. It's closed only
+        // when the page unloads.
         analyser = null;
         smoothedFreq = null;
         smoothedCents = null;
@@ -3506,9 +3533,9 @@
       // Prefer the processed mic destination (highpass + compressor +4dB)
       // for the recorded audio. Fall back to the raw mic track only if
       // the processing chain failed to build (older browsers, etc.).
-      // The drone runs in a SEPARATE AudioContext (droneAudioCtx) and is
-      // not plumbed into either mic node; the only way drone can reach
-      // the recording is acoustic bleed (speaker → mic).
+      // Tanpura now lives on the SAME shared AudioContext and its master
+      // gain is wired into micProcessing.dest, so the drone is mixed
+      // into this same MediaStream sample-accurately.
       let audioTrack = null;
       let audioSource = 'none';
       if (micProcessing && micProcessing.dest) {
@@ -3532,8 +3559,7 @@
       console.log('[record] start',
         'audioSource=', audioSource,
         'trackLabel=', audioTrack && audioTrack.label,
-        'micCtxState=', audioContext && audioContext.state,
-        'droneCtxState=', droneAudioCtx && droneAudioCtx.state,
+        'ctxState=', audioContext && audioContext.state,
         'droneEnabled=', tanpuraEnabled,
         'streamTracks=', canvasStream.getTracks().map(t => t.kind));
 
@@ -3834,15 +3860,20 @@
     // for tanpura character: shorter prime delays, no shimmer self-loop,
     // fixed per-line feedback. ~12 small nodes vs. the convolver, which
     // is dramatically cheaper at the same lush character.
-    function buildTanpura() {
-      if (!droneAudioCtx) return;
+    function buildTanpura(ctx) {
+      if (!ctx) return;
       if (tanpuraNodes) return;
-      const ctx = droneAudioCtx;
 
-      // Master gain — controls overall tanpura level (separate from per-ratio drones)
+      // Master gain — controls overall tanpura level (separate from per-ratio drones).
+      // Connects to BOTH the speakers (audioContext.destination) AND the
+      // recorder bus (micProcessing.dest, if it exists). Same node feeds
+      // both — the volume slider stays a single source of truth.
       const masterGain = ctx.createGain();
       masterGain.gain.value = 0;
-      masterGain.connect(droneAudioCtx.destination);
+      masterGain.connect(ctx.destination);
+      if (micProcessing && micProcessing.dest) {
+        masterGain.connect(micProcessing.dest);
+      }
 
       // FDN reverb (replaces previous Convolver + 25 ms preDelay). Same
       // wet/dry balance — 0.55/0.45 — direct signal carries the apparent
@@ -4028,6 +4059,12 @@
 
       const noiseLen = Math.floor(ctx.sampleRate * 4);
 
+      // Anchor every voice to a single start time so the per-voice 20 ms
+      // gain ramp lines up with the oscillator start — kills the audible
+      // click that was happening when oscGain jumped from 0 to v.gain at
+      // the same instant the saw started.
+      const tanpuraStartAt = ctx.currentTime + 0.02;
+
       for (let i = 0; i < voiceSpecs.length; i++) {
         const v = voiceSpecs[i];
 
@@ -4036,8 +4073,11 @@
         osc.frequency.value = config.refFreq * v.mul;
         osc.detune.value = v.det;
 
+        // 20 ms linear ramp from 0 → v.gain at oscillator start. No
+        // instant jumps; ramp aligned to the shared start time.
         const oscGain = ctx.createGain();
-        oscGain.gain.value = v.gain;
+        oscGain.gain.setValueAtTime(0, tanpuraStartAt);
+        oscGain.gain.linearRampToValueAtTime(v.gain, tanpuraStartAt + 0.02);
 
         // Tremolo VCA — its gain breathes around 1.0 by ±6%.
         const tremGain = ctx.createGain();
@@ -4080,10 +4120,9 @@
         tremGain.connect(panner);
         panner.connect(sumGain);
 
-        const startAt = ctx.currentTime + 0.02;
         try {
-          osc.start(startAt);
-          noiseSrc.start(startAt + i * 0.013);
+          osc.start(tanpuraStartAt);
+          noiseSrc.start(tanpuraStartAt + i * 0.013);
         } catch (e) { /* already started */ }
 
         oscs.push(osc);
@@ -4097,11 +4136,13 @@
       const octOsc = ctx.createOscillator();
       octOsc.type = 'sawtooth';
       octOsc.frequency.value = config.refFreq * 2;
+      // 20 ms ramp from 0 → 0.08 at start, same anchor as voices.
       const octGain = ctx.createGain();
-      octGain.gain.value = 0.08;
+      octGain.gain.setValueAtTime(0, tanpuraStartAt);
+      octGain.gain.linearRampToValueAtTime(0.08, tanpuraStartAt + 0.02);
       octOsc.connect(octGain);
       octGain.connect(sumGain);
-      try { octOsc.start(); } catch (e) {}
+      try { octOsc.start(tanpuraStartAt); } catch (e) {}
 
       tanpuraNodes = {
         oscs, oscMuls,
@@ -4118,7 +4159,7 @@
 
     function teardownTanpura() {
       if (!tanpuraNodes) return;
-      const ctx = droneAudioCtx;
+      const ctx = audioContext;
       const t = ctx ? ctx.currentTime : 0;
 
       // Fade out then stop to avoid clicks
@@ -4162,22 +4203,15 @@
           try { nodes.masterGain.disconnect(); } catch (_) {}
         } catch (_) {}
 
-        // Suspend the drone's AudioContext so its audio worker thread
-        // stops competing with the mic-side context for CPU on Pixel 7.
-        // Resume happens automatically in setTanpuraEnabled(true) on
-        // the next user gesture. Skip suspend if the user re-enabled
-        // the drone during the 120 ms teardown delay (tanpuraNodes
-        // would be non-null).
-        if (!tanpuraEnabled && !tanpuraNodes && droneAudioCtx
-            && droneAudioCtx.state === 'running') {
-          droneAudioCtx.suspend().catch(() => {});
-        }
+        // No more droneAudioCtx.suspend() — the shared context is also
+        // hosting the mic and the recorder bus, so suspending it would
+        // kill those too. Tanpura nodes are gone; CPU drops accordingly.
       }, 120);
     }
 
     function applyTanpuraVolume() {
-      if (!tanpuraNodes || !droneAudioCtx) return;
-      const ctx = droneAudioCtx;
+      if (!tanpuraNodes || !audioContext) return;
+      const ctx = audioContext;
       // Square-law slider mapping kept (smooth quiet end). Ceiling raised
       // from 0.85 → 1.4 — the bus compressor catches peaks at -22 dB so
       // we can run hot makeup gain after the wet/dry split without hard
@@ -4189,8 +4223,8 @@
     }
 
     function setTanpuraTuning(refFreq) {
-      if (!tanpuraNodes || !droneAudioCtx) return;
-      const ctx = droneAudioCtx;
+      if (!tanpuraNodes || !audioContext) return;
+      const ctx = audioContext;
       const t = ctx.currentTime;
       const TAU = 0.04;
       const muls = tanpuraNodes.oscMuls || [];
@@ -4210,30 +4244,19 @@
 
       const recActive = mediaRecorder && mediaRecorder.state === 'recording';
       if (recActive) {
-        // The drone runs in droneAudioCtx (separate from the mic/recorder
-        // AudioContext) and is NOT plumbed into the recording stream by
-        // software. Logging helps scout any reported "drone breaks the
-        // recording" reports — likely acoustic bleed or BT routing, not
-        // a graph issue.
+        // Drone now runs on the SAME shared AudioContext as the mic and
+        // recorder bus — its master gain is wired to micProcessing.dest
+        // when buildTanpura() runs, so the drone is sample-accurate in
+        // the recording (no acoustic-bleed dependency).
         console.log('[record] drone toggled mid-recording:',
           'on=', tanpuraEnabled,
-          'micCtxState=', audioContext && audioContext.state,
-          'droneCtxState=', droneAudioCtx && droneAudioCtx.state);
+          'ctxState=', audioContext && audioContext.state);
       }
 
       if (tanpuraEnabled) {
-        initDroneAudio();
-        if (droneAudioCtx.state === 'suspended') {
-          try { await droneAudioCtx.resume(); } catch (_) {}
-        }
-        if (!tanpuraNodes) buildTanpura();
+        const ctx = getAudioContext();
+        if (!tanpuraNodes) buildTanpura(ctx);
         applyTanpuraVolume();
-        // Make sure the mic-side context didn't get nudged into 'suspended'
-        // by the gesture (defensive — shouldn't happen, but cheap to check).
-        if (recActive && audioContext && audioContext.state === 'suspended') {
-          console.warn('[record] mic AudioContext suspended after drone toggle; resuming');
-          try { await audioContext.resume(); } catch (_) {}
-        }
       } else {
         if (tanpuraNodes) {
           // Fade out, then teardown to free CPU
@@ -4254,9 +4277,9 @@
     function setDroneCutoff(hz) {
       droneCutoff = Math.max(DRONE_CUTOFF_MIN, Math.min(DRONE_CUTOFF_MAX, hz));
       try { localStorage.setItem('tuner.drone.cutoff', String(droneCutoff)); } catch (_) {}
-      if (tanpuraNodes && tanpuraNodes.lpf && droneAudioCtx) {
+      if (tanpuraNodes && tanpuraNodes.lpf && audioContext) {
         try {
-          tanpuraNodes.lpf.frequency.setTargetAtTime(droneCutoff, droneAudioCtx.currentTime, 0.05);
+          tanpuraNodes.lpf.frequency.setTargetAtTime(droneCutoff, audioContext.currentTime, 0.05);
         } catch (_) {}
       }
     }
