@@ -2906,10 +2906,29 @@
     }
     
     function buildAudioConstraints(deviceId) {
+      // HARD constraints (`{ exact: false }`) instead of soft preferences.
+      // Soft constraints — `echoCancellation: false` — are treated as a
+      // PREFERENCE; Chrome can silently override them and still apply the
+      // built-in processing pipeline. The exact form makes getUserMedia
+      // FAIL if the browser can't honour the constraint, which forces it
+      // to deliver a truly raw stream instead of one that's been quietly
+      // run through AGC/AEC/NS/highpass even after we asked it not to.
+      // Goog-prefixed hints catch older Chromium builds that still read
+      // them. We also pin sampleRate to 48 kHz to match the encoder, and
+      // mono (channelCount: 1) — single-channel reduces the surface for
+      // stereo-interleave-related artifacts at the encoder boundary.
       const audio = {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false
+        echoCancellation: { exact: false },
+        noiseSuppression: { exact: false },
+        autoGainControl: { exact: false },
+        googEchoCancellation: false,
+        googAutoGainControl: false,
+        googNoiseSuppression: false,
+        googHighpassFilter: false,
+        googTypingNoiseDetection: false,
+        googAudioMirroring: false,
+        sampleRate: { ideal: 48000 },
+        channelCount: { ideal: 1 }
       };
       if (deviceId) {
         // Use `ideal` (not `exact`) so the browser doesn't throw when
@@ -3720,9 +3739,13 @@
         canvasStream.addTrack(audioTrack);
       }
 
+      const trackSettings = audioTrack && audioTrack.getSettings ? audioTrack.getSettings() : {};
       console.log('[record] start',
         'audioSource=', audioSource,
         'trackLabel=', audioTrack && audioTrack.label,
+        'ctxSampleRate=', audioContext && audioContext.sampleRate,
+        'trackSampleRate=', trackSettings.sampleRate,
+        'trackChannelCount=', trackSettings.channelCount,
         'ctxState=', audioContext && audioContext.state,
         'droneEnabled=', tanpuraEnabled,
         'streamTracks=', canvasStream.getTracks().map(t => t.kind));
