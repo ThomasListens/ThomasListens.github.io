@@ -3688,15 +3688,22 @@
       const canvasStream = canvas.captureStream(0);
       recordVideoTrack = canvasStream.getVideoTracks()[0] || null;
 
-      // Prefer the processed mic destination (highpass + compressor +4dB)
-      // for the recorded audio. Fall back to the raw mic track only if
-      // the processing chain failed to build (older browsers, etc.).
-      // Tanpura now lives on the SAME shared AudioContext and its master
-      // gain is wired into micProcessing.dest, so the drone is mixed
-      // into this same MediaStream sample-accurately.
+      // Audio track selection. The Web Audio path
+      // (MediaStreamAudioSourceNode → ... → MediaStreamAudioDestinationNode)
+      // gives us drone-in-recording and voice FX baked in, but it has
+      // been the suspected source of rhythmic clicks during recording.
+      // The raw getUserMedia track is exactly what Reaper would record
+      // — no Web Audio in the path — and is click-free by definition.
+      //
+      // We only use the processed path when there's something to process:
+      // a voice FX is enabled, OR the drone is enabled (drone is mixed
+      // in via micProcessing.dest). Otherwise we use the raw track.
+      const needsProcessedAudio =
+        voiceFX.lowcut || voiceFX.compression || voiceFX.reverb || tanpuraEnabled;
+
       let audioTrack = null;
       let audioSource = 'none';
-      if (micProcessing && micProcessing.dest) {
+      if (needsProcessedAudio && micProcessing && micProcessing.dest) {
         const processedTracks = micProcessing.dest.stream.getAudioTracks();
         if (processedTracks.length > 0) {
           audioTrack = processedTracks[0];
@@ -3706,8 +3713,7 @@
       if (!audioTrack && currentAudioStream) {
         audioTrack = currentAudioStream.getAudioTracks()[0] || null;
         if (audioTrack) {
-          audioSource = 'raw-fallback';
-          console.warn('[record] processed mic chain unavailable; using raw mic');
+          audioSource = needsProcessedAudio ? 'raw-fallback' : 'raw-direct';
         }
       }
       if (audioTrack) {
