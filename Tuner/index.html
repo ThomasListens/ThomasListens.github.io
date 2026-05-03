@@ -3939,9 +3939,14 @@
       // mirrors buildShimmerReverb but is tuned for drone:
       //   - 4 parallel delay lines (167, 251, 367, 487 ms primes)
       //   - per-line lowpass damping at 3 kHz (Q 0.7)
-      //   - per-line feedback fixed at 0.78 (no slider — drone tail is
-      //     consistent; voice reverb gets the slider)
-      //   - cross-feed 0.3 line→next (Hadamard-lite)
+      //   - per-line feedback fixed at 0.6 (lowered from 0.78 to kill
+      //     runaway buildup; max steady-state gain = 1/(1-0.6) = 2.5x —
+      //     provably bounded, no exponential growth)
+      //   - NO cross-feed (was 0.3 line→next; the ring + 0.78 per-line
+      //     pushed effective loop gain past 1.0 at certain frequencies,
+      //     causing self-oscillation after ~1 minute of play). The four
+      //     lines now operate as parallel combs — each tail decays
+      //     independently. Slightly less density, much more stability.
       //   - panning [-0.4, +0.2, -0.1, +0.4]
       //   - per-line ±0.5 ms delay-time LFO at 0.04/0.07/0.10/0.13 Hz
       //     for breath
@@ -3954,15 +3959,20 @@
       const dryGain = ctx.createGain();
       dryGain.gain.value = 0.45;
 
-      // ---- Safety net (DC blocker + brick-wall limiter) ----
+      // ---- Safety net (DC blocker + graceful-catcher limiter) ----
       // Wet+dry sum → mixGain → dcBlocker (HPF 10 Hz, Q 0.5) →
-      // limiter (-6 dB, 20:1, 1 ms attack, 50 ms release) → masterGain.
+      // limiter (-3 dB, 6 dB knee, 8:1, 5 ms attack, 120 ms release)
+      // → masterGain.
       // The dcBlocker kills sub-audio drift/DC that would otherwise compound
-      // over minutes of FDN feedback (per-line fb=0.78, cross-feed 0.3).
-      // The limiter is the same pattern proven on the voice wet bus —
-      // even if a resonance starts to ring, peaks are clamped before they
-      // reach EITHER speakers OR the recorder bus, since masterGain (the
-      // post-limiter node) is what feeds both destinations.
+      // over minutes of FDN feedback (per-line fb=0.6, no cross-feed).
+      // The limiter is now a soft-knee "graceful catcher" rather than a
+      // brick wall — with the FDN stable by construction (0.6 per-line, no
+      // ring), it should rarely engage at all. When it does, the soft knee
+      // and 8:1 ratio bend the signal musically instead of clicking it
+      // (the previous 20:1 / 1 ms hard limiter pumped on incoming peaks
+      // and produced the click artifacts). It still protects both speakers
+      // AND the recorder bus, since masterGain (the post-limiter node) is
+      // what feeds both destinations.
       const mixGain = ctx.createGain();
       mixGain.gain.value = 1;
 
@@ -3972,11 +3982,11 @@
       dcBlocker.Q.value = 0.5;
 
       const limiter = ctx.createDynamicsCompressor();
-      limiter.threshold.value = -6;
-      limiter.knee.value = 0;
-      limiter.ratio.value = 20;
-      limiter.attack.value = 0.001;
-      limiter.release.value = 0.05;
+      limiter.threshold.value = -3;
+      limiter.knee.value = 6;
+      limiter.ratio.value = 8;
+      limiter.attack.value = 0.005;
+      limiter.release.value = 0.12;
 
       wetGain.connect(mixGain);
       dryGain.connect(mixGain);
@@ -4022,7 +4032,13 @@
         lpf.Q.value = 0.7;
 
         const fb = ctx.createGain();
-        fb.gain.value = 0.78;
+        // Per-line feedback lowered from 0.78 → 0.6 to kill the runaway
+        // buildup that produced the harsh feedback ~1 min into play.
+        // With no cross-feed (see below), each line is an independent
+        // parallel comb with steady-state gain 1/(1-0.6) = 2.5x —
+        // provably bounded. T60 ≈ 1.5–2 s at the 367 ms mean delay,
+        // perceptual decay ~4–5 s — still a substantial drone tail.
+        fb.gain.value = 0.6;
 
         const p = ctx.createStereoPanner();
         p.pan.value = dronePans[i];
@@ -4054,15 +4070,16 @@
         droneLfoGains.push(lfoGain);
       }
 
-      // Cross-feed ring: each lpf output → next line's delay input
-      // at 0.3 gain. Adds echo density without per-line resonance.
-      for (let i = 0; i < 4; i++) {
-        const xf = ctx.createGain();
-        xf.gain.value = 0.3;
-        droneLpfs[i].connect(xf);
-        xf.connect(droneDelayNodes[(i + 1) % 4]);
-        droneXfeeds.push(xf);
-      }
+      // Cross-feed ring REMOVED. Previously each lpf output → next line's
+      // delay input at 0.3 gain (Hadamard-lite density trick). Combined
+      // with 0.78 per-line feedback, the 4-line cross-feed ring formed a
+      // closed loop whose effective gain exceeded 1.0 at certain
+      // frequencies, causing the drone to self-oscillate after ~1 minute.
+      // Without the cross-feed the FDN simplifies to four parallel comb
+      // filters with feedback 0.6 — provably stable, max steady-state
+      // gain 2.5x the input. We lose some echo density; we gain stability
+      // for indefinite play. droneXfeeds remains as an empty array so any
+      // teardown loops that iterate it stay safe.
 
       // Bus compressor — the actual loudness lever. Sits between the
       // tone-shaping (lpf+shelf) and the wet/dry split, so both the dry
