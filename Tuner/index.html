@@ -1553,6 +1553,10 @@
     let recordedChunks = [];
     let recordStartTime = 0;
     let recordTimerId = null;
+    // Reference to the canvas captureStream's video track during a
+    // recording, so audioLoop can call .requestFrame() after each paint
+    // and sync video timestamps to actual paint times.
+    let recordVideoTrack = null;
 
     // Voice processing for recording. Built lazily once an audioContext
     // exists. Raw mic still feeds the analyser unmodified — pitch
@@ -1917,7 +1921,20 @@
     // gone — nothing closes the context anymore.
     function getAudioContext() {
       if (!audioContext) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        // latencyHint: 'playback' gives the audio thread larger buffers
+        // (~50 ms vs the default ~3 ms 'interactive'). The pitch
+        // analyser sees data ~50 ms later than before — the indicator's
+        // visual lag is still well under "reactive feel" — but the
+        // recorder gets a much bigger CPU budget per audio block, which
+        // is the difference between buffer underruns (audible as clicks)
+        // and clean output on machines where the recorder + canvas
+        // capture would otherwise crowd the audio thread.
+        const Ctor = window.AudioContext || window.webkitAudioContext;
+        try {
+          audioContext = new Ctor({ latencyHint: 'playback' });
+        } catch (_) {
+          audioContext = new Ctor();
+        }
       }
       if (audioContext.state === 'suspended') {
         audioContext.resume().catch(() => {});
@@ -2747,11 +2764,20 @@
         const duration = audioBuffer.duration;
         updateTimeDisplay(currentTime, duration);
         document.getElementById('seekBar').value = (currentTime / duration) * 100;
-        
+
         if (currentTime >= duration) stopFilePlayback();
       }
-      
+
       draw();
+
+      // Sync the recording's video track to the actual paint we just
+      // performed. captureStream(0) only emits a video frame when this
+      // is called — pinning timestamps to paints, not to a polled clock,
+      // is what eliminates the rhythmic clicks in the recorded audio.
+      if (recordVideoTrack && mediaRecorder && mediaRecorder.state === 'recording') {
+        try { recordVideoTrack.requestFrame(); } catch (_) {}
+      }
+
       animationId = requestAnimationFrame(audioLoop);
     }
     
@@ -3649,14 +3675,18 @@
       }
 
       const canvas = document.getElementById('rulerCanvas');
-      // captureStream() with no arg captures a frame each time the canvas
-      // is updated, instead of polling at a fixed rate. The fixed-rate
-      // form (captureStream(30)) was producing video timestamps that drift
-      // off the actual paint times — MediaRecorder then has to resync the
-      // audio against those drifting video timestamps every frame, which
-      // is exactly what was producing the rhythmic clicks the user heard
-      // whenever audio was present in the recording.
-      const canvasStream = canvas.captureStream();
+      // captureStream(0) means "no automatic capture" — frames are only
+      // emitted when we explicitly call track.requestFrame(). audioLoop
+      // calls requestFrame at the end of every draw() while recording,
+      // so the video track's timestamps land exactly on our paints
+      // instead of on the browser's internal polling grid. Both the
+      // fixed-rate form (captureStream(30)) and the on-update form
+      // (captureStream() with no arg) were producing timestamps that
+      // drift off the actual paint times, forcing MediaRecorder to
+      // resync the audio against drifting video, which was the source
+      // of the rhythmic clicks during audio.
+      const canvasStream = canvas.captureStream(0);
+      recordVideoTrack = canvasStream.getVideoTracks()[0] || null;
 
       // Prefer the processed mic destination (highpass + compressor +4dB)
       // for the recorded audio. Fall back to the raw mic track only if
@@ -3709,6 +3739,7 @@
       mediaRecorder.onstop = () => {
         // Stop only the canvas video track; keep the shared mic track alive
         try { canvasStream.getVideoTracks().forEach(t => t.stop()); } catch (_) {}
+        recordVideoTrack = null;
 
         const elapsedMs = recordStartTime ? (performance.now() - recordStartTime) : 0;
         const totalBytes = recordedChunks.reduce((n, c) => n + (c && c.size ? c.size : 0), 0);
