@@ -2651,52 +2651,64 @@
     }
     
     function audioLoop() {
-      if (!analyser) return;
-      if (!isListening && !isPlaying) return;
+      // Render loop is alive whenever the canvas needs painting: mic on,
+      // file playing, OR record mode (camera background must keep
+      // refreshing even before the user activates the mic). Without the
+      // recordMode branch the canvas froze on entry whenever the user
+      // hadn't tapped the mic button yet, since draw() is only called
+      // from this loop and the loop returned early on no analyser.
+      if (!isListening && !isPlaying && !recordMode) {
+        animationId = null;
+        return;
+      }
 
       const now = performance.now();
 
-      // Pitch-detection throttle. Outside recording, run full rAF rate
-      // (~60 Hz) so the indicator is maximally responsive. Inside record
-      // mode, skip every other frame — autocorrelation + smoothing is
-      // the heaviest CPU cost in the rAF loop and Pixel 7 stutters when
-      // the recorder + drone + camera filter are all stacked. The visual
-      // smoothing (draw() below) still updates every frame, so the ruler
-      // never looks choppy — only the actual detection is halved.
-      pitchFrameCounter++;
-      const isRecording = document.body.classList.contains('record-mode');
-      const skipFrame = isRecording && (pitchFrameCounter % 2 === 1);
+      // Pitch detection only runs when there's actually audio coming in.
+      // In record mode without mic the camera still paints (draw() at the
+      // bottom of this loop) but YIN is skipped entirely.
+      if (analyser && audioContext && (isListening || isPlaying)) {
+        // Pitch-detection throttle. Outside recording, run full rAF rate
+        // (~60 Hz) so the indicator is maximally responsive. Inside record
+        // mode, skip every other frame — autocorrelation + smoothing is
+        // the heaviest CPU cost in the rAF loop and Pixel 7 stutters when
+        // the recorder + drone + camera filter are all stacked. The visual
+        // smoothing (draw() below) still updates every frame, so the ruler
+        // never looks choppy — only the actual detection is halved.
+        pitchFrameCounter++;
+        const skipFrame = recordMode && (pitchFrameCounter % 2 === 1);
 
-      if (!skipFrame) {
-        lastDetectTime = now;
+        if (!skipFrame) {
+          lastDetectTime = now;
 
-        const bufferLength = analyser.fftSize;
-        const buffer = new Float32Array(bufferLength);
-        analyser.getFloatTimeDomainData(buffer);
+          const bufferLength = analyser.fftSize;
+          const buffer = new Float32Array(bufferLength);
+          analyser.getFloatTimeDomainData(buffer);
 
-        const result = yinDetect(buffer, audioContext.sampleRate);
+          const result = yinDetect(buffer, audioContext.sampleRate);
 
-        if (result.freq > 50 && result.freq < 2000 && result.probability > 0.5) {
-          let rawCents = 1200 * Math.log2(result.freq / config.refFreq);
+          if (result.freq > 50 && result.freq < 2000 && result.probability > 0.5) {
+            let rawCents = 1200 * Math.log2(result.freq / config.refFreq);
 
-          const baseAlpha = 0.03 + (config.responsiveness / 10) * 0.25;
-          const smoothingFactor = 16 / (config.smoothing + 1);
-          const alpha = Math.max(0.005, baseAlpha * Math.min(1, smoothingFactor));
+            const baseAlpha = 0.03 + (config.responsiveness / 10) * 0.25;
+            const smoothingFactor = 16 / (config.smoothing + 1);
+            const alpha = Math.max(0.005, baseAlpha * Math.min(1, smoothingFactor));
 
-          if (smoothedFreq === null) {
-            smoothedFreq = result.freq;
-            smoothedCents = rawCents;
-          } else {
-            smoothedFreq += (result.freq - smoothedFreq) * alpha;
-            smoothedCents += (rawCents - smoothedCents) * alpha;
+            if (smoothedFreq === null) {
+              smoothedFreq = result.freq;
+              smoothedCents = rawCents;
+            } else {
+              smoothedFreq += (result.freq - smoothedFreq) * alpha;
+              smoothedCents += (rawCents - smoothedCents) * alpha;
+            }
+
+            currentProbability = result.probability;
+            lastPitchTime = now;
+            lastValidPitch = { freq: smoothedFreq, cents: smoothedCents, probability: result.probability };
           }
-
-          currentProbability = result.probability;
-          lastPitchTime = now;
-          lastValidPitch = { freq: smoothedFreq, cents: smoothedCents, probability: result.probability };
         }
       }
-      
+
       if (fileMode && isPlaying && audioBuffer) {
         const currentTime = audioContext.currentTime - startTime;
         const duration = audioBuffer.duration;
@@ -3208,7 +3220,19 @@
         for (let i = 0; i < stages.length - 1; i++) {
           stages[i].connect(stages[i + 1]);
         }
-        const chainEnd = stages[stages.length - 1] || null;
+        let chainEnd = stages[stages.length - 1] || null;
+
+        // Reverb-only edge case: if the user has lowcut + compression
+        // both off and only reverb on, `stages` is empty and `chainEnd`
+        // is null — the reverb branch below silently bails and the wet
+        // signal disappears. Inject a unity passthrough so the source
+        // has somewhere to land and the wet/dry split sees the input.
+        if (voiceFX.reverb && !chainEnd) {
+          const passthrough = ctx.createGain();
+          passthrough.gain.value = 1;
+          stages.push(passthrough);
+          chainEnd = passthrough;
+        }
 
         if (voiceFX.reverb && chainEnd) {
           const reverb = buildShimmerReverb(ctx, {
@@ -3386,7 +3410,13 @@
         }
       } else {
         isListening = false;
-        if (animationId) cancelAnimationFrame(animationId);
+        // Cancel the rAF only if record mode isn't keeping it alive for
+        // the camera. Otherwise the loop should keep running so the
+        // canvas paints.
+        if (animationId && !recordMode) {
+          cancelAnimationFrame(animationId);
+          animationId = null;
+        }
         tearDownAudioStream(currentAudioStream);
         currentAudioStream = null;
         // Disconnect the mic SOURCE from the permanent micProcessing
@@ -3504,8 +3534,9 @@
       // Force canvas to repaint at new dimensions on next frame
       const canvas = document.getElementById('rulerCanvas');
       canvas.width = 0;
-      // Kick the render loop in case mic is on but loop got stale
-      if (!animationId && isListening) audioLoop();
+      // Kick the render loop unconditionally — record mode now drives
+      // the loop on its own (camera needs paint regardless of mic state).
+      if (!animationId) audioLoop();
     }
 
     function exitRecordMode() {
@@ -3924,74 +3955,53 @@
       }
     }
 
-    // -------- Feature 4: Tanpura drone --------
+    // -------- Feature 4: Tanpura drone (offline-rendered) --------
+    //
+    // The full tanpura synth (4 saw voices each with its own random-walk
+    // LFO chain, octave-up saw, all-pass diffusion, 4-line FDN reverb,
+    // shelf, bus compressor, DC blocker, limiter) used to run live. On
+    // mobile that ~50-node graph stuttered and clicked while the
+    // recorder + camera filter were also competing for CPU.
+    //
+    // It now renders ONCE into an AudioBuffer via OfflineAudioContext.
+    // Live playback is just:
+    //
+    //     bufferSource (loop) → userLpf (cutoff control) → masterGain
+    //                                                         ├→ destination
+    //                                                         └→ recorder.dest
+    //
+    // Three nodes total at runtime. ~90% CPU reduction on the drone path.
+    //
+    // Seamless looping uses the classic crossfade-loop trick: render
+    // (skip + L + overlap) seconds, then build the output buffer where
+    // the FIRST `overlap` seconds are an equal-power blend of the
+    // rendered audio at offsets [skip..skip+overlap] (fading in) and
+    // [skip+L..skip+L+overlap] (fading out). After the crossfade, the
+    // tail of the buffer is just the original audio. When the buffer
+    // loops, output[L-1] sits one sample before what output[0] morphed
+    // into — the wraparound is sample-continuous in the source signal.
+    // No click. No "tail restart" artefact, because the FDN tail at
+    // sample 0 of a fresh iteration is the rendered tail at offset
+    // skip+L, which IS the natural continuation of skip+L-1.
+    const TANPURA_LOOP_SEC = 11;       // user-visible loop length
+    const TANPURA_OVERLAP_SEC = 1.0;   // crossfade region at start of loop
+    const TANPURA_SKIP_SEC = 4.0;      // discarded head — let FDN settle and
+                                        // oscillator startup transients pass
+    let tanpuraRenderToken = 0;        // monotonic; cancels superseded renders
+    let tanpuraRenderDebounce = null;
 
-    // The drone reverb used to be a ConvolverNode + 3 s noise IR. Even
-    // with the IR module-cached, convolution at 3 s × 44.1 kHz = ~132 k
-    // multiply-adds per output sample — the single heaviest node on the
-    // drone graph and a confirmed crackle-source on Pixel 7 while
-    // recording. It's been replaced (in buildTanpura below) with a
-    // 4-line FDN structure modelled after the voice reverb but tuned
-    // for tanpura character: shorter prime delays, no shimmer self-loop,
-    // fixed per-line feedback. ~12 small nodes vs. the convolver, which
-    // is dramatically cheaper at the same lush character.
-    function buildTanpura(ctx) {
-      if (!ctx) return;
-      if (tanpuraNodes) return;
+    // Build the synth graph on a given AudioContext (online OR offline).
+    // Output sums into ctx.destination — the offline renderer's
+    // destination is what becomes the rendered AudioBuffer. The internal
+    // tone-shaping LPF runs at MAX cutoff (no LFO) so the baked buffer
+    // is full-bandwidth; user-facing cutoff lives on the live playback
+    // chain as a single biquad after the buffer source.
+    function buildOfflineTanpuraGraph(ctx, refFreq) {
+      // ---- Wet / dry mix + safety net ----
+      const wetGain = ctx.createGain(); wetGain.gain.value = 0.55;
+      const dryGain = ctx.createGain(); dryGain.gain.value = 0.45;
 
-      // Master gain — controls overall tanpura level (separate from per-ratio drones).
-      // Connects to BOTH the speakers (audioContext.destination) AND the
-      // recorder bus (micProcessing.dest, if it exists). Same node feeds
-      // both — the volume slider stays a single source of truth.
-      const masterGain = ctx.createGain();
-      masterGain.gain.value = 0;
-      masterGain.connect(ctx.destination);
-      if (micProcessing && micProcessing.dest) {
-        masterGain.connect(micProcessing.dest);
-      }
-
-      // FDN reverb (replaces previous Convolver + 25 ms preDelay). Same
-      // wet/dry balance — 0.55/0.45 — direct signal carries the apparent
-      // loudness while the tail bathes the chord. The architecture
-      // mirrors buildShimmerReverb but is tuned for drone:
-      //   - 4 parallel delay lines (167, 251, 367, 487 ms primes)
-      //   - per-line lowpass damping at 3 kHz (Q 0.7)
-      //   - per-line feedback fixed at 0.6 (lowered from 0.78 to kill
-      //     runaway buildup; max steady-state gain = 1/(1-0.6) = 2.5x —
-      //     provably bounded, no exponential growth)
-      //   - NO cross-feed (was 0.3 line→next; the ring + 0.78 per-line
-      //     pushed effective loop gain past 1.0 at certain frequencies,
-      //     causing self-oscillation after ~1 minute of play). The four
-      //     lines now operate as parallel combs — each tail decays
-      //     independently. Slightly less density, much more stability.
-      //   - panning [-0.4, +0.2, -0.1, +0.4]
-      //   - per-line ±0.5 ms delay-time LFO at 0.04/0.07/0.10/0.13 Hz
-      //     for breath
-      //   - 3-stage all-pass cascade (600/1500/3000 Hz, Q 0.5) PRE-FDN
-      //     for diffusion
-      //   - NO shimmer self-loop (saw drones already provide harmonic
-      //     content; would gild the lily)
-      const wetGain = ctx.createGain();
-      wetGain.gain.value = 0.55;
-      const dryGain = ctx.createGain();
-      dryGain.gain.value = 0.45;
-
-      // ---- Safety net (DC blocker + graceful-catcher limiter) ----
-      // Wet+dry sum → mixGain → dcBlocker (HPF 10 Hz, Q 0.5) →
-      // limiter (-3 dB, 6 dB knee, 8:1, 5 ms attack, 120 ms release)
-      // → masterGain.
-      // The dcBlocker kills sub-audio drift/DC that would otherwise compound
-      // over minutes of FDN feedback (per-line fb=0.6, no cross-feed).
-      // The limiter is now a soft-knee "graceful catcher" rather than a
-      // brick wall — with the FDN stable by construction (0.6 per-line, no
-      // ring), it should rarely engage at all. When it does, the soft knee
-      // and 8:1 ratio bend the signal musically instead of clicking it
-      // (the previous 20:1 / 1 ms hard limiter pumped on incoming peaks
-      // and produced the click artifacts). It still protects both speakers
-      // AND the recorder bus, since masterGain (the post-limiter node) is
-      // what feeds both destinations.
-      const mixGain = ctx.createGain();
-      mixGain.gain.value = 1;
+      const mixGain = ctx.createGain(); mixGain.gain.value = 1;
 
       const dcBlocker = ctx.createBiquadFilter();
       dcBlocker.type = 'highpass';
@@ -4009,10 +4019,9 @@
       dryGain.connect(mixGain);
       mixGain.connect(dcBlocker);
       dcBlocker.connect(limiter);
-      limiter.connect(masterGain);
+      limiter.connect(ctx.destination);
 
-      // Pre-FDN diffusion: 3-stage all-pass cascade. Phase-only,
-      // amplitude-flat — smears transients before the FDN, smoother tail.
+      // ---- Pre-FDN diffusion: 3-stage all-pass cascade ----
       const droneAp1 = ctx.createBiquadFilter();
       droneAp1.type = 'allpass'; droneAp1.frequency.value = 600;  droneAp1.Q.value = 0.5;
       const droneAp2 = ctx.createBiquadFilter();
@@ -4020,24 +4029,16 @@
       const droneAp3 = ctx.createBiquadFilter();
       droneAp3.type = 'allpass'; droneAp3.frequency.value = 3000; droneAp3.Q.value = 0.5;
 
-      // fdnIn feeds the 4 delay lines (post-diffusion).
       const droneFdnIn = ctx.createGain();
       droneFdnIn.gain.value = 1;
       droneAp1.connect(droneAp2);
       droneAp2.connect(droneAp3);
       droneAp3.connect(droneFdnIn);
 
-      // 4 parallel delay lines.
+      // ---- 4-line FDN: parallel combs, no cross-feed (provably stable) ----
       const droneDelayMs   = [167, 251, 367, 487];
       const dronePans      = [-0.4, 0.2, -0.1, 0.4];
       const droneLfoRates  = [0.04, 0.07, 0.10, 0.13];
-      const droneDelayNodes = [];
-      const droneLpfs       = [];
-      const droneFbGains    = [];
-      const dronePanners    = [];
-      const droneLfos       = [];
-      const droneLfoGains   = [];
-      const droneXfeeds     = [];
 
       for (let i = 0; i < 4; i++) {
         const d = ctx.createDelay(2.0);
@@ -4049,27 +4050,19 @@
         lpf.Q.value = 0.7;
 
         const fb = ctx.createGain();
-        // Per-line feedback lowered from 0.78 → 0.6 to kill the runaway
-        // buildup that produced the harsh feedback ~1 min into play.
-        // With no cross-feed (see below), each line is an independent
-        // parallel comb with steady-state gain 1/(1-0.6) = 2.5x —
-        // provably bounded. T60 ≈ 1.5–2 s at the 367 ms mean delay,
-        // perceptual decay ~4–5 s — still a substantial drone tail.
         fb.gain.value = 0.6;
 
         const p = ctx.createStereoPanner();
         p.pan.value = dronePans[i];
 
-        // ±0.5 ms breath, slow rates so each line drifts independently.
         const lfo = ctx.createOscillator();
         lfo.type = 'sine';
         lfo.frequency.value = droneLfoRates[i];
         const lfoGain = ctx.createGain();
-        lfoGain.gain.value = 0.0005; // ±0.5 ms in seconds
+        lfoGain.gain.value = 0.0005; // ±0.5 ms breath
         lfo.connect(lfoGain);
         lfoGain.connect(d.delayTime);
 
-        // droneFdnIn → delay → lpf → (feedback → delay) + (pan → wetGain)
         droneFdnIn.connect(d);
         d.connect(lpf);
         lpf.connect(fb);
@@ -4077,97 +4070,44 @@
         lpf.connect(p);
         p.connect(wetGain);
 
-        try { lfo.start(ctx.currentTime + i * 0.21); } catch (_) {}
-
-        droneDelayNodes.push(d);
-        droneLpfs.push(lpf);
-        droneFbGains.push(fb);
-        dronePanners.push(p);
-        droneLfos.push(lfo);
-        droneLfoGains.push(lfoGain);
+        try { lfo.start(i * 0.21); } catch (_) {}
       }
 
-      // Cross-feed ring REMOVED. Previously each lpf output → next line's
-      // delay input at 0.3 gain (Hadamard-lite density trick). Combined
-      // with 0.78 per-line feedback, the 4-line cross-feed ring formed a
-      // closed loop whose effective gain exceeded 1.0 at certain
-      // frequencies, causing the drone to self-oscillate after ~1 minute.
-      // Without the cross-feed the FDN simplifies to four parallel comb
-      // filters with feedback 0.6 — provably stable, max steady-state
-      // gain 2.5x the input. We lose some echo density; we gain stability
-      // for indefinite play. droneXfeeds remains as an empty array so any
-      // teardown loops that iterate it stay safe.
-
-      // Bus compressor — the actual loudness lever. Sits between the
-      // tone-shaping (lpf+shelf) and the wet/dry split, so both the dry
-      // tap and the FDN feed sample the squashed signal. Slow LFO motion
-      // on the saw drones gives a ~6-10 dB peak-to-average gap worth
-      // catching; threshold/ratio/knee chosen to ride the tops without
-      // audibly pumping.
+      // ---- Bus compressor → wet front + dry tap ----
       const droneComp = ctx.createDynamicsCompressor();
       droneComp.threshold.value = -22;
       droneComp.knee.value = 12;
       droneComp.ratio.value = 4;
       droneComp.attack.value = 0.005;
       droneComp.release.value = 0.18;
-      droneComp.connect(dryGain);   // dry tap
-      droneComp.connect(droneAp1);  // wet front: AP cascade → FDN
+      droneComp.connect(dryGain);
+      droneComp.connect(droneAp1);
 
-      // High-shelf for air → feeds the compressor input.
+      // ---- High-shelf for air ----
       const shelf = ctx.createBiquadFilter();
       shelf.type = 'highshelf';
       shelf.frequency.value = 6000;
       shelf.gain.value = 2;
       shelf.connect(droneComp);
 
-      // Lowpass to tame saw harshness. The base cutoff is set by the
-      // user (droneCutoff, default 2500 Hz, log-mapped slider 800-6000)
-      // and a slow sine LFO sweeps ±DRONE_LFO_DEPTH Hz around it
-      // (~30 s period) — motion around the user's value, no longer
-      // dominating it.
+      // ---- Internal tone LPF baked at MAX cutoff (no LFO) ----
+      // User-facing cutoff lives on the live chain as a separate biquad
+      // post-buffer, so the buffer itself stays full-bandwidth.
       const lpf = ctx.createBiquadFilter();
       lpf.type = 'lowpass';
-      lpf.frequency.value = droneCutoff;
-      // Q lowered from 0.7 → 0.3 to broaden the response and kill the
-      // resonant peak right at the LFO-swept cutoff. The narrower peak
-      // was feeding the FDN a steady stream of energy at one frequency,
-      // which is what built up to clicks after ~1 minute.
+      lpf.frequency.value = DRONE_CUTOFF_MAX;
       lpf.Q.value = 0.3;
       lpf.connect(shelf);
 
-      const lpfLfo = ctx.createOscillator();
-      lpfLfo.type = 'sine';
-      lpfLfo.frequency.value = 1 / 30; // ≈0.033 Hz, 30 s period
-      const lpfLfoGain = ctx.createGain();
-      lpfLfoGain.gain.value = DRONE_LFO_DEPTH; // ±Hz around droneCutoff centre
-      lpfLfo.connect(lpfLfoGain);
-      lpfLfoGain.connect(lpf.frequency);
-      try { lpfLfo.start(); } catch (_) {}
-
-      // Sum bus — gain raised from 0.18 to 0.32 so the drone is audibly
-      // present on phone speakers. Voice gains sum to ≈1.23 worst-case;
-      // post-LPF and 0.85 master ceiling, peak output stays ≲0.5 of full
-      // scale even with constructive interference + reverb tail.
+      // ---- Voice sum bus ----
       const sumGain = ctx.createGain();
       sumGain.gain.value = 0.32;
       sumGain.connect(lpf);
 
-      // -- Voices --
-      // Three unison saws (mild static detune) plus a sub-octave voice
-      // = four "fundamental" voices. Each gets a SINGLE random-walk LFO
-      // (low-passed noise) whose output is split through two scaled
-      // gain nodes — one driving osc.detune (±7 cents), the other
-      // driving the tremolo VCA (±6%). Detune and tremolo are therefore
-      // correlated per voice, but voices have independent LFOs at
-      // different cutoffs, so the chord still breathes organically and
-      // the correlation is inaudible. Halves the LFO node count vs.
-      // the previous independent-LFO design (Pixel 7 CPU win).
-      // The previous optional fifth-above voice was dropped: the
-      // four-voice patch is plenty rich and removing it saves an osc,
-      // an LFO chain, a panner, and a tremolo VCA.
-      // mul = freq multiplier vs refFreq, det = static detune in cents,
-      // pan = stereo position, gain = static voice gain,
-      // lfoCut = shared LFO lowpass cutoff (Hz, ~0.2 Hz target)
+      // ---- 4 sawtooth voices with random-walk LFOs ----
+      // Each voice gets a low-passed-noise LFO whose output drives both
+      // detune (±7¢) and tremolo (±6%) — correlated per voice but at
+      // different filter cutoffs, so the chord still breathes.
       const voiceSpecs = [
         { mul: 0.5, det:  0, pan:  0.00, gain: 0.20, lfoCut: 0.12 }, // sub octave
         { mul: 1.0, det: -3, pan: -0.25, gain: 0.28, lfoCut: 0.20 },
@@ -4175,45 +4115,27 @@
         { mul: 1.0, det:  3, pan:  0.25, gain: 0.28, lfoCut: 0.40 },
       ];
 
-      const oscs = [];
-      const oscMuls = [];
-      const lfoSources = [];
-      const tremGains = [];
-      const panners = [];
-
       const noiseLen = Math.floor(ctx.sampleRate * 4);
-
-      // Anchor every voice to a single start time so the per-voice 20 ms
-      // gain ramp lines up with the oscillator start — kills the audible
-      // click that was happening when oscGain jumped from 0 to v.gain at
-      // the same instant the saw started.
-      const tanpuraStartAt = ctx.currentTime + 0.02;
+      const tanpuraStartAt = 0.02;
 
       for (let i = 0; i < voiceSpecs.length; i++) {
         const v = voiceSpecs[i];
 
         const osc = ctx.createOscillator();
         osc.type = 'sawtooth';
-        osc.frequency.value = config.refFreq * v.mul;
+        osc.frequency.value = refFreq * v.mul;
         osc.detune.value = v.det;
 
-        // 20 ms linear ramp from 0 → v.gain at oscillator start. No
-        // instant jumps; ramp aligned to the shared start time.
         const oscGain = ctx.createGain();
         oscGain.gain.setValueAtTime(0, tanpuraStartAt);
         oscGain.gain.linearRampToValueAtTime(v.gain, tanpuraStartAt + 0.02);
 
-        // Tremolo VCA — its gain breathes around 1.0 by ±6%.
         const tremGain = ctx.createGain();
         tremGain.gain.value = 1.0;
 
         const panner = ctx.createStereoPanner();
         panner.pan.value = v.pan;
 
-        // Single random-walk LFO via low-passed noise. Output splits
-        // into a detune-scale gain (±7 cents → osc.detune) and a
-        // tremolo-scale gain (±0.06 → tremGain.gain). One BufferSource +
-        // one BiquadFilter per voice instead of two of each.
         const noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
         const noiseData = noiseBuf.getChannelData(0);
         for (let j = 0; j < noiseLen; j++) noiseData[j] = Math.random() * 2 - 1;
@@ -4227,10 +4149,10 @@
         lfoFilter.Q.value = 0.7;
 
         const detuneGain = ctx.createGain();
-        detuneGain.gain.value = 7; // ±~7 cents
+        detuneGain.gain.value = 7;
 
         const tremoloGain = ctx.createGain();
-        tremoloGain.gain.value = 0.06; // ±6% gain swing
+        tremoloGain.gain.value = 0.06;
 
         noiseSrc.connect(lfoFilter);
         lfoFilter.connect(detuneGain);
@@ -4238,7 +4160,6 @@
         detuneGain.connect(osc.detune);
         tremoloGain.connect(tremGain.gain);
 
-        // Signal chain: osc → oscGain → tremGain → panner → sumGain
         osc.connect(oscGain);
         oscGain.connect(tremGain);
         tremGain.connect(panner);
@@ -4247,78 +4168,174 @@
         try {
           osc.start(tanpuraStartAt);
           noiseSrc.start(tanpuraStartAt + i * 0.013);
-        } catch (e) { /* already started */ }
-
-        oscs.push(osc);
-        oscMuls.push(v.mul);
-        lfoSources.push(noiseSrc);
-        tremGains.push(tremGain);
-        panners.push(panner);
+        } catch (e) {}
       }
 
-      // Octave-up for sparkle (stays centered, no tremolo — keeps the air bright)
+      // ---- Octave-up sparkle (no tremolo) ----
       const octOsc = ctx.createOscillator();
       octOsc.type = 'sawtooth';
-      octOsc.frequency.value = config.refFreq * 2;
-      // 20 ms ramp from 0 → 0.08 at start, same anchor as voices.
+      octOsc.frequency.value = refFreq * 2;
       const octGain = ctx.createGain();
       octGain.gain.setValueAtTime(0, tanpuraStartAt);
       octGain.gain.linearRampToValueAtTime(0.08, tanpuraStartAt + 0.02);
       octOsc.connect(octGain);
       octGain.connect(sumGain);
       try { octOsc.start(tanpuraStartAt); } catch (e) {}
-
-      tanpuraNodes = {
-        oscs, oscMuls,
-        octOsc,
-        lfoSources, tremGains, panners,
-        masterGain, lpf, lpfLfo, lpfLfoGain,
-        shelf, droneComp, sumGain, dryGain, wetGain,
-        // Safety nets between wet/dry mix and masterGain — guards both
-        // speakers AND recorder bus (both are fed off masterGain).
-        mixGain, dcBlocker, limiter,
-        // FDN reverb (replaced ConvolverNode + preDelay)
-        droneAp1, droneAp2, droneAp3, droneFdnIn,
-        droneDelayNodes, droneLpfs, droneFbGains, dronePanners,
-        droneLfos, droneLfoGains, droneXfeeds
-      };
     }
 
-    // The tanpura graph is PERMANENT — built once in bootstrapAudio() on
-    // the first user gesture, then it lives forever. Toggling drone
-    // on/off is now a pure parameter change: applyTanpuraVolume() ramps
-    // masterGain to its target via setTargetAtTime, no node creation or
-    // destruction. Eliminates the ~75-node rebuild that previously
-    // raced with the recorder and caused crackling. The previous
-    // teardownTanpura() function has been deleted.
+    // Render the tanpura into an AudioBuffer in the live ctx's sample
+    // rate. Returns a Promise<AudioBuffer> sized to TANPURA_LOOP_SEC.
+    // The render runs off the audio thread inside the offline context;
+    // the UI stays responsive while it works.
+    async function renderTanpuraBuffer(liveCtx, refFreq) {
+      const sampleRate = liveCtx.sampleRate;
+      const totalSec = TANPURA_SKIP_SEC + TANPURA_LOOP_SEC + TANPURA_OVERLAP_SEC;
+      const totalSamples = Math.ceil(totalSec * sampleRate);
 
+      const offline = new OfflineAudioContext(2, totalSamples, sampleRate);
+      buildOfflineTanpuraGraph(offline, refFreq);
+      const rendered = await offline.startRendering();
+
+      const skipSamples = Math.floor(TANPURA_SKIP_SEC * sampleRate);
+      const loopSamples = Math.floor(TANPURA_LOOP_SEC * sampleRate);
+      const overlapSamples = Math.floor(TANPURA_OVERLAP_SEC * sampleRate);
+
+      if (rendered.length < skipSamples + loopSamples + overlapSamples) {
+        throw new Error('tanpura render too short');
+      }
+
+      const numCh = rendered.numberOfChannels;
+      const out = liveCtx.createBuffer(numCh, loopSamples, sampleRate);
+
+      for (let ch = 0; ch < numCh; ch++) {
+        const src = rendered.getChannelData(ch);
+        const dst = out.getChannelData(ch);
+
+        // Crossfade region: equal-power (sin/cos) blend.
+        // dst[i] = src[skip+L+i] * fadeOut(i) + src[skip+i] * fadeIn(i)
+        // At i=0: pure tail. At i=overlap-1: pure head. Then plain copy.
+        for (let i = 0; i < overlapSamples; i++) {
+          const x = i / overlapSamples;
+          const fadeIn = Math.sin(x * Math.PI / 2);
+          const fadeOut = Math.cos(x * Math.PI / 2);
+          dst[i] = src[skipSamples + loopSamples + i] * fadeOut +
+                   src[skipSamples + i] * fadeIn;
+        }
+        for (let i = overlapSamples; i < loopSamples; i++) {
+          dst[i] = src[skipSamples + i];
+        }
+      }
+
+      return out;
+    }
+
+    // Stop the current playback source (if any), create a fresh
+    // BufferSource with the new buffer, start it, and connect to the
+    // persistent live chain (userLpf → masterGain). The masterGain stays
+    // alive across swaps so the recorder bus connection at
+    // micProcessing.dest is never disturbed.
+    function swapTanpuraSource(ctx, buffer) {
+      if (!tanpuraNodes || !tanpuraNodes.userLpf) return;
+
+      const oldSrc = tanpuraNodes.bufferSource;
+      if (oldSrc) {
+        try { oldSrc.stop(); } catch (_) {}
+        try { oldSrc.disconnect(); } catch (_) {}
+      }
+
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.loop = true;
+      src.connect(tanpuraNodes.userLpf);
+      try { src.start(); } catch (_) {}
+
+      tanpuraNodes.bufferSource = src;
+      tanpuraNodes.buffer = buffer;
+    }
+
+    // Schedule a re-render at the given refFreq. Coalesces rapid
+    // requests (slider drags, typing in the freq input) via a 250 ms
+    // debounce, and uses a monotonic token so a stale render that
+    // resolves AFTER a newer request never overwrites the buffer.
+    function rerenderTanpura(refFreq) {
+      if (!audioContext) return;
+      const ctx = audioContext;
+      const token = ++tanpuraRenderToken;
+
+      if (tanpuraRenderDebounce) {
+        clearTimeout(tanpuraRenderDebounce);
+        tanpuraRenderDebounce = null;
+      }
+      tanpuraRenderDebounce = setTimeout(async () => {
+        tanpuraRenderDebounce = null;
+        if (token !== tanpuraRenderToken) return;
+        try {
+          const buffer = await renderTanpuraBuffer(ctx, refFreq);
+          if (token !== tanpuraRenderToken) return;
+          swapTanpuraSource(ctx, buffer);
+          if (tanpuraNodes) tanpuraNodes.renderedRefFreq = refFreq;
+        } catch (e) {
+          console.warn('[tanpura] render failed:', e);
+        }
+      }, 250);
+    }
+
+    // Build the persistent live playback chain and kick the first render.
+    // Idempotent — bootstrapAudio calls this exactly once. The masterGain
+    // wires into the recorder bus (micProcessing.dest) so any drone audio
+    // that flows through it is mixed into recordings sample-accurately.
+    function buildTanpura(ctx) {
+      if (!ctx) return;
+      if (tanpuraNodes) return;
+
+      const masterGain = ctx.createGain();
+      masterGain.gain.value = 0;
+      masterGain.connect(ctx.destination);
+      if (micProcessing && micProcessing.dest) {
+        try { masterGain.connect(micProcessing.dest); } catch (_) {}
+      }
+
+      const userLpf = ctx.createBiquadFilter();
+      userLpf.type = 'lowpass';
+      userLpf.frequency.value = droneCutoff;
+      userLpf.Q.value = 0.3;
+      userLpf.connect(masterGain);
+
+      tanpuraNodes = {
+        masterGain,
+        userLpf,
+        bufferSource: null,
+        buffer: null,
+        renderedRefFreq: null
+      };
+
+      // Kick the first offline render in the background. Until it
+      // resolves the drone is silent (masterGain at 0). After resolve
+      // a looping BufferSource starts feeding userLpf — applyTanpuraVolume
+      // ramps masterGain to audible when the user enables the drone.
+      rerenderTanpura(config.refFreq);
+    }
+
+    // Drone enable/disable and volume both reduce to a masterGain ramp.
+    // No node creation, no node teardown, no rebuild churn.
     function applyTanpuraVolume() {
       if (!tanpuraNodes || !audioContext) return;
       const ctx = audioContext;
-      // Square-law slider mapping kept (smooth quiet end). Ceiling raised
-      // from 0.85 → 1.4 — the bus compressor catches peaks at -22 dB so
-      // we can run hot makeup gain after the wet/dry split without hard
-      // clipping. Average loudness lifts well above the previous setting;
-      // brief peaks ride the limiter rather than the destination clipper.
+      // Square-law slider mapping (smooth quiet end). Ceiling 1.4 — the
+      // baked compressor + limiter inside the buffer keep peaks from
+      // clipping when masterGain runs hot.
       const linear = Math.max(0, Math.min(1, tanpuraVolume));
       const target = tanpuraEnabled ? Math.pow(linear, 2) * 1.4 : 0;
       tanpuraNodes.masterGain.gain.setTargetAtTime(target, ctx.currentTime, 0.05);
     }
 
+    // Tuning change → re-render at new fundamental. While the render is
+    // in flight, the existing buffer keeps playing (out of tune until the
+    // swap lands ~300-500 ms later).
     function setTanpuraTuning(refFreq) {
       if (!tanpuraNodes || !audioContext) return;
-      const ctx = audioContext;
-      const t = ctx.currentTime;
-      const TAU = 0.04;
-      const muls = tanpuraNodes.oscMuls || [];
-      for (let i = 0; i < tanpuraNodes.oscs.length; i++) {
-        const o = tanpuraNodes.oscs[i];
-        const m = muls[i] != null ? muls[i] : 1;
-        try { o.frequency.setTargetAtTime(refFreq * m, t, TAU); } catch (_) {}
-      }
-      if (tanpuraNodes.octOsc) {
-        try { tanpuraNodes.octOsc.frequency.setTargetAtTime(refFreq * 2, t, TAU); } catch (_) {}
-      }
+      if (tanpuraNodes.renderedRefFreq === refFreq) return;
+      rerenderTanpura(refFreq);
     }
 
     function setTanpuraEnabled(on) {
@@ -4331,11 +4348,6 @@
           'ctxState=', audioContext && audioContext.state);
       }
 
-      // First call (typically a user enabling the drone) builds the
-      // permanent audio graph; subsequent calls just re-target the master
-      // gain via applyTanpuraVolume(). No teardown, no rebuild churn.
-      // If the user toggles off before any audio gesture has bootstrapped
-      // the graph, do nothing — there's nothing to silence.
       if (tanpuraEnabled) {
         bootstrapAudio();
       }
@@ -4350,18 +4362,21 @@
       applyTanpuraVolume();
     }
 
-    // Smoothly retarget the drone master lowpass centre. The LFO is
-    // wired to the same AudioParam, so it keeps adding ±DRONE_LFO_DEPTH
-    // motion on top of whatever base we set here.
+    // User cutoff slider drives the live post-buffer biquad — purely a
+    // parameter ramp, no re-render needed.
     function setDroneCutoff(hz) {
       droneCutoff = Math.max(DRONE_CUTOFF_MIN, Math.min(DRONE_CUTOFF_MAX, hz));
       try { localStorage.setItem('tuner.drone.cutoff', String(droneCutoff)); } catch (_) {}
-      if (tanpuraNodes && tanpuraNodes.lpf && audioContext) {
+      if (tanpuraNodes && tanpuraNodes.userLpf && audioContext) {
         try {
-          tanpuraNodes.lpf.frequency.setTargetAtTime(droneCutoff, audioContext.currentTime, 0.05);
+          tanpuraNodes.userLpf.frequency.setTargetAtTime(droneCutoff, audioContext.currentTime, 0.05);
         } catch (_) {}
       }
     }
+
+    // (Old live-graph buildTanpura, applyTanpuraVolume, setTanpuraTuning,
+    // setTanpuraEnabled, setTanpuraVolume, setDroneCutoff removed — the
+    // pre-render replacements above own all of these now.)
 
     // Mirror the drone UI state across the side panel and the floating
     // record strip. Single source of truth: tanpuraEnabled, tanpuraVolume,
