@@ -3649,7 +3649,14 @@
       }
 
       const canvas = document.getElementById('rulerCanvas');
-      const canvasStream = canvas.captureStream(30);
+      // captureStream() with no arg captures a frame each time the canvas
+      // is updated, instead of polling at a fixed rate. The fixed-rate
+      // form (captureStream(30)) was producing video timestamps that drift
+      // off the actual paint times — MediaRecorder then has to resync the
+      // audio against those drifting video timestamps every frame, which
+      // is exactly what was producing the rhythmic clicks the user heard
+      // whenever audio was present in the recording.
+      const canvasStream = canvas.captureStream();
 
       // Prefer the processed mic destination (highpass + compressor +4dB)
       // for the recorded audio. Fall back to the raw mic track only if
@@ -3736,7 +3743,13 @@
         recordedChunks = [];
       };
 
-      mediaRecorder.start(1000);
+      // No timeslice: let MediaRecorder buffer the entire take and only
+      // emit a single 'dataavailable' on stop. Periodic chunk emission
+      // (start(1000)) was forcing the encoder to flush every second,
+      // which on some setups produces a ticking artifact in the audio.
+      // For Instagram-length takes (under a couple of minutes) the
+      // memory cost of holding the full blob is negligible.
+      mediaRecorder.start();
       recordStartTime = performance.now();
       document.getElementById('recBtn').classList.add('recording');
       document.getElementById('discardRecBtn').classList.add('visible');
