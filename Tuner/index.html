@@ -826,6 +826,15 @@
     }
     #audioInputActive.warn { color: #d6a35c; }
 
+    /* Voice processing-on indicator. Tells the user the recording mic
+       runs through highpass + compressor + makeup gain. */
+    #voiceProcNote {
+      font-size: 11px;
+      color: #6a8b6a;
+      margin-top: 4px;
+      letter-spacing: 0.2px;
+    }
+
     /* ====================================================================
        Floating drone strip — visible in record mode so the user can
        toggle the drone and adjust volume / cutoff mid-take without
@@ -947,6 +956,7 @@
           <button type="button" id="audioInputRefresh" title="Re-scan input devices">⟳ Refresh</button>
         </div>
         <div id="audioInputActive" aria-live="polite"></div>
+        <div id="voiceProcNote">Recording voice: lo-cut + compression</div>
         <div id="iosInputNote" style="display: none;">
           On iOS, audio input is controlled by the system. If your AirPods aren't being picked up correctly, set them to "Listen only" in iOS Bluetooth settings, or disconnect them while tuning.
         </div>
@@ -1301,6 +1311,14 @@
     let recordedChunks = [];
     let recordStartTime = 0;
     let recordTimerId = null;
+
+    // Voice processing for recording (always on). Built lazily once an
+    // audioContext exists. Raw mic still feeds the analyser unmodified —
+    // pitch detection MUST stay on the unprocessed signal.
+    //   sourceNode → highpass(90Hz) → compressor(-24,3:1) → +4dB gain →
+    //   MediaStreamAudioDestinationNode → captured by MediaRecorder.
+    let micProcessing = null;       // { highpass, compressor, gain, dest }
+    let currentMicSource = null;    // current MediaStreamAudioSourceNode
     let featherAmount = 0.80;
     let featherWidth = 0.01; // -1..1 of canvas width: positive = feather outward (left), negative = feather inward (right)
     let backdropEdge = 0.80; // 0..1, x position where solid backdrop starts
@@ -2567,6 +2585,59 @@
       } catch (_) {}
     }
 
+    // Build the (one-time, per-AudioContext) voice processing chain that
+    // feeds the recorder. The chain is intentionally simple: highpass to
+    // kill HVAC rumble + AirPods proximity bass, compressor to even out
+    // the voice, +4 dB makeup. The output is a MediaStreamAudioDestination
+    // whose .stream is what MediaRecorder captures.
+    function buildMicProcessing(ctx) {
+      if (!ctx) return null;
+      try {
+        const highpass = ctx.createBiquadFilter();
+        highpass.type = 'highpass';
+        highpass.frequency.value = 90;
+        highpass.Q.value = 0.707;
+
+        const compressor = ctx.createDynamicsCompressor();
+        compressor.threshold.value = -24;
+        compressor.knee.value = 10;
+        compressor.ratio.value = 3;
+        compressor.attack.value = 0.003;
+        compressor.release.value = 0.12;
+
+        const gain = ctx.createGain();
+        gain.gain.value = 1.585; // +4 dB makeup (10^(4/20))
+
+        const dest = ctx.createMediaStreamDestination();
+
+        highpass.connect(compressor);
+        compressor.connect(gain);
+        gain.connect(dest);
+        return { highpass, compressor, gain, dest };
+      } catch (e) {
+        console.warn('[record] buildMicProcessing failed:', e);
+        return null;
+      }
+    }
+
+    // Wire (or rewire) a freshly-created mic source into the analyser
+    // and the recording processing chain. The analyser ALWAYS receives
+    // the raw source (pitch detection requirement); the processing chain
+    // is parallel — its output feeds MediaRecorder, never the analyser.
+    function attachMicSource(source) {
+      if (!source) return;
+      // Disconnect the previous source from the processing chain so we
+      // don't end up summing two parallel mic feeds into the recorder.
+      if (currentMicSource && currentMicSource !== source) {
+        try { currentMicSource.disconnect(); } catch (_) {}
+      }
+      currentMicSource = source;
+      try { source.connect(analyser); } catch (_) {}
+      if (micProcessing && micProcessing.highpass) {
+        try { source.connect(micProcessing.highpass); } catch (_) {}
+      }
+    }
+
     async function toggleListening() {
       const btn = document.getElementById('micBtn');
 
@@ -2597,7 +2668,12 @@
           const source = audioContext.createMediaStreamSource(stream);
           analyser = audioContext.createAnalyser();
           analyser.fftSize = 4096;
-          source.connect(analyser);
+          // Build (or rebuild) the recording-only processing chain on
+          // this AudioContext, then route source → analyser AND
+          // source → processing chain. Pitch detection still reads the
+          // raw source via analyser.
+          if (!micProcessing) micProcessing = buildMicProcessing(audioContext);
+          attachMicSource(source);
 
           isListening = true;
           btn.innerHTML = 'Listening';
@@ -2616,6 +2692,14 @@
         if (animationId) cancelAnimationFrame(animationId);
         tearDownAudioStream(currentAudioStream);
         currentAudioStream = null;
+        // Drop mic-processing references — they belong to audioContext
+        // and become invalid after .close(). They'll be rebuilt next
+        // time the user starts listening.
+        if (currentMicSource) {
+          try { currentMicSource.disconnect(); } catch (_) {}
+          currentMicSource = null;
+        }
+        micProcessing = null;
         if (audioContext) audioContext.close();
         audioContext = null;
         analyser = null;
@@ -2766,10 +2850,40 @@
 
       const canvas = document.getElementById('rulerCanvas');
       const canvasStream = canvas.captureStream(30);
-      const audioTrack = currentAudioStream.getAudioTracks()[0];
+
+      // Prefer the processed mic destination (highpass + compressor +4dB)
+      // for the recorded audio. Fall back to the raw mic track only if
+      // the processing chain failed to build (older browsers, etc.).
+      // The drone runs in a SEPARATE AudioContext (droneAudioCtx) and is
+      // not plumbed into either mic node; the only way drone can reach
+      // the recording is acoustic bleed (speaker → mic).
+      let audioTrack = null;
+      let audioSource = 'none';
+      if (micProcessing && micProcessing.dest) {
+        const processedTracks = micProcessing.dest.stream.getAudioTracks();
+        if (processedTracks.length > 0) {
+          audioTrack = processedTracks[0];
+          audioSource = 'processed';
+        }
+      }
+      if (!audioTrack && currentAudioStream) {
+        audioTrack = currentAudioStream.getAudioTracks()[0] || null;
+        if (audioTrack) {
+          audioSource = 'raw-fallback';
+          console.warn('[record] processed mic chain unavailable; using raw mic');
+        }
+      }
       if (audioTrack) {
         canvasStream.addTrack(audioTrack);
       }
+
+      console.log('[record] start',
+        'audioSource=', audioSource,
+        'trackLabel=', audioTrack && audioTrack.label,
+        'micCtxState=', audioContext && audioContext.state,
+        'droneCtxState=', droneAudioCtx && droneAudioCtx.state,
+        'droneEnabled=', tanpuraEnabled,
+        'streamTracks=', canvasStream.getTracks().map(t => t.kind));
 
       const mime = pickRecorderMime();
       recordedChunks = [];
@@ -2789,6 +2903,15 @@
       mediaRecorder.onstop = () => {
         // Stop only the canvas video track; keep the shared mic track alive
         try { canvasStream.getVideoTracks().forEach(t => t.stop()); } catch (_) {}
+
+        const elapsedMs = recordStartTime ? (performance.now() - recordStartTime) : 0;
+        const totalBytes = recordedChunks.reduce((n, c) => n + (c && c.size ? c.size : 0), 0);
+        console.log('[record] stop',
+          'durMs=', Math.round(elapsedMs),
+          'chunks=', recordedChunks.length,
+          'bytes=', totalBytes,
+          'discarded=', discardRequested,
+          'droneEnabled=', tanpuraEnabled);
 
         if (discardRequested) {
           // Throw away — no save
@@ -3028,7 +3151,11 @@
         verifyAudioInputBinding(newStream, requestedId);
 
         const source = audioContext.createMediaStreamSource(newStream);
-        source.connect(analyser);
+        // Re-route source through analyser AND the recording processing
+        // chain. attachMicSource also disconnects the prior source so
+        // we don't double-feed the recorder bus.
+        if (!micProcessing) micProcessing = buildMicProcessing(audioContext);
+        attachMicSource(source);
 
         // Reset analyzer-side smoothing so we don't carry stale state
         smoothedFreq = null;
@@ -3068,27 +3195,44 @@
       masterGain.connect(droneAudioCtx.destination);
 
       // Reverb path with a 25 ms pre-delay so the dry signal blooms
-      // for a moment before the long tail arrives. Wet/dry 70/30.
+      // for a moment before the long tail arrives. Wet/dry rebalanced
+      // 0.55/0.45 (was 0.70/0.30) — direct signal carries more apparent
+      // loudness while the tail still bathes the chord.
       const convolver = ctx.createConvolver();
       convolver.buffer = buildTanpuraImpulseResponse(ctx, 5.5);
       const preDelay = ctx.createDelay(0.5);
       preDelay.delayTime.value = 0.025;
       const wetGain = ctx.createGain();
-      wetGain.gain.value = 0.7;
+      wetGain.gain.value = 0.55;
       const dryGain = ctx.createGain();
-      dryGain.gain.value = 0.3;
+      dryGain.gain.value = 0.45;
       preDelay.connect(convolver);
       convolver.connect(wetGain);
       wetGain.connect(masterGain);
       dryGain.connect(masterGain);
 
-      // High-shelf for air
+      // Bus compressor — the actual loudness lever. Sits between the
+      // tone-shaping (lpf+shelf) and the wet/dry split, so both the dry
+      // tap and the convolver feed sample the squashed signal. Slow LFO
+      // motion on the saw drones gives a ~6-10 dB peak-to-average gap
+      // worth catching; threshold/ratio/knee chosen to ride the tops
+      // without audibly pumping. Combined with the higher master ceiling
+      // this lifts the average loudness several dB without clipping.
+      const droneComp = ctx.createDynamicsCompressor();
+      droneComp.threshold.value = -22;
+      droneComp.knee.value = 12;
+      droneComp.ratio.value = 4;
+      droneComp.attack.value = 0.005;
+      droneComp.release.value = 0.18;
+      droneComp.connect(dryGain);
+      droneComp.connect(preDelay);
+
+      // High-shelf for air → feeds the compressor input.
       const shelf = ctx.createBiquadFilter();
       shelf.type = 'highshelf';
       shelf.frequency.value = 6000;
       shelf.gain.value = 2;
-      shelf.connect(dryGain);
-      shelf.connect(preDelay);
+      shelf.connect(droneComp);
 
       // Lowpass to tame saw harshness. The base cutoff is set by the
       // user (droneCutoff, default 2500 Hz, log-mapped slider 800-6000)
@@ -3271,7 +3415,7 @@
         octOsc, fifthOsc,
         lfoSources, tremGains, panners,
         masterGain, lpf, lpfLfo, lpfLfoGain,
-        shelf, sumGain, dryGain, wetGain,
+        shelf, droneComp, sumGain, dryGain, wetGain,
         convolver, preDelay
       };
     }
@@ -3308,6 +3452,7 @@
           try { nodes.sumGain.disconnect(); } catch (_) {}
           try { nodes.lpf.disconnect(); } catch (_) {}
           try { nodes.shelf.disconnect(); } catch (_) {}
+          if (nodes.droneComp) { try { nodes.droneComp.disconnect(); } catch (_) {} }
           if (nodes.preDelay) { try { nodes.preDelay.disconnect(); } catch (_) {} }
           try { nodes.dryGain.disconnect(); } catch (_) {}
           try { nodes.wetGain.disconnect(); } catch (_) {}
@@ -3321,11 +3466,12 @@
       if (!tanpuraNodes || !droneAudioCtx) return;
       const ctx = droneAudioCtx;
       // Square-law slider mapping kept (smooth quiet end). Ceiling raised
-      // from 0.35 → 0.85 so slider=100 is meaningfully loud on a phone
-      // speaker. End-to-end peak (sumGain × master) ≈ 0.85·0.32·~1 ≈ 0.27,
-      // with reverb adding a fractional tail; safely under 0.95 clipping.
+      // from 0.85 → 1.4 — the bus compressor catches peaks at -22 dB so
+      // we can run hot makeup gain after the wet/dry split without hard
+      // clipping. Average loudness lifts well above the previous setting;
+      // brief peaks ride the limiter rather than the destination clipper.
       const linear = Math.max(0, Math.min(1, tanpuraVolume));
-      const target = tanpuraEnabled ? Math.pow(linear, 2) * 0.85 : 0;
+      const target = tanpuraEnabled ? Math.pow(linear, 2) * 1.4 : 0;
       tanpuraNodes.masterGain.gain.setTargetAtTime(target, ctx.currentTime, 0.05);
     }
 
@@ -3352,6 +3498,19 @@
       tanpuraEnabled = !!on;
       try { localStorage.setItem('tuner.drone.enabled', tanpuraEnabled ? '1' : '0'); } catch (_) {}
 
+      const recActive = mediaRecorder && mediaRecorder.state === 'recording';
+      if (recActive) {
+        // The drone runs in droneAudioCtx (separate from the mic/recorder
+        // AudioContext) and is NOT plumbed into the recording stream by
+        // software. Logging helps scout any reported "drone breaks the
+        // recording" reports — likely acoustic bleed or BT routing, not
+        // a graph issue.
+        console.log('[record] drone toggled mid-recording:',
+          'on=', tanpuraEnabled,
+          'micCtxState=', audioContext && audioContext.state,
+          'droneCtxState=', droneAudioCtx && droneAudioCtx.state);
+      }
+
       if (tanpuraEnabled) {
         initDroneAudio();
         if (droneAudioCtx.state === 'suspended') {
@@ -3359,6 +3518,12 @@
         }
         if (!tanpuraNodes) buildTanpura();
         applyTanpuraVolume();
+        // Make sure the mic-side context didn't get nudged into 'suspended'
+        // by the gesture (defensive — shouldn't happen, but cheap to check).
+        if (recActive && audioContext && audioContext.state === 'suspended') {
+          console.warn('[record] mic AudioContext suspended after drone toggle; resuming');
+          try { await audioContext.resume(); } catch (_) {}
+        }
       } else {
         if (tanpuraNodes) {
           // Fade out, then teardown to free CPU
