@@ -641,16 +641,116 @@
         margin-top: 8px;
       }
     }
+
+    /* Settings hide toggle (Feature 1) */
+    #settingsToggle {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 1000;
+      width: 40px;
+      height: 40px;
+      background: rgba(20, 20, 20, 0.85);
+      border: 1px solid #333;
+      color: #aaa;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 0;
+      line-height: 1;
+    }
+
+    #settingsToggle:hover {
+      background: rgba(40, 40, 40, 0.95);
+      color: #fff;
+    }
+
+    #settingsToggle:active {
+      transform: scale(0.95);
+    }
+
+    body.settings-hidden #controls,
+    body.settings-hidden #mobileToggle {
+      display: none !important;
+    }
+
+    body.record-mode #settingsToggle,
+    body.obs #settingsToggle {
+      display: none !important;
+    }
+
+    /* Discard recording button (Feature 2) */
+    #discardRecBtn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 1px solid #552222;
+      background: rgba(80, 20, 20, 0.85);
+      color: #ff6666;
+      font-size: 20px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 0;
+      line-height: 1;
+    }
+
+    #discardRecBtn.visible {
+      display: flex;
+    }
+
+    #discardRecBtn.confirming {
+      background: rgba(180, 40, 40, 0.95);
+      color: #fff;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    #discardRecBtn:active {
+      transform: scale(0.92);
+    }
+
+    /* Audio input picker iOS note (Feature 3) */
+    #iosInputNote {
+      font-size: 11px;
+      color: #aa9966;
+      line-height: 1.4;
+      margin-top: 6px;
+      padding: 8px 10px;
+      background: rgba(255, 153, 0, 0.06);
+      border-left: 2px solid rgba(255, 153, 0, 0.4);
+      border-radius: 3px;
+    }
   </style>
 </head>
 <body>
   <button id="mobileToggle">☰</button>
+  <button id="settingsToggle" title="Hide settings panel" aria-label="Hide settings panel">✕</button>
   <div id="app">
     <div id="controls">
       <h1 id="title">JI Pitch Ruler</h1>
       
       <button id="micBtn">Microphone</button>
-      
+
+      <div class="control-section">
+        <div class="section-header">Audio input</div>
+        <select id="audioInputDevice">
+          <option value="">Default</option>
+        </select>
+        <div id="iosInputNote" style="display: none;">
+          On iOS, audio input is controlled by the system. If your AirPods aren't being picked up correctly, set them to "Listen only" in iOS Bluetooth settings, or disconnect them while tuning.
+        </div>
+      </div>
+
       <div class="control-section">
         <div class="section-header">Reference</div>
         <label style="font-size: 12px; color: #666; margin-bottom: 4px;">Fundamental frequency</label>
@@ -804,6 +904,19 @@
         </div>
       </div>
       
+      <div class="control-section">
+        <div class="section-header">Drone</div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="tanpuraEnabled">
+          <label for="tanpuraEnabled">Tanpura drone (tracks reference)</label>
+        </div>
+        <label style="margin-top: 4px;">Volume</label>
+        <div class="slider-row">
+          <input type="range" id="tanpuraVolume" min="0" max="100" value="30">
+          <span id="tanpuraVolumeVal">30%</span>
+        </div>
+      </div>
+
       <button id="stopDronesBtn">🔇 Stop All Drones</button>
       
       <!-- Remove this line to delete the "Show advanced features" toggle -->
@@ -923,6 +1036,7 @@
     </div>
     <div class="record-row">
       <button class="icon" id="flipCamBtn" title="Flip camera">⟳</button>
+      <button id="discardRecBtn" title="Discard recording" aria-label="Discard recording">🗑</button>
       <button id="recBtn" title="Record"></button>
       <button class="icon" id="exitRecBtn" title="Exit record mode">✕</button>
     </div>
@@ -997,6 +1111,25 @@
     let suppressNextCanvasClick = false;
     let recordAspect = '9:16';
     let rulerOpacity = 1.0;
+
+    // Feature 1: settings hide
+    let settingsHidden = false;
+
+    // Feature 2: discard recording
+    let discardRequested = false;
+    let discardConfirmPending = false;
+    let discardConfirmTimer = null;
+
+    // Feature 3: audio input device picker
+    let selectedInputDeviceId = null;
+    let audioInputListReady = false;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    // Feature 4: tanpura drone
+    let tanpuraEnabled = false;
+    let tanpuraVolume = 0.30;
+    let tanpuraNodes = null;
 
     const ASPECT_DIMS = {
       '9:16': [1080, 1920],
@@ -2128,19 +2261,38 @@
       fadeOutIndicator();
     }
     
+    function buildAudioConstraints(deviceId) {
+      const audio = {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false
+      };
+      if (deviceId) {
+        audio.deviceId = { exact: deviceId };
+      }
+      return { audio };
+    }
+
     async function toggleListening() {
       const btn = document.getElementById('micBtn');
 
       if (!isListening) {
         try {
           audioContext = new (window.AudioContext || window.webkitAudioContext)();
-          const stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-              echoCancellation: false,
-              noiseSuppression: false,
-              autoGainControl: false
+          let stream;
+          try {
+            stream = await navigator.mediaDevices.getUserMedia(buildAudioConstraints(selectedInputDeviceId));
+          } catch (err) {
+            // Selected device may no longer be available — fall back to default
+            if (selectedInputDeviceId) {
+              console.warn('Falling back to default audio input:', err);
+              selectedInputDeviceId = null;
+              try { localStorage.removeItem('tuner.inputDeviceId'); } catch (_) {}
+              stream = await navigator.mediaDevices.getUserMedia(buildAudioConstraints(null));
+            } else {
+              throw err;
             }
-          });
+          }
           currentAudioStream = stream;
           const source = audioContext.createMediaStreamSource(stream);
           analyser = audioContext.createAnalyser();
@@ -2152,6 +2304,9 @@
           btn.classList.add('listening');
           lastDetectTime = 0;
           audioLoop();
+
+          // Now that permission is granted, device labels are populated
+          refreshAudioInputList();
         } catch (err) {
           console.error('Microphone error:', err);
           alert('Could not access microphone.');
@@ -2320,6 +2475,15 @@
         if (e.data && e.data.size > 0) recordedChunks.push(e.data);
       };
       mediaRecorder.onstop = () => {
+        // Stop only the canvas video track; keep the shared mic track alive
+        try { canvasStream.getVideoTracks().forEach(t => t.stop()); } catch (_) {}
+
+        if (discardRequested) {
+          // Throw away — no save
+          finalizeDiscard();
+          return;
+        }
+
         const type = mediaRecorder.mimeType || mime || 'video/webm';
         const ext = type.includes('mp4') ? 'mp4' : 'webm';
         const blob = new Blob(recordedChunks, { type });
@@ -2335,14 +2499,13 @@
           URL.revokeObjectURL(url);
         }, 100);
 
-        // Stop only the canvas video track; keep the shared mic track alive
-        canvasStream.getVideoTracks().forEach(t => t.stop());
         recordedChunks = [];
       };
 
       mediaRecorder.start(1000);
       recordStartTime = performance.now();
       document.getElementById('recBtn').classList.add('recording');
+      document.getElementById('discardRecBtn').classList.add('visible');
       const ind = document.getElementById('recIndicator');
       ind.classList.add('visible');
       const tick = () => {
@@ -2361,6 +2524,8 @@
       mediaRecorder.stop();
       document.getElementById('recBtn').classList.remove('recording');
       document.getElementById('recIndicator').classList.remove('visible');
+      document.getElementById('discardRecBtn').classList.remove('visible');
+      clearDiscardConfirm();
       if (recordTimerId) {
         clearTimeout(recordTimerId);
         recordTimerId = null;
@@ -2373,6 +2538,390 @@
       } else {
         startRecording();
       }
+    }
+
+    // -------- Feature 2: Discard recording --------
+    function clearDiscardConfirm() {
+      discardConfirmPending = false;
+      if (discardConfirmTimer) {
+        clearTimeout(discardConfirmTimer);
+        discardConfirmTimer = null;
+      }
+      const btn = document.getElementById('discardRecBtn');
+      if (btn) {
+        btn.classList.remove('confirming');
+        btn.textContent = '🗑';
+        btn.title = 'Discard recording';
+      }
+    }
+
+    function handleDiscardClick() {
+      if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
+
+      if (!discardConfirmPending) {
+        // First click — arm the confirmation
+        discardConfirmPending = true;
+        const btn = document.getElementById('discardRecBtn');
+        if (btn) {
+          btn.classList.add('confirming');
+          btn.textContent = 'SURE?';
+          btn.title = 'Tap again to discard';
+        }
+        if (navigator.vibrate) navigator.vibrate(10);
+        discardConfirmTimer = setTimeout(clearDiscardConfirm, 3000);
+        return;
+      }
+
+      // Second click — actually discard
+      clearDiscardConfirm();
+      discardRecording();
+    }
+
+    function discardRecording() {
+      if (!mediaRecorder) return;
+
+      discardRequested = true;
+      try {
+        if (mediaRecorder.state === 'recording') {
+          mediaRecorder.stop();
+        }
+      } catch (e) {
+        console.warn('Discard stop failed:', e);
+        // Force-clean if stop somehow fails
+        finalizeDiscard();
+      }
+
+      // UI state goes back to idle immediately
+      document.getElementById('recBtn').classList.remove('recording');
+      document.getElementById('recIndicator').classList.remove('visible');
+      document.getElementById('discardRecBtn').classList.remove('visible');
+      if (recordTimerId) {
+        clearTimeout(recordTimerId);
+        recordTimerId = null;
+      }
+
+      if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
+    }
+
+    function finalizeDiscard() {
+      recordedChunks = [];
+      discardRequested = false;
+    }
+
+    // -------- Feature 3: Audio input device picker --------
+    async function refreshAudioInputList() {
+      const sel = document.getElementById('audioInputDevice');
+      if (!sel) return;
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const inputs = devices.filter(d => d.kind === 'audioinput');
+
+        // Preserve current selection
+        const prev = selectedInputDeviceId || sel.value;
+
+        // Clear and rebuild
+        sel.innerHTML = '';
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = 'Default';
+        sel.appendChild(defaultOpt);
+
+        let count = 0;
+        for (const d of inputs) {
+          if (!d.deviceId || d.deviceId === 'default' || d.deviceId === 'communications') continue;
+          count++;
+          const o = document.createElement('option');
+          o.value = d.deviceId;
+          o.textContent = d.label || `Input ${count}`;
+          sel.appendChild(o);
+        }
+
+        // Restore prior selection if still available
+        if (prev && [...sel.options].some(o => o.value === prev)) {
+          sel.value = prev;
+        } else if (prev) {
+          // Selected device disappeared — fall back to default
+          sel.value = '';
+        }
+
+        // Mark as ready once we've populated with labels (post-permission)
+        if (inputs.some(d => d.label)) audioInputListReady = true;
+      } catch (e) {
+        console.warn('enumerateDevices failed:', e);
+      }
+    }
+
+    async function applyAudioInputDevice(deviceId) {
+      // Persist regardless of whether we can apply right now
+      selectedInputDeviceId = deviceId || null;
+      try {
+        if (deviceId) localStorage.setItem('tuner.inputDeviceId', deviceId);
+        else localStorage.removeItem('tuner.inputDeviceId');
+      } catch (_) {}
+
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        alert('Stop recording before changing the audio input device.');
+        // Restore selector to current device
+        const sel = document.getElementById('audioInputDevice');
+        if (sel && currentAudioStream) {
+          const t = currentAudioStream.getAudioTracks()[0];
+          const id = t && t.getSettings ? t.getSettings().deviceId : null;
+          if (id) sel.value = id;
+        }
+        return;
+      }
+
+      if (!isListening || !audioContext || !analyser) {
+        // Will be applied on next mic start
+        return;
+      }
+
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia(buildAudioConstraints(deviceId));
+        // Tear down the prior stream's tracks
+        if (currentAudioStream) {
+          currentAudioStream.getTracks().forEach(t => t.stop());
+        }
+        currentAudioStream = newStream;
+        const source = audioContext.createMediaStreamSource(newStream);
+        source.connect(analyser);
+
+        // Reset analyzer-side smoothing so we don't carry stale state
+        smoothedFreq = null;
+        smoothedCents = null;
+        lastDetectTime = 0;
+      } catch (err) {
+        console.error('Could not switch audio input:', err);
+        alert('Could not switch to that input device.');
+      }
+    }
+
+    // -------- Feature 4: Tanpura drone --------
+    function buildTanpuraImpulseResponse(ctx, seconds) {
+      const len = Math.max(1, Math.floor(ctx.sampleRate * seconds));
+      const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        const data = buf.getChannelData(ch);
+        for (let i = 0; i < len; i++) {
+          const t = i / len;
+          // Exponential decay; slight low-passing via averaging avoided for simplicity
+          const env = Math.exp(-t * 4);
+          data[i] = (Math.random() * 2 - 1) * env;
+        }
+      }
+      return buf;
+    }
+
+    function buildTanpura() {
+      if (!droneAudioCtx) return;
+      if (tanpuraNodes) return;
+      const ctx = droneAudioCtx;
+
+      // Master gain — controls overall tanpura level (separate from per-ratio drones)
+      const masterGain = ctx.createGain();
+      masterGain.gain.value = 0;
+      masterGain.connect(droneAudioCtx.destination);
+
+      // Reverb path
+      const convolver = ctx.createConvolver();
+      convolver.buffer = buildTanpuraImpulseResponse(ctx, 3);
+      const wetGain = ctx.createGain();
+      wetGain.gain.value = 0.6;
+      const dryGain = ctx.createGain();
+      dryGain.gain.value = 0.4;
+      convolver.connect(wetGain);
+      wetGain.connect(masterGain);
+      dryGain.connect(masterGain);
+
+      // High-shelf for air
+      const shelf = ctx.createBiquadFilter();
+      shelf.type = 'highshelf';
+      shelf.frequency.value = 6000;
+      shelf.gain.value = 2;
+      shelf.connect(dryGain);
+      shelf.connect(convolver);
+
+      // Lowpass to tame saw harshness
+      const lpf = ctx.createBiquadFilter();
+      lpf.type = 'lowpass';
+      lpf.frequency.value = 2500;
+      lpf.Q.value = 0.7;
+      lpf.connect(shelf);
+
+      // Sum bus — keep some headroom before convolver
+      const sumGain = ctx.createGain();
+      sumGain.gain.value = 0.22;
+      sumGain.connect(lpf);
+
+      const detunes = [-3, 0, 3];
+      const oscs = [];
+      const lfoSources = [];
+
+      for (let i = 0; i < detunes.length; i++) {
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.value = config.refFreq;
+        osc.detune.value = detunes[i];
+
+        const oscGain = ctx.createGain();
+        oscGain.gain.value = 0.33;
+
+        // LFO via noise → heavy lowpass → scale into detune cents
+        const noiseLen = Math.floor(ctx.sampleRate * 4);
+        const noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
+        const noiseData = noiseBuf.getChannelData(0);
+        for (let j = 0; j < noiseLen; j++) noiseData[j] = Math.random() * 2 - 1;
+
+        const noiseSrc = ctx.createBufferSource();
+        noiseSrc.buffer = noiseBuf;
+        noiseSrc.loop = true;
+
+        const lfoFilter = ctx.createBiquadFilter();
+        lfoFilter.type = 'lowpass';
+        // Different cutoff per oscillator so they don't move in lockstep
+        lfoFilter.frequency.value = 0.30 + i * 0.08;
+        lfoFilter.Q.value = 0.7;
+
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.value = 3.5; // ±~3.5 cents
+
+        noiseSrc.connect(lfoFilter);
+        lfoFilter.connect(lfoGain);
+        lfoGain.connect(osc.detune);
+
+        osc.connect(oscGain);
+        oscGain.connect(sumGain);
+
+        const startAt = ctx.currentTime + 0.02;
+        try {
+          osc.start(startAt);
+          // Slight stagger so noise sources don't share identical phase histories
+          noiseSrc.start(startAt + i * 0.01);
+        } catch (e) { /* already started */ }
+
+        oscs.push(osc);
+        lfoSources.push(noiseSrc);
+      }
+
+      // Octave-up for sparkle
+      const octOsc = ctx.createOscillator();
+      octOsc.type = 'sawtooth';
+      octOsc.frequency.value = config.refFreq * 2;
+      const octGain = ctx.createGain();
+      octGain.gain.value = 0.08;
+      octOsc.connect(octGain);
+      octGain.connect(sumGain);
+      try { octOsc.start(); } catch (e) {}
+
+      tanpuraNodes = { oscs, octOsc, lfoSources, masterGain, lpf, shelf, sumGain, dryGain, wetGain, convolver };
+    }
+
+    function teardownTanpura() {
+      if (!tanpuraNodes) return;
+      const ctx = droneAudioCtx;
+      const t = ctx ? ctx.currentTime : 0;
+
+      // Fade out then stop to avoid clicks
+      try {
+        tanpuraNodes.masterGain.gain.cancelScheduledValues(t);
+        tanpuraNodes.masterGain.gain.setValueAtTime(tanpuraNodes.masterGain.gain.value, t);
+        tanpuraNodes.masterGain.gain.linearRampToValueAtTime(0, t + 0.08);
+      } catch (_) {}
+
+      const nodes = tanpuraNodes;
+      tanpuraNodes = null;
+
+      setTimeout(() => {
+        try {
+          for (const o of nodes.oscs) { try { o.stop(); } catch (_) {} try { o.disconnect(); } catch (_) {} }
+          for (const n of nodes.lfoSources) { try { n.stop(); } catch (_) {} try { n.disconnect(); } catch (_) {} }
+          try { nodes.octOsc.stop(); } catch (_) {}
+          try { nodes.octOsc.disconnect(); } catch (_) {}
+          try { nodes.sumGain.disconnect(); } catch (_) {}
+          try { nodes.lpf.disconnect(); } catch (_) {}
+          try { nodes.shelf.disconnect(); } catch (_) {}
+          try { nodes.dryGain.disconnect(); } catch (_) {}
+          try { nodes.wetGain.disconnect(); } catch (_) {}
+          try { nodes.convolver.disconnect(); } catch (_) {}
+          try { nodes.masterGain.disconnect(); } catch (_) {}
+        } catch (_) {}
+      }, 120);
+    }
+
+    function applyTanpuraVolume() {
+      if (!tanpuraNodes || !droneAudioCtx) return;
+      const ctx = droneAudioCtx;
+      // Log-ish curve (square) so the slider feels more linear perceptually
+      const linear = Math.max(0, Math.min(1, tanpuraVolume));
+      const target = tanpuraEnabled ? Math.pow(linear, 2) * 0.35 : 0;
+      tanpuraNodes.masterGain.gain.setTargetAtTime(target, ctx.currentTime, 0.05);
+    }
+
+    function setTanpuraTuning(refFreq) {
+      if (!tanpuraNodes || !droneAudioCtx) return;
+      const ctx = droneAudioCtx;
+      const t = ctx.currentTime;
+      const TAU = 0.04;
+      for (const o of tanpuraNodes.oscs) {
+        try { o.frequency.setTargetAtTime(refFreq, t, TAU); } catch (_) {}
+      }
+      if (tanpuraNodes.octOsc) {
+        try { tanpuraNodes.octOsc.frequency.setTargetAtTime(refFreq * 2, t, TAU); } catch (_) {}
+      }
+    }
+
+    async function setTanpuraEnabled(on) {
+      tanpuraEnabled = !!on;
+      try { localStorage.setItem('tuner.drone.enabled', tanpuraEnabled ? '1' : '0'); } catch (_) {}
+
+      if (tanpuraEnabled) {
+        initDroneAudio();
+        if (droneAudioCtx.state === 'suspended') {
+          try { await droneAudioCtx.resume(); } catch (_) {}
+        }
+        if (!tanpuraNodes) buildTanpura();
+        applyTanpuraVolume();
+      } else {
+        if (tanpuraNodes) {
+          // Fade out, then teardown to free CPU
+          teardownTanpura();
+        }
+      }
+    }
+
+    function setTanpuraVolume(v) {
+      tanpuraVolume = Math.max(0, Math.min(1, v));
+      try { localStorage.setItem('tuner.drone.volume', String(tanpuraVolume)); } catch (_) {}
+      applyTanpuraVolume();
+    }
+
+    // -------- Feature 1: Settings hide toggle --------
+    function applySettingsHidden() {
+      const btn = document.getElementById('settingsToggle');
+      document.body.classList.toggle('settings-hidden', settingsHidden);
+      if (btn) {
+        if (settingsHidden) {
+          btn.textContent = '⚙';
+          btn.title = 'Show settings panel';
+          btn.setAttribute('aria-label', 'Show settings panel');
+        } else {
+          btn.textContent = '✕';
+          btn.title = 'Hide settings panel';
+          btn.setAttribute('aria-label', 'Hide settings panel');
+        }
+      }
+      // Force canvas to repaint at new dimensions
+      const canvas = document.getElementById('rulerCanvas');
+      if (canvas) canvas.width = 0;
+      draw();
+    }
+
+    function toggleSettingsHidden() {
+      settingsHidden = !settingsHidden;
+      try { localStorage.setItem('tuner.settingsHidden', settingsHidden ? '1' : '0'); } catch (_) {}
+      applySettingsHidden();
     }
 
     function setupTitleLongPress() {
@@ -2670,10 +3219,13 @@
       lastDisplayCents = null;
       lastDisplayFreq = null;
       indicatorOpacity = 0;
-      
+
+      // Retune tanpura when the reference pitch changes
+      if (tanpuraNodes) setTanpuraTuning(config.refFreq);
+
       draw();
     }
-    
+
     function handlePresetChange() {
       const preset = document.getElementById('refPreset').value;
       if (preset) {
@@ -2879,6 +3431,60 @@
         draw();
       });
       
+      // -------- Feature 1: Settings hide toggle --------
+      try {
+        settingsHidden = localStorage.getItem('tuner.settingsHidden') === '1';
+      } catch (_) {}
+      document.getElementById('settingsToggle').addEventListener('click', toggleSettingsHidden);
+      applySettingsHidden();
+
+      // -------- Feature 2: Discard recording --------
+      document.getElementById('discardRecBtn').addEventListener('click', handleDiscardClick);
+
+      // -------- Feature 3: Audio input device picker --------
+      try {
+        const stored = localStorage.getItem('tuner.inputDeviceId');
+        if (stored) selectedInputDeviceId = stored;
+      } catch (_) {}
+      if (isIOS) {
+        const note = document.getElementById('iosInputNote');
+        if (note) note.style.display = 'block';
+      }
+      const audioInputSel = document.getElementById('audioInputDevice');
+      audioInputSel.addEventListener('change', (e) => {
+        applyAudioInputDevice(e.target.value || null);
+      });
+      // Initial enumeration (labels likely empty until permission granted)
+      refreshAudioInputList();
+      if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+        navigator.mediaDevices.addEventListener('devicechange', refreshAudioInputList);
+      }
+      // Pre-select stored device in dropdown if present
+      if (selectedInputDeviceId) audioInputSel.value = selectedInputDeviceId;
+
+      // -------- Feature 4: Tanpura drone --------
+      try {
+        const v = localStorage.getItem('tuner.drone.volume');
+        if (v !== null && !isNaN(parseFloat(v))) tanpuraVolume = Math.max(0, Math.min(1, parseFloat(v)));
+        const en = localStorage.getItem('tuner.drone.enabled') === '1';
+        // Don't auto-enable on load (autoplay restrictions); restore the slider but keep checkbox honest
+        tanpuraEnabled = false;
+        const cb = document.getElementById('tanpuraEnabled');
+        if (cb) cb.checked = false;
+        const slider = document.getElementById('tanpuraVolume');
+        if (slider) slider.value = Math.round(tanpuraVolume * 100);
+        const valSpan = document.getElementById('tanpuraVolumeVal');
+        if (valSpan) valSpan.textContent = Math.round(tanpuraVolume * 100) + '%';
+      } catch (_) {}
+      document.getElementById('tanpuraEnabled').addEventListener('change', (e) => {
+        setTanpuraEnabled(e.target.checked);
+      });
+      document.getElementById('tanpuraVolume').addEventListener('input', (e) => {
+        const v = parseInt(e.target.value, 10) / 100;
+        document.getElementById('tanpuraVolumeVal').textContent = e.target.value + '%';
+        setTanpuraVolume(v);
+      });
+
       const loaded = loadSession();
       if (!loaded) {
         document.getElementById('refFreq').value = DEFAULTS.refFreq;
