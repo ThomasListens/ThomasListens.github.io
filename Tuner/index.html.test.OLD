@@ -560,13 +560,6 @@
       }
     }
 
-    /* Ruler hide — toggle in the floating audio-FX strip (record-mode
-       only). The canvas itself stays VISIBLE because the camera frame
-       is drawn into it; only the ruler/backdrop overlay is suppressed,
-       which is gated inside draw() via this body class. Pitch detection
-       keeps running. No CSS visibility rule here — hiding the canvas
-       would also hide the camera feed. */
-
     #recordOverlay .aspect-row {
       display: flex;
       gap: 6px;
@@ -681,71 +674,9 @@
       transform: scale(0.95);
     }
 
-    /* ====================================================================
-       Settings-hidden master "clear my screen" rule.
-       The ✕ / ⚙ button (#settingsToggle) toggles body.settings-hidden.
-       When on, every settings/effects control disappears so the pitch
-       ruler has the screen to itself — but the essential record
-       controls (record/stop, exit, discard) and the recording timer
-       pill stay visible so the user can stop or scrap a take without
-       un-hiding the panel.
-
-       Stays visible:
-         - #settingsToggle (the button itself — the way back)
-         - #rulerContainer / #rulerCanvas (the pitch display the user is
-           recording / watching)
-         - The #recordOverlay row marked .record-essential (rec/stop +
-           exit + discard + flip-cam buttons)
-         - #recIndicator ("● 0:00" timer pill, only visible while
-           actually recording — controlled by .visible class)
-       Hidden:
-         - the side/top settings panel
-         - the mobile hamburger
-         - the floating drone strip
-         - everything in the record dock EXCEPT .record-essential:
-           aspect ratio, zoom, framing, backdrop, edge, feather,
-           brightness/contrast/saturate, B&W toggle/tone, EDO grid,
-           trail, ruler position/size/opacity/spread/shift,
-           ratio-label toggle + x/y/size
-       Flip-cam stays visible: user explicitly wants to be able to
-       flip cameras mid-take while the rest of the dock is hidden.
-       Works whether or not record-mode is active.
-       ==================================================================== */
-    body.settings-hidden #controls,        /* main settings side panel */
-    body.settings-hidden #mobileToggle,    /* mobile hamburger */
-    body.settings-hidden #droneRecordStrip, /* floating drone strip (record mode) */
-    body.settings-hidden #audioFXRecordStrip { /* floating voice-FX strip (record mode) */
+    body.settings-hidden #controls,
+    body.settings-hidden #mobileToggle {
       display: none !important;
-    }
-
-    /* Hide every direct child of the record dock EXCEPT the essentials
-       row. The essentials row (.record-essential) holds rec/stop,
-       exit, discard, and flip-cam — all of which stay visible. */
-    body.settings-hidden #recordOverlay > :not(.record-essential) {
-      display: none !important;
-    }
-
-    /* When the dock is hidden in landscape record mode, reclaim the
-       280px gutter the dock normally occupies on the right. */
-    @media (orientation: landscape) and (min-width: 768px) {
-      body.record-mode.settings-hidden #rulerContainer {
-        padding-right: 0;
-      }
-
-      /* Landscape ≥768px: the record dock occupies the right edge, so
-         the floating strips fall back to the original top-left layout
-         to avoid colliding with it. Portrait/mobile keeps the
-         right-handed default declared above. */
-      #droneRecordStrip {
-        top: 12px;
-        left: 12px;
-        right: auto;
-      }
-      #audioFXRecordStrip {
-        top: 60px;
-        left: 12px;
-        right: auto;
-      }
     }
 
     /* OBS mode hides everything for clean capture */
@@ -830,263 +761,6 @@
       border-left: 2px solid rgba(255, 153, 0, 0.4);
       border-radius: 3px;
     }
-
-    /* Audio input diagnostic readout — shows actual bound device so the
-       user can see whether their pick took effect. Critical scouting info
-       on Pixel 7 Chrome where the picker has been routing to default. */
-    #audioInputControls {
-      display: flex;
-      gap: 6px;
-      margin-top: 6px;
-      align-items: center;
-    }
-    #audioInputRefresh {
-      flex: 0 0 auto;
-      padding: 8px 12px;
-      border: 1px solid #333;
-      background: #111;
-      color: #ccc;
-      border-radius: 6px;
-      font-size: 12px;
-      cursor: pointer;
-      font-family: inherit;
-    }
-    #audioInputRefresh:hover { background: #181818; color: #fff; }
-    #audioInputRefresh:active { background: #222; }
-    #audioInputActive {
-      font-size: 11px;
-      color: #888;
-      margin-top: 4px;
-      line-height: 1.4;
-      word-break: break-all;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    }
-    #audioInputActive.warn { color: #d6a35c; }
-
-    /* Voice processing-on indicator. Tells the user the recording mic
-       runs through highpass + compressor + makeup gain. */
-    #voiceProcNote {
-      font-size: 11px;
-      color: #6a8b6a;
-      margin-top: 4px;
-      letter-spacing: 0.2px;
-    }
-
-    /* ====================================================================
-       Floating drone strip — visible in record mode so the user can
-       toggle the drone and adjust volume / cutoff mid-take without
-       opening the side panel. Bundled under settings-hidden so the
-       master "clean my screen" toggle still nukes it.
-       Placed top-right (right-handed thumb reach) below the
-       settingsToggle in portrait. In landscape ≥768px the record dock
-       takes the right edge, so we fall back to top-left there (see
-       the landscape override further down).
-       ==================================================================== */
-    #droneRecordStrip {
-      display: none;
-      position: fixed;
-      top: 50px;
-      right: 12px;
-      z-index: 200;
-      flex-direction: row;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 10px;
-      background: rgba(20, 20, 20, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      border-radius: 8px;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-    }
-    body.record-mode #droneRecordStrip {
-      display: flex;
-    }
-    #droneRecordStrip button#droneRecordToggle {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      border: 1px solid rgba(255, 255, 255, 0.45);
-      background: transparent;
-      color: rgba(255, 255, 255, 0.75);
-      font-size: 17px;
-      line-height: 1;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-      flex-shrink: 0;
-      font-family: inherit;
-    }
-    #droneRecordStrip button#droneRecordToggle.on {
-      background: rgba(255, 255, 255, 0.9);
-      color: #000;
-      border-color: #fff;
-    }
-    #droneRecordStrip button#droneRecordToggle:active {
-      transform: scale(0.92);
-    }
-    #droneRecordStrip .dr-label {
-      font-size: 10px;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.55);
-      flex-shrink: 0;
-    }
-    #droneRecordStrip input[type="range"] {
-      -webkit-appearance: none;
-      appearance: none;
-      height: 36px;
-      background: transparent;
-      outline: none;
-      flex-shrink: 0;
-      margin: 0;
-    }
-    #droneRecordStrip input[type="range"]::-webkit-slider-runnable-track {
-      height: 4px;
-      background: rgba(255, 255, 255, 0.25);
-      border-radius: 2px;
-    }
-    #droneRecordStrip input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: #fff;
-      margin-top: -9px;
-      cursor: pointer;
-      border: none;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    }
-    #droneRecordStrip input[type="range"]::-moz-range-track {
-      height: 4px;
-      background: rgba(255, 255, 255, 0.25);
-      border-radius: 2px;
-    }
-    #droneRecordStrip input[type="range"]::-moz-range-thumb {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: #fff;
-      border: none;
-      cursor: pointer;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    }
-    #droneRecordStrip #droneRecordVolume { width: 120px; }
-    #droneRecordStrip #droneRecordCutoff { width: 80px; }
-
-    /* ====================================================================
-       Floating audio-FX strip — mirrors the main panel's voice processing
-       toggles (lo-cut / compression / shimmer reverb) plus a mini wet-mix
-       slider that appears only when reverb is on. Sits directly below the
-       drone strip so they stack in the top-left without colliding with the
-       record dock or the settingsToggle.
-       ==================================================================== */
-    #audioFXRecordStrip {
-      display: none;
-      position: fixed;
-      top: 100px;    /* sits under #droneRecordStrip (top:50 + ~42 height) */
-      right: 12px;
-      z-index: 200;
-      flex-direction: row;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 10px;
-      background: rgba(20, 20, 20, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      border-radius: 8px;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-    }
-    body.record-mode #audioFXRecordStrip {
-      display: flex;
-    }
-    #audioFXRecordStrip button.afx-chip {
-      min-width: 36px;
-      height: 36px;
-      padding: 0 8px;
-      border-radius: 18px;
-      border: 1px solid rgba(255, 255, 255, 0.45);
-      background: transparent;
-      color: rgba(255, 255, 255, 0.75);
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-      line-height: 1;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      font-family: inherit;
-    }
-    #audioFXRecordStrip button.afx-chip.on {
-      background: rgba(255, 255, 255, 0.9);
-      color: #000;
-      border-color: #fff;
-    }
-    #audioFXRecordStrip button.afx-chip:active {
-      transform: scale(0.92);
-    }
-    #audioFXRecordStrip .afx-mix {
-      display: none;
-      align-items: center;
-      gap: 4px;
-      padding-left: 4px;
-      border-left: 1px solid rgba(255, 255, 255, 0.18);
-    }
-    #audioFXRecordStrip.reverb-on .afx-mix {
-      display: inline-flex;
-    }
-    #audioFXRecordStrip .afx-label {
-      font-size: 10px;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.55);
-      flex-shrink: 0;
-    }
-    #audioFXRecordStrip input[type="range"] {
-      -webkit-appearance: none;
-      appearance: none;
-      height: 36px;
-      background: transparent;
-      outline: none;
-      flex-shrink: 0;
-      margin: 0;
-      width: 80px;
-    }
-    #audioFXRecordStrip input[type="range"]::-webkit-slider-runnable-track {
-      height: 4px;
-      background: rgba(255, 255, 255, 0.25);
-      border-radius: 2px;
-    }
-    #audioFXRecordStrip input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: #fff;
-      margin-top: -9px;
-      cursor: pointer;
-      border: none;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    }
-    #audioFXRecordStrip input[type="range"]::-moz-range-track {
-      height: 4px;
-      background: rgba(255, 255, 255, 0.25);
-      border-radius: 2px;
-    }
-    #audioFXRecordStrip input[type="range"]::-moz-range-thumb {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: #fff;
-      border: none;
-      cursor: pointer;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    }
   </style>
 </head>
 <body>
@@ -1103,42 +777,8 @@
         <select id="audioInputDevice">
           <option value="">Default</option>
         </select>
-        <div id="audioInputControls">
-          <button type="button" id="audioInputRefresh" title="Re-scan input devices">⟳ Refresh</button>
-        </div>
-        <div id="audioInputActive" aria-live="polite"></div>
-        <div id="voiceProcNote">Voice: lo-cut + compression</div>
         <div id="iosInputNote" style="display: none;">
           On iOS, audio input is controlled by the system. If your AirPods aren't being picked up correctly, set them to "Listen only" in iOS Bluetooth settings, or disconnect them while tuning.
-        </div>
-      </div>
-
-      <!-- Voice processing toggles. Only the recorded mic stream is
-           affected — the analyser still receives the raw mic signal
-           untouched, so pitch detection is never coloured by these. -->
-      <div class="control-section">
-        <div class="section-header">Voice processing</div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="voiceLowcut" checked>
-          <label for="voiceLowcut">Lo-cut (90 Hz)</label>
-        </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="voiceCompression" checked>
-          <label for="voiceCompression">Compression</label>
-        </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="voiceReverb">
-          <label for="voiceReverb">Shimmer reverb</label>
-        </div>
-        <div id="voiceReverbControls" style="display: none; padding-left: 4px;">
-          <label style="font-size: 12px; color: #888; margin-bottom: 2px;">Mix <span id="voiceReverbMixVal" style="color: #aaa;">50%</span></label>
-          <div class="slider-row" style="margin-bottom: 8px;">
-            <input type="range" id="voiceReverbMix" min="0" max="100" value="50">
-          </div>
-          <label style="font-size: 12px; color: #888; margin-bottom: 2px;">Tail <span id="voiceReverbTailVal" style="color: #aaa;">60%</span></label>
-          <div class="slider-row">
-            <input type="range" id="voiceReverbTail" min="0" max="100" value="60">
-          </div>
         </div>
       </div>
 
@@ -1306,11 +946,6 @@
           <input type="range" id="tanpuraVolume" min="0" max="100" value="30">
           <span id="tanpuraVolumeVal">30%</span>
         </div>
-        <label style="margin-top: 4px;">Cutoff</label>
-        <div class="slider-row">
-          <input type="range" id="droneCutoff" min="0" max="100" value="56" step="0.5">
-          <span id="droneCutoffVal">2.5 kHz</span>
-        </div>
       </div>
 
       <button id="stopDronesBtn">🔇 Stop All Drones</button>
@@ -1347,29 +982,6 @@
   <video id="cameraFeed" autoplay playsinline muted></video>
 
   <div id="recIndicator"><span id="recTime">0:00</span></div>
-
-  <!-- Floating drone strip — only rendered (display:flex) in record mode.
-       Mirrors state of the main panel's drone controls. -->
-  <div id="droneRecordStrip" aria-label="Drone controls">
-    <button type="button" id="droneRecordToggle" title="Drone on/off" aria-label="Toggle drone">⏻</button>
-    <input type="range" id="droneRecordVolume" min="0" max="100" value="30" aria-label="Drone volume">
-    <span class="dr-label" title="Filter cutoff">filter</span>
-    <input type="range" id="droneRecordCutoff" min="0" max="100" value="56" step="0.5" aria-label="Drone filter cutoff">
-  </div>
-
-  <!-- Floating audio-FX strip — mirrors the side panel's Voice processing
-       section. State is shared (voiceFX / voiceFXMix); syncVoiceFXUI keeps
-       both UIs in lockstep regardless of which one was tapped. -->
-  <div id="audioFXRecordStrip" aria-label="Voice FX controls">
-    <button type="button" class="afx-chip" id="audioFXLcBtn" title="Lo-cut (90 Hz)" aria-label="Toggle lo-cut">LC</button>
-    <button type="button" class="afx-chip" id="audioFXCmpBtn" title="Compression" aria-label="Toggle compression">CMP</button>
-    <button type="button" class="afx-chip" id="audioFXVrbBtn" title="Shimmer reverb" aria-label="Toggle reverb">VRB</button>
-    <button type="button" class="afx-chip on" id="rulerHideBtn" title="Show/hide tuning ruler" aria-label="Show or hide tuning ruler">📏</button>
-    <span class="afx-mix">
-      <span class="afx-label">Mix</span>
-      <input type="range" id="audioFXMixSlider" min="0" max="100" value="50" aria-label="Reverb mix">
-    </span>
-  </div>
 
   <div id="recordOverlay">
     <div class="aspect-row">
@@ -1453,7 +1065,7 @@
       <label>Label Sz</label>
       <input type="range" id="ratioSizeSlider" min="40" max="300" value="105">
     </div>
-    <div class="record-row record-essential">
+    <div class="record-row">
       <button class="icon" id="flipCamBtn" title="Flip camera">⟳</button>
       <button id="discardRecBtn" title="Discard recording" aria-label="Discard recording">🗑</button>
       <button id="recBtn" title="Record"></button>
@@ -1486,17 +1098,11 @@
     let smoothedFreq = null, smoothedCents = null, currentProbability = 0;
     let ghostTrail = [], animationId = null, lastGhostTime = 0;
     let lastPitchTime = 0, lastValidPitch = null, lastDetectTime = 0;
-    // Frame counter for pitch-detection throttle (see audioLoop). Skips
-    // every other frame while body.record-mode is set so Pixel 7 doesn't
-    // crackle when the recorder + drone + camera filter all stack up.
-    let pitchFrameCounter = 0;
     let ratioExtensions = {}, lastNearestLabel = null;
     let indicatorY = null, indicatorOpacity = 0;
     let lastDisplayCents = null, lastDisplayFreq = null, smoothedProximity = 0;
     let droneOscillators = {}, droneRatioYPositions = {};
-    // Single shared AudioContext (audioContext) hosts mic, recorder bus,
-    // tanpura, and per-ratio drones. droneAudioCtx is gone — see
-    // getAudioContext() below.
+    let droneAudioCtx = null, droneMasterGain = null, droneDCBlock = null, droneLimiter = null;
     let audioBuffer = null, sourceNode = null, isPlaying = false;
     let startTime = 0, pauseTime = 0, fileMode = false;
     let advancedVisible = false;
@@ -1504,15 +1110,6 @@
 
     let recordMode = false;
     let recordHintShown = false;
-
-    // Analyser FFT sizes. YIN autocorrelation cost is O((fftSize/2)²),
-    // so halving fftSize ≈ quarters CPU per detection cycle. At 48 kHz
-    // sample rate, fftSize=2048 → halfBuffer=1024 → lowest detectable
-    // freq ≈ 47 Hz, which is well below normal voice range. Outside
-    // record mode we keep the larger 4096 buffer for maximum precision.
-    const ANALYSER_FFT_IDLE   = 4096;
-    const ANALYSER_FFT_RECORD = 2048;
-
     let cameraStream = null;
     let cameraFacing = 'user';
     let currentAudioStream = null;
@@ -1520,37 +1117,6 @@
     let recordedChunks = [];
     let recordStartTime = 0;
     let recordTimerId = null;
-
-    // Voice processing for recording. Built lazily once an audioContext
-    // exists. Raw mic still feeds the analyser unmodified — pitch
-    // detection MUST stay on the unprocessed signal. The recording
-    // chain branches off the same source. Stages are individually
-    // togglable (see voiceFX); the chain rebuilds in place when any
-    // toggle changes, while the persistent micOut → dest tail keeps the
-    // recorder's stream identity stable across rebuilds.
-    //
-    //   source → analyser                                  (always)
-    //   source → micProcessing.head → … → micProcessing.micOut → dest
-    //                                       ↑
-    //                       optional [highpass][compressor][reverb]
-    let micProcessing = null;       // { ctx, dest, micOut, head, chain, reverb }
-    let currentMicSource = null;    // current MediaStreamAudioSourceNode
-
-    // Voice FX state — persists in localStorage. Defaults: clean speech
-    // (lowcut + compression on, shimmer reverb off).
-    let voiceFX = { lowcut: true, compression: true, reverb: false };
-    let voiceFXMix = 0.5;     // 0..1 wet/dry blend (50% default)
-    let voiceFXTail = 0.6;    // 0..1 → mapped to feedback 0.5..0.78
-
-    function voiceFXTailToFeedback(t) {
-      const x = Math.max(0, Math.min(1, t));
-      // Capped at 0.78 (was 0.92) to prevent FDN self-oscillation that
-      // produced an audible internal feedback runaway when reverb was on.
-      // With per-line FB ≤ 0.78 the FDN alone is provably stable; combined
-      // with the new 0.08 shimmer self-loop and the wet-bus limiter the
-      // worst-case closed-loop gain stays well under 1.0 at all freqs.
-      return 0.5 + x * 0.28; // 0 → 0.50, 1 → 0.78  (default 0.6 → ~0.668)
-    }
     let featherAmount = 0.80;
     let featherWidth = 0.01; // -1..1 of canvas width: positive = feather outward (left), negative = feather inward (right)
     let backdropEdge = 0.80; // 0..1, x position where solid backdrop starts
@@ -1581,11 +1147,6 @@
     // Feature 1: settings hide
     let settingsHidden = false;
 
-    // Hide-ruler toggle (independent of settingsHidden) — lets the user
-    // blank just the ruler during recording without dismissing the rest
-    // of the controls. Persisted under tuner.rulerHidden.
-    let rulerHidden = false;
-
     // Feature 2: discard recording
     let discardRequested = false;
     let discardConfirmPending = false;
@@ -1601,20 +1162,6 @@
     let tanpuraEnabled = false;
     let tanpuraVolume = 0.30;
     let tanpuraNodes = null;
-    // Drone master-lowpass centre frequency (Hz). The LFO sweeps
-    // ±400 Hz around this value. Default 2500 Hz matches the
-    // pre-cutoff-slider behaviour. Slider 0–100 maps log-scale to
-    // 800 Hz (warm/dark) … 6000 Hz (bright/buzzy).
-    let droneCutoff = 2500;
-    const DRONE_CUTOFF_MIN = 800;
-    const DRONE_CUTOFF_MAX = 6000;
-    const DRONE_LFO_DEPTH = 400; // Hz, ±depth around droneCutoff
-    function droneSliderToCutoff(s) {
-      return Math.exp((s / 100) * Math.log(DRONE_CUTOFF_MAX / DRONE_CUTOFF_MIN)) * DRONE_CUTOFF_MIN;
-    }
-    function droneCutoffToSlider(hz) {
-      return 100 * Math.log(hz / DRONE_CUTOFF_MIN) / Math.log(DRONE_CUTOFF_MAX / DRONE_CUTOFF_MIN);
-    }
 
     const ASPECT_DIMS = {
       '9:16': [1080, 1920],
@@ -1877,90 +1424,58 @@
       return ratios;
     }
     
-    // Lazy getter for the shared AudioContext. Created lazily on the
-    // first user gesture (via bootstrapAudio), then never closed for the
-    // page lifetime. Backgrounding may suspend it; we resume here and on
-    // visibilitychange. The previous "if closed, recreate" branch is
-    // gone — nothing closes the context anymore.
-    function getAudioContext() {
-      if (!audioContext) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioContext.state === 'suspended') {
-        audioContext.resume().catch(() => {});
-      }
-      return audioContext;
+    function initDroneAudio() {
+      if (droneAudioCtx) return;
+      
+      droneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      droneMasterGain = droneAudioCtx.createGain();
+      droneMasterGain.gain.value = 0.3;
+      
+      droneDCBlock = droneAudioCtx.createBiquadFilter();
+      droneDCBlock.type = 'highpass';
+      droneDCBlock.frequency.value = 10;
+      droneDCBlock.Q.value = 0.7;
+      
+      droneLimiter = droneAudioCtx.createDynamicsCompressor();
+      droneLimiter.threshold.value = -6;
+      droneLimiter.ratio.value = 20;
+      droneLimiter.attack.value = 0.003;
+      droneLimiter.release.value = 0.05;
+      
+      droneDCBlock.connect(droneLimiter);
+      droneLimiter.connect(droneMasterGain);
+      droneMasterGain.connect(droneAudioCtx.destination);
     }
-
-    // One-time audio graph construction. Idempotent — every entry point
-    // that needs audio (drone toggle, mic toggle, record start, per-ratio
-    // drone tap) calls this first; first call builds the full permanent
-    // graph (mic-processing scaffold + tanpura at master gain 0), every
-    // subsequent call is a no-op. Must be invoked from a user gesture so
-    // the AudioContext can autoplay on mobile. After this returns, the
-    // graph never gets torn down — toggling state becomes parameter-only
-    // (gain ramps and source connect/disconnect), no node creation or
-    // destruction. Eliminates the rebuild churn that was causing
-    // crackling and racing with the recorder.
-    let audioBootstrapped = false;
-    function bootstrapAudio() {
-      const ctx = getAudioContext();
-      if (audioBootstrapped) return ctx;
-      // Build the mic-side bus FIRST so buildTanpura can wire its master
-      // gain into micProcessing.dest at construction time.
-      if (!micProcessing) {
-        micProcessing = buildMicProcessing(ctx);
-        if (micProcessing) {
-          applyVoiceFX({ smooth: false });
-        }
-      }
-      if (!tanpuraNodes) {
-        buildTanpura(ctx);
-      }
-      audioBootstrapped = true;
-      return ctx;
-    }
-
-    // Resume the shared context when the page becomes visible again.
-    // Mobile browsers (esp. Pixel) auto-suspend AudioContexts when the
-    // tab loses focus or the screen turns off; without this, the drone
-    // doesn't come back when the user returns.
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && audioContext && audioContext.state === 'suspended') {
-        audioContext.resume().catch(() => {});
-      }
-    });
-
+    
     function toggleDrone(ratio) {
       const label = ratio.label;
       const freq = config.refFreq * ratio.ratio;
-
+      
       if (droneOscillators[label]) {
         stopDrone(label);
         updateStopButton();
         return;
       }
-
-      // Bootstraps the shared graph on the first audio gesture; after
-      // that this is just a context-resume + return.
-      const ctx = bootstrapAudio();
-
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
+      
+      initDroneAudio();
+      if (droneAudioCtx.state === 'suspended') droneAudioCtx.resume();
+      
+      const now = droneAudioCtx.currentTime;
+      const osc = droneAudioCtx.createOscillator();
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, now);
-
-      const gain = ctx.createGain();
+      
+      const gain = droneAudioCtx.createGain();
       gain.gain.setValueAtTime(0, now);
-
+      
       osc.connect(gain);
-      gain.connect(ctx.destination);
-
+      gain.connect(droneDCBlock);
+      
       const startDelay = 0.01;
       osc.start(now + startDelay);
       gain.gain.setValueAtTime(0, now + startDelay);
       gain.gain.linearRampToValueAtTime(0.12, now + startDelay + 0.02);
-
+      
       droneOscillators[label] = { osc, gain, freq };
       updateStopButton();
       draw();
@@ -1974,15 +1489,9 @@
     
     function stopDrone(label) {
       if (!droneOscillators[label]) return;
-
+      
       const { osc, gain } = droneOscillators[label];
-      if (!audioContext) {
-        // Context was already closed; just drop the reference.
-        delete droneOscillators[label];
-        draw();
-        return;
-      }
-      const now = audioContext.currentTime;
+      const now = droneAudioCtx.currentTime;
       
       gain.gain.cancelScheduledValues(now);
       gain.gain.setValueAtTime(gain.gain.value, now);
@@ -2197,28 +1706,12 @@
       }
     }
 
-    // Throttle the draw() body to ~30 FPS while record-mode is on, to
-     // match canvas.captureStream(30) and the halved pitch-detection
-     // rate. Outside record mode, run every rAF tick (full ~60 Hz) for
-     // maximum visual responsiveness. The rAF loop in audioLoop() always
-     // schedules the next frame regardless — this only skips the actual
-     // rendering work on intervening ticks.
-    let lastDrawTime = 0;
-    const RECORD_DRAW_INTERVAL_MS = 33;
-
     function draw() {
-      if (recordMode) {
-        const t = performance.now();
-        if (t - lastDrawTime < RECORD_DRAW_INTERVAL_MS) return;
-        lastDrawTime = t;
-      }
-
       const canvas = document.getElementById('rulerCanvas');
       const ctx = canvas.getContext('2d');
       const dpr = window.devicePixelRatio || 1;
 
       let W, H;
-      const rulerHidden = document.body.classList.contains('ruler-hidden');
 
       if (recordMode) {
         const dims = ASPECT_DIMS[recordAspect] || ASPECT_DIMS['9:16'];
@@ -2231,30 +1724,9 @@
           canvas.style.height = '';
         }
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-        // ===== INVARIANT: camera ALWAYS renders in record mode =====
-        // Hide-ruler must NEVER hide the camera frame. The user expects
-        // to see themselves recording even with the ruler overlay off.
-        // drawCameraBackground() owns the full canvas clear + video
-        // blit (with brightness/contrast/saturate/B&W filters applied).
-        // Nothing above this line, and nothing in the rulerHidden=true
-        // branch below, may skip this call.
         drawCameraBackground(ctx, W, H);
-
-        if (rulerHidden) {
-          // Camera is now on the canvas. Skip every overlay: dark vertical
-          // backdrop, ruler ticks, ratio lines, EDO grid, ghost trail,
-          // crosshair, ratio labels — everything that paints on top of
-          // the camera. Pitch detection keeps running (it's in audioLoop,
-          // not draw()).
-          return;
-        }
         drawRulerBackdrop(ctx, W, H);
       } else {
-        // Non-record mode: no camera preview here. The <video> element
-        // is parked off-screen; only record mode composites it onto the
-        // canvas. So when ruler is hidden in non-record mode, we just
-        // leave a black canvas — there's no camera to preserve.
         const rect = canvas.parentElement.getBoundingClientRect();
         const targetWidth = rect.width * dpr;
         const targetHeight = rect.height * dpr;
@@ -2271,7 +1743,6 @@
         H = rect.height;
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, W, H);
-        if (rulerHidden) return;
       }
 
       if (config.ratios.length === 0) return;
@@ -2653,36 +2124,26 @@
     function audioLoop() {
       if (!analyser) return;
       if (!isListening && !isPlaying) return;
-
+      
       const now = performance.now();
-
-      // Pitch-detection throttle. Outside recording, run full rAF rate
-      // (~60 Hz) so the indicator is maximally responsive. Inside record
-      // mode, skip every other frame — autocorrelation + smoothing is
-      // the heaviest CPU cost in the rAF loop and Pixel 7 stutters when
-      // the recorder + drone + camera filter are all stacked. The visual
-      // smoothing (draw() below) still updates every frame, so the ruler
-      // never looks choppy — only the actual detection is halved.
-      pitchFrameCounter++;
-      const isRecording = document.body.classList.contains('record-mode');
-      const skipFrame = isRecording && (pitchFrameCounter % 2 === 1);
-
-      if (!skipFrame) {
+      const detectInterval = 33;
+      
+      if (now - lastDetectTime >= detectInterval) {
         lastDetectTime = now;
-
+        
         const bufferLength = analyser.fftSize;
         const buffer = new Float32Array(bufferLength);
         analyser.getFloatTimeDomainData(buffer);
-
+        
         const result = yinDetect(buffer, audioContext.sampleRate);
-
+        
         if (result.freq > 50 && result.freq < 2000 && result.probability > 0.5) {
           let rawCents = 1200 * Math.log2(result.freq / config.refFreq);
-
+          
           const baseAlpha = 0.03 + (config.responsiveness / 10) * 0.25;
           const smoothingFactor = 16 / (config.smoothing + 1);
           const alpha = Math.max(0.005, baseAlpha * Math.min(1, smoothingFactor));
-
+          
           if (smoothedFreq === null) {
             smoothedFreq = result.freq;
             smoothedCents = rawCents;
@@ -2690,7 +2151,7 @@
             smoothedFreq += (result.freq - smoothedFreq) * alpha;
             smoothedCents += (rawCents - smoothedCents) * alpha;
           }
-
+          
           currentProbability = result.probability;
           lastPitchTime = now;
           lastValidPitch = { freq: smoothedFreq, cents: smoothedCents, probability: result.probability };
@@ -2715,9 +2176,11 @@
       
       if (isListening) await toggleListening();
       if (isPlaying) stopFilePlayback();
-
-      getAudioContext();
-
+      
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      
       try {
         const arrayBuffer = await file.arrayBuffer();
         audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
@@ -2837,497 +2300,9 @@
         autoGainControl: false
       };
       if (deviceId) {
-        // Use `ideal` (not `exact`) so the browser doesn't throw when
-        // the saved deviceId is stale — common on Android Chrome where
-        // device IDs rotate. We verify the actual binding after the
-        // stream resolves via getSettings() and surface mismatches.
-        audio.deviceId = { ideal: deviceId };
+        audio.deviceId = { exact: deviceId };
       }
       return { audio };
-    }
-
-    // Update the diagnostic readout under the input picker. `mismatch`
-    // means the requested deviceId did not bind — the browser fell back
-    // to default. This is the scouting tool for the Pixel 7 issue.
-    function updateAudioInputDiagnostic(label, deviceId, requestedId, mismatch) {
-      const el = document.getElementById('audioInputActive');
-      if (!el) return;
-      if (!label && !deviceId) {
-        el.textContent = '';
-        el.classList.remove('warn');
-        return;
-      }
-      const idShort = deviceId ? (deviceId.length > 12 ? deviceId.slice(0, 8) + '…' + deviceId.slice(-4) : deviceId) : '(none)';
-      let msg = `Active: ${label || '(unknown)'} [${idShort}]`;
-      if (mismatch) {
-        const reqShort = requestedId ? (requestedId.length > 12 ? requestedId.slice(0, 8) + '…' + requestedId.slice(-4) : requestedId) : '(none)';
-        msg += `  ⚠ requested ${reqShort} but bound to default`;
-        el.classList.add('warn');
-      } else {
-        el.classList.remove('warn');
-      }
-      el.textContent = msg;
-    }
-
-    // After getUserMedia resolves, inspect the actual audio track to
-    // confirm it bound to the device the user picked. Returns the bound
-    // deviceId (or null) and updates the diagnostic UI.
-    function verifyAudioInputBinding(stream, requestedId) {
-      try {
-        const track = stream && stream.getAudioTracks ? stream.getAudioTracks()[0] : null;
-        if (!track) {
-          console.warn('[input] verify: no audio track on stream');
-          updateAudioInputDiagnostic('(no track)', null, requestedId, !!requestedId);
-          return null;
-        }
-        const settings = (track.getSettings ? track.getSettings() : {}) || {};
-        const boundId = settings.deviceId || null;
-        const label = track.label || '';
-        const mismatch = !!(requestedId && boundId && requestedId !== boundId);
-        console.log('[input] verify: requested=', requestedId, 'bound=', boundId, 'label=', label, 'settings=', settings);
-        updateAudioInputDiagnostic(label, boundId, requestedId, mismatch);
-        return boundId;
-      } catch (e) {
-        console.warn('[input] verify failed:', e);
-        return null;
-      }
-    }
-
-    // Stop and disconnect every track on a stream so the device is
-    // released cleanly before requesting a new one. Some Android Chrome
-    // versions hand back the same stream if the previous one wasn't
-    // fully torn down.
-    function tearDownAudioStream(stream) {
-      if (!stream) return;
-      try {
-        stream.getTracks().forEach(t => {
-          try { t.stop(); } catch (_) {}
-        });
-      } catch (_) {}
-    }
-
-    // ----------------------------------------------------------------
-    // Smooth digital reverb — AI-style, pleasant, no phasey artefacts.
-    // FDN with all-pass diffusion (Lexicon/Eventide-style). Architecture:
-    //   input ─► AP1(700) ─► AP2(1700) ─► AP3(3300) ─► fdnIn
-    //                                                    │
-    //   fdnIn ─► 4 delay lines (211, 307, 401, 503 ms) ─► fdnSum
-    //              each:  delay → LPF(5 kHz, Q 0.7)
-    //                       ↳ feedback (gain ≤ 0.78) → back into own delay
-    //                       ↳ panner [-0.55,+0.30,-0.15,+0.55] → fdnSum
-    //                       ↳ cross-feed (0.3) → next line's delay input
-    //                     each delay's delayTime is modulated by a slow
-    //                     ±0.5 ms sine LFO (0.04 / 0.06 / 0.085 / 0.11 Hz)
-    //   fdnSum → shimmerBPF(2 kHz, Q 0.6) → shimmerFB(0.08) ─► back into fdnIn
-    //   fdnSum → postShelf(+4 dB @ 5 kHz) → wetComp(-18 dB, 4:1)
-    //          → wetLimiter(-6 dB, 20:1) → output
-    //
-    // What replaced what (vs. the previous chorus-flanger-y version):
-    //   - Pre-FDN cascaded ALL-PASS diffusion (phase-only, amplitude-flat)
-    //     replaces the +3 dB pre-shelf as the smoothing trick.
-    //   - Per-line LOWPASS damping replaces the LFO-swept BANDPASS — no
-    //     more "swept formant" coloration.
-    //   - Tiny per-line DELAY-TIME LFOs replace the bandpass-centre LFOs —
-    //     natural breath instead of moving comb notches.
-    //   - The output stage drops the 3-tap modulated chorus entirely
-    //     (that was the flanger that produced the phasey/comb sound)
-    //     and the tanh waveshaper (no harmonic muck on top of the verb).
-    //   - The high-shelf brightness moved from PRE-FDN to POST-FDN so
-    //     it doesn't get re-amplified by feedback.
-    function buildShimmerReverb(ctx, opts) {
-      const o = opts || {};
-      const feedback = o.feedback != null ? o.feedback : 0.668;
-      const delays = [0.211, 0.307, 0.401, 0.503];
-      const pans = [-0.55, 0.30, -0.15, 0.55];
-      // Per-line delay-time LFO rates (Hz). Slow, mutually prime-ish so
-      // the four breaths slowly drift out of phase and never repeat.
-      const lfoRates = [0.04, 0.06, 0.085, 0.11];
-
-      const input = ctx.createGain();   input.gain.value = 1;
-      const output = ctx.createGain();  output.gain.value = 1;
-
-      // -------- Pre-FDN diffusion: 3-stage all-pass cascade --------
-      // All-pass biquads change phase but NOT amplitude, so they smear
-      // the input across time without creating amplitude notches. This
-      // is the classical Lexicon/Eventide trick for smooth tails.
-      const ap1 = ctx.createBiquadFilter();
-      ap1.type = 'allpass'; ap1.frequency.value = 700;  ap1.Q.value = 0.5;
-      const ap2 = ctx.createBiquadFilter();
-      ap2.type = 'allpass'; ap2.frequency.value = 1700; ap2.Q.value = 0.5;
-      const ap3 = ctx.createBiquadFilter();
-      ap3.type = 'allpass'; ap3.frequency.value = 3300; ap3.Q.value = 0.5;
-
-      // fdnIn is the node that feeds the FDN delays (post-diffusion).
-      // The shimmer self-loop also re-enters here.
-      const fdnIn = ctx.createGain();
-      fdnIn.gain.value = 1;
-
-      input.connect(ap1);
-      ap1.connect(ap2);
-      ap2.connect(ap3);
-      ap3.connect(fdnIn);
-
-      const fdnSum = ctx.createGain();
-      fdnSum.gain.value = 1;
-
-      // -------- 4-line FDN with lowpass damping --------
-      const delayNodes = [];
-      const lpfs = [];
-      const fbGains = [];
-      const panners = [];
-      const lfos = [];
-      const lfoGains = [];
-      const xfeeds = [];
-
-      for (let i = 0; i < 4; i++) {
-        const d = ctx.createDelay(2.0);
-        d.delayTime.value = delays[i];
-
-        // Lowpass damping (replaces the swept bandpass): -3 dB @ 5 kHz,
-        // gently attenuates HF energy on each loop iteration so the tail
-        // darkens naturally without imposing a moving spectral notch.
-        const lpf = ctx.createBiquadFilter();
-        lpf.type = 'lowpass';
-        lpf.frequency.value = 5000;
-        lpf.Q.value = 0.7;
-
-        const fb = ctx.createGain();
-        fb.gain.value = feedback;
-
-        const p = ctx.createStereoPanner();
-        p.pan.value = pans[i];
-
-        // Subtle delay-time LFO: ±0.5 ms breath, no formant sweep.
-        // OscillatorNode (sine) → gain (0.0005 = 0.5 ms in seconds) →
-        // delay.delayTime AudioParam. Very slow rates (sub-Hz) so each
-        // line breathes independently.
-        const lfo = ctx.createOscillator();
-        lfo.type = 'sine';
-        lfo.frequency.value = lfoRates[i];
-        const lfoGain = ctx.createGain();
-        lfoGain.gain.value = 0.0005; // ±0.5 ms
-        lfo.connect(lfoGain);
-        lfoGain.connect(d.delayTime);
-
-        // fdnIn → delay → lpf → (feedback into delay) + (pan → fdnSum)
-        fdnIn.connect(d);
-        d.connect(lpf);
-        lpf.connect(fb);
-        fb.connect(d);
-        lpf.connect(p);
-        p.connect(fdnSum);
-
-        try { lfo.start(ctx.currentTime + i * 0.27); } catch (_) {}
-
-        delayNodes.push(d);
-        lpfs.push(lpf);
-        fbGains.push(fb);
-        panners.push(p);
-        lfos.push(lfo);
-        lfoGains.push(lfoGain);
-      }
-
-      // Cross-feed ring: each line's lpf output → next line's delay
-      // input at 0.3 gain. Hadamard-style mixing simplification — adds
-      // echo density without per-line resonant coloration.
-      for (let i = 0; i < 4; i++) {
-        const xf = ctx.createGain();
-        xf.gain.value = 0.3;
-        lpfs[i].connect(xf);
-        xf.connect(delayNodes[(i + 1) % 4]);
-        xfeeds.push(xf);
-      }
-
-      // -------- Shimmer self-loop (kept) --------
-      // Tap fdnSum, narrow BPF at 2 kHz (Q 0.6), fold back into fdnIn.
-      // Builds the AI-style upper-register halo without phasing.
-      const shimmerBPF = ctx.createBiquadFilter();
-      shimmerBPF.type = 'bandpass';
-      shimmerBPF.frequency.value = 2000;
-      shimmerBPF.Q.value = 0.6;
-      const shimmerFB = ctx.createGain();
-      // Stability (worst case @ 2 kHz):
-      //   shimmerFB × |H_BPF|_peak × |H_FDN_at_2kHz|_peak
-      //   ≈ 0.08 × 1.0 × (per-line peak ~4.5 × sum gain ~1.5) ≈ 0.54 < 1.0.
-      shimmerFB.gain.value = 0.08;
-      fdnSum.connect(shimmerBPF);
-      shimmerBPF.connect(shimmerFB);
-      shimmerFB.connect(fdnIn); // re-enter post-diffusion FDN front
-
-      // -------- Output stage: shelf, comp, limiter --------
-      // High-shelf moved POST-FDN (was pre): the wet path gets sparkle
-      // without re-amplifying the boost on each feedback iteration.
-      const postShelf = ctx.createBiquadFilter();
-      postShelf.type = 'highshelf';
-      postShelf.frequency.value = 5000;
-      postShelf.gain.value = 4;
-      postShelf.Q.value = 0.7;
-
-      // Safety net: moderate compressor catches sustained energy build-up.
-      // -18 dB threshold, 4:1, 1 ms attack, 100 ms release.
-      const wetComp = ctx.createDynamicsCompressor();
-      wetComp.threshold.value = -18;
-      wetComp.knee.value = 6;
-      wetComp.ratio.value = 4;
-      wetComp.attack.value = 0.001;
-      wetComp.release.value = 0.1;
-
-      // Brick-wall limiter at the very end of the wet path. 20:1 ratio,
-      // -6 dB threshold, 0 knee, 1 ms attack, 50 ms release — last-line
-      // defence against any runaway reaching the recording bus.
-      const wetLimiter = ctx.createDynamicsCompressor();
-      wetLimiter.threshold.value = -6;
-      wetLimiter.knee.value = 0;
-      wetLimiter.ratio.value = 20;
-      wetLimiter.attack.value = 0.001;
-      wetLimiter.release.value = 0.05;
-
-      // fdnSum → postShelf → wetComp → wetLimiter → output
-      // (no chorus, no waveshaper — those were the phasing/grit culprits)
-      fdnSum.connect(postShelf);
-      postShelf.connect(wetComp);
-      wetComp.connect(wetLimiter);
-      wetLimiter.connect(output);
-
-      return {
-        input, output,
-        setFeedback(fb) {
-          const t = ctx.currentTime;
-          // Hard clamp to 0.78 even if a stale call arrives with a
-          // higher value — defensive belt-and-suspenders.
-          const safe = Math.min(0.78, Math.max(0, fb));
-          for (const g of fbGains) {
-            try { g.gain.setTargetAtTime(safe, t, 0.05); } catch (_) {}
-          }
-        },
-        dispose() {
-          for (const o of lfos) { try { o.stop(); } catch (_) {} try { o.disconnect(); } catch (_) {} }
-          const all = [input, output, ap1, ap2, ap3, fdnIn, fdnSum, shimmerBPF, shimmerFB, postShelf, wetComp, wetLimiter]
-            .concat(delayNodes, lpfs, fbGains, panners, lfoGains, xfeeds);
-          for (const n of all) { try { n.disconnect(); } catch (_) {} }
-        }
-      };
-    }
-
-    // Build the persistent voice-processing scaffold (one per AudioContext).
-    // Holds the MediaStreamDestination and the always-present micOut tail
-    // so the recorder's stream identity survives chain rebuilds. The
-    // togglable stages live in micProcessing.chain and rebuild via
-    // applyVoiceFX().
-    function buildMicProcessing(ctx) {
-      if (!ctx) return null;
-      try {
-        const dest = ctx.createMediaStreamDestination();
-        const micOut = ctx.createGain();
-        micOut.gain.value = 1.0;
-        micOut.connect(dest);
-        const mp = {
-          ctx,
-          dest,
-          micOut,
-          head: micOut,    // first node mic-source connects to; updated by applyVoiceFX
-          chain: [],       // disposable nodes in the active chain
-          reverb: null,    // shimmer FDN handle, if active
-          wetGain: null,
-          dryGain: null
-        };
-        // If tanpura is already running on the shared context, wire its
-        // master gain into this fresh recorder bus so the drone shows up
-        // in recordings.
-        if (tanpuraNodes && tanpuraNodes.masterGain) {
-          try { tanpuraNodes.masterGain.connect(dest); } catch (_) {}
-        }
-        return mp;
-      } catch (e) {
-        console.warn('[record] buildMicProcessing failed:', e);
-        return null;
-      }
-    }
-
-    // Tear down only the togglable inner stages — preserves dest+micOut
-    // so the recorder's MediaStream identity is stable across rebuilds.
-    function disposeVoiceChain() {
-      if (!micProcessing) return;
-      if (micProcessing.reverb) {
-        try { micProcessing.reverb.dispose(); } catch (_) {}
-        micProcessing.reverb = null;
-      }
-      for (const n of micProcessing.chain) {
-        try { n.disconnect(); } catch (_) {}
-      }
-      micProcessing.chain = [];
-      micProcessing.wetGain = null;
-      micProcessing.dryGain = null;
-      micProcessing.head = micProcessing.micOut;
-    }
-
-    // Rebuild the voice chain to match voiceFX state. Smooth: ramp
-    // micOut.gain to 0, swap, ramp back up — avoids pop on toggle.
-    function applyVoiceFX(opts) {
-      if (!micProcessing) { updateVoiceProcNote(); return; }
-      const ctx = micProcessing.ctx;
-      const smooth = !(opts && opts.smooth === false);
-
-      const doRebuild = () => {
-        // TRUE BYPASS: every FX node here is created only when its
-        // toggle is on. disposeVoiceChain() above disconnected the old
-        // graph — disabled FX no longer exist as nodes, no gain-to-zero
-        // tricks. When all toggles are off, the chain collapses to
-        // source → micOut → MediaStreamDestination (no makeup, no
-        // filters, no compressor, no reverb network).
-        disposeVoiceChain();
-        const stages = [];
-
-        if (voiceFX.lowcut) {
-          const hp = ctx.createBiquadFilter();
-          hp.type = 'highpass';
-          hp.frequency.value = 90;
-          hp.Q.value = 0.707;
-          stages.push(hp);
-        }
-
-        if (voiceFX.compression) {
-          const co = ctx.createDynamicsCompressor();
-          co.threshold.value = -24;
-          co.knee.value = 10;
-          co.ratio.value = 3;
-          co.attack.value = 0.003;
-          co.release.value = 0.12;
-          stages.push(co);
-
-          // Makeup gain (+4 dB) only when compressor is in the chain —
-          // it's there to compensate for compression-induced loudness
-          // loss. With no compressor running, no makeup needed (and
-          // skipping it gives true source → micOut when all FX off).
-          const makeup = ctx.createGain();
-          makeup.gain.value = 1.585;
-          stages.push(makeup);
-        }
-
-        // Series-connect dry stages
-        for (let i = 0; i < stages.length - 1; i++) {
-          stages[i].connect(stages[i + 1]);
-        }
-        const chainEnd = stages[stages.length - 1] || null;
-
-        if (voiceFX.reverb && chainEnd) {
-          const reverb = buildShimmerReverb(ctx, {
-            feedback: voiceFXTailToFeedback(voiceFXTail)
-          });
-          const wet = ctx.createGain();
-          const dry = ctx.createGain();
-          const m = Math.max(0, Math.min(1, voiceFXMix));
-          wet.gain.value = m;
-          dry.gain.value = 1 - m;
-          chainEnd.connect(reverb.input);
-          chainEnd.connect(dry);
-          reverb.output.connect(wet);
-          dry.connect(micProcessing.micOut);
-          wet.connect(micProcessing.micOut);
-          stages.push(reverb.input, reverb.output, wet, dry);
-          micProcessing.reverb = reverb;
-          micProcessing.wetGain = wet;
-          micProcessing.dryGain = dry;
-        } else if (chainEnd) {
-          chainEnd.connect(micProcessing.micOut);
-        }
-        // If chainEnd is null (all FX off, no makeup), nothing else
-        // needs connecting — the mic source connects directly to
-        // micProcessing.head (which is micOut) via attachMicSource.
-
-        micProcessing.chain = stages;
-        micProcessing.head = stages[0] || micProcessing.micOut;
-
-        // Re-route the live mic source through the rebuilt head.
-        if (currentMicSource) {
-          try { currentMicSource.disconnect(); } catch (_) {}
-          if (analyser) { try { currentMicSource.connect(analyser); } catch (_) {} }
-          try { currentMicSource.connect(micProcessing.head); } catch (_) {}
-        }
-
-        updateVoiceProcNote();
-        updateVoiceReverbControlsVisibility();
-      };
-
-      if (!smooth || !ctx) {
-        doRebuild();
-        return;
-      }
-      try {
-        const t = ctx.currentTime;
-        micProcessing.micOut.gain.cancelScheduledValues(t);
-        micProcessing.micOut.gain.setValueAtTime(micProcessing.micOut.gain.value, t);
-        micProcessing.micOut.gain.linearRampToValueAtTime(0, t + 0.03);
-      } catch (_) {}
-      setTimeout(() => {
-        doRebuild();
-        try {
-          const t2 = ctx.currentTime;
-          micProcessing.micOut.gain.cancelScheduledValues(t2);
-          micProcessing.micOut.gain.setValueAtTime(0, t2);
-          micProcessing.micOut.gain.linearRampToValueAtTime(1, t2 + 0.03);
-        } catch (_) {}
-      }, 40);
-    }
-
-    // Live update of mix/tail without rebuilding the graph.
-    function setVoiceReverbMix(v) {
-      voiceFXMix = Math.max(0, Math.min(1, v));
-      try { localStorage.setItem('tuner.voice.reverbMix', String(voiceFXMix)); } catch (_) {}
-      const lbl = document.getElementById('voiceReverbMixVal');
-      if (lbl) lbl.textContent = Math.round(voiceFXMix * 100) + '%';
-      if (micProcessing && micProcessing.wetGain && micProcessing.dryGain && micProcessing.ctx) {
-        const t = micProcessing.ctx.currentTime;
-        try {
-          micProcessing.wetGain.gain.setTargetAtTime(voiceFXMix, t, 0.03);
-          micProcessing.dryGain.gain.setTargetAtTime(1 - voiceFXMix, t, 0.03);
-        } catch (_) {}
-      }
-    }
-
-    function setVoiceReverbTail(v) {
-      voiceFXTail = Math.max(0, Math.min(1, v));
-      try { localStorage.setItem('tuner.voice.reverbTail', String(voiceFXTail)); } catch (_) {}
-      const lbl = document.getElementById('voiceReverbTailVal');
-      if (lbl) lbl.textContent = Math.round(voiceFXTail * 100) + '%';
-      if (micProcessing && micProcessing.reverb) {
-        try { micProcessing.reverb.setFeedback(voiceFXTailToFeedback(voiceFXTail)); } catch (_) {}
-      }
-    }
-
-    function updateVoiceReverbControlsVisibility() {
-      const ctrl = document.getElementById('voiceReverbControls');
-      if (ctrl) ctrl.style.display = voiceFX.reverb ? 'block' : 'none';
-    }
-
-    function updateVoiceProcNote() {
-      const note = document.getElementById('voiceProcNote');
-      if (!note) return;
-      const parts = [];
-      if (voiceFX.lowcut) parts.push('lo-cut');
-      if (voiceFX.compression) parts.push('compression');
-      if (voiceFX.reverb) parts.push('shimmer reverb');
-      note.textContent = parts.length
-        ? 'Voice: ' + parts.join(' + ')
-        : 'Voice: clean (no processing)';
-    }
-
-    // Wire (or rewire) a freshly-created mic source into the analyser
-    // and the recording processing chain. The analyser ALWAYS receives
-    // the raw source (pitch detection requirement); the processing chain
-    // is parallel — its output feeds MediaRecorder, never the analyser.
-    function attachMicSource(source) {
-      if (!source) return;
-      // Disconnect the previous source from the processing chain so we
-      // don't end up summing two parallel mic feeds into the recorder.
-      if (currentMicSource && currentMicSource !== source) {
-        try { currentMicSource.disconnect(); } catch (_) {}
-      }
-      currentMicSource = source;
-      try { source.connect(analyser); } catch (_) {}
-      if (micProcessing && micProcessing.head) {
-        try { source.connect(micProcessing.head); } catch (_) {}
-      }
     }
 
     async function toggleListening() {
@@ -3335,18 +2310,14 @@
 
       if (!isListening) {
         try {
-          // Build (idempotent) the permanent audio graph — micProcessing
-          // and tanpura are guaranteed to exist after this returns.
-          // Also resumes the context if it was suspended.
-          bootstrapAudio();
-          console.log('[input] toggleListening: requesting deviceId=', selectedInputDeviceId);
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
           let stream;
           try {
             stream = await navigator.mediaDevices.getUserMedia(buildAudioConstraints(selectedInputDeviceId));
           } catch (err) {
             // Selected device may no longer be available — fall back to default
             if (selectedInputDeviceId) {
-              console.warn('[input] toggleListening: falling back to default after error:', err);
+              console.warn('Falling back to default audio input:', err);
               selectedInputDeviceId = null;
               try { localStorage.removeItem('tuner.inputDeviceId'); } catch (_) {}
               stream = await navigator.mediaDevices.getUserMedia(buildAudioConstraints(null));
@@ -3354,23 +2325,11 @@
               throw err;
             }
           }
-          // Tiny await for the stream to deliver its first frame so the
-          // analyzer doesn't briefly read silence from an empty source.
-          await new Promise(r => setTimeout(r, 30));
           currentAudioStream = stream;
-          verifyAudioInputBinding(stream, selectedInputDeviceId);
-
           const source = audioContext.createMediaStreamSource(stream);
           analyser = audioContext.createAnalyser();
-          // Idle/preview fftSize. enterRecordMode() drops this to
-          // ANALYSER_FFT_RECORD to cut YIN cost ~4x while recording.
-          analyser.fftSize = recordMode ? ANALYSER_FFT_RECORD : ANALYSER_FFT_IDLE;
-          // micProcessing was built once in bootstrapAudio(); it lives
-          // forever. Just attach the new mic source to the head of the
-          // permanent chain. analyser also gets the raw source for pitch
-          // detection (parallel — the FX chain feeds the recorder, never
-          // the analyser).
-          attachMicSource(source);
+          analyser.fftSize = 4096;
+          source.connect(analyser);
 
           isListening = true;
           btn.innerHTML = 'Listening';
@@ -3381,23 +2340,18 @@
           // Now that permission is granted, device labels are populated
           refreshAudioInputList();
         } catch (err) {
-          console.error('[input] Microphone error:', err);
+          console.error('Microphone error:', err);
           alert('Could not access microphone.');
         }
       } else {
         isListening = false;
         if (animationId) cancelAnimationFrame(animationId);
-        tearDownAudioStream(currentAudioStream);
-        currentAudioStream = null;
-        // Disconnect the mic SOURCE from the permanent micProcessing
-        // chain. The chain itself (highpass, compressor, makeup, optional
-        // reverb, micOut, MediaStreamDestination) stays — it's permanent.
-        // Tanpura is still routed through the recorder bus; if recording
-        // continues it captures the drone alone.
-        if (currentMicSource) {
-          try { currentMicSource.disconnect(); } catch (_) {}
-          currentMicSource = null;
+        if (currentAudioStream) {
+          currentAudioStream.getTracks().forEach(t => t.stop());
+          currentAudioStream = null;
         }
+        if (audioContext) audioContext.close();
+        audioContext = null;
         analyser = null;
         smoothedFreq = null;
         smoothedCents = null;
@@ -3405,7 +2359,6 @@
 
         btn.innerHTML = 'Microphone';
         btn.classList.remove('listening');
-        updateAudioInputDiagnostic('', null, null, false);
 
         fadeOutIndicator();
       }
@@ -3451,20 +2404,15 @@
     async function enterRecordMode() {
       if (recordMode) return;
 
-      // No mic activation here — entering record mode is mic-agnostic so
-      // the user can frame, monitor the drone, or just look at the
-      // ruler before deciding to record. The mic is only requested when
-      // they actually press the record button (see startRecording).
+      if (!isListening) {
+        await toggleListening();
+        if (!isListening) return; // mic permission failed
+      }
+
       const ok = await setupCamera(cameraFacing);
       if (!ok) return;
 
       recordMode = true;
-      // Drop analyser FFT to halve YIN's quadratic cost while the
-      // recorder + camera + drone are competing for CPU on Pixel 7.
-      // 2048 still resolves down to ~47 Hz at 48 kHz, fine for voice.
-      if (analyser) {
-        try { analyser.fftSize = ANALYSER_FFT_RECORD; } catch (_) {}
-      }
       document.body.classList.add('record-mode');
       document.body.classList.add('aspect-' + recordAspect.replace(':', '-'));
       // First-time hint: pulse the settings toggle once per page load so
@@ -3514,11 +2462,6 @@
         stopRecording();
       }
       recordMode = false;
-      // Restore the larger FFT for maximum pitch precision when not
-      // bottlenecked by the recorder.
-      if (analyser) {
-        try { analyser.fftSize = ANALYSER_FFT_IDLE; } catch (_) {}
-      }
       document.body.classList.remove('record-mode', 'aspect-9-16', 'aspect-4-5', 'aspect-1-1');
       if (cameraStream) {
         cameraStream.getTracks().forEach(t => t.stop());
@@ -3546,22 +2489,9 @@
       return '';
     }
 
-    async function startRecording() {
+    function startRecording() {
       if (!recordMode) return;
       if (mediaRecorder && mediaRecorder.state === 'recording') return;
-
-      // Auto-activate the mic on first record press if the user hasn't
-      // turned it on manually. Built-in mic is preferred when BT
-      // headphones are connected (smart default in pickSmartDefaultInput).
-      // This is the ONLY place that activates the mic on record-mode
-      // entry — enterRecordMode no longer touches getUserMedia, so the
-      // user can drone-monitor before deciding to record.
-      if (!currentMicSource && !isListening) {
-        await toggleListening();
-        // Give the source a tick to settle before grabbing tracks.
-        await new Promise(r => setTimeout(r, 30));
-      }
-
       if (!currentAudioStream) {
         alert('Microphone not active.');
         return;
@@ -3569,39 +2499,10 @@
 
       const canvas = document.getElementById('rulerCanvas');
       const canvasStream = canvas.captureStream(30);
-
-      // Prefer the processed mic destination (highpass + compressor +4dB)
-      // for the recorded audio. Fall back to the raw mic track only if
-      // the processing chain failed to build (older browsers, etc.).
-      // Tanpura now lives on the SAME shared AudioContext and its master
-      // gain is wired into micProcessing.dest, so the drone is mixed
-      // into this same MediaStream sample-accurately.
-      let audioTrack = null;
-      let audioSource = 'none';
-      if (micProcessing && micProcessing.dest) {
-        const processedTracks = micProcessing.dest.stream.getAudioTracks();
-        if (processedTracks.length > 0) {
-          audioTrack = processedTracks[0];
-          audioSource = 'processed';
-        }
-      }
-      if (!audioTrack && currentAudioStream) {
-        audioTrack = currentAudioStream.getAudioTracks()[0] || null;
-        if (audioTrack) {
-          audioSource = 'raw-fallback';
-          console.warn('[record] processed mic chain unavailable; using raw mic');
-        }
-      }
+      const audioTrack = currentAudioStream.getAudioTracks()[0];
       if (audioTrack) {
         canvasStream.addTrack(audioTrack);
       }
-
-      console.log('[record] start',
-        'audioSource=', audioSource,
-        'trackLabel=', audioTrack && audioTrack.label,
-        'ctxState=', audioContext && audioContext.state,
-        'droneEnabled=', tanpuraEnabled,
-        'streamTracks=', canvasStream.getTracks().map(t => t.kind));
 
       const mime = pickRecorderMime();
       recordedChunks = [];
@@ -3621,15 +2522,6 @@
       mediaRecorder.onstop = () => {
         // Stop only the canvas video track; keep the shared mic track alive
         try { canvasStream.getVideoTracks().forEach(t => t.stop()); } catch (_) {}
-
-        const elapsedMs = recordStartTime ? (performance.now() - recordStartTime) : 0;
-        const totalBytes = recordedChunks.reduce((n, c) => n + (c && c.size ? c.size : 0), 0);
-        console.log('[record] stop',
-          'durMs=', Math.round(elapsedMs),
-          'chunks=', recordedChunks.length,
-          'bytes=', totalBytes,
-          'discarded=', discardRequested,
-          'droneEnabled=', tanpuraEnabled);
 
         if (discardRequested) {
           // Throw away — no save
@@ -3762,31 +2654,6 @@
     }
 
     // -------- Feature 3: Audio input device picker --------
-
-    // Smart default for the input picker. Returns a deviceId to bind, or
-    // null to leave the current selection alone.
-    //
-    // Rules:
-    //   - If the user has a saved preference (localStorage), respect it
-    //     — never override.
-    //   - Otherwise, if we can see BOTH a built-in mic AND a Bluetooth
-    //     mic in the device list, prefer the built-in. This sidesteps
-    //     Android's Hands-Free Profile (HFP) routing, which forces BT
-    //     headphones into mono and breaks the system volume rocker.
-    //   - Otherwise, return null (browser default is fine).
-    function pickSmartDefaultInput(inputs) {
-      try {
-        if (localStorage.getItem('tuner.inputDeviceId')) return null;
-      } catch (_) {}
-
-      const list = (inputs || []).filter(d => d && d.kind === 'audioinput' && d.deviceId && d.label);
-      const builtIn = list.find(d => /built[\s-]?in|internal|microphone \(built-in\)/i.test(d.label));
-      const btMic = list.find(d => /bluetooth|airpods|hands[\s-]?free|headset|hfp/i.test(d.label));
-
-      if (builtIn && btMic) return builtIn.deviceId;
-      return null;
-    }
-
     async function refreshAudioInputList() {
       const sel = document.getElementById('audioInputDevice');
       if (!sel) return;
@@ -3795,11 +2662,6 @@
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const inputs = devices.filter(d => d.kind === 'audioinput');
-        console.log('[input] enumerateDevices →', inputs.map(d => ({
-          deviceId: d.deviceId,
-          label: d.label,
-          groupId: d.groupId
-        })));
 
         // Preserve current selection
         const prev = selectedInputDeviceId || sel.value;
@@ -3812,11 +2674,9 @@
         sel.appendChild(defaultOpt);
 
         let count = 0;
-        const usableIds = new Set();
         for (const d of inputs) {
           if (!d.deviceId || d.deviceId === 'default' || d.deviceId === 'communications') continue;
           count++;
-          usableIds.add(d.deviceId);
           const o = document.createElement('option');
           o.value = d.deviceId;
           o.textContent = d.label || `Input ${count}`;
@@ -3824,49 +2684,25 @@
         }
 
         // Restore prior selection if still available
-        if (prev && usableIds.has(prev)) {
+        if (prev && [...sel.options].some(o => o.value === prev)) {
           sel.value = prev;
         } else if (prev) {
-          // Selected device disappeared. Only clear localStorage once
-          // labels are populated (post-permission) — pre-permission the
-          // device list is unreliable so a missing match isn't conclusive.
-          const labelsReady = inputs.some(d => d.label);
-          if (labelsReady) {
-            console.warn('[input] stored deviceId not in current list — clearing.', { stored: prev });
-            try { localStorage.removeItem('tuner.inputDeviceId'); } catch (_) {}
-            selectedInputDeviceId = null;
-          }
+          // Selected device disappeared — fall back to default
           sel.value = '';
         }
 
         // Mark as ready once we've populated with labels (post-permission)
-        if (inputs.some(d => d.label)) {
-          audioInputListReady = true;
-          // First time we see real labels: if the user has no saved
-          // preference and we can see both a built-in mic and a BT mic,
-          // prefer built-in to avoid HFP routing on Android.
-          const smartId = pickSmartDefaultInput(inputs);
-          if (smartId && smartId !== selectedInputDeviceId) {
-            console.log('[input] smart default → built-in mic:', smartId);
-            sel.value = smartId;
-            // applyAudioInputDevice persists to localStorage and rebinds
-            // getUserMedia to the picked device.
-            applyAudioInputDevice(smartId);
-          }
-        }
+        if (inputs.some(d => d.label)) audioInputListReady = true;
       } catch (e) {
-        console.warn('[input] enumerateDevices failed:', e);
+        console.warn('enumerateDevices failed:', e);
       }
     }
 
     async function applyAudioInputDevice(deviceId) {
-      const requestedId = deviceId || null;
-      console.log('[input] applyAudioInputDevice: requested=', requestedId);
-
       // Persist regardless of whether we can apply right now
-      selectedInputDeviceId = requestedId;
+      selectedInputDeviceId = deviceId || null;
       try {
-        if (requestedId) localStorage.setItem('tuner.inputDeviceId', requestedId);
+        if (deviceId) localStorage.setItem('tuner.inputDeviceId', deviceId);
         else localStorage.removeItem('tuner.inputDeviceId');
       } catch (_) {}
 
@@ -3884,295 +2720,112 @@
 
       if (!isListening || !audioContext || !analyser) {
         // Will be applied on next mic start
-        console.log('[input] not listening yet — will apply on next mic start');
         return;
       }
 
-      // Tear down the prior stream's tracks BEFORE asking for the new
-      // one. Some Android Chrome versions otherwise hand back the same
-      // stream or fail silently.
-      tearDownAudioStream(currentAudioStream);
-      currentAudioStream = null;
-
       try {
-        console.log('[input] getUserMedia with constraints=', buildAudioConstraints(requestedId));
-        const newStream = await navigator.mediaDevices.getUserMedia(buildAudioConstraints(requestedId));
-        // Brief pause so the source has produced its first frame before
-        // the analyzer reads from it.
-        await new Promise(r => setTimeout(r, 30));
+        const newStream = await navigator.mediaDevices.getUserMedia(buildAudioConstraints(deviceId));
+        // Tear down the prior stream's tracks
+        if (currentAudioStream) {
+          currentAudioStream.getTracks().forEach(t => t.stop());
+        }
         currentAudioStream = newStream;
-
-        // Verify what we actually got. If the browser bound to default
-        // instead of the requested device, the diagnostic UI surfaces it.
-        verifyAudioInputBinding(newStream, requestedId);
-
         const source = audioContext.createMediaStreamSource(newStream);
-        // Re-route source through analyser AND the (permanent) recording
-        // processing chain. attachMicSource also disconnects the prior
-        // source so we don't double-feed the recorder bus. The chain
-        // itself was built once in bootstrapAudio() and never rebuilds.
-        attachMicSource(source);
+        source.connect(analyser);
 
         // Reset analyzer-side smoothing so we don't carry stale state
         smoothedFreq = null;
         smoothedCents = null;
         lastDetectTime = 0;
       } catch (err) {
-        console.error('[input] Could not switch audio input:', err);
-        updateAudioInputDiagnostic('(switch failed)', null, requestedId, true);
+        console.error('Could not switch audio input:', err);
         alert('Could not switch to that input device.');
       }
     }
 
     // -------- Feature 4: Tanpura drone --------
+    function buildTanpuraImpulseResponse(ctx, seconds) {
+      const len = Math.max(1, Math.floor(ctx.sampleRate * seconds));
+      const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        const data = buf.getChannelData(ch);
+        for (let i = 0; i < len; i++) {
+          const t = i / len;
+          // Slower decay (exp(-2.5*t)) gives a longer, more spacious tail.
+          const env = Math.exp(-t * 2.5);
+          data[i] = (Math.random() * 2 - 1) * env;
+        }
+      }
+      return buf;
+    }
 
-    // The drone reverb used to be a ConvolverNode + 3 s noise IR. Even
-    // with the IR module-cached, convolution at 3 s × 44.1 kHz = ~132 k
-    // multiply-adds per output sample — the single heaviest node on the
-    // drone graph and a confirmed crackle-source on Pixel 7 while
-    // recording. It's been replaced (in buildTanpura below) with a
-    // 4-line FDN structure modelled after the voice reverb but tuned
-    // for tanpura character: shorter prime delays, no shimmer self-loop,
-    // fixed per-line feedback. ~12 small nodes vs. the convolver, which
-    // is dramatically cheaper at the same lush character.
-    function buildTanpura(ctx) {
-      if (!ctx) return;
+    function buildTanpura() {
+      if (!droneAudioCtx) return;
       if (tanpuraNodes) return;
+      const ctx = droneAudioCtx;
 
-      // Master gain — controls overall tanpura level (separate from per-ratio drones).
-      // Connects to BOTH the speakers (audioContext.destination) AND the
-      // recorder bus (micProcessing.dest, if it exists). Same node feeds
-      // both — the volume slider stays a single source of truth.
+      // Master gain — controls overall tanpura level (separate from per-ratio drones)
       const masterGain = ctx.createGain();
       masterGain.gain.value = 0;
-      masterGain.connect(ctx.destination);
-      if (micProcessing && micProcessing.dest) {
-        masterGain.connect(micProcessing.dest);
-      }
+      masterGain.connect(droneAudioCtx.destination);
 
-      // FDN reverb (replaces previous Convolver + 25 ms preDelay). Same
-      // wet/dry balance — 0.55/0.45 — direct signal carries the apparent
-      // loudness while the tail bathes the chord. The architecture
-      // mirrors buildShimmerReverb but is tuned for drone:
-      //   - 4 parallel delay lines (167, 251, 367, 487 ms primes)
-      //   - per-line lowpass damping at 3 kHz (Q 0.7)
-      //   - per-line feedback fixed at 0.6 (lowered from 0.78 to kill
-      //     runaway buildup; max steady-state gain = 1/(1-0.6) = 2.5x —
-      //     provably bounded, no exponential growth)
-      //   - NO cross-feed (was 0.3 line→next; the ring + 0.78 per-line
-      //     pushed effective loop gain past 1.0 at certain frequencies,
-      //     causing self-oscillation after ~1 minute of play). The four
-      //     lines now operate as parallel combs — each tail decays
-      //     independently. Slightly less density, much more stability.
-      //   - panning [-0.4, +0.2, -0.1, +0.4]
-      //   - per-line ±0.5 ms delay-time LFO at 0.04/0.07/0.10/0.13 Hz
-      //     for breath
-      //   - 3-stage all-pass cascade (600/1500/3000 Hz, Q 0.5) PRE-FDN
-      //     for diffusion
-      //   - NO shimmer self-loop (saw drones already provide harmonic
-      //     content; would gild the lily)
+      // Reverb path with a 25 ms pre-delay so the dry signal blooms
+      // for a moment before the long tail arrives. Wet/dry 70/30.
+      const convolver = ctx.createConvolver();
+      convolver.buffer = buildTanpuraImpulseResponse(ctx, 5.5);
+      const preDelay = ctx.createDelay(0.5);
+      preDelay.delayTime.value = 0.025;
       const wetGain = ctx.createGain();
-      wetGain.gain.value = 0.55;
+      wetGain.gain.value = 0.7;
       const dryGain = ctx.createGain();
-      dryGain.gain.value = 0.45;
+      dryGain.gain.value = 0.3;
+      preDelay.connect(convolver);
+      convolver.connect(wetGain);
+      wetGain.connect(masterGain);
+      dryGain.connect(masterGain);
 
-      // ---- Safety net (DC blocker + graceful-catcher limiter) ----
-      // Wet+dry sum → mixGain → dcBlocker (HPF 10 Hz, Q 0.5) →
-      // limiter (-3 dB, 6 dB knee, 8:1, 5 ms attack, 120 ms release)
-      // → masterGain.
-      // The dcBlocker kills sub-audio drift/DC that would otherwise compound
-      // over minutes of FDN feedback (per-line fb=0.6, no cross-feed).
-      // The limiter is now a soft-knee "graceful catcher" rather than a
-      // brick wall — with the FDN stable by construction (0.6 per-line, no
-      // ring), it should rarely engage at all. When it does, the soft knee
-      // and 8:1 ratio bend the signal musically instead of clicking it
-      // (the previous 20:1 / 1 ms hard limiter pumped on incoming peaks
-      // and produced the click artifacts). It still protects both speakers
-      // AND the recorder bus, since masterGain (the post-limiter node) is
-      // what feeds both destinations.
-      const mixGain = ctx.createGain();
-      mixGain.gain.value = 1;
-
-      const dcBlocker = ctx.createBiquadFilter();
-      dcBlocker.type = 'highpass';
-      dcBlocker.frequency.value = 10;
-      dcBlocker.Q.value = 0.5;
-
-      const limiter = ctx.createDynamicsCompressor();
-      limiter.threshold.value = -3;
-      limiter.knee.value = 6;
-      limiter.ratio.value = 8;
-      limiter.attack.value = 0.005;
-      limiter.release.value = 0.12;
-
-      wetGain.connect(mixGain);
-      dryGain.connect(mixGain);
-      mixGain.connect(dcBlocker);
-      dcBlocker.connect(limiter);
-      limiter.connect(masterGain);
-
-      // Pre-FDN diffusion: 3-stage all-pass cascade. Phase-only,
-      // amplitude-flat — smears transients before the FDN, smoother tail.
-      const droneAp1 = ctx.createBiquadFilter();
-      droneAp1.type = 'allpass'; droneAp1.frequency.value = 600;  droneAp1.Q.value = 0.5;
-      const droneAp2 = ctx.createBiquadFilter();
-      droneAp2.type = 'allpass'; droneAp2.frequency.value = 1500; droneAp2.Q.value = 0.5;
-      const droneAp3 = ctx.createBiquadFilter();
-      droneAp3.type = 'allpass'; droneAp3.frequency.value = 3000; droneAp3.Q.value = 0.5;
-
-      // fdnIn feeds the 4 delay lines (post-diffusion).
-      const droneFdnIn = ctx.createGain();
-      droneFdnIn.gain.value = 1;
-      droneAp1.connect(droneAp2);
-      droneAp2.connect(droneAp3);
-      droneAp3.connect(droneFdnIn);
-
-      // 4 parallel delay lines.
-      const droneDelayMs   = [167, 251, 367, 487];
-      const dronePans      = [-0.4, 0.2, -0.1, 0.4];
-      const droneLfoRates  = [0.04, 0.07, 0.10, 0.13];
-      const droneDelayNodes = [];
-      const droneLpfs       = [];
-      const droneFbGains    = [];
-      const dronePanners    = [];
-      const droneLfos       = [];
-      const droneLfoGains   = [];
-      const droneXfeeds     = [];
-
-      for (let i = 0; i < 4; i++) {
-        const d = ctx.createDelay(2.0);
-        d.delayTime.value = droneDelayMs[i] / 1000;
-
-        const lpf = ctx.createBiquadFilter();
-        lpf.type = 'lowpass';
-        lpf.frequency.value = 3000;
-        lpf.Q.value = 0.7;
-
-        const fb = ctx.createGain();
-        // Per-line feedback lowered from 0.78 → 0.6 to kill the runaway
-        // buildup that produced the harsh feedback ~1 min into play.
-        // With no cross-feed (see below), each line is an independent
-        // parallel comb with steady-state gain 1/(1-0.6) = 2.5x —
-        // provably bounded. T60 ≈ 1.5–2 s at the 367 ms mean delay,
-        // perceptual decay ~4–5 s — still a substantial drone tail.
-        fb.gain.value = 0.6;
-
-        const p = ctx.createStereoPanner();
-        p.pan.value = dronePans[i];
-
-        // ±0.5 ms breath, slow rates so each line drifts independently.
-        const lfo = ctx.createOscillator();
-        lfo.type = 'sine';
-        lfo.frequency.value = droneLfoRates[i];
-        const lfoGain = ctx.createGain();
-        lfoGain.gain.value = 0.0005; // ±0.5 ms in seconds
-        lfo.connect(lfoGain);
-        lfoGain.connect(d.delayTime);
-
-        // droneFdnIn → delay → lpf → (feedback → delay) + (pan → wetGain)
-        droneFdnIn.connect(d);
-        d.connect(lpf);
-        lpf.connect(fb);
-        fb.connect(d);
-        lpf.connect(p);
-        p.connect(wetGain);
-
-        try { lfo.start(ctx.currentTime + i * 0.21); } catch (_) {}
-
-        droneDelayNodes.push(d);
-        droneLpfs.push(lpf);
-        droneFbGains.push(fb);
-        dronePanners.push(p);
-        droneLfos.push(lfo);
-        droneLfoGains.push(lfoGain);
-      }
-
-      // Cross-feed ring REMOVED. Previously each lpf output → next line's
-      // delay input at 0.3 gain (Hadamard-lite density trick). Combined
-      // with 0.78 per-line feedback, the 4-line cross-feed ring formed a
-      // closed loop whose effective gain exceeded 1.0 at certain
-      // frequencies, causing the drone to self-oscillate after ~1 minute.
-      // Without the cross-feed the FDN simplifies to four parallel comb
-      // filters with feedback 0.6 — provably stable, max steady-state
-      // gain 2.5x the input. We lose some echo density; we gain stability
-      // for indefinite play. droneXfeeds remains as an empty array so any
-      // teardown loops that iterate it stay safe.
-
-      // Bus compressor — the actual loudness lever. Sits between the
-      // tone-shaping (lpf+shelf) and the wet/dry split, so both the dry
-      // tap and the FDN feed sample the squashed signal. Slow LFO motion
-      // on the saw drones gives a ~6-10 dB peak-to-average gap worth
-      // catching; threshold/ratio/knee chosen to ride the tops without
-      // audibly pumping.
-      const droneComp = ctx.createDynamicsCompressor();
-      droneComp.threshold.value = -22;
-      droneComp.knee.value = 12;
-      droneComp.ratio.value = 4;
-      droneComp.attack.value = 0.005;
-      droneComp.release.value = 0.18;
-      droneComp.connect(dryGain);   // dry tap
-      droneComp.connect(droneAp1);  // wet front: AP cascade → FDN
-
-      // High-shelf for air → feeds the compressor input.
+      // High-shelf for air
       const shelf = ctx.createBiquadFilter();
       shelf.type = 'highshelf';
       shelf.frequency.value = 6000;
       shelf.gain.value = 2;
-      shelf.connect(droneComp);
+      shelf.connect(dryGain);
+      shelf.connect(preDelay);
 
-      // Lowpass to tame saw harshness. The base cutoff is set by the
-      // user (droneCutoff, default 2500 Hz, log-mapped slider 800-6000)
-      // and a slow sine LFO sweeps ±DRONE_LFO_DEPTH Hz around it
-      // (~30 s period) — motion around the user's value, no longer
-      // dominating it.
+      // Lowpass to tame saw harshness — its cutoff is modulated slowly so
+      // the timbre swells and recedes (1800–3200 Hz, ~30 s period).
       const lpf = ctx.createBiquadFilter();
       lpf.type = 'lowpass';
-      lpf.frequency.value = droneCutoff;
-      // Q lowered from 0.7 → 0.3 to broaden the response and kill the
-      // resonant peak right at the LFO-swept cutoff. The narrower peak
-      // was feeding the FDN a steady stream of energy at one frequency,
-      // which is what built up to clicks after ~1 minute.
-      lpf.Q.value = 0.3;
+      lpf.frequency.value = 2500;
+      lpf.Q.value = 0.7;
       lpf.connect(shelf);
 
       const lpfLfo = ctx.createOscillator();
       lpfLfo.type = 'sine';
       lpfLfo.frequency.value = 1 / 30; // ≈0.033 Hz, 30 s period
       const lpfLfoGain = ctx.createGain();
-      lpfLfoGain.gain.value = DRONE_LFO_DEPTH; // ±Hz around droneCutoff centre
+      lpfLfoGain.gain.value = 700; // ±700 Hz around 2500 Hz centre
       lpfLfo.connect(lpfLfoGain);
       lpfLfoGain.connect(lpf.frequency);
       try { lpfLfo.start(); } catch (_) {}
 
-      // Sum bus — gain raised from 0.18 to 0.32 so the drone is audibly
-      // present on phone speakers. Voice gains sum to ≈1.23 worst-case;
-      // post-LPF and 0.85 master ceiling, peak output stays ≲0.5 of full
-      // scale even with constructive interference + reverb tail.
+      // Sum bus — keep some headroom before reverb
       const sumGain = ctx.createGain();
-      sumGain.gain.value = 0.32;
+      sumGain.gain.value = 0.18;
       sumGain.connect(lpf);
 
       // -- Voices --
       // Three unison saws (mild static detune) plus a sub-octave voice
-      // = four "fundamental" voices. Each gets a SINGLE random-walk LFO
-      // (low-passed noise) whose output is split through two scaled
-      // gain nodes — one driving osc.detune (±7 cents), the other
-      // driving the tremolo VCA (±6%). Detune and tremolo are therefore
-      // correlated per voice, but voices have independent LFOs at
-      // different cutoffs, so the chord still breathes organically and
-      // the correlation is inaudible. Halves the LFO node count vs.
-      // the previous independent-LFO design (Pixel 7 CPU win).
-      // The previous optional fifth-above voice was dropped: the
-      // four-voice patch is plenty rich and removing it saves an osc,
-      // an LFO chain, a panner, and a tremolo VCA.
+      // make up the four "fundamental" voices that get random-walk detune
+      // and tremolo. Frequencies vary per voice so they never lock in phase.
       // mul = freq multiplier vs refFreq, det = static detune in cents,
       // pan = stereo position, gain = static voice gain,
-      // lfoCut = shared LFO lowpass cutoff (Hz, ~0.2 Hz target)
+      // detLfo = detune LFO cutoff (Hz), tremLfo = tremolo LFO cutoff (Hz)
       const voiceSpecs = [
-        { mul: 0.5, det:  0, pan:  0.00, gain: 0.20, lfoCut: 0.12 }, // sub octave
-        { mul: 1.0, det: -3, pan: -0.25, gain: 0.28, lfoCut: 0.20 },
-        { mul: 1.0, det:  0, pan:  0.00, gain: 0.28, lfoCut: 0.30 },
-        { mul: 1.0, det:  3, pan:  0.25, gain: 0.28, lfoCut: 0.40 },
+        { mul: 0.5, det:  0, pan:  0.00, gain: 0.20, detLfo: 0.15, tremLfo: 0.08 }, // sub octave
+        { mul: 1.0, det: -3, pan: -0.25, gain: 0.28, detLfo: 0.27, tremLfo: 0.13 },
+        { mul: 1.0, det:  0, pan:  0.00, gain: 0.28, detLfo: 0.41, tremLfo: 0.19 },
+        { mul: 1.0, det:  3, pan:  0.25, gain: 0.28, detLfo: 0.55, tremLfo: 0.24 },
       ];
 
       const oscs = [];
@@ -4183,12 +2836,6 @@
 
       const noiseLen = Math.floor(ctx.sampleRate * 4);
 
-      // Anchor every voice to a single start time so the per-voice 20 ms
-      // gain ramp lines up with the oscillator start — kills the audible
-      // click that was happening when oscGain jumped from 0 to v.gain at
-      // the same instant the saw started.
-      const tanpuraStartAt = ctx.currentTime + 0.02;
-
       for (let i = 0; i < voiceSpecs.length; i++) {
         const v = voiceSpecs[i];
 
@@ -4197,23 +2844,17 @@
         osc.frequency.value = config.refFreq * v.mul;
         osc.detune.value = v.det;
 
-        // 20 ms linear ramp from 0 → v.gain at oscillator start. No
-        // instant jumps; ramp aligned to the shared start time.
         const oscGain = ctx.createGain();
-        oscGain.gain.setValueAtTime(0, tanpuraStartAt);
-        oscGain.gain.linearRampToValueAtTime(v.gain, tanpuraStartAt + 0.02);
+        oscGain.gain.value = v.gain;
 
-        // Tremolo VCA — its gain breathes around 1.0 by ±6%.
+        // Tremolo VCA — its gain breathes around 1.0 by ±8%.
         const tremGain = ctx.createGain();
         tremGain.gain.value = 1.0;
 
         const panner = ctx.createStereoPanner();
         panner.pan.value = v.pan;
 
-        // Single random-walk LFO via low-passed noise. Output splits
-        // into a detune-scale gain (±7 cents → osc.detune) and a
-        // tremolo-scale gain (±0.06 → tremGain.gain). One BufferSource +
-        // one BiquadFilter per voice instead of two of each.
+        // Detune LFO via low-passed noise scaled to ±7 cents
         const noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
         const noiseData = noiseBuf.getChannelData(0);
         for (let j = 0; j < noiseLen; j++) noiseData[j] = Math.random() * 2 - 1;
@@ -4221,22 +2862,37 @@
         noiseSrc.buffer = noiseBuf;
         noiseSrc.loop = true;
 
-        const lfoFilter = ctx.createBiquadFilter();
-        lfoFilter.type = 'lowpass';
-        lfoFilter.frequency.value = v.lfoCut;
-        lfoFilter.Q.value = 0.7;
+        const detLfoFilter = ctx.createBiquadFilter();
+        detLfoFilter.type = 'lowpass';
+        detLfoFilter.frequency.value = v.detLfo;
+        detLfoFilter.Q.value = 0.7;
 
-        const detuneGain = ctx.createGain();
-        detuneGain.gain.value = 7; // ±~7 cents
+        const detLfoGain = ctx.createGain();
+        detLfoGain.gain.value = 7; // ±~7 cents
 
-        const tremoloGain = ctx.createGain();
-        tremoloGain.gain.value = 0.06; // ±6% gain swing
+        noiseSrc.connect(detLfoFilter);
+        detLfoFilter.connect(detLfoGain);
+        detLfoGain.connect(osc.detune);
 
-        noiseSrc.connect(lfoFilter);
-        lfoFilter.connect(detuneGain);
-        lfoFilter.connect(tremoloGain);
-        detuneGain.connect(osc.detune);
-        tremoloGain.connect(tremGain.gain);
+        // Independent tremolo LFO (random-walk style via noise → lowpass)
+        const tremNoiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
+        const tremData = tremNoiseBuf.getChannelData(0);
+        for (let j = 0; j < noiseLen; j++) tremData[j] = Math.random() * 2 - 1;
+        const tremNoiseSrc = ctx.createBufferSource();
+        tremNoiseSrc.buffer = tremNoiseBuf;
+        tremNoiseSrc.loop = true;
+
+        const tremLfoFilter = ctx.createBiquadFilter();
+        tremLfoFilter.type = 'lowpass';
+        tremLfoFilter.frequency.value = v.tremLfo;
+        tremLfoFilter.Q.value = 0.7;
+
+        const tremLfoGain = ctx.createGain();
+        tremLfoGain.gain.value = 0.08; // ±8% gain swing
+
+        tremNoiseSrc.connect(tremLfoFilter);
+        tremLfoFilter.connect(tremLfoGain);
+        tremLfoGain.connect(tremGain.gain);
 
         // Signal chain: osc → oscGain → tremGain → panner → sumGain
         osc.connect(oscGain);
@@ -4244,14 +2900,17 @@
         tremGain.connect(panner);
         panner.connect(sumGain);
 
+        const startAt = ctx.currentTime + 0.02;
         try {
-          osc.start(tanpuraStartAt);
-          noiseSrc.start(tanpuraStartAt + i * 0.013);
+          osc.start(startAt);
+          noiseSrc.start(startAt + i * 0.013);
+          tremNoiseSrc.start(startAt + i * 0.017 + 0.005);
         } catch (e) { /* already started */ }
 
         oscs.push(osc);
         oscMuls.push(v.mul);
         lfoSources.push(noiseSrc);
+        lfoSources.push(tremNoiseSrc);
         tremGains.push(tremGain);
         panners.push(panner);
       }
@@ -4260,54 +2919,112 @@
       const octOsc = ctx.createOscillator();
       octOsc.type = 'sawtooth';
       octOsc.frequency.value = config.refFreq * 2;
-      // 20 ms ramp from 0 → 0.08 at start, same anchor as voices.
       const octGain = ctx.createGain();
-      octGain.gain.setValueAtTime(0, tanpuraStartAt);
-      octGain.gain.linearRampToValueAtTime(0.08, tanpuraStartAt + 0.02);
+      octGain.gain.value = 0.08;
       octOsc.connect(octGain);
       octGain.connect(sumGain);
-      try { octOsc.start(tanpuraStartAt); } catch (e) {}
+      try { octOsc.start(); } catch (e) {}
+
+      // Tanpura-style fifth-above voice, slightly detuned off pure 3:2.
+      // Sits at ≈ -8 dB relative to the unison saws so it perfumes the
+      // chord without dominating it.
+      const fifthOsc = ctx.createOscillator();
+      fifthOsc.type = 'sawtooth';
+      fifthOsc.frequency.value = config.refFreq * 1.5;
+      fifthOsc.detune.value = 5;
+      const fifthGain = ctx.createGain();
+      fifthGain.gain.value = 0.11;
+      const fifthPanner = ctx.createStereoPanner();
+      fifthPanner.pan.value = 0.15;
+
+      const fifthNoiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
+      const fifthNoiseData = fifthNoiseBuf.getChannelData(0);
+      for (let j = 0; j < noiseLen; j++) fifthNoiseData[j] = Math.random() * 2 - 1;
+      const fifthNoiseSrc = ctx.createBufferSource();
+      fifthNoiseSrc.buffer = fifthNoiseBuf;
+      fifthNoiseSrc.loop = true;
+      const fifthLfoFilter = ctx.createBiquadFilter();
+      fifthLfoFilter.type = 'lowpass';
+      fifthLfoFilter.frequency.value = 0.22;
+      fifthLfoFilter.Q.value = 0.7;
+      const fifthLfoGain = ctx.createGain();
+      fifthLfoGain.gain.value = 5;
+      fifthNoiseSrc.connect(fifthLfoFilter);
+      fifthLfoFilter.connect(fifthLfoGain);
+      fifthLfoGain.connect(fifthOsc.detune);
+
+      fifthOsc.connect(fifthGain);
+      fifthGain.connect(fifthPanner);
+      fifthPanner.connect(sumGain);
+      try {
+        fifthOsc.start();
+        fifthNoiseSrc.start();
+      } catch (e) {}
+      lfoSources.push(fifthNoiseSrc);
 
       tanpuraNodes = {
         oscs, oscMuls,
-        octOsc,
+        octOsc, fifthOsc,
         lfoSources, tremGains, panners,
         masterGain, lpf, lpfLfo, lpfLfoGain,
-        shelf, droneComp, sumGain, dryGain, wetGain,
-        // Safety nets between wet/dry mix and masterGain — guards both
-        // speakers AND recorder bus (both are fed off masterGain).
-        mixGain, dcBlocker, limiter,
-        // FDN reverb (replaced ConvolverNode + preDelay)
-        droneAp1, droneAp2, droneAp3, droneFdnIn,
-        droneDelayNodes, droneLpfs, droneFbGains, dronePanners,
-        droneLfos, droneLfoGains, droneXfeeds
+        shelf, sumGain, dryGain, wetGain,
+        convolver, preDelay
       };
     }
 
-    // The tanpura graph is PERMANENT — built once in bootstrapAudio() on
-    // the first user gesture, then it lives forever. Toggling drone
-    // on/off is now a pure parameter change: applyTanpuraVolume() ramps
-    // masterGain to its target via setTargetAtTime, no node creation or
-    // destruction. Eliminates the ~75-node rebuild that previously
-    // raced with the recorder and caused crackling. The previous
-    // teardownTanpura() function has been deleted.
+    function teardownTanpura() {
+      if (!tanpuraNodes) return;
+      const ctx = droneAudioCtx;
+      const t = ctx ? ctx.currentTime : 0;
+
+      // Fade out then stop to avoid clicks
+      try {
+        tanpuraNodes.masterGain.gain.cancelScheduledValues(t);
+        tanpuraNodes.masterGain.gain.setValueAtTime(tanpuraNodes.masterGain.gain.value, t);
+        tanpuraNodes.masterGain.gain.linearRampToValueAtTime(0, t + 0.08);
+      } catch (_) {}
+
+      const nodes = tanpuraNodes;
+      tanpuraNodes = null;
+
+      setTimeout(() => {
+        try {
+          for (const o of nodes.oscs) { try { o.stop(); } catch (_) {} try { o.disconnect(); } catch (_) {} }
+          for (const n of nodes.lfoSources) { try { n.stop(); } catch (_) {} try { n.disconnect(); } catch (_) {} }
+          if (nodes.tremGains) { for (const g of nodes.tremGains) { try { g.disconnect(); } catch (_) {} } }
+          if (nodes.panners) { for (const p of nodes.panners) { try { p.disconnect(); } catch (_) {} } }
+          try { nodes.octOsc.stop(); } catch (_) {}
+          try { nodes.octOsc.disconnect(); } catch (_) {}
+          if (nodes.fifthOsc) {
+            try { nodes.fifthOsc.stop(); } catch (_) {}
+            try { nodes.fifthOsc.disconnect(); } catch (_) {}
+          }
+          if (nodes.lpfLfo) { try { nodes.lpfLfo.stop(); } catch (_) {} try { nodes.lpfLfo.disconnect(); } catch (_) {} }
+          if (nodes.lpfLfoGain) { try { nodes.lpfLfoGain.disconnect(); } catch (_) {} }
+          try { nodes.sumGain.disconnect(); } catch (_) {}
+          try { nodes.lpf.disconnect(); } catch (_) {}
+          try { nodes.shelf.disconnect(); } catch (_) {}
+          if (nodes.preDelay) { try { nodes.preDelay.disconnect(); } catch (_) {} }
+          try { nodes.dryGain.disconnect(); } catch (_) {}
+          try { nodes.wetGain.disconnect(); } catch (_) {}
+          try { nodes.convolver.disconnect(); } catch (_) {}
+          try { nodes.masterGain.disconnect(); } catch (_) {}
+        } catch (_) {}
+      }, 120);
+    }
 
     function applyTanpuraVolume() {
-      if (!tanpuraNodes || !audioContext) return;
-      const ctx = audioContext;
-      // Square-law slider mapping kept (smooth quiet end). Ceiling raised
-      // from 0.85 → 1.4 — the bus compressor catches peaks at -22 dB so
-      // we can run hot makeup gain after the wet/dry split without hard
-      // clipping. Average loudness lifts well above the previous setting;
-      // brief peaks ride the limiter rather than the destination clipper.
+      if (!tanpuraNodes || !droneAudioCtx) return;
+      const ctx = droneAudioCtx;
+      // Log-ish curve (square) so the slider feels more linear perceptually
       const linear = Math.max(0, Math.min(1, tanpuraVolume));
-      const target = tanpuraEnabled ? Math.pow(linear, 2) * 1.4 : 0;
+      const target = tanpuraEnabled ? Math.pow(linear, 2) * 0.35 : 0;
       tanpuraNodes.masterGain.gain.setTargetAtTime(target, ctx.currentTime, 0.05);
     }
 
     function setTanpuraTuning(refFreq) {
-      if (!tanpuraNodes || !audioContext) return;
-      const ctx = audioContext;
+      if (!tanpuraNodes || !droneAudioCtx) return;
+      const ctx = droneAudioCtx;
       const t = ctx.currentTime;
       const TAU = 0.04;
       const muls = tanpuraNodes.oscMuls || [];
@@ -4319,28 +3036,27 @@
       if (tanpuraNodes.octOsc) {
         try { tanpuraNodes.octOsc.frequency.setTargetAtTime(refFreq * 2, t, TAU); } catch (_) {}
       }
+      if (tanpuraNodes.fifthOsc) {
+        try { tanpuraNodes.fifthOsc.frequency.setTargetAtTime(refFreq * 1.5, t, TAU); } catch (_) {}
+      }
     }
 
-    function setTanpuraEnabled(on) {
+    async function setTanpuraEnabled(on) {
       tanpuraEnabled = !!on;
       try { localStorage.setItem('tuner.drone.enabled', tanpuraEnabled ? '1' : '0'); } catch (_) {}
 
-      if (mediaRecorder && mediaRecorder.state === 'recording') {
-        console.log('[record] drone toggled mid-recording:',
-          'on=', tanpuraEnabled,
-          'ctxState=', audioContext && audioContext.state);
-      }
-
-      // First call (typically a user enabling the drone) builds the
-      // permanent audio graph; subsequent calls just re-target the master
-      // gain via applyTanpuraVolume(). No teardown, no rebuild churn.
-      // If the user toggles off before any audio gesture has bootstrapped
-      // the graph, do nothing — there's nothing to silence.
       if (tanpuraEnabled) {
-        bootstrapAudio();
-      }
-      if (tanpuraNodes) {
+        initDroneAudio();
+        if (droneAudioCtx.state === 'suspended') {
+          try { await droneAudioCtx.resume(); } catch (_) {}
+        }
+        if (!tanpuraNodes) buildTanpura();
         applyTanpuraVolume();
+      } else {
+        if (tanpuraNodes) {
+          // Fade out, then teardown to free CPU
+          teardownTanpura();
+        }
       }
     }
 
@@ -4348,78 +3064,6 @@
       tanpuraVolume = Math.max(0, Math.min(1, v));
       try { localStorage.setItem('tuner.drone.volume', String(tanpuraVolume)); } catch (_) {}
       applyTanpuraVolume();
-    }
-
-    // Smoothly retarget the drone master lowpass centre. The LFO is
-    // wired to the same AudioParam, so it keeps adding ±DRONE_LFO_DEPTH
-    // motion on top of whatever base we set here.
-    function setDroneCutoff(hz) {
-      droneCutoff = Math.max(DRONE_CUTOFF_MIN, Math.min(DRONE_CUTOFF_MAX, hz));
-      try { localStorage.setItem('tuner.drone.cutoff', String(droneCutoff)); } catch (_) {}
-      if (tanpuraNodes && tanpuraNodes.lpf && audioContext) {
-        try {
-          tanpuraNodes.lpf.frequency.setTargetAtTime(droneCutoff, audioContext.currentTime, 0.05);
-        } catch (_) {}
-      }
-    }
-
-    // Mirror the drone UI state across the side panel and the floating
-    // record strip. Single source of truth: tanpuraEnabled, tanpuraVolume,
-    // droneCutoff. Call after any state change.
-    function syncDroneUI() {
-      const cb       = document.getElementById('tanpuraEnabled');
-      const volMain  = document.getElementById('tanpuraVolume');
-      const volLbl   = document.getElementById('tanpuraVolumeVal');
-      const cutMain  = document.getElementById('droneCutoff');
-      const cutLbl   = document.getElementById('droneCutoffVal');
-      const togStrip = document.getElementById('droneRecordToggle');
-      const volStrip = document.getElementById('droneRecordVolume');
-      const cutStrip = document.getElementById('droneRecordCutoff');
-
-      const volPct = Math.round(tanpuraVolume * 100);
-      const cutSlider = droneCutoffToSlider(droneCutoff).toFixed(1);
-
-      if (cb)       cb.checked = tanpuraEnabled;
-      if (volMain)  volMain.value = volPct;
-      if (volLbl)   volLbl.textContent = volPct + '%';
-      if (cutMain)  cutMain.value = cutSlider;
-      if (cutLbl)   cutLbl.textContent = (droneCutoff / 1000).toFixed(1) + ' kHz';
-
-      if (togStrip) togStrip.classList.toggle('on', tanpuraEnabled);
-      if (volStrip) volStrip.value = volPct;
-      if (cutStrip) cutStrip.value = cutSlider;
-    }
-
-    // Mirror the voice-FX UI state across the side panel and the floating
-    // record strip. Single source of truth: voiceFX.{lowcut,compression,reverb}
-    // and voiceFXMix. Call after any state change from either UI.
-    function syncVoiceFXUI() {
-      // Side panel
-      const lcMain   = document.getElementById('voiceLowcut');
-      const cmpMain  = document.getElementById('voiceCompression');
-      const vrbMain  = document.getElementById('voiceReverb');
-      const mixMain  = document.getElementById('voiceReverbMix');
-      const mixLbl   = document.getElementById('voiceReverbMixVal');
-      // Record strip
-      const strip    = document.getElementById('audioFXRecordStrip');
-      const lcChip   = document.getElementById('audioFXLcBtn');
-      const cmpChip  = document.getElementById('audioFXCmpBtn');
-      const vrbChip  = document.getElementById('audioFXVrbBtn');
-      const mixStrip = document.getElementById('audioFXMixSlider');
-
-      const mixPct = Math.round(voiceFXMix * 100);
-
-      if (lcMain)   lcMain.checked  = voiceFX.lowcut;
-      if (cmpMain)  cmpMain.checked = voiceFX.compression;
-      if (vrbMain)  vrbMain.checked = voiceFX.reverb;
-      if (mixMain)  mixMain.value   = mixPct;
-      if (mixLbl)   mixLbl.textContent = mixPct + '%';
-
-      if (lcChip)   lcChip.classList.toggle('on',  voiceFX.lowcut);
-      if (cmpChip)  cmpChip.classList.toggle('on', voiceFX.compression);
-      if (vrbChip)  vrbChip.classList.toggle('on', voiceFX.reverb);
-      if (mixStrip) mixStrip.value = mixPct;
-      if (strip)    strip.classList.toggle('reverb-on', voiceFX.reverb);
     }
 
     // -------- Feature 1: Settings hide toggle --------
@@ -4891,327 +3535,4 @@
         bwMode = !bwMode;
         e.currentTarget.classList.toggle('active', bwMode);
       });
-      document.getElementById('edoToggle').addEventListener('click', (e) => {
-        config.show12EDO = !config.show12EDO;
-        e.currentTarget.classList.toggle('active', config.show12EDO);
-        const cb = document.getElementById('show12EDO');
-        if (cb) cb.checked = config.show12EDO;
-      });
-      document.getElementById('bwToneSlider').addEventListener('input', (e) => {
-        bwTone = parseInt(e.target.value, 10) / 100;
-      });
-      document.getElementById('trailSlider').addEventListener('input', (e) => {
-        const next = parseInt(e.target.value, 10) / 100;
-        if (trailAmount === 0 && next > 0) trailSeeded = false;
-        trailAmount = next;
-      });
-      document.getElementById('zoomSlider').addEventListener('input', (e) => {
-        cameraZoom = parseInt(e.target.value, 10) / 100;
-      });
-      document.getElementById('resetFramingBtn').addEventListener('click', () => {
-        cameraZoom = 1.0;
-        cameraPanX = 0;
-        cameraPanY = 0;
-        document.getElementById('zoomSlider').value = 100;
-      });
-      document.getElementById('rulerPosSlider').addEventListener('input', (e) => {
-        config.rulerX = parseInt(e.target.value, 10) / 100;
-        document.getElementById('rulerPosition').value = e.target.value;
-        document.getElementById('rulerPosVal').textContent = e.target.value + '%';
-      });
-      document.getElementById('rulerSizeSlider').addEventListener('input', (e) => {
-        rulerScale = parseInt(e.target.value, 10) / 100;
-      });
-      document.getElementById('rulerOpacitySlider').addEventListener('input', (e) => {
-        rulerOpacity = parseInt(e.target.value, 10) / 100;
-      });
-      document.querySelectorAll('.aspect-btn[data-aspect]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const a = btn.dataset.aspect;
-          recordAspect = a;
-          document.body.classList.remove('aspect-9-16', 'aspect-4-5', 'aspect-1-1');
-          document.body.classList.add('aspect-' + a.replace(':', '-'));
-          document.querySelectorAll('.aspect-btn[data-aspect]').forEach(b => b.classList.toggle('active', b === btn));
-          // Force canvas to repaint at new internal dims
-          const canvas = document.getElementById('rulerCanvas');
-          canvas.width = 0;
-        });
-      });
-      setupCameraPan();
-      
-      document.getElementById('saveBtn').addEventListener('click', saveSession);
-      document.getElementById('resetBtn').addEventListener('click', resetToDefaults);
-      
-      document.getElementById('audioFile').addEventListener('change', (e) => {
-        if (e.target.files[0]) handleFileUpload(e.target.files[0]);
-      });
-      
-      document.getElementById('playPauseBtn').addEventListener('click', toggleFilePlayback);
-      document.getElementById('seekBar').addEventListener('input', (e) => seekTo(parseFloat(e.target.value)));
-      document.getElementById('clearFileBtn').addEventListener('click', clearFile);
-      
-      window.addEventListener('resize', () => {
-        const canvas = document.getElementById('rulerCanvas');
-        canvas.width = 0;
-        draw();
-      });
-      
-      // -------- Feature 1: Settings hide toggle --------
-      try {
-        settingsHidden = localStorage.getItem('tuner.settingsHidden') === '1';
-      } catch (_) {}
-      document.getElementById('settingsToggle').addEventListener('click', toggleSettingsHidden);
-      applySettingsHidden();
-
-      // -------- Feature 2: Discard recording --------
-      document.getElementById('discardRecBtn').addEventListener('click', handleDiscardClick);
-
-      // -------- Feature 3: Audio input device picker --------
-      try {
-        const stored = localStorage.getItem('tuner.inputDeviceId');
-        if (stored) selectedInputDeviceId = stored;
-      } catch (_) {}
-      if (isIOS) {
-        const note = document.getElementById('iosInputNote');
-        if (note) note.style.display = 'block';
-      }
-      const audioInputSel = document.getElementById('audioInputDevice');
-      audioInputSel.addEventListener('change', (e) => {
-        applyAudioInputDevice(e.target.value || null);
-      });
-      // Initial enumeration (labels likely empty until permission granted)
-      refreshAudioInputList();
-      if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
-        navigator.mediaDevices.addEventListener('devicechange', () => {
-          console.log('[input] devicechange fired');
-          refreshAudioInputList();
-        });
-      }
-      // Pre-select stored device in dropdown if present
-      if (selectedInputDeviceId) audioInputSel.value = selectedInputDeviceId;
-      // Manual re-scan — Chrome's device list goes stale after permission
-      // changes; this gives the user a way to force a fresh enumerate.
-      const refreshBtn = document.getElementById('audioInputRefresh');
-      if (refreshBtn) {
-        refreshBtn.addEventListener('click', async () => {
-          console.log('[input] manual refresh clicked');
-          await refreshAudioInputList();
-          // If currently listening, also re-verify the bound device so
-          // the diagnostic stays honest.
-          if (currentAudioStream) {
-            verifyAudioInputBinding(currentAudioStream, selectedInputDeviceId);
-          }
-        });
-      }
-
-      // -------- Voice processing: lo-cut / compression / shimmer reverb --------
-      try {
-        const lc = localStorage.getItem('tuner.voice.lowcut');
-        const cm = localStorage.getItem('tuner.voice.compression');
-        const rv = localStorage.getItem('tuner.voice.reverb');
-        if (lc !== null) voiceFX.lowcut = lc === '1';
-        if (cm !== null) voiceFX.compression = cm === '1';
-        if (rv !== null) voiceFX.reverb = rv === '1';
-        const mix = localStorage.getItem('tuner.voice.reverbMix');
-        if (mix !== null && !isNaN(parseFloat(mix))) {
-          voiceFXMix = Math.max(0, Math.min(1, parseFloat(mix)));
-        }
-        const tail = localStorage.getItem('tuner.voice.reverbTail');
-        if (tail !== null && !isNaN(parseFloat(tail))) {
-          voiceFXTail = Math.max(0, Math.min(1, parseFloat(tail)));
-        }
-      } catch (_) {}
-      const lowcutCb = document.getElementById('voiceLowcut');
-      const compressCb = document.getElementById('voiceCompression');
-      const reverbCb = document.getElementById('voiceReverb');
-      const reverbMixSlider = document.getElementById('voiceReverbMix');
-      const reverbTailSlider = document.getElementById('voiceReverbTail');
-      const reverbTailLbl = document.getElementById('voiceReverbTailVal');
-      if (reverbTailSlider) reverbTailSlider.value = Math.round(voiceFXTail * 100);
-      if (reverbTailLbl) reverbTailLbl.textContent = Math.round(voiceFXTail * 100) + '%';
-      updateVoiceReverbControlsVisibility();
-      updateVoiceProcNote();
-      syncVoiceFXUI();
-
-      function persistVoiceFXFlags() {
-        try {
-          localStorage.setItem('tuner.voice.lowcut', voiceFX.lowcut ? '1' : '0');
-          localStorage.setItem('tuner.voice.compression', voiceFX.compression ? '1' : '0');
-          localStorage.setItem('tuner.voice.reverb', voiceFX.reverb ? '1' : '0');
-        } catch (_) {}
-      }
-      function onVoiceFXToggle() {
-        voiceFX.lowcut      = !!(lowcutCb   && lowcutCb.checked);
-        voiceFX.compression = !!(compressCb && compressCb.checked);
-        voiceFX.reverb      = !!(reverbCb   && reverbCb.checked);
-        persistVoiceFXFlags();
-        applyVoiceFX();
-        syncVoiceFXUI();
-      }
-      if (lowcutCb) lowcutCb.addEventListener('change', onVoiceFXToggle);
-      if (compressCb) compressCb.addEventListener('change', onVoiceFXToggle);
-      if (reverbCb) reverbCb.addEventListener('change', onVoiceFXToggle);
-      if (reverbMixSlider) {
-        reverbMixSlider.addEventListener('input', (e) => {
-          setVoiceReverbMix(parseInt(e.target.value, 10) / 100);
-          syncVoiceFXUI();
-        });
-      }
-      if (reverbTailSlider) {
-        reverbTailSlider.addEventListener('input', (e) => {
-          setVoiceReverbTail(parseInt(e.target.value, 10) / 100);
-        });
-      }
-
-      // Floating audio-FX strip — chip toggles + mini Mix slider.
-      // Mirrors the side panel via syncVoiceFXUI() in both directions.
-      const afxLcChip   = document.getElementById('audioFXLcBtn');
-      const afxCmpChip  = document.getElementById('audioFXCmpBtn');
-      const afxVrbChip  = document.getElementById('audioFXVrbBtn');
-      const afxMixStrip = document.getElementById('audioFXMixSlider');
-      function makeAfxToggleHandler(key) {
-        return () => {
-          voiceFX[key] = !voiceFX[key];
-          persistVoiceFXFlags();
-          applyVoiceFX();
-          syncVoiceFXUI();
-        };
-      }
-      if (afxLcChip)  afxLcChip .addEventListener('click', makeAfxToggleHandler('lowcut'));
-      if (afxCmpChip) afxCmpChip.addEventListener('click', makeAfxToggleHandler('compression'));
-      if (afxVrbChip) afxVrbChip.addEventListener('click', makeAfxToggleHandler('reverb'));
-
-      // -------- Hide-ruler toggle (record-mode only) --------
-      // Independent of body.settings-hidden: lets the user blank the
-      // ruler when they switch from singing to talking, then bring it
-      // back without un-hiding the rest of the panel. Pitch detection
-      // keeps running — only the visual is hidden via CSS visibility.
-      try {
-        rulerHidden = localStorage.getItem('tuner.rulerHidden') === '1';
-      } catch (_) {}
-      document.body.classList.toggle('ruler-hidden', rulerHidden);
-      const rulerHideBtn = document.getElementById('rulerHideBtn');
-      if (rulerHideBtn) {
-        // Filled when ruler is showing (default), hollow when hidden.
-        rulerHideBtn.classList.toggle('on', !rulerHidden);
-        rulerHideBtn.addEventListener('click', () => {
-          rulerHidden = !rulerHidden;
-          try { localStorage.setItem('tuner.rulerHidden', rulerHidden ? '1' : '0'); } catch (_) {}
-          document.body.classList.toggle('ruler-hidden', rulerHidden);
-          rulerHideBtn.classList.toggle('on', !rulerHidden);
-        });
-      }
-      if (afxMixStrip) {
-        afxMixStrip.addEventListener('input', (e) => {
-          setVoiceReverbMix(parseInt(e.target.value, 10) / 100);
-          syncVoiceFXUI();
-        });
-      }
-
-      // -------- Feature 4: Tanpura drone --------
-      try {
-        const v = localStorage.getItem('tuner.drone.volume');
-        if (v !== null && !isNaN(parseFloat(v))) tanpuraVolume = Math.max(0, Math.min(1, parseFloat(v)));
-        const en = localStorage.getItem('tuner.drone.enabled') === '1';
-        // Don't auto-enable on load (autoplay restrictions); restore the slider but keep checkbox honest
-        tanpuraEnabled = false;
-        const cb = document.getElementById('tanpuraEnabled');
-        if (cb) cb.checked = false;
-        const slider = document.getElementById('tanpuraVolume');
-        if (slider) slider.value = Math.round(tanpuraVolume * 100);
-        const valSpan = document.getElementById('tanpuraVolumeVal');
-        if (valSpan) valSpan.textContent = Math.round(tanpuraVolume * 100) + '%';
-
-        // Restore drone cutoff
-        const c = localStorage.getItem('tuner.drone.cutoff');
-        const parsedC = c !== null ? parseFloat(c) : NaN;
-        if (!isNaN(parsedC)) {
-          droneCutoff = Math.max(DRONE_CUTOFF_MIN, Math.min(DRONE_CUTOFF_MAX, parsedC));
-        }
-        const cSlider = document.getElementById('droneCutoff');
-        if (cSlider) cSlider.value = droneCutoffToSlider(droneCutoff).toFixed(1);
-        const cVal = document.getElementById('droneCutoffVal');
-        if (cVal) cVal.textContent = (droneCutoff / 1000).toFixed(1) + ' kHz';
-      } catch (_) {}
-      document.getElementById('tanpuraEnabled').addEventListener('change', async (e) => {
-        await setTanpuraEnabled(e.target.checked);
-        syncDroneUI();
-      });
-      document.getElementById('tanpuraVolume').addEventListener('input', (e) => {
-        const v = parseInt(e.target.value, 10) / 100;
-        setTanpuraVolume(v);
-        syncDroneUI();
-      });
-      document.getElementById('droneCutoff').addEventListener('input', (e) => {
-        const sliderVal = parseFloat(e.target.value);
-        const hz = droneSliderToCutoff(sliderVal);
-        setDroneCutoff(hz);
-        syncDroneUI();
-      });
-
-      // Floating drone strip — mirrors the side panel. State is shared
-      // (tanpuraEnabled / tanpuraVolume / droneCutoff), syncDroneUI keeps
-      // both UIs in lockstep regardless of which one moved.
-      const droneStripToggle = document.getElementById('droneRecordToggle');
-      const droneStripVolume = document.getElementById('droneRecordVolume');
-      const droneStripCutoff = document.getElementById('droneRecordCutoff');
-      if (droneStripToggle) {
-        droneStripToggle.addEventListener('click', async () => {
-          await setTanpuraEnabled(!tanpuraEnabled);
-          syncDroneUI();
-        });
-      }
-      if (droneStripVolume) {
-        droneStripVolume.addEventListener('input', (e) => {
-          const v = parseInt(e.target.value, 10) / 100;
-          setTanpuraVolume(v);
-          syncDroneUI();
-        });
-      }
-      if (droneStripCutoff) {
-        droneStripCutoff.addEventListener('input', (e) => {
-          const hz = droneSliderToCutoff(parseFloat(e.target.value));
-          setDroneCutoff(hz);
-          syncDroneUI();
-        });
-      }
-      // Initial sync so the strip reflects restored state from localStorage
-      syncDroneUI();
-
-      const loaded = loadSession();
-      if (!loaded) {
-        document.getElementById('refFreq').value = DEFAULTS.refFreq;
-        document.getElementById('ratios').value = DEFAULTS.ratios;
-        document.getElementById('showCents').checked = DEFAULTS.showCents;
-        document.getElementById('show12EDO').checked = DEFAULTS.show12EDO;
-        document.getElementById('edoOffset').value = DEFAULTS.edoOffset * 100;
-      }
-
-      let saveTimeout;
-      function scheduleSave() {
-        clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(saveSession, 500);
-      }
-      const autoSaveTriggers = ['ratios', 'refFreq', 'showCents', 'showHz', 'showGhost', 'octaveWrap', 'show12EDO', 'edoOffset', 'rulerPosition', 'smoothing', 'responsiveness', 'showIndicatorHz', 'showIndicatorDeviation', 'showIndicatorRatio'];
-      autoSaveTriggers.forEach(id => {
-        document.getElementById(id).addEventListener('change', scheduleSave);
-      });
-
-      const recordOverlay = document.getElementById('recordOverlay');
-      recordOverlay.addEventListener('input', scheduleSave);
-      recordOverlay.addEventListener('click', (e) => {
-        if (e.target.closest('button.aspect-btn, #ratioLabelToggle, #bwToggle, #resetFramingBtn')) {
-          scheduleSave();
-        }
-      });
-      document.getElementById('rulerCanvas').addEventListener('pointerup', () => {
-        if (recordMode) scheduleSave();
-      });
-
-      updateConfig();
-    }
-    
-    init();
-  </script>
-</body>
-</html>
+      document.getElementById('edoToggle').addEven
