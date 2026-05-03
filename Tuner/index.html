@@ -560,6 +560,15 @@
       }
     }
 
+    /* Ruler hide — toggle in the floating audio-FX strip (record-mode
+       only). visibility:hidden (not display:none) so the canvas keeps
+       its drawing buffer alive — the user can flip it back on without
+       a layout reflow / canvas reset. Pitch detection keeps running. */
+    body.ruler-hidden #rulerContainer,
+    body.ruler-hidden #rulerCanvas {
+      visibility: hidden !important;
+    }
+
     #recordOverlay .aspect-row {
       display: flex;
       gap: 6px;
@@ -688,7 +697,7 @@
          - #rulerContainer / #rulerCanvas (the pitch display the user is
            recording / watching)
          - The #recordOverlay row marked .record-essential (rec/stop +
-           exit + discard buttons) — flip-cam is excluded below
+           exit + discard + flip-cam buttons)
          - #recIndicator ("● 0:00" timer pill, only visible while
            actually recording — controlled by .visible class)
        Hidden:
@@ -700,8 +709,8 @@
            brightness/contrast/saturate, B&W toggle/tone, EDO grid,
            trail, ruler position/size/opacity/spread/shift,
            ratio-label toggle + x/y/size
-         - the flip-cam button (lives inside the essential row but
-           counts as a settings/effects control)
+       Flip-cam stays visible: user explicitly wants to be able to
+       flip cameras mid-take while the rest of the dock is hidden.
        Works whether or not record-mode is active.
        ==================================================================== */
     body.settings-hidden #controls,        /* main settings side panel */
@@ -713,13 +722,8 @@
 
     /* Hide every direct child of the record dock EXCEPT the essentials
        row. The essentials row (.record-essential) holds rec/stop,
-       exit, discard, and flip-cam. Flip-cam is then individually
-       hidden below — it's an effects control, not an essential one. */
+       exit, discard, and flip-cam — all of which stay visible. */
     body.settings-hidden #recordOverlay > :not(.record-essential) {
-      display: none !important;
-    }
-
-    body.settings-hidden #flipCamBtn {
       display: none !important;
     }
 
@@ -1345,6 +1349,7 @@
     <button type="button" class="afx-chip" id="audioFXLcBtn" title="Lo-cut (90 Hz)" aria-label="Toggle lo-cut">LC</button>
     <button type="button" class="afx-chip" id="audioFXCmpBtn" title="Compression" aria-label="Toggle compression">CMP</button>
     <button type="button" class="afx-chip" id="audioFXVrbBtn" title="Shimmer reverb" aria-label="Toggle reverb">VRB</button>
+    <button type="button" class="afx-chip on" id="rulerHideBtn" title="Show/hide tuning ruler" aria-label="Show or hide tuning ruler">📏</button>
     <span class="afx-mix">
       <span class="afx-label">Mix</span>
       <input type="range" id="audioFXMixSlider" min="0" max="100" value="50" aria-label="Reverb mix">
@@ -1466,6 +1471,10 @@
     let smoothedFreq = null, smoothedCents = null, currentProbability = 0;
     let ghostTrail = [], animationId = null, lastGhostTime = 0;
     let lastPitchTime = 0, lastValidPitch = null, lastDetectTime = 0;
+    // Frame counter for pitch-detection throttle (see audioLoop). Skips
+    // every other frame while body.record-mode is set so Pixel 7 doesn't
+    // crackle when the recorder + drone + camera filter all stack up.
+    let pitchFrameCounter = 0;
     let ratioExtensions = {}, lastNearestLabel = null;
     let indicatorY = null, indicatorOpacity = 0;
     let lastDisplayCents = null, lastDisplayFreq = null, smoothedProximity = 0;
@@ -1545,6 +1554,11 @@
 
     // Feature 1: settings hide
     let settingsHidden = false;
+
+    // Hide-ruler toggle (independent of settingsHidden) — lets the user
+    // blank just the ruler during recording without dismissing the rest
+    // of the controls. Persisted under tuner.rulerHidden.
+    let rulerHidden = false;
 
     // Feature 2: discard recording
     let discardRequested = false;
@@ -2537,26 +2551,36 @@
     function audioLoop() {
       if (!analyser) return;
       if (!isListening && !isPlaying) return;
-      
+
       const now = performance.now();
-      const detectInterval = 33;
-      
-      if (now - lastDetectTime >= detectInterval) {
+
+      // Pitch-detection throttle. Outside recording, run full rAF rate
+      // (~60 Hz) so the indicator is maximally responsive. Inside record
+      // mode, skip every other frame — autocorrelation + smoothing is
+      // the heaviest CPU cost in the rAF loop and Pixel 7 stutters when
+      // the recorder + drone + camera filter are all stacked. The visual
+      // smoothing (draw() below) still updates every frame, so the ruler
+      // never looks choppy — only the actual detection is halved.
+      pitchFrameCounter++;
+      const isRecording = document.body.classList.contains('record-mode');
+      const skipFrame = isRecording && (pitchFrameCounter % 2 === 1);
+
+      if (!skipFrame) {
         lastDetectTime = now;
-        
+
         const bufferLength = analyser.fftSize;
         const buffer = new Float32Array(bufferLength);
         analyser.getFloatTimeDomainData(buffer);
-        
+
         const result = yinDetect(buffer, audioContext.sampleRate);
-        
+
         if (result.freq > 50 && result.freq < 2000 && result.probability > 0.5) {
           let rawCents = 1200 * Math.log2(result.freq / config.refFreq);
-          
+
           const baseAlpha = 0.03 + (config.responsiveness / 10) * 0.25;
           const smoothingFactor = 16 / (config.smoothing + 1);
           const alpha = Math.max(0.005, baseAlpha * Math.min(1, smoothingFactor));
-          
+
           if (smoothedFreq === null) {
             smoothedFreq = result.freq;
             smoothedCents = rawCents;
@@ -2564,7 +2588,7 @@
             smoothedFreq += (result.freq - smoothedFreq) * alpha;
             smoothedCents += (rawCents - smoothedCents) * alpha;
           }
-          
+
           currentProbability = result.probability;
           lastPitchTime = now;
           lastValidPitch = { freq: smoothedFreq, cents: smoothedCents, probability: result.probability };
@@ -3731,42 +3755,15 @@
 
     // -------- Feature 4: Tanpura drone --------
 
-    // Cached convolver impulse response, keyed by sample rate. The IR is
-    // pure noise + envelope and does not change at runtime, so we build
-    // it once per session and reuse it on every drone-on. Pixel 7
-    // measurement: convolver buffer construction + warm-up coincided
-    // with MediaRecorder spin-up and produced audible drone crackle.
-    // Module-scope caching avoids that hit on every toggle.
-    let tanpuraReverbBuffer = null;
-    let tanpuraReverbBufferRate = 0;
-
-    function buildTanpuraImpulseResponse(ctx, seconds) {
-      const len = Math.max(1, Math.floor(ctx.sampleRate * seconds));
-      const buf = ctx.createBuffer(2, len, ctx.sampleRate);
-      for (let ch = 0; ch < 2; ch++) {
-        const data = buf.getChannelData(ch);
-        for (let i = 0; i < len; i++) {
-          const t = i / len;
-          // 3-second IR with exp(-3.5*t) decay. Down from 5.5 s /
-          // exp(-2.5*t): the tail still blooms naturally for tanpura but
-          // the convolver does roughly 45% less work per sample, which
-          // is the single biggest CPU cost on the drone graph.
-          const env = Math.exp(-t * 3.5);
-          data[i] = (Math.random() * 2 - 1) * env;
-        }
-      }
-      return buf;
-    }
-
-    function getTanpuraReverbBuffer(ctx) {
-      if (tanpuraReverbBuffer && tanpuraReverbBufferRate === ctx.sampleRate) {
-        return tanpuraReverbBuffer;
-      }
-      tanpuraReverbBuffer = buildTanpuraImpulseResponse(ctx, 3.0);
-      tanpuraReverbBufferRate = ctx.sampleRate;
-      return tanpuraReverbBuffer;
-    }
-
+    // The drone reverb used to be a ConvolverNode + 3 s noise IR. Even
+    // with the IR module-cached, convolution at 3 s × 44.1 kHz = ~132 k
+    // multiply-adds per output sample — the single heaviest node on the
+    // drone graph and a confirmed crackle-source on Pixel 7 while
+    // recording. It's been replaced (in buildTanpura below) with a
+    // 4-line FDN structure modelled after the voice reverb but tuned
+    // for tanpura character: shorter prime delays, no shimmer self-loop,
+    // fixed per-line feedback. ~12 small nodes vs. the convolver, which
+    // is dramatically cheaper at the same lush character.
     function buildTanpura() {
       if (!droneAudioCtx) return;
       if (tanpuraNodes) return;
@@ -3777,38 +3774,123 @@
       masterGain.gain.value = 0;
       masterGain.connect(droneAudioCtx.destination);
 
-      // Reverb path with a 25 ms pre-delay so the dry signal blooms
-      // for a moment before the long tail arrives. Wet/dry rebalanced
-      // 0.55/0.45 (was 0.70/0.30) — direct signal carries more apparent
-      // loudness while the tail still bathes the chord.
-      const convolver = ctx.createConvolver();
-      convolver.buffer = getTanpuraReverbBuffer(ctx);
-      const preDelay = ctx.createDelay(0.5);
-      preDelay.delayTime.value = 0.025;
+      // FDN reverb (replaces previous Convolver + 25 ms preDelay). Same
+      // wet/dry balance — 0.55/0.45 — direct signal carries the apparent
+      // loudness while the tail bathes the chord. The architecture
+      // mirrors buildShimmerReverb but is tuned for drone:
+      //   - 4 parallel delay lines (167, 251, 367, 487 ms primes)
+      //   - per-line lowpass damping at 3 kHz (Q 0.7)
+      //   - per-line feedback fixed at 0.78 (no slider — drone tail is
+      //     consistent; voice reverb gets the slider)
+      //   - cross-feed 0.3 line→next (Hadamard-lite)
+      //   - panning [-0.4, +0.2, -0.1, +0.4]
+      //   - per-line ±0.5 ms delay-time LFO at 0.04/0.07/0.10/0.13 Hz
+      //     for breath
+      //   - 3-stage all-pass cascade (600/1500/3000 Hz, Q 0.5) PRE-FDN
+      //     for diffusion
+      //   - NO shimmer self-loop (saw drones already provide harmonic
+      //     content; would gild the lily)
       const wetGain = ctx.createGain();
       wetGain.gain.value = 0.55;
       const dryGain = ctx.createGain();
       dryGain.gain.value = 0.45;
-      preDelay.connect(convolver);
-      convolver.connect(wetGain);
       wetGain.connect(masterGain);
       dryGain.connect(masterGain);
 
+      // Pre-FDN diffusion: 3-stage all-pass cascade. Phase-only,
+      // amplitude-flat — smears transients before the FDN, smoother tail.
+      const droneAp1 = ctx.createBiquadFilter();
+      droneAp1.type = 'allpass'; droneAp1.frequency.value = 600;  droneAp1.Q.value = 0.5;
+      const droneAp2 = ctx.createBiquadFilter();
+      droneAp2.type = 'allpass'; droneAp2.frequency.value = 1500; droneAp2.Q.value = 0.5;
+      const droneAp3 = ctx.createBiquadFilter();
+      droneAp3.type = 'allpass'; droneAp3.frequency.value = 3000; droneAp3.Q.value = 0.5;
+
+      // fdnIn feeds the 4 delay lines (post-diffusion).
+      const droneFdnIn = ctx.createGain();
+      droneFdnIn.gain.value = 1;
+      droneAp1.connect(droneAp2);
+      droneAp2.connect(droneAp3);
+      droneAp3.connect(droneFdnIn);
+
+      // 4 parallel delay lines.
+      const droneDelayMs   = [167, 251, 367, 487];
+      const dronePans      = [-0.4, 0.2, -0.1, 0.4];
+      const droneLfoRates  = [0.04, 0.07, 0.10, 0.13];
+      const droneDelayNodes = [];
+      const droneLpfs       = [];
+      const droneFbGains    = [];
+      const dronePanners    = [];
+      const droneLfos       = [];
+      const droneLfoGains   = [];
+      const droneXfeeds     = [];
+
+      for (let i = 0; i < 4; i++) {
+        const d = ctx.createDelay(2.0);
+        d.delayTime.value = droneDelayMs[i] / 1000;
+
+        const lpf = ctx.createBiquadFilter();
+        lpf.type = 'lowpass';
+        lpf.frequency.value = 3000;
+        lpf.Q.value = 0.7;
+
+        const fb = ctx.createGain();
+        fb.gain.value = 0.78;
+
+        const p = ctx.createStereoPanner();
+        p.pan.value = dronePans[i];
+
+        // ±0.5 ms breath, slow rates so each line drifts independently.
+        const lfo = ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = droneLfoRates[i];
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.value = 0.0005; // ±0.5 ms in seconds
+        lfo.connect(lfoGain);
+        lfoGain.connect(d.delayTime);
+
+        // droneFdnIn → delay → lpf → (feedback → delay) + (pan → wetGain)
+        droneFdnIn.connect(d);
+        d.connect(lpf);
+        lpf.connect(fb);
+        fb.connect(d);
+        lpf.connect(p);
+        p.connect(wetGain);
+
+        try { lfo.start(ctx.currentTime + i * 0.21); } catch (_) {}
+
+        droneDelayNodes.push(d);
+        droneLpfs.push(lpf);
+        droneFbGains.push(fb);
+        dronePanners.push(p);
+        droneLfos.push(lfo);
+        droneLfoGains.push(lfoGain);
+      }
+
+      // Cross-feed ring: each lpf output → next line's delay input
+      // at 0.3 gain. Adds echo density without per-line resonance.
+      for (let i = 0; i < 4; i++) {
+        const xf = ctx.createGain();
+        xf.gain.value = 0.3;
+        droneLpfs[i].connect(xf);
+        xf.connect(droneDelayNodes[(i + 1) % 4]);
+        droneXfeeds.push(xf);
+      }
+
       // Bus compressor — the actual loudness lever. Sits between the
       // tone-shaping (lpf+shelf) and the wet/dry split, so both the dry
-      // tap and the convolver feed sample the squashed signal. Slow LFO
-      // motion on the saw drones gives a ~6-10 dB peak-to-average gap
-      // worth catching; threshold/ratio/knee chosen to ride the tops
-      // without audibly pumping. Combined with the higher master ceiling
-      // this lifts the average loudness several dB without clipping.
+      // tap and the FDN feed sample the squashed signal. Slow LFO motion
+      // on the saw drones gives a ~6-10 dB peak-to-average gap worth
+      // catching; threshold/ratio/knee chosen to ride the tops without
+      // audibly pumping.
       const droneComp = ctx.createDynamicsCompressor();
       droneComp.threshold.value = -22;
       droneComp.knee.value = 12;
       droneComp.ratio.value = 4;
       droneComp.attack.value = 0.005;
       droneComp.release.value = 0.18;
-      droneComp.connect(dryGain);
-      droneComp.connect(preDelay);
+      droneComp.connect(dryGain);   // dry tap
+      droneComp.connect(droneAp1);  // wet front: AP cascade → FDN
 
       // High-shelf for air → feeds the compressor input.
       const shelf = ctx.createBiquadFilter();
@@ -3957,7 +4039,10 @@
         lfoSources, tremGains, panners,
         masterGain, lpf, lpfLfo, lpfLfoGain,
         shelf, droneComp, sumGain, dryGain, wetGain,
-        convolver, preDelay
+        // FDN reverb (replaced ConvolverNode + preDelay)
+        droneAp1, droneAp2, droneAp3, droneFdnIn,
+        droneDelayNodes, droneLpfs, droneFbGains, dronePanners,
+        droneLfos, droneLfoGains, droneXfeeds
       };
     }
 
@@ -3990,10 +4075,20 @@
           try { nodes.lpf.disconnect(); } catch (_) {}
           try { nodes.shelf.disconnect(); } catch (_) {}
           if (nodes.droneComp) { try { nodes.droneComp.disconnect(); } catch (_) {} }
-          if (nodes.preDelay) { try { nodes.preDelay.disconnect(); } catch (_) {} }
+          // FDN reverb teardown
+          if (nodes.droneAp1) { try { nodes.droneAp1.disconnect(); } catch (_) {} }
+          if (nodes.droneAp2) { try { nodes.droneAp2.disconnect(); } catch (_) {} }
+          if (nodes.droneAp3) { try { nodes.droneAp3.disconnect(); } catch (_) {} }
+          if (nodes.droneFdnIn) { try { nodes.droneFdnIn.disconnect(); } catch (_) {} }
+          if (nodes.droneLfos) { for (const o of nodes.droneLfos) { try { o.stop(); } catch (_) {} try { o.disconnect(); } catch (_) {} } }
+          if (nodes.droneLfoGains) { for (const g of nodes.droneLfoGains) { try { g.disconnect(); } catch (_) {} } }
+          if (nodes.droneDelayNodes) { for (const d of nodes.droneDelayNodes) { try { d.disconnect(); } catch (_) {} } }
+          if (nodes.droneLpfs) { for (const l of nodes.droneLpfs) { try { l.disconnect(); } catch (_) {} } }
+          if (nodes.droneFbGains) { for (const g of nodes.droneFbGains) { try { g.disconnect(); } catch (_) {} } }
+          if (nodes.dronePanners) { for (const p of nodes.dronePanners) { try { p.disconnect(); } catch (_) {} } }
+          if (nodes.droneXfeeds) { for (const x of nodes.droneXfeeds) { try { x.disconnect(); } catch (_) {} } }
           try { nodes.dryGain.disconnect(); } catch (_) {}
           try { nodes.wetGain.disconnect(); } catch (_) {}
-          try { nodes.convolver.disconnect(); } catch (_) {}
           try { nodes.masterGain.disconnect(); } catch (_) {}
         } catch (_) {}
       }, 120);
@@ -4802,6 +4897,27 @@
       if (afxLcChip)  afxLcChip .addEventListener('click', makeAfxToggleHandler('lowcut'));
       if (afxCmpChip) afxCmpChip.addEventListener('click', makeAfxToggleHandler('compression'));
       if (afxVrbChip) afxVrbChip.addEventListener('click', makeAfxToggleHandler('reverb'));
+
+      // -------- Hide-ruler toggle (record-mode only) --------
+      // Independent of body.settings-hidden: lets the user blank the
+      // ruler when they switch from singing to talking, then bring it
+      // back without un-hiding the rest of the panel. Pitch detection
+      // keeps running — only the visual is hidden via CSS visibility.
+      try {
+        rulerHidden = localStorage.getItem('tuner.rulerHidden') === '1';
+      } catch (_) {}
+      document.body.classList.toggle('ruler-hidden', rulerHidden);
+      const rulerHideBtn = document.getElementById('rulerHideBtn');
+      if (rulerHideBtn) {
+        // Filled when ruler is showing (default), hollow when hidden.
+        rulerHideBtn.classList.toggle('on', !rulerHidden);
+        rulerHideBtn.addEventListener('click', () => {
+          rulerHidden = !rulerHidden;
+          try { localStorage.setItem('tuner.rulerHidden', rulerHidden ? '1' : '0'); } catch (_) {}
+          document.body.classList.toggle('ruler-hidden', rulerHidden);
+          rulerHideBtn.classList.toggle('on', !rulerHidden);
+        });
+      }
       if (afxMixStrip) {
         afxMixStrip.addEventListener('input', (e) => {
           setVoiceReverbMix(parseInt(e.target.value, 10) / 100);
