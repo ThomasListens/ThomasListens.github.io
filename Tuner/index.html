@@ -677,29 +677,48 @@
     /* ====================================================================
        Settings-hidden master "clear my screen" rule.
        The ✕ / ⚙ button (#settingsToggle) toggles body.settings-hidden.
-       When on, EVERY floating UI element disappears so the pitch ruler
-       has the screen to itself. Add new floating overlays here.
+       When on, every settings/effects control disappears so the pitch
+       ruler has the screen to itself — but the essential record
+       controls (record/stop, exit, discard) and the recording timer
+       pill stay visible so the user can stop or scrap a take without
+       un-hiding the panel.
 
        Stays visible:
          - #settingsToggle (the button itself — the way back)
          - #rulerContainer / #rulerCanvas (the pitch display the user is
            recording / watching)
+         - The #recordOverlay row marked .record-essential (rec/stop +
+           exit + discard buttons) — flip-cam is excluded below
+         - #recIndicator ("● 0:00" timer pill, only visible while
+           actually recording — controlled by .visible class)
        Hidden:
          - the side/top settings panel
          - the mobile hamburger
-         - the entire record dock (sliders, trail, frame, buttons,
-           discard, record button, exit, flip, aspect, ratio label,
-           position/size/opacity/spread/shift, label x/y/size, B&W,
-           EDO grid, brightness/contrast/saturate, backdrop, edge,
-           feather, zoom, trail, etc.)
-         - the "● 0:00" recording timer pill at top
+         - the floating drone strip
+         - everything in the record dock EXCEPT .record-essential:
+           aspect ratio, zoom, framing, backdrop, edge, feather,
+           brightness/contrast/saturate, B&W toggle/tone, EDO grid,
+           trail, ruler position/size/opacity/spread/shift,
+           ratio-label toggle + x/y/size
+         - the flip-cam button (lives inside the essential row but
+           counts as a settings/effects control)
        Works whether or not record-mode is active.
        ==================================================================== */
     body.settings-hidden #controls,        /* main settings side panel */
     body.settings-hidden #mobileToggle,    /* mobile hamburger */
-    body.settings-hidden #recordOverlay,   /* record dock: every video-overlay control */
-    body.settings-hidden #recIndicator,    /* "● 0:00" recording timer pill */
     body.settings-hidden #droneRecordStrip { /* floating drone strip (record mode) */
+      display: none !important;
+    }
+
+    /* Hide every direct child of the record dock EXCEPT the essentials
+       row. The essentials row (.record-essential) holds rec/stop,
+       exit, discard, and flip-cam. Flip-cam is then individually
+       hidden below — it's an effects control, not an essential one. */
+    body.settings-hidden #recordOverlay > :not(.record-essential) {
+      display: none !important;
+    }
+
+    body.settings-hidden #flipCamBtn {
       display: none !important;
     }
 
@@ -1259,7 +1278,7 @@
       <label>Label Sz</label>
       <input type="range" id="ratioSizeSlider" min="40" max="300" value="105">
     </div>
-    <div class="record-row">
+    <div class="record-row record-essential">
       <button class="icon" id="flipCamBtn" title="Flip camera">⟳</button>
       <button id="discardRecBtn" title="Discard recording" aria-label="Discard recording">🗑</button>
       <button id="recBtn" title="Record"></button>
@@ -3169,6 +3188,16 @@
     }
 
     // -------- Feature 4: Tanpura drone --------
+
+    // Cached convolver impulse response, keyed by sample rate. The IR is
+    // pure noise + envelope and does not change at runtime, so we build
+    // it once per session and reuse it on every drone-on. Pixel 7
+    // measurement: convolver buffer construction + warm-up coincided
+    // with MediaRecorder spin-up and produced audible drone crackle.
+    // Module-scope caching avoids that hit on every toggle.
+    let tanpuraReverbBuffer = null;
+    let tanpuraReverbBufferRate = 0;
+
     function buildTanpuraImpulseResponse(ctx, seconds) {
       const len = Math.max(1, Math.floor(ctx.sampleRate * seconds));
       const buf = ctx.createBuffer(2, len, ctx.sampleRate);
@@ -3176,12 +3205,24 @@
         const data = buf.getChannelData(ch);
         for (let i = 0; i < len; i++) {
           const t = i / len;
-          // Slower decay (exp(-2.5*t)) gives a longer, more spacious tail.
-          const env = Math.exp(-t * 2.5);
+          // 3-second IR with exp(-3.5*t) decay. Down from 5.5 s /
+          // exp(-2.5*t): the tail still blooms naturally for tanpura but
+          // the convolver does roughly 45% less work per sample, which
+          // is the single biggest CPU cost on the drone graph.
+          const env = Math.exp(-t * 3.5);
           data[i] = (Math.random() * 2 - 1) * env;
         }
       }
       return buf;
+    }
+
+    function getTanpuraReverbBuffer(ctx) {
+      if (tanpuraReverbBuffer && tanpuraReverbBufferRate === ctx.sampleRate) {
+        return tanpuraReverbBuffer;
+      }
+      tanpuraReverbBuffer = buildTanpuraImpulseResponse(ctx, 3.0);
+      tanpuraReverbBufferRate = ctx.sampleRate;
+      return tanpuraReverbBuffer;
     }
 
     function buildTanpura() {
@@ -3199,7 +3240,7 @@
       // 0.55/0.45 (was 0.70/0.30) — direct signal carries more apparent
       // loudness while the tail still bathes the chord.
       const convolver = ctx.createConvolver();
-      convolver.buffer = buildTanpuraImpulseResponse(ctx, 5.5);
+      convolver.buffer = getTanpuraReverbBuffer(ctx);
       const preDelay = ctx.createDelay(0.5);
       preDelay.delayTime.value = 0.025;
       const wetGain = ctx.createGain();
@@ -3264,16 +3305,25 @@
 
       // -- Voices --
       // Three unison saws (mild static detune) plus a sub-octave voice
-      // make up the four "fundamental" voices that get random-walk detune
-      // and tremolo. Frequencies vary per voice so they never lock in phase.
+      // = four "fundamental" voices. Each gets a SINGLE random-walk LFO
+      // (low-passed noise) whose output is split through two scaled
+      // gain nodes — one driving osc.detune (±7 cents), the other
+      // driving the tremolo VCA (±6%). Detune and tremolo are therefore
+      // correlated per voice, but voices have independent LFOs at
+      // different cutoffs, so the chord still breathes organically and
+      // the correlation is inaudible. Halves the LFO node count vs.
+      // the previous independent-LFO design (Pixel 7 CPU win).
+      // The previous optional fifth-above voice was dropped: the
+      // four-voice patch is plenty rich and removing it saves an osc,
+      // an LFO chain, a panner, and a tremolo VCA.
       // mul = freq multiplier vs refFreq, det = static detune in cents,
       // pan = stereo position, gain = static voice gain,
-      // detLfo = detune LFO cutoff (Hz), tremLfo = tremolo LFO cutoff (Hz)
+      // lfoCut = shared LFO lowpass cutoff (Hz, ~0.2 Hz target)
       const voiceSpecs = [
-        { mul: 0.5, det:  0, pan:  0.00, gain: 0.20, detLfo: 0.15, tremLfo: 0.08 }, // sub octave
-        { mul: 1.0, det: -3, pan: -0.25, gain: 0.28, detLfo: 0.27, tremLfo: 0.13 },
-        { mul: 1.0, det:  0, pan:  0.00, gain: 0.28, detLfo: 0.41, tremLfo: 0.19 },
-        { mul: 1.0, det:  3, pan:  0.25, gain: 0.28, detLfo: 0.55, tremLfo: 0.24 },
+        { mul: 0.5, det:  0, pan:  0.00, gain: 0.20, lfoCut: 0.12 }, // sub octave
+        { mul: 1.0, det: -3, pan: -0.25, gain: 0.28, lfoCut: 0.20 },
+        { mul: 1.0, det:  0, pan:  0.00, gain: 0.28, lfoCut: 0.30 },
+        { mul: 1.0, det:  3, pan:  0.25, gain: 0.28, lfoCut: 0.40 },
       ];
 
       const oscs = [];
@@ -3295,14 +3345,17 @@
         const oscGain = ctx.createGain();
         oscGain.gain.value = v.gain;
 
-        // Tremolo VCA — its gain breathes around 1.0 by ±8%.
+        // Tremolo VCA — its gain breathes around 1.0 by ±6%.
         const tremGain = ctx.createGain();
         tremGain.gain.value = 1.0;
 
         const panner = ctx.createStereoPanner();
         panner.pan.value = v.pan;
 
-        // Detune LFO via low-passed noise scaled to ±7 cents
+        // Single random-walk LFO via low-passed noise. Output splits
+        // into a detune-scale gain (±7 cents → osc.detune) and a
+        // tremolo-scale gain (±0.06 → tremGain.gain). One BufferSource +
+        // one BiquadFilter per voice instead of two of each.
         const noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
         const noiseData = noiseBuf.getChannelData(0);
         for (let j = 0; j < noiseLen; j++) noiseData[j] = Math.random() * 2 - 1;
@@ -3310,37 +3363,22 @@
         noiseSrc.buffer = noiseBuf;
         noiseSrc.loop = true;
 
-        const detLfoFilter = ctx.createBiquadFilter();
-        detLfoFilter.type = 'lowpass';
-        detLfoFilter.frequency.value = v.detLfo;
-        detLfoFilter.Q.value = 0.7;
+        const lfoFilter = ctx.createBiquadFilter();
+        lfoFilter.type = 'lowpass';
+        lfoFilter.frequency.value = v.lfoCut;
+        lfoFilter.Q.value = 0.7;
 
-        const detLfoGain = ctx.createGain();
-        detLfoGain.gain.value = 7; // ±~7 cents
+        const detuneGain = ctx.createGain();
+        detuneGain.gain.value = 7; // ±~7 cents
 
-        noiseSrc.connect(detLfoFilter);
-        detLfoFilter.connect(detLfoGain);
-        detLfoGain.connect(osc.detune);
+        const tremoloGain = ctx.createGain();
+        tremoloGain.gain.value = 0.06; // ±6% gain swing
 
-        // Independent tremolo LFO (random-walk style via noise → lowpass)
-        const tremNoiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
-        const tremData = tremNoiseBuf.getChannelData(0);
-        for (let j = 0; j < noiseLen; j++) tremData[j] = Math.random() * 2 - 1;
-        const tremNoiseSrc = ctx.createBufferSource();
-        tremNoiseSrc.buffer = tremNoiseBuf;
-        tremNoiseSrc.loop = true;
-
-        const tremLfoFilter = ctx.createBiquadFilter();
-        tremLfoFilter.type = 'lowpass';
-        tremLfoFilter.frequency.value = v.tremLfo;
-        tremLfoFilter.Q.value = 0.7;
-
-        const tremLfoGain = ctx.createGain();
-        tremLfoGain.gain.value = 0.08; // ±8% gain swing
-
-        tremNoiseSrc.connect(tremLfoFilter);
-        tremLfoFilter.connect(tremLfoGain);
-        tremLfoGain.connect(tremGain.gain);
+        noiseSrc.connect(lfoFilter);
+        lfoFilter.connect(detuneGain);
+        lfoFilter.connect(tremoloGain);
+        detuneGain.connect(osc.detune);
+        tremoloGain.connect(tremGain.gain);
 
         // Signal chain: osc → oscGain → tremGain → panner → sumGain
         osc.connect(oscGain);
@@ -3352,13 +3390,11 @@
         try {
           osc.start(startAt);
           noiseSrc.start(startAt + i * 0.013);
-          tremNoiseSrc.start(startAt + i * 0.017 + 0.005);
         } catch (e) { /* already started */ }
 
         oscs.push(osc);
         oscMuls.push(v.mul);
         lfoSources.push(noiseSrc);
-        lfoSources.push(tremNoiseSrc);
         tremGains.push(tremGain);
         panners.push(panner);
       }
@@ -3373,46 +3409,9 @@
       octGain.connect(sumGain);
       try { octOsc.start(); } catch (e) {}
 
-      // Tanpura-style fifth-above voice, slightly detuned off pure 3:2.
-      // Sits at ≈ -8 dB relative to the unison saws so it perfumes the
-      // chord without dominating it.
-      const fifthOsc = ctx.createOscillator();
-      fifthOsc.type = 'sawtooth';
-      fifthOsc.frequency.value = config.refFreq * 1.5;
-      fifthOsc.detune.value = 5;
-      const fifthGain = ctx.createGain();
-      fifthGain.gain.value = 0.11;
-      const fifthPanner = ctx.createStereoPanner();
-      fifthPanner.pan.value = 0.15;
-
-      const fifthNoiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
-      const fifthNoiseData = fifthNoiseBuf.getChannelData(0);
-      for (let j = 0; j < noiseLen; j++) fifthNoiseData[j] = Math.random() * 2 - 1;
-      const fifthNoiseSrc = ctx.createBufferSource();
-      fifthNoiseSrc.buffer = fifthNoiseBuf;
-      fifthNoiseSrc.loop = true;
-      const fifthLfoFilter = ctx.createBiquadFilter();
-      fifthLfoFilter.type = 'lowpass';
-      fifthLfoFilter.frequency.value = 0.22;
-      fifthLfoFilter.Q.value = 0.7;
-      const fifthLfoGain = ctx.createGain();
-      fifthLfoGain.gain.value = 5;
-      fifthNoiseSrc.connect(fifthLfoFilter);
-      fifthLfoFilter.connect(fifthLfoGain);
-      fifthLfoGain.connect(fifthOsc.detune);
-
-      fifthOsc.connect(fifthGain);
-      fifthGain.connect(fifthPanner);
-      fifthPanner.connect(sumGain);
-      try {
-        fifthOsc.start();
-        fifthNoiseSrc.start();
-      } catch (e) {}
-      lfoSources.push(fifthNoiseSrc);
-
       tanpuraNodes = {
         oscs, oscMuls,
-        octOsc, fifthOsc,
+        octOsc,
         lfoSources, tremGains, panners,
         masterGain, lpf, lpfLfo, lpfLfoGain,
         shelf, droneComp, sumGain, dryGain, wetGain,
@@ -3443,10 +3442,6 @@
           if (nodes.panners) { for (const p of nodes.panners) { try { p.disconnect(); } catch (_) {} } }
           try { nodes.octOsc.stop(); } catch (_) {}
           try { nodes.octOsc.disconnect(); } catch (_) {}
-          if (nodes.fifthOsc) {
-            try { nodes.fifthOsc.stop(); } catch (_) {}
-            try { nodes.fifthOsc.disconnect(); } catch (_) {}
-          }
           if (nodes.lpfLfo) { try { nodes.lpfLfo.stop(); } catch (_) {} try { nodes.lpfLfo.disconnect(); } catch (_) {} }
           if (nodes.lpfLfoGain) { try { nodes.lpfLfoGain.disconnect(); } catch (_) {} }
           try { nodes.sumGain.disconnect(); } catch (_) {}
@@ -3488,9 +3483,6 @@
       }
       if (tanpuraNodes.octOsc) {
         try { tanpuraNodes.octOsc.frequency.setTargetAtTime(refFreq * 2, t, TAU); } catch (_) {}
-      }
-      if (tanpuraNodes.fifthOsc) {
-        try { tanpuraNodes.fifthOsc.frequency.setTargetAtTime(refFreq * 1.5, t, TAU); } catch (_) {}
       }
     }
 
