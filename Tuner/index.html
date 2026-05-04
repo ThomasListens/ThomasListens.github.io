@@ -1549,6 +1549,12 @@
     let cameraStream = null;
     let cameraFacing = 'user';
     let currentAudioStream = null;
+    // Independent clone of the mic track that AudioContext consumes for
+    // the analyser/FX path. The recorder reads currentAudioStream's
+    // pristine original. Two readers on one track cause clicks in the
+    // recording on Chrome (raw test outside the page is clean; same
+    // path inside the page clicks → contention is the cause).
+    let analysisAudioStream = null;
     let mediaRecorder = null;
     let recordedChunks = [];
     let recordStartTime = 0;
@@ -3472,7 +3478,16 @@
           currentAudioStream = stream;
           verifyAudioInputBinding(stream, selectedInputDeviceId);
 
-          const source = audioContext.createMediaStreamSource(stream);
+          // Hand the AudioContext a CLONE of the mic track. The original
+          // track on `currentAudioStream` stays pristine for the
+          // MediaRecorder (raw-audio path). When both AudioContext and
+          // MediaRecorder read the same track, Chrome produces audible
+          // clicks in the recording even though the raw test in
+          // isolation is clean.
+          const origTrack = stream.getAudioTracks()[0];
+          const cloneTrack = origTrack ? origTrack.clone() : null;
+          analysisAudioStream = cloneTrack ? new MediaStream([cloneTrack]) : stream;
+          const source = audioContext.createMediaStreamSource(analysisAudioStream);
           analyser = audioContext.createAnalyser();
           // Idle/preview fftSize. enterRecordMode() drops this to
           // ANALYSER_FFT_RECORD to cut YIN cost ~4x while recording.
@@ -3511,6 +3526,10 @@
         }
         tearDownAudioStream(currentAudioStream);
         currentAudioStream = null;
+        // Stop the cloned analysis track too — it's an independent
+        // track from clone() and won't be reaped by the original.
+        tearDownAudioStream(analysisAudioStream);
+        analysisAudioStream = null;
         // Disconnect the mic SOURCE from the permanent micProcessing
         // chain. The chain itself (highpass, compressor, makeup, optional
         // reverb, micOut, MediaStreamDestination) stays — it's permanent.
@@ -4053,6 +4072,8 @@
       // stream or fail silently.
       tearDownAudioStream(currentAudioStream);
       currentAudioStream = null;
+      tearDownAudioStream(analysisAudioStream);
+      analysisAudioStream = null;
 
       try {
         console.log('[input] getUserMedia with constraints=', buildAudioConstraints(requestedId));
@@ -4066,7 +4087,13 @@
         // instead of the requested device, the diagnostic UI surfaces it.
         verifyAudioInputBinding(newStream, requestedId);
 
-        const source = audioContext.createMediaStreamSource(newStream);
+        // Same clone strategy as toggleListening — pristine track for the
+        // recorder, independent clone for the AudioContext. See note at
+        // analysisAudioStream declaration.
+        const origTrack2 = newStream.getAudioTracks()[0];
+        const cloneTrack2 = origTrack2 ? origTrack2.clone() : null;
+        analysisAudioStream = cloneTrack2 ? new MediaStream([cloneTrack2]) : newStream;
+        const source = audioContext.createMediaStreamSource(analysisAudioStream);
         // Re-route source through analyser AND the (permanent) recording
         // processing chain. attachMicSource also disconnects the prior
         // source so we don't double-feed the recorder bus. The chain

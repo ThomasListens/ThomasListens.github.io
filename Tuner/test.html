@@ -1,0 +1,17 @@
+<!doctype html>
+<button id=b>start</button>
+<script>
+b.onclick = async () => {
+  const s = await navigator.mediaDevices.getUserMedia({audio:true});
+  const r = new MediaRecorder(s);
+  const chunks = [];
+  r.ondataavailable = e => chunks.push(e.data);
+  r.onstop = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(chunks));
+    a.download = 'raw.webm'; a.click();
+  };
+  r.start();
+  setTimeout(() => r.stop(), 5000);
+};
+</script>
