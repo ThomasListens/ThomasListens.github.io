@@ -2011,6 +2011,12 @@
 
       osc.connect(gain);
       gain.connect(ctx.destination);
+      // Also feed the recorder bus so the drone bakes into the video.
+      // Routes via micOut (same path mic uses) — direct connect to
+      // micProcessing.dest can be silently dropped by Chrome.
+      if (micProcessing && micProcessing.micOut) {
+        try { gain.connect(micProcessing.micOut); } catch (_) {}
+      }
 
       const startDelay = 0.01;
       osc.start(now + startDelay);
@@ -3241,7 +3247,7 @@
         // master gain into this fresh recorder bus so the drone shows up
         // in recordings.
         if (tanpuraNodes && tanpuraNodes.masterGain) {
-          try { tanpuraNodes.masterGain.connect(dest); } catch (_) {}
+          try { tanpuraNodes.masterGain.connect(micOut); } catch (_) {}
         }
         return mp;
       } catch (e) {
@@ -3742,8 +3748,9 @@
       // We only use the processed path when there's something to process:
       // a voice FX is enabled, OR the drone is enabled (drone is mixed
       // in via micProcessing.dest). Otherwise we use the raw track.
+      const hasRatioDrones = Object.keys(droneOscillators).length > 0;
       const needsProcessedAudio =
-        voiceFX.lowcut || voiceFX.compression || voiceFX.reverb || tanpuraEnabled;
+        voiceFX.lowcut || voiceFX.compression || voiceFX.reverb || tanpuraEnabled || hasRatioDrones;
 
       let audioTrack = null;
       let audioSource = 'none';
@@ -4447,8 +4454,13 @@
       const masterGain = ctx.createGain();
       masterGain.gain.value = 0;
       masterGain.connect(ctx.destination);
-      if (micProcessing && micProcessing.dest) {
-        try { masterGain.connect(micProcessing.dest); } catch (_) {}
+      // Route into the recorder via micOut (the same node the mic flows
+      // through), not directly into the MediaStreamDestination. Chrome
+      // has historically dropped parallel buffer-source connections to
+      // MediaStreamAudioDestinationNode silently — the mic's path is
+      // proven to land in the recording, so piggy-back on it.
+      if (micProcessing && micProcessing.micOut) {
+        try { masterGain.connect(micProcessing.micOut); } catch (_) {}
       }
 
       const userLpf = ctx.createBiquadFilter();
