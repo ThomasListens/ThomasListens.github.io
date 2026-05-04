@@ -512,13 +512,25 @@
       display: block;
     }
 
-    /* "Optimizing video..." pill — formerly shown while mp4box.js remuxed
-       the MP4 to fast-start. The remux step has been disabled (it produced
-       fragmented MP4 that wouldn't play locally on phones), so this pill is
-       force-hidden permanently. Element kept in the DOM in case a future
-       remux strategy needs the same UI affordance. */
-    #remuxIndicator,
-    #remuxIndicator.visible { display: none !important; }
+    /* "Optimizing video..." pill — shown briefly while the hand-rolled
+       fast-start remuxer relocates the moov atom to the front of the MP4
+       (so Instagram and other importers see the full file, not just the
+       first few seconds). Hidden by default; .visible toggles it on. */
+    #remuxIndicator {
+      position: fixed;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      z-index: 1000;
+      display: none;
+      pointer-events: none;
+    }
+    #remuxIndicator.visible { display: block; }
 
     body.record-mode #controls,
     body.record-mode #mobileToggle {
@@ -3719,148 +3731,167 @@
       draw();
     }
 
-    // -------- mp4box.js lazy loader + fast-start remux --------
+    // -------- Hand-rolled MP4 fast-start remuxer --------
     //
     // Instagram's video importer requires the MP4 moov atom (the index)
-    // to be up front (fast-start / "moov-at-start"). MediaRecorder
-    // produces MP4s with moov at the END, which IG silently rejects on
-    // upload. mp4box.js can repackage the file as a fragmented MP4
-    // (fMP4) — fragmented MP4 is natively fast-start because the moov
-    // contains no per-sample tables; per-fragment moofs sit ahead of
-    // each mdat run.
+    // to be at the FRONT of the file (fast-start / "moov-at-start").
+    // MediaRecorder produces MP4s with moov at the END, which IG only
+    // partially imports (it sees the first few seconds, then stops).
     //
-    // We lazy-load mp4box.js from a CDN only when a recording finishes
-    // (and only when the mime is MP4). WebM recordings skip remux.
+    // We previously tried mp4box.js's segmentation API to produce
+    // fragmented MP4 — that worked for IG but broke local phone playback.
+    // This implementation does the minimal thing: relocate moov to the
+    // front of the file and patch chunk offsets (stco / co64) so they
+    // still point at the right bytes inside mdat. No external library,
+    // no fragmentation, no codec re-encode.
+    //
+    // Algorithm:
+    //   1. Walk top-level atoms (ftyp, mdat, moov, free, ...).
+    //   2. If moov already precedes mdat — already fast-start, return original.
+    //   3. Otherwise: copy buffer (so we can mutate), walk into moov to find
+    //      every stco / co64 atom, add the moov-size delta to every chunk
+    //      offset entry. The delta equals moov.size because moov is being
+    //      inserted before mdat (and any other atoms that originally sat
+    //      between ftyp and mdat keep their original positions, so the
+    //      shift applied to mdat-relative offsets is exactly moov.size).
+    //   4. Reassemble: ftyp, then moov (mutated), then everything else in
+    //      original order minus moov.
 
-    let mp4boxPromise = null;
-    function loadMp4box() {
-      if (mp4boxPromise) return mp4boxPromise;
-      mp4boxPromise = new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js';
-        s.onload = () => resolve(window.MP4Box);
-        s.onerror = reject;
-        document.head.appendChild(s);
-      });
-      return mp4boxPromise;
+    function _atomType(view, pos) {
+      return String.fromCharCode(
+        view.getUint8(pos + 4),
+        view.getUint8(pos + 5),
+        view.getUint8(pos + 6),
+        view.getUint8(pos + 7)
+      );
     }
 
-    // fastStartMp4(blob) → Promise<Blob>
-    //
-    // Reads the blob, runs it through mp4box.js's segmentation API, and
-    // returns a fragmented MP4 blob (init segment + media segments
-    // concatenated). The output is fast-start by construction.
-    //
-    // Implementation notes / quirks resolved:
-    //   - mp4box.js needs `buf.fileStart = 0` on the appended buffer.
-    //   - `setSegmentOptions(trackId, user, { nbSamples })` must be
-    //     called for EVERY track inside `onReady`, not after.
-    //   - `initializeSegmentation()` returns init segments (one per
-    //     track that had setSegmentOptions called); these are the
-    //     start of the output.
-    //   - `onSegment` fires for each fragment of each track; we
-    //     collect them in arrival order — interleaving is fine for
-    //     fMP4 playback / IG upload.
-    //   - We must call `mp4.flush()` after appending, then `mp4.start()`
-    //     to make the segmenter emit segments. Order matters in older
-    //     mp4box builds; we call start() before flush(), which works
-    //     reliably on 0.5.2.
-    //   - On any error / timeout we reject; the caller falls back to
-    //     the original (non-fast-start) blob.
-    async function fastStartMp4(blob) {
-      const MP4Box = await loadMp4box();
-      if (!MP4Box || typeof MP4Box.createFile !== 'function') {
-        throw new Error('MP4Box unavailable');
+    function _readAtomHeader(view, pos, end) {
+      // Returns { size, headerSize } reading the standard MP4 box header
+      // at `pos`. `end` is the upper byte bound (exclusive).
+      let size = view.getUint32(pos);
+      let headerSize = 8;
+      if (size === 1) {
+        // 64-bit largesize in next 8 bytes
+        const hi = view.getUint32(pos + 8);
+        const lo = view.getUint32(pos + 12);
+        size = hi * 4294967296 + lo;
+        headerSize = 16;
+      } else if (size === 0) {
+        // box extends to end of container
+        size = end - pos;
       }
-      const buf = await blob.arrayBuffer();
-      // mp4box wants an ArrayBuffer with a `fileStart` property.
-      buf.fileStart = 0;
+      return { size, headerSize };
+    }
 
-      return new Promise((resolve, reject) => {
-        const mp4 = MP4Box.createFile();
-        const collected = []; // {id, buffer}
-        let initSegments = null;
-        let trackCount = 0;
-        let finishedTracks = 0;
-        let finished = false;
+    function _parseTopLevelAtoms(buf) {
+      const view = new DataView(buf);
+      const atoms = [];
+      let pos = 0;
+      while (pos + 8 <= buf.byteLength) {
+        const { size, headerSize } = _readAtomHeader(view, pos, buf.byteLength);
+        const type = _atomType(view, pos);
+        atoms.push({ type, pos, size, headerSize });
+        if (size <= 0) break; // safety: avoid infinite loop on malformed file
+        pos += size;
+      }
+      return atoms;
+    }
 
-        const finalize = () => {
-          if (finished) return;
-          finished = true;
-          try {
-            const parts = [];
-            if (initSegments) {
-              for (const seg of initSegments) parts.push(seg.buffer);
-            }
-            for (const c of collected) parts.push(c.buffer);
-            const out = new Blob(parts, { type: 'video/mp4' });
-            resolve(out);
-          } catch (e) {
-            reject(e);
-          }
-        };
+    // Container atoms that hold child boxes inside their payload.
+    const _MP4_CONTAINERS = new Set([
+      'moov', 'trak', 'mdia', 'minf', 'stbl',
+      'edts', 'mvex', 'udta', 'moof', 'traf'
+    ]);
 
-        mp4.onError = (e) => {
-          if (!finished) {
-            finished = true;
-            reject(new Error('mp4box error: ' + e));
-          }
-        };
-
-        mp4.onReady = (info) => {
-          try {
-            trackCount = info.tracks.length;
-            for (const t of info.tracks) {
-              mp4.setSegmentOptions(t.id, null, { nbSamples: 1000 });
-            }
-            initSegments = mp4.initializeSegmentation();
-            mp4.start();
-          } catch (e) {
-            if (!finished) {
-              finished = true;
-              reject(e);
-            }
-          }
-        };
-
-        mp4.onSegment = (id, user, buffer, sampleNum, isLast) => {
-          collected.push({ id, buffer });
-          if (isLast) {
-            finishedTracks++;
-            if (finishedTracks >= trackCount) finalize();
-          }
-        };
-
-        // Hard timeout safety — IG-acceptable file is better arriving
-        // late than never, but never-arriving is worse than the original.
-        const timeoutId = setTimeout(() => {
-          if (!finished) {
-            finished = true;
-            reject(new Error('mp4box remux timeout'));
-          }
-        }, 20000);
-        const wrappedResolve = resolve;
-        // Replace resolve so we clear the timeout on success
-        // (closure capture above means we can't reassign resolve directly;
-        //  finalize already calls the original resolve, so just clear here).
-        const origFinalize = finalize;
-        // No-op — keep finalize as-is; clear timeout in onSegment isLast path
-        // by piggybacking on the finished flag below.
-        const checkClear = () => { if (finished) clearTimeout(timeoutId); };
-
-        try {
-          mp4.appendBuffer(buf);
-          mp4.flush();
-          // Nudge: some samples / segments may not flush until microtask.
-          Promise.resolve().then(checkClear);
-        } catch (e) {
-          if (!finished) {
-            finished = true;
-            clearTimeout(timeoutId);
-            reject(e);
-          }
+    function _findOffsetAtoms(buf, view, parentPos, parentSize, parentHeaderSize) {
+      const results = [];
+      const start = parentPos + parentHeaderSize;
+      const end = parentPos + parentSize;
+      let pos = start;
+      while (pos + 8 <= end) {
+        const { size, headerSize } = _readAtomHeader(view, pos, end);
+        const type = _atomType(view, pos);
+        if (type === 'stco' || type === 'co64') {
+          results.push({ type, pos, size, headerSize });
+        } else if (_MP4_CONTAINERS.has(type)) {
+          const nested = _findOffsetAtoms(buf, view, pos, size, headerSize);
+          for (const n of nested) results.push(n);
         }
-      });
+        if (size <= 0) break;
+        pos += size;
+      }
+      return results;
+    }
+
+    function _shiftOffsets(view, offsetAtom, delta) {
+      // Skip box header + 4-byte version/flags
+      const dataStart = offsetAtom.pos + offsetAtom.headerSize + 4;
+      const entryCount = view.getUint32(dataStart);
+      let entryPos = dataStart + 4;
+      if (offsetAtom.type === 'stco') {
+        for (let i = 0; i < entryCount; i++) {
+          const oldOff = view.getUint32(entryPos);
+          // uint32 wraps in JS via >>> 0; intentional mask
+          view.setUint32(entryPos, (oldOff + delta) >>> 0);
+          entryPos += 4;
+        }
+      } else { // co64
+        for (let i = 0; i < entryCount; i++) {
+          const hi = view.getUint32(entryPos);
+          const lo = view.getUint32(entryPos + 4);
+          const oldOff = hi * 4294967296 + lo;
+          const newOff = oldOff + delta;
+          view.setUint32(entryPos, Math.floor(newOff / 4294967296));
+          view.setUint32(entryPos + 4, (newOff >>> 0));
+          entryPos += 8;
+        }
+      }
+    }
+
+    async function remuxFastStart(blob) {
+      const srcBuf = await blob.arrayBuffer();
+      const atoms = _parseTopLevelAtoms(srcBuf);
+      const moov = atoms.find(a => a.type === 'moov');
+      const mdat = atoms.find(a => a.type === 'mdat');
+      if (!moov || !mdat) {
+        // Not a recognizable MP4 structure — leave untouched.
+        return blob;
+      }
+      if (moov.pos < mdat.pos) {
+        // Already fast-start.
+        return blob;
+      }
+
+      // Copy so we can mutate moov's chunk-offset tables in place.
+      const bufCopy = srcBuf.slice(0);
+      const view = new DataView(bufCopy);
+
+      // Delta = moov.size, because moov is being inserted before mdat
+      // (and any other inter-ftyp/mdat atoms keep their original positions
+      // relative to mdat — they shifted earlier by moov.size too, but
+      // chunk offsets only point into mdat). Concretely: in the new file,
+      // mdat starts moov.size bytes later than it did in the old file.
+      const delta = moov.size;
+
+      const offsetAtoms = _findOffsetAtoms(bufCopy, view, moov.pos, moov.size, moov.headerSize);
+      for (const oa of offsetAtoms) {
+        _shiftOffsets(view, oa, delta);
+      }
+
+      // Assemble: ftyp, moov, then everything else in original order (minus moov).
+      const ftyp = atoms.find(a => a.type === 'ftyp');
+      const parts = [];
+      if (ftyp) {
+        parts.push(new Uint8Array(bufCopy, ftyp.pos, ftyp.size));
+      }
+      parts.push(new Uint8Array(bufCopy, moov.pos, moov.size));
+      for (const a of atoms) {
+        if (a === ftyp || a === moov) continue;
+        parts.push(new Uint8Array(bufCopy, a.pos, a.size));
+      }
+
+      return new Blob(parts, { type: 'video/mp4' });
     }
 
     function pickRecorderMime() {
@@ -4000,12 +4031,24 @@
         const ext = type.includes('mp4') ? 'mp4' : 'webm';
         const recordedBlob = new Blob(recordedChunks, { type });
 
-        // mp4box remux disabled — was producing fragmented MP4 that doesn't
-        // play locally on phones. Save the raw MediaRecorder blob instead.
-        // The fastStartMp4 / loadMp4box scaffolding below is kept in place so
-        // a different remux strategy can be wired in later without rebuilding
-        // the lazy loader.
-        const outputBlob = recordedBlob;
+        // Hand-rolled fast-start remux: relocate moov to the front so
+        // Instagram (and other importers) ingest the full clip instead
+        // of just the first few seconds. WebM and any unrecognized MP4
+        // structures fall through with the original blob.
+        let outputBlob = recordedBlob;
+        const remuxIndicator = document.getElementById('remuxIndicator');
+        if (type.includes('mp4')) {
+          if (remuxIndicator) remuxIndicator.classList.add('visible');
+          try {
+            outputBlob = await remuxFastStart(recordedBlob);
+            console.log('[record] fast-start remux complete:', outputBlob.size, 'bytes');
+          } catch (e) {
+            console.warn('[record] fast-start remux failed, using original:', e);
+            outputBlob = recordedBlob;
+          } finally {
+            if (remuxIndicator) remuxIndicator.classList.remove('visible');
+          }
+        }
 
         const url = URL.createObjectURL(outputBlob);
         const a = document.createElement('a');
