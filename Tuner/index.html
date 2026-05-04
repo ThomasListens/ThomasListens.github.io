@@ -953,6 +953,13 @@
     let smoothedFreq = null, smoothedCents = null, currentProbability = 0;
     let ghostTrail = [], animationId = null, lastGhostTime = 0;
     let lastPitchTime = 0, lastValidPitch = null, lastDetectTime = 0;
+<<<<<<< HEAD
+=======
+    // Frame counter for pitch-detection throttle (see audioLoop). Skips
+    // every other frame while body.record-mode is set so Pixel 7 doesn't
+    // crackle when the recorder + drone + camera filter all stack up.
+    let pitchFrameCounter = 0;
+>>>>>>> parent of 95589b2 (Update index.html)
     let ratioExtensions = {}, lastNearestLabel = null;
     let indicatorY = null, indicatorOpacity = 0;
     let lastDisplayCents = null, lastDisplayFreq = null, smoothedProximity = 0;
@@ -1961,6 +1968,7 @@
       if (!isListening && !isPlaying) return;
       
       const now = performance.now();
+<<<<<<< HEAD
       const detectInterval = 33;
       
       if (now - lastDetectTime >= detectInterval) {
@@ -1985,6 +1993,50 @@
           } else {
             smoothedFreq += (result.freq - smoothedFreq) * alpha;
             smoothedCents += (rawCents - smoothedCents) * alpha;
+=======
+
+      // Pitch detection only runs when there's actually audio coming in.
+      // In record mode without mic the camera still paints (draw() at the
+      // bottom of this loop) but YIN is skipped entirely.
+      if (analyser && audioContext && (isListening || isPlaying)) {
+        // Pitch-detection throttle. Outside recording, run full rAF rate
+        // (~60 Hz) so the indicator is maximally responsive. Inside record
+        // mode, skip every other frame — autocorrelation + smoothing is
+        // the heaviest CPU cost in the rAF loop and Pixel 7 stutters when
+        // the recorder + drone + camera filter are all stacked. The visual
+        // smoothing (draw() below) still updates every frame, so the ruler
+        // never looks choppy — only the actual detection is halved.
+        pitchFrameCounter++;
+        const skipFrame = recordMode && (pitchFrameCounter % 2 === 1);
+
+        if (!skipFrame) {
+          lastDetectTime = now;
+
+          const bufferLength = analyser.fftSize;
+          const buffer = new Float32Array(bufferLength);
+          analyser.getFloatTimeDomainData(buffer);
+
+          const result = yinDetect(buffer, audioContext.sampleRate);
+
+          if (result.freq > 50 && result.freq < 2000 && result.probability > 0.5) {
+            let rawCents = 1200 * Math.log2(result.freq / config.refFreq);
+
+            const baseAlpha = 0.03 + (config.responsiveness / 10) * 0.25;
+            const smoothingFactor = 16 / (config.smoothing + 1);
+            const alpha = Math.max(0.005, baseAlpha * Math.min(1, smoothingFactor));
+
+            if (smoothedFreq === null) {
+              smoothedFreq = result.freq;
+              smoothedCents = rawCents;
+            } else {
+              smoothedFreq += (result.freq - smoothedFreq) * alpha;
+              smoothedCents += (rawCents - smoothedCents) * alpha;
+            }
+
+            currentProbability = result.probability;
+            lastPitchTime = now;
+            lastValidPitch = { freq: smoothedFreq, cents: smoothedCents, probability: result.probability };
+>>>>>>> parent of 95589b2 (Update index.html)
           }
           
           currentProbability = result.probability;
