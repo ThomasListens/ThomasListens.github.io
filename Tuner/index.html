@@ -512,25 +512,13 @@
       display: block;
     }
 
-    /* "Optimizing video..." pill — shown briefly after recording stops while
-       mp4box.js remuxes the MP4 to fast-start (moov atom up front). Same
-       style family as #recIndicator but without the pulsing dot. */
-    #remuxIndicator {
-      position: fixed;
-      top: calc(14px + env(safe-area-inset-top));
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 201;
-      padding: 6px 14px;
-      background: rgba(0,0,0,0.7);
-      border-radius: 20px;
-      color: #fff;
-      font-size: 13px;
-      display: none;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-    }
-    #remuxIndicator.visible { display: block; }
+    /* "Optimizing video..." pill — formerly shown while mp4box.js remuxed
+       the MP4 to fast-start. The remux step has been disabled (it produced
+       fragmented MP4 that wouldn't play locally on phones), so this pill is
+       force-hidden permanently. Element kept in the DOM in case a future
+       remux strategy needs the same UI affordance. */
+    #remuxIndicator,
+    #remuxIndicator.visible { display: none !important; }
 
     body.record-mode #controls,
     body.record-mode #mobileToggle {
@@ -4012,25 +4000,12 @@
         const ext = type.includes('mp4') ? 'mp4' : 'webm';
         const recordedBlob = new Blob(recordedChunks, { type });
 
-        // Fast-start remux for MP4 only. WebM is natively streamable and
-        // doesn't need this. On any failure we fall back to the original
-        // blob so the user always gets *something*.
-        let outputBlob = recordedBlob;
-        const remuxInd = document.getElementById('remuxIndicator');
-        if (type.includes('mp4')) {
-          if (remuxInd) remuxInd.classList.add('visible');
-          try {
-            outputBlob = await fastStartMp4(recordedBlob);
-            console.log('[record] mp4 fast-start remux ok',
-              'inBytes=', recordedBlob.size,
-              'outBytes=', outputBlob.size);
-          } catch (e) {
-            console.warn('[record] mp4 remux failed, using original:', e);
-            outputBlob = recordedBlob;
-          } finally {
-            if (remuxInd) remuxInd.classList.remove('visible');
-          }
-        }
+        // mp4box remux disabled — was producing fragmented MP4 that doesn't
+        // play locally on phones. Save the raw MediaRecorder blob instead.
+        // The fastStartMp4 / loadMp4box scaffolding below is kept in place so
+        // a different remux strategy can be wired in later without rebuilding
+        // the lazy loader.
+        const outputBlob = recordedBlob;
 
         const url = URL.createObjectURL(outputBlob);
         const a = document.createElement('a');
