@@ -533,8 +533,19 @@
       z-index: 1000;
       display: none;
       pointer-events: none;
+      max-width: 90vw;
+      text-align: center;
+      white-space: normal;
+      line-height: 1.3;
     }
     #remuxIndicator.visible { display: block; }
+    /* Warning state — used for visible error reporting on mobile, where
+       the user can't see the JS console. Amber pill, slightly wider so a
+       full error message fits on a phone. */
+    #remuxIndicator.warning {
+      background: rgba(180, 110, 0, 0.95);
+      color: #fff;
+    }
 
     body.record-mode #controls,
     body.record-mode #mobileToggle {
@@ -1416,7 +1427,7 @@
   <video id="cameraFeed" autoplay playsinline muted></video>
 
   <div id="recIndicator"><span id="recTime">0:00</span></div>
-  <div id="remuxIndicator">Optimizing video...</div>
+  <div id="remuxIndicator"></div>
 
   <!-- Floating drone strip — only rendered (display:flex) in record mode.
        Mirrors state of the main panel's drone controls. The on/off toggle
@@ -3749,58 +3760,96 @@
     // moov atom up front (faststart). No re-encode — sample bytes pass
     // through; only the container is rewritten.
     //
-    // The single-threaded core is used (NOT @ffmpeg/core-mt) because
-    // multi-threaded ffmpeg.wasm requires SharedArrayBuffer, which in
-    // turn requires COOP/COEP cross-origin-isolation headers we don't
-    // have on GitHub Pages. The single-threaded build runs anywhere.
+    // We use FFmpeg.wasm 0.11.x (NOT 0.12.x). 0.12.x's "single-threaded"
+    // core still requires SharedArrayBuffer in practice, which means
+    // COOP/COEP cross-origin-isolation headers — not available on
+    // GitHub Pages. 0.11.x ships a true single-threaded ASM.js/wasm
+    // core that runs without SAB and without COOP/COEP. The 0.11.x API
+    // is also different: createFFmpeg() factory + FS('writeFile'/...)
+    // helpers + ffmpeg.run(...args) instead of the 0.12.x class API.
+
+    // Visible indicator helper. The recording UI runs on mobile where
+    // console.log is invisible — surface state on screen instead.
+    function showRemuxIndicator(text, opts) {
+      const el = document.getElementById('remuxIndicator');
+      if (!el) return;
+      el.textContent = text;
+      el.classList.toggle('warning', !!(opts && opts.warning));
+      el.classList.add('visible');
+    }
+    function hideRemuxIndicator() {
+      const el = document.getElementById('remuxIndicator');
+      if (!el) return;
+      el.classList.remove('visible');
+      el.classList.remove('warning');
+    }
 
     let _ffmpegPromise = null;
     async function loadFFmpeg() {
       if (_ffmpegPromise) return _ffmpegPromise;
       _ffmpegPromise = (async () => {
-        // Dynamic import() works inside a regular <script> block — it's
-        // a runtime function call, not the static `import` statement.
-        const ffmpegMod = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js');
-        const utilMod = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js');
-        const { FFmpeg } = ffmpegMod;
-        const { toBlobURL } = utilMod;
-
-        const ffmpeg = new FFmpeg();
-        // Single-threaded core — does NOT require SharedArrayBuffer /
-        // crossOriginIsolated, so it works on GitHub Pages without
-        // COOP/COEP headers.
-        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-        await ffmpeg.load({
-          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        // 0.11.x ships a UMD bundle that exposes a global `FFmpeg`. Inject
+        // it via a <script> tag — dynamic ESM import() of the 0.11.x
+        // package would pull in the wrong (missing) entry. Once the script
+        // loads, `window.FFmpeg.createFFmpeg`/`fetchFile` are available.
+        if (!window.FFmpeg) {
+          await new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js';
+            s.onload = resolve;
+            s.onerror = () => reject(new Error('FFmpeg.wasm script failed to load'));
+            document.head.appendChild(s);
+          });
+        }
+        if (!window.FFmpeg) throw new Error('FFmpeg global not present after script load');
+        const { createFFmpeg, fetchFile } = window.FFmpeg;
+        const ffmpeg = createFFmpeg({
+          log: false,
+          // Single-threaded 0.11.0 core — does NOT require SharedArrayBuffer
+          // or crossOriginIsolated, so it works on GitHub Pages without
+          // COOP/COEP headers.
+          corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
         });
-        return ffmpeg;
+        await ffmpeg.load();
+        return { ffmpeg, fetchFile };
       })();
       return _ffmpegPromise;
     }
 
     async function remuxToFastStartMP4(blob) {
-      const ffmpeg = await loadFFmpeg();
-      const inputData = new Uint8Array(await blob.arrayBuffer());
-      await ffmpeg.writeFile('input.mp4', inputData);
+      // First-load detection: if _ffmpegPromise hasn't been kicked off yet,
+      // this call is going to download the ~25 MB core, so the indicator
+      // should say so. Subsequent calls reuse the cached instance.
+      const isFirstLoad = !_ffmpegPromise;
+      if (isFirstLoad) showRemuxIndicator('Loading optimizer (~25 MB)...');
+      const { ffmpeg, fetchFile } = await loadFFmpeg();
+      showRemuxIndicator('Optimizing video...');
+
+      // 0.11.x uses MEMFS-style helpers: FS('writeFile'/'readFile'/'unlink').
+      ffmpeg.FS('writeFile', 'input.mp4', await fetchFile(blob));
 
       // -c copy: stream copy (no re-encoding, fast)
       // -movflags +faststart: write moov atom first (non-fragmented, IG-friendly)
-      const exitCode = await ffmpeg.exec([
+      // 0.11.x's run() doesn't reliably return an exit code, so we detect
+      // failure by trying to read output.mp4 below.
+      await ffmpeg.run(
         '-i', 'input.mp4',
         '-c', 'copy',
         '-movflags', '+faststart',
         'output.mp4'
-      ]);
+      );
 
-      if (exitCode !== 0) {
-        throw new Error('ffmpeg exit code: ' + exitCode);
+      let data;
+      try {
+        data = ffmpeg.FS('readFile', 'output.mp4');
+      } catch (e) {
+        throw new Error('output.mp4 missing — ffmpeg likely failed: ' + e.message);
       }
 
-      const data = await ffmpeg.readFile('output.mp4');
       // Clean up the in-memory FS to keep memory bounded across recordings.
-      try { await ffmpeg.deleteFile('input.mp4'); } catch (_) {}
-      try { await ffmpeg.deleteFile('output.mp4'); } catch (_) {}
+      // 0.11.x has no deleteFile(); use FS('unlink', name).
+      try { ffmpeg.FS('unlink', 'input.mp4'); } catch (_) {}
+      try { ffmpeg.FS('unlink', 'output.mp4'); } catch (_) {}
 
       // data is a Uint8Array; wrap it in a Blob.
       return new Blob([data.buffer], { type: 'video/mp4' });
@@ -3949,18 +3998,23 @@
         // stops at the first moof). FFmpeg.wasm rewrites the container
         // with `-c copy -movflags +faststart` (no re-encode). WebM and
         // any non-MP4 mime types fall through unchanged.
+        //
+        // remuxToFastStartMP4() drives the indicator through its stages
+        // ("Loading optimizer..." → "Optimizing video...") itself. On
+        // failure, we surface the error message visibly for ~6s — mobile
+        // users have no console, so silent failures are unacceptable.
         let outputBlob = recordedBlob;
-        const remuxIndicator = document.getElementById('remuxIndicator');
         if (type.includes('mp4')) {
-          if (remuxIndicator) remuxIndicator.classList.add('visible');
           try {
             outputBlob = await remuxToFastStartMP4(recordedBlob);
             console.log('[record] FFmpeg remux complete, size:', outputBlob.size);
+            hideRemuxIndicator();
           } catch (e) {
             console.warn('[record] FFmpeg remux failed, using original:', e);
             outputBlob = recordedBlob;
-          } finally {
-            if (remuxIndicator) remuxIndicator.classList.remove('visible');
+            const msg = (e && e.message) ? e.message : String(e);
+            showRemuxIndicator('Optimizer error: ' + msg + '. Saved original.', { warning: true });
+            setTimeout(hideRemuxIndicator, 6000);
           }
         }
 
