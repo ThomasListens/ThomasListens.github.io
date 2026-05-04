@@ -2776,18 +2776,13 @@
         if (currentTime >= duration) stopFilePlayback();
       }
 
-      const didPaint = draw();
+      draw();
 
-      // Sync the recording's video track to the actual paint we just
-      // performed. captureStream(0) only emits a video frame when this
-      // is called — pinning timestamps to paints, not to a polled clock,
-      // is what eliminates the rhythmic clicks in the recorded audio.
-      // Must gate on didPaint: draw() skips work on alternating rAF ticks
-      // in record mode (~30 FPS), but requestFrame here used to run every
-      // tick (~60 Hz), confusing the muxer vs continuous mic audio.
-      if (recordVideoTrack && mediaRecorder && mediaRecorder.state === 'recording' && didPaint) {
-        try { recordVideoTrack.requestFrame(); } catch (_) {}
-      }
+      // No requestFrame() call here. captureStream(30) is browser-paced
+      // — it polls the canvas at 30 Hz on its own clock, independent of
+      // main-thread work. Driving frames manually from the main thread
+      // (captureStream(0) + requestFrame) tied video timing to rAF
+      // jitter, which clicked the audio under load.
 
       animationId = requestAnimationFrame(audioLoop);
     }
@@ -3705,17 +3700,17 @@
       }
 
       const canvas = document.getElementById('rulerCanvas');
-      // captureStream(0) means "no automatic capture" — frames are only
-      // emitted when we explicitly call track.requestFrame(). audioLoop
-      // calls requestFrame after each successful draw() paint while recording,
-      // so the video track's timestamps land exactly on our paints
-      // instead of on the browser's internal polling grid. Both the
-      // fixed-rate form (captureStream(30)) and the on-update form
-      // (captureStream() with no arg) were producing timestamps that
-      // drift off the actual paint times, forcing MediaRecorder to
-      // resync the audio against drifting video, which was the source
-      // of the rhythmic clicks during audio.
-      const canvasStream = canvas.captureStream(0);
+      // Browser-paced capture at 30 fps. The browser polls the canvas
+      // on its own clock, independent of rAF / main-thread jitter, so
+      // the muxer sees a steady video clock even when YIN, canvas blur,
+      // or UI work momentarily blocks the main thread. Audio packets
+      // stream on the audio thread and align cleanly against this
+      // steady clock — no per-frame resync, no clicks.
+      //
+      // captureStream(0) (manual requestFrame) was tried and made things
+      // worse: every main-thread stall translated directly into video
+      // clock stalls, and the muxer popped on each realignment.
+      const canvasStream = canvas.captureStream(30);
       recordVideoTrack = canvasStream.getVideoTracks()[0] || null;
 
       // Audio track selection. The Web Audio path
@@ -3814,13 +3809,13 @@
         recordedChunks = [];
       };
 
-      // No timeslice: let MediaRecorder buffer the entire take and only
-      // emit a single 'dataavailable' on stop. Periodic chunk emission
-      // (start(1000)) was forcing the encoder to flush every second,
-      // which on some setups produces a ticking artifact in the audio.
-      // For Instagram-length takes (under a couple of minutes) the
-      // memory cost of holding the full blob is negligible.
-      mediaRecorder.start();
+      // 1-second timeslice: the encoder flushes a chunk every second,
+      // so the muxer never accumulates a long backlog of audio packets
+      // that could get re-aligned on stop. This is the original
+      // working setting — the no-timeslice variant tried later was
+      // looking for a click that turned out to be elsewhere
+      // (captureStream(0) main-thread pacing, see above).
+      mediaRecorder.start(1000);
       recordStartTime = performance.now();
       document.getElementById('recBtn').classList.add('recording');
       document.getElementById('discardRecBtn').classList.add('visible');
