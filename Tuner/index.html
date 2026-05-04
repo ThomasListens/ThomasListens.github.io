@@ -1937,7 +1937,7 @@
         // capture would otherwise crowd the audio thread.
         const Ctor = window.AudioContext || window.webkitAudioContext;
         try {
-          audioContext = new Ctor({ latencyHint: 'playback' });
+          audioContext = new Ctor({ latencyHint: 'playback', sampleRate: 48000 });
         } catch (_) {
           audioContext = new Ctor();
         }
