@@ -1523,6 +1523,9 @@
     // every other frame while body.record-mode is set so Pixel 7 doesn't
     // crackle when the recorder + drone + camera filter all stack up.
     let pitchFrameCounter = 0;
+    // Reusable buffer for analyser.getFloatTimeDomainData. Allocated once
+    // and resized only when fftSize changes. See audioLoop.
+    let pitchBuffer = null;
     let ratioExtensions = {}, lastNearestLabel = null;
     let indicatorY = null, indicatorOpacity = 0;
     let lastDisplayCents = null, lastDisplayFreq = null, smoothedProximity = 0;
@@ -2752,10 +2755,16 @@
           lastDetectTime = now;
 
           const bufferLength = analyser.fftSize;
-          const buffer = new Float32Array(bufferLength);
-          analyser.getFloatTimeDomainData(buffer);
+          // Reuse a single buffer across rAF frames. A fresh
+          // Float32Array(4096) per frame is ~1 MB/sec of garbage, which
+          // forces a GC every few hundred ms — long enough to underrun
+          // the audio thread's output buffer and produce clicks.
+          if (!pitchBuffer || pitchBuffer.length !== bufferLength) {
+            pitchBuffer = new Float32Array(bufferLength);
+          }
+          analyser.getFloatTimeDomainData(pitchBuffer);
 
-          const result = yinDetect(buffer, audioContext.sampleRate);
+          const result = yinDetect(pitchBuffer, audioContext.sampleRate);
 
           if (result.freq > 50 && result.freq < 2000 && result.probability > 0.5) {
             let rawCents = 1200 * Math.log2(result.freq / config.refFreq);
