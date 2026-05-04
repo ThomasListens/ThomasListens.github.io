@@ -512,10 +512,12 @@
       display: block;
     }
 
-    /* "Optimizing video..." pill — shown briefly while the hand-rolled
-       fast-start remuxer relocates the moov atom to the front of the MP4
-       (so Instagram and other importers see the full file, not just the
-       first few seconds). Hidden by default; .visible toggles it on. */
+    /* "Stitching for upload..." pill — shown briefly while mp4box.js
+       converts the MediaRecorder fragmented MP4 (ftyp/moov-init/moof+mdat...)
+       into a single-moov, single-mdat non-fragmented MP4 with a full
+       sample table — the layout strict importers like Instagram require
+       in order to ingest the full clip. Hidden by default; .visible
+       toggles it on. */
     #remuxIndicator {
       position: fixed;
       top: 60px;
@@ -1412,7 +1414,7 @@
   <video id="cameraFeed" autoplay playsinline muted></video>
 
   <div id="recIndicator"><span id="recTime">0:00</span></div>
-  <div id="remuxIndicator">Optimizing video...</div>
+  <div id="remuxIndicator">Stitching for upload...</div>
 
   <!-- Floating drone strip — only rendered (display:flex) in record mode.
        Mirrors state of the main panel's drone controls. The on/off toggle
@@ -3731,167 +3733,162 @@
       draw();
     }
 
-    // -------- Hand-rolled MP4 fast-start remuxer --------
+    // -------- Fragmented-MP4 → non-fragmented MP4 stitcher --------
     //
-    // Instagram's video importer requires the MP4 moov atom (the index)
-    // to be at the FRONT of the file (fast-start / "moov-at-start").
-    // MediaRecorder produces MP4s with moov at the END, which IG only
-    // partially imports (it sees the first few seconds, then stops).
+    // MediaRecorder on Chrome/Android emits an *fMP4* file:
+    //   ftyp → moov(mvex, no stbl) → moof → mdat → moof → mdat → ...
+    // The leading moov is just an init segment — the actual sample
+    // metadata lives in each moof. Strict importers (notably Instagram)
+    // read the moov, see mvex, can't follow the fragments, and stop
+    // after the first moof+mdat (so they import only ~3-5 seconds).
     //
-    // We previously tried mp4box.js's segmentation API to produce
-    // fragmented MP4 — that worked for IG but broke local phone playback.
-    // This implementation does the minimal thing: relocate moov to the
-    // front of the file and patch chunk offsets (stco / co64) so they
-    // still point at the right bytes inside mdat. No external library,
-    // no fragmentation, no codec re-encode.
-    //
-    // Algorithm:
-    //   1. Walk top-level atoms (ftyp, mdat, moov, free, ...).
-    //   2. If moov already precedes mdat — already fast-start, return original.
-    //   3. Otherwise: copy buffer (so we can mutate), walk into moov to find
-    //      every stco / co64 atom, add the moov-size delta to every chunk
-    //      offset entry. The delta equals moov.size because moov is being
-    //      inserted before mdat (and any other atoms that originally sat
-    //      between ftyp and mdat keep their original positions, so the
-    //      shift applied to mdat-relative offsets is exactly moov.size).
-    //   4. Reassemble: ftyp, then moov (mutated), then everything else in
-    //      original order minus moov.
+    // We use mp4box.js to parse the fragmented input, extract every
+    // sample (with its timing + sync flags), and re-pack into a
+    // standard, non-fragmented MP4:
+    //   ftyp → moov(full stbl per track) → mdat
+    // No re-encode — sample bytes pass through; only the container
+    // is rewritten. Handles both AVC video and AAC (or whatever else
+    // the recorder produced) by copying the original sample entry as
+    // the new track's `description`.
 
-    function _atomType(view, pos) {
-      return String.fromCharCode(
-        view.getUint8(pos + 4),
-        view.getUint8(pos + 5),
-        view.getUint8(pos + 6),
-        view.getUint8(pos + 7)
-      );
+    let _mp4boxPromise = null;
+    function loadMP4Box() {
+      if (_mp4boxPromise) return _mp4boxPromise;
+      _mp4boxPromise = new Promise((resolve, reject) => {
+        if (window.MP4Box) { resolve(window.MP4Box); return; }
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js';
+        s.onload = () => {
+          if (window.MP4Box) resolve(window.MP4Box);
+          else reject(new Error('mp4box loaded but window.MP4Box undefined'));
+        };
+        s.onerror = () => reject(new Error('Failed to load mp4box.js'));
+        document.head.appendChild(s);
+      });
+      return _mp4boxPromise;
     }
 
-    function _readAtomHeader(view, pos, end) {
-      // Returns { size, headerSize } reading the standard MP4 box header
-      // at `pos`. `end` is the upper byte bound (exclusive).
-      let size = view.getUint32(pos);
-      let headerSize = 8;
-      if (size === 1) {
-        // 64-bit largesize in next 8 bytes
-        const hi = view.getUint32(pos + 8);
-        const lo = view.getUint32(pos + 12);
-        size = hi * 4294967296 + lo;
-        headerSize = 16;
-      } else if (size === 0) {
-        // box extends to end of container
-        size = end - pos;
-      }
-      return { size, headerSize };
-    }
-
-    function _parseTopLevelAtoms(buf) {
-      const view = new DataView(buf);
-      const atoms = [];
-      let pos = 0;
-      while (pos + 8 <= buf.byteLength) {
-        const { size, headerSize } = _readAtomHeader(view, pos, buf.byteLength);
-        const type = _atomType(view, pos);
-        atoms.push({ type, pos, size, headerSize });
-        if (size <= 0) break; // safety: avoid infinite loop on malformed file
-        pos += size;
-      }
-      return atoms;
-    }
-
-    // Container atoms that hold child boxes inside their payload.
-    const _MP4_CONTAINERS = new Set([
-      'moov', 'trak', 'mdia', 'minf', 'stbl',
-      'edts', 'mvex', 'udta', 'moof', 'traf'
-    ]);
-
-    function _findOffsetAtoms(buf, view, parentPos, parentSize, parentHeaderSize) {
-      const results = [];
-      const start = parentPos + parentHeaderSize;
-      const end = parentPos + parentSize;
-      let pos = start;
-      while (pos + 8 <= end) {
-        const { size, headerSize } = _readAtomHeader(view, pos, end);
-        const type = _atomType(view, pos);
-        if (type === 'stco' || type === 'co64') {
-          results.push({ type, pos, size, headerSize });
-        } else if (_MP4_CONTAINERS.has(type)) {
-          const nested = _findOffsetAtoms(buf, view, pos, size, headerSize);
-          for (const n of nested) results.push(n);
-        }
-        if (size <= 0) break;
-        pos += size;
-      }
-      return results;
-    }
-
-    function _shiftOffsets(view, offsetAtom, delta) {
-      // Skip box header + 4-byte version/flags
-      const dataStart = offsetAtom.pos + offsetAtom.headerSize + 4;
-      const entryCount = view.getUint32(dataStart);
-      let entryPos = dataStart + 4;
-      if (offsetAtom.type === 'stco') {
-        for (let i = 0; i < entryCount; i++) {
-          const oldOff = view.getUint32(entryPos);
-          // uint32 wraps in JS via >>> 0; intentional mask
-          view.setUint32(entryPos, (oldOff + delta) >>> 0);
-          entryPos += 4;
-        }
-      } else { // co64
-        for (let i = 0; i < entryCount; i++) {
-          const hi = view.getUint32(entryPos);
-          const lo = view.getUint32(entryPos + 4);
-          const oldOff = hi * 4294967296 + lo;
-          const newOff = oldOff + delta;
-          view.setUint32(entryPos, Math.floor(newOff / 4294967296));
-          view.setUint32(entryPos + 4, (newOff >>> 0));
-          entryPos += 8;
-        }
+    function _getTrackSampleEntry(inTrack) {
+      // Walk down to the original SampleEntry box (avc1/hvc1/mp4a/...).
+      // mp4box.js parses this out of stsd inside the input file, and
+      // re-passing it as `description` on addTrack preserves codec config
+      // (avcC/SPS+PPS for H.264, esds with AudioSpecificConfig for AAC).
+      try {
+        return inTrack.mdia.minf.stbl.stsd.entries[0];
+      } catch (_) {
+        return null;
       }
     }
 
-    async function remuxFastStart(blob) {
+    async function stitchFragmentedMp4(blob) {
+      const MP4Box = await loadMP4Box();
       const srcBuf = await blob.arrayBuffer();
-      const atoms = _parseTopLevelAtoms(srcBuf);
-      const moov = atoms.find(a => a.type === 'moov');
-      const mdat = atoms.find(a => a.type === 'mdat');
-      if (!moov || !mdat) {
-        // Not a recognizable MP4 structure — leave untouched.
-        return blob;
-      }
-      if (moov.pos < mdat.pos) {
-        // Already fast-start.
-        return blob;
-      }
 
-      // Copy so we can mutate moov's chunk-offset tables in place.
-      const bufCopy = srcBuf.slice(0);
-      const view = new DataView(bufCopy);
+      return new Promise((resolve, reject) => {
+        const inFile = MP4Box.createFile();
+        const outFile = MP4Box.createFile();
+        const trackMap = {};                    // input trackId → output trackId
+        const totalSamplesPerTrack = {};
+        const receivedSamplesPerTrack = {};
+        let settled = false;
 
-      // Delta = moov.size, because moov is being inserted before mdat
-      // (and any other inter-ftyp/mdat atoms keep their original positions
-      // relative to mdat — they shifted earlier by moov.size too, but
-      // chunk offsets only point into mdat). Concretely: in the new file,
-      // mdat starts moov.size bytes later than it did in the old file.
-      const delta = moov.size;
+        inFile.onError = (err) => {
+          if (settled) return;
+          settled = true;
+          reject(new Error('mp4box parse error: ' + err));
+        };
 
-      const offsetAtoms = _findOffsetAtoms(bufCopy, view, moov.pos, moov.size, moov.headerSize);
-      for (const oa of offsetAtoms) {
-        _shiftOffsets(view, oa, delta);
-      }
+        inFile.onReady = (info) => {
+          if (settled) return;
+          try {
+            for (const track of info.tracks) {
+              const inTrack = inFile.getTrackById(track.id);
+              const sampleEntry = _getTrackSampleEntry(inTrack);
 
-      // Assemble: ftyp, moov, then everything else in original order (minus moov).
-      const ftyp = atoms.find(a => a.type === 'ftyp');
-      const parts = [];
-      if (ftyp) {
-        parts.push(new Uint8Array(bufCopy, ftyp.pos, ftyp.size));
-      }
-      parts.push(new Uint8Array(bufCopy, moov.pos, moov.size));
-      for (const a of atoms) {
-        if (a === ftyp || a === moov) continue;
-        parts.push(new Uint8Array(bufCopy, a.pos, a.size));
-      }
+              // Prefer the parsed sample entry's actual type (avc1/hvc1/mp4a/...)
+              // since that already matches the codec_id family in the input.
+              const sampleEntryType = (sampleEntry && sampleEntry.type) ||
+                (track.codec.startsWith('avc') ? 'avc1' :
+                 track.codec.startsWith('hev') || track.codec.startsWith('hvc') ? 'hvc1' :
+                 track.codec.startsWith('vp09') ? 'vp09' :
+                 track.codec.startsWith('mp4a') ? 'mp4a' :
+                 track.codec.split('.')[0]);
 
-      return new Blob(parts, { type: 'video/mp4' });
+              const opts = {
+                type: sampleEntryType,
+                timescale: track.timescale,
+                duration: track.duration,
+                media_duration: track.duration,
+                language: track.language || 'und',
+                // The full SampleEntry box from the input — mp4box.js will
+                // serialize it back out verbatim, preserving avcC/esds/etc.
+                description: sampleEntry,
+              };
+
+              if (track.video) {
+                opts.width = track.video.width;
+                opts.height = track.video.height;
+              }
+              if (track.audio) {
+                opts.channel_count = track.audio.channel_count;
+                opts.samplerate = track.audio.sample_rate;
+                opts.samplesize = track.audio.sample_size || 16;
+                opts.hdlr = 'soun';
+              }
+
+              const outTrackId = outFile.addTrack(opts);
+              trackMap[track.id] = outTrackId;
+              totalSamplesPerTrack[track.id] = track.nb_samples;
+              receivedSamplesPerTrack[track.id] = 0;
+
+              // null user, batch up to 100 samples per onSamples callback
+              inFile.setExtractionOptions(track.id, null, { nbSamples: 100 });
+            }
+            inFile.start();
+          } catch (err) {
+            if (settled) return;
+            settled = true;
+            reject(err);
+          }
+        };
+
+        inFile.onSamples = (trackId, user, samples) => {
+          if (settled) return;
+          const outTrackId = trackMap[trackId];
+          try {
+            for (const s of samples) {
+              outFile.addSample(outTrackId, s.data, {
+                duration: s.duration,
+                dts: s.dts,
+                cts: s.cts,
+                is_sync: s.is_sync,
+              });
+              receivedSamplesPerTrack[trackId]++;
+            }
+
+            const trackIds = Object.keys(totalSamplesPerTrack);
+            const allDone = trackIds.length > 0 && trackIds.every(
+              (tid) => receivedSamplesPerTrack[tid] >= totalSamplesPerTrack[tid]
+            );
+            if (allDone) {
+              settled = true;
+              // mp4box.js getBuffer() returns an ArrayBuffer of the
+              // assembled file. Wrap it in a Blob for the caller.
+              const outBuf = outFile.getBuffer();
+              resolve(new Blob([outBuf], { type: 'video/mp4' }));
+            }
+          } catch (err) {
+            if (settled) return;
+            settled = true;
+            reject(err);
+          }
+        };
+
+        // mp4box.js requires fileStart on the buffer it receives.
+        srcBuf.fileStart = 0;
+        inFile.appendBuffer(srcBuf);
+        inFile.flush();
+      });
     }
 
     function pickRecorderMime() {
@@ -4031,19 +4028,20 @@
         const ext = type.includes('mp4') ? 'mp4' : 'webm';
         const recordedBlob = new Blob(recordedChunks, { type });
 
-        // Hand-rolled fast-start remux: relocate moov to the front so
-        // Instagram (and other importers) ingest the full clip instead
-        // of just the first few seconds. WebM and any unrecognized MP4
-        // structures fall through with the original blob.
+        // Stitch fragmented MP4 → non-fragmented MP4 with full sample
+        // table. MediaRecorder emits ftyp/moov-init/moof+mdat... which
+        // Instagram only partially imports (~3-5 seconds, then stops at
+        // the first moof). The stitcher rewrites it to ftyp/moov(stbl)/mdat.
+        // WebM and any unrecognized MP4 structures fall through unchanged.
         let outputBlob = recordedBlob;
         const remuxIndicator = document.getElementById('remuxIndicator');
         if (type.includes('mp4')) {
           if (remuxIndicator) remuxIndicator.classList.add('visible');
           try {
-            outputBlob = await remuxFastStart(recordedBlob);
-            console.log('[record] fast-start remux complete:', outputBlob.size, 'bytes');
+            outputBlob = await stitchFragmentedMp4(recordedBlob);
+            console.log('[record] stitched fMP4 → MP4, size:', outputBlob.size);
           } catch (e) {
-            console.warn('[record] fast-start remux failed, using original:', e);
+            console.warn('[record] stitch failed, using original:', e);
             outputBlob = recordedBlob;
           } finally {
             if (remuxIndicator) remuxIndicator.classList.remove('visible');
