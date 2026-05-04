@@ -512,6 +512,26 @@
       display: block;
     }
 
+    /* "Optimizing video..." pill — shown briefly after recording stops while
+       mp4box.js remuxes the MP4 to fast-start (moov atom up front). Same
+       style family as #recIndicator but without the pulsing dot. */
+    #remuxIndicator {
+      position: fixed;
+      top: calc(14px + env(safe-area-inset-top));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 201;
+      padding: 6px 14px;
+      background: rgba(0,0,0,0.7);
+      border-radius: 20px;
+      color: #fff;
+      font-size: 13px;
+      display: none;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    #remuxIndicator.visible { display: block; }
+
     body.record-mode #controls,
     body.record-mode #mobileToggle {
       display: none !important;
@@ -1392,6 +1412,7 @@
   <video id="cameraFeed" autoplay playsinline muted></video>
 
   <div id="recIndicator"><span id="recTime">0:00</span></div>
+  <div id="remuxIndicator">Optimizing video...</div>
 
   <!-- Floating drone strip — only rendered (display:flex) in record mode.
        Mirrors state of the main panel's drone controls. The on/off toggle
@@ -3051,7 +3072,8 @@
     //              each:  delay → LPF(5 kHz, Q 0.7)
     //                       ↳ feedback (gain ≤ 0.78) → back into own delay
     //                       ↳ panner [-0.55,+0.30,-0.15,+0.55] → fdnSum
-    //                       ↳ cross-feed (0.3) → next line's delay input
+    //                     (NO cross-feed ring — see note in code below.
+    //                      4 independent parallel combs, stable for FB<1.)
     //                     each delay's delayTime is modulated by a slow
     //                     ±0.5 ms sine LFO (0.04 / 0.06 / 0.085 / 0.11 Hz)
     //   fdnSum → shimmerBPF(2 kHz, Q 0.6) → shimmerFB(0.08) ─► back into fdnIn
@@ -3113,7 +3135,6 @@
       const panners = [];
       const lfos = [];
       const lfoGains = [];
-      const xfeeds = [];
 
       for (let i = 0; i < 4; i++) {
         const d = ctx.createDelay(2.0);
@@ -3163,16 +3184,13 @@
         lfoGains.push(lfoGain);
       }
 
-      // Cross-feed ring: each line's lpf output → next line's delay
-      // input at 0.3 gain. Hadamard-style mixing simplification — adds
-      // echo density without per-line resonant coloration.
-      for (let i = 0; i < 4; i++) {
-        const xf = ctx.createGain();
-        xf.gain.value = 0.3;
-        lpfs[i].connect(xf);
-        xf.connect(delayNodes[(i + 1) % 4]);
-        xfeeds.push(xf);
-      }
+      // Cross-feed ring REMOVED (was: each line's lpf → next line's delay
+      // at 0.3 gain). Combined with per-line FB up to 0.78, the ring
+      // pushed closed-loop gain to 0.968+ at certain frequencies and
+      // produced glaring pumping. Same surgery was done on the drone
+      // FDN in commit bfeead9 and was missed in this voice copy. With
+      // the ring gone the four lines are independent parallel combs —
+      // provably stable for any per-line FB < 1.0.
 
       // -------- Shimmer self-loop (kept) --------
       // Tap fdnSum, narrow BPF at 2 kHz (Q 0.6), fold back into fdnIn.
@@ -3239,7 +3257,7 @@
         dispose() {
           for (const o of lfos) { try { o.stop(); } catch (_) {} try { o.disconnect(); } catch (_) {} }
           const all = [input, output, ap1, ap2, ap3, fdnIn, fdnSum, shimmerBPF, shimmerFB, postShelf, wetComp, wetLimiter]
-            .concat(delayNodes, lpfs, fbGains, panners, lfoGains, xfeeds);
+            .concat(delayNodes, lpfs, fbGains, panners, lfoGains);
           for (const n of all) { try { n.disconnect(); } catch (_) {} }
         }
       };
@@ -3713,10 +3731,159 @@
       draw();
     }
 
+    // -------- mp4box.js lazy loader + fast-start remux --------
+    //
+    // Instagram's video importer requires the MP4 moov atom (the index)
+    // to be up front (fast-start / "moov-at-start"). MediaRecorder
+    // produces MP4s with moov at the END, which IG silently rejects on
+    // upload. mp4box.js can repackage the file as a fragmented MP4
+    // (fMP4) — fragmented MP4 is natively fast-start because the moov
+    // contains no per-sample tables; per-fragment moofs sit ahead of
+    // each mdat run.
+    //
+    // We lazy-load mp4box.js from a CDN only when a recording finishes
+    // (and only when the mime is MP4). WebM recordings skip remux.
+
+    let mp4boxPromise = null;
+    function loadMp4box() {
+      if (mp4boxPromise) return mp4boxPromise;
+      mp4boxPromise = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js';
+        s.onload = () => resolve(window.MP4Box);
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+      return mp4boxPromise;
+    }
+
+    // fastStartMp4(blob) → Promise<Blob>
+    //
+    // Reads the blob, runs it through mp4box.js's segmentation API, and
+    // returns a fragmented MP4 blob (init segment + media segments
+    // concatenated). The output is fast-start by construction.
+    //
+    // Implementation notes / quirks resolved:
+    //   - mp4box.js needs `buf.fileStart = 0` on the appended buffer.
+    //   - `setSegmentOptions(trackId, user, { nbSamples })` must be
+    //     called for EVERY track inside `onReady`, not after.
+    //   - `initializeSegmentation()` returns init segments (one per
+    //     track that had setSegmentOptions called); these are the
+    //     start of the output.
+    //   - `onSegment` fires for each fragment of each track; we
+    //     collect them in arrival order — interleaving is fine for
+    //     fMP4 playback / IG upload.
+    //   - We must call `mp4.flush()` after appending, then `mp4.start()`
+    //     to make the segmenter emit segments. Order matters in older
+    //     mp4box builds; we call start() before flush(), which works
+    //     reliably on 0.5.2.
+    //   - On any error / timeout we reject; the caller falls back to
+    //     the original (non-fast-start) blob.
+    async function fastStartMp4(blob) {
+      const MP4Box = await loadMp4box();
+      if (!MP4Box || typeof MP4Box.createFile !== 'function') {
+        throw new Error('MP4Box unavailable');
+      }
+      const buf = await blob.arrayBuffer();
+      // mp4box wants an ArrayBuffer with a `fileStart` property.
+      buf.fileStart = 0;
+
+      return new Promise((resolve, reject) => {
+        const mp4 = MP4Box.createFile();
+        const collected = []; // {id, buffer}
+        let initSegments = null;
+        let trackCount = 0;
+        let finishedTracks = 0;
+        let finished = false;
+
+        const finalize = () => {
+          if (finished) return;
+          finished = true;
+          try {
+            const parts = [];
+            if (initSegments) {
+              for (const seg of initSegments) parts.push(seg.buffer);
+            }
+            for (const c of collected) parts.push(c.buffer);
+            const out = new Blob(parts, { type: 'video/mp4' });
+            resolve(out);
+          } catch (e) {
+            reject(e);
+          }
+        };
+
+        mp4.onError = (e) => {
+          if (!finished) {
+            finished = true;
+            reject(new Error('mp4box error: ' + e));
+          }
+        };
+
+        mp4.onReady = (info) => {
+          try {
+            trackCount = info.tracks.length;
+            for (const t of info.tracks) {
+              mp4.setSegmentOptions(t.id, null, { nbSamples: 1000 });
+            }
+            initSegments = mp4.initializeSegmentation();
+            mp4.start();
+          } catch (e) {
+            if (!finished) {
+              finished = true;
+              reject(e);
+            }
+          }
+        };
+
+        mp4.onSegment = (id, user, buffer, sampleNum, isLast) => {
+          collected.push({ id, buffer });
+          if (isLast) {
+            finishedTracks++;
+            if (finishedTracks >= trackCount) finalize();
+          }
+        };
+
+        // Hard timeout safety — IG-acceptable file is better arriving
+        // late than never, but never-arriving is worse than the original.
+        const timeoutId = setTimeout(() => {
+          if (!finished) {
+            finished = true;
+            reject(new Error('mp4box remux timeout'));
+          }
+        }, 20000);
+        const wrappedResolve = resolve;
+        // Replace resolve so we clear the timeout on success
+        // (closure capture above means we can't reassign resolve directly;
+        //  finalize already calls the original resolve, so just clear here).
+        const origFinalize = finalize;
+        // No-op — keep finalize as-is; clear timeout in onSegment isLast path
+        // by piggybacking on the finished flag below.
+        const checkClear = () => { if (finished) clearTimeout(timeoutId); };
+
+        try {
+          mp4.appendBuffer(buf);
+          mp4.flush();
+          // Nudge: some samples / segments may not flush until microtask.
+          Promise.resolve().then(checkClear);
+        } catch (e) {
+          if (!finished) {
+            finished = true;
+            clearTimeout(timeoutId);
+            reject(e);
+          }
+        }
+      });
+    }
+
     function pickRecorderMime() {
+      // Pin H.264 Baseline @ L3.0 + AAC-LC first — the broadly safe combo
+      // for Instagram and other social importers. avc1.42E01E = Baseline
+      // profile, level 3.0. mp4a.40.2 = AAC-LC. Falls back through plain
+      // MP4 candidates and then WebM only if no MP4 variant is supported.
       const candidates = [
-        'video/mp4;codecs=avc1,mp4a',
-        'video/mp4',
+        'video/mp4;codecs=avc1.42E01E,mp4a.40.2',  // H.264 Baseline @ L3.0 + AAC-LC — broadly safe for IG/social
+        'video/mp4;codecs=h264,aac',                // simpler MP4 fallback some browsers prefer
+        'video/mp4',                                 // last MP4 fallback
         'video/webm;codecs=vp9,opus',
         'video/webm;codecs=vp8,opus',
         'video/webm'
@@ -3810,8 +3977,8 @@
       recordedChunks = [];
       try {
         mediaRecorder = mime
-          ? new MediaRecorder(canvasStream, { mimeType: mime, videoBitsPerSecond: 8_000_000 })
-          : new MediaRecorder(canvasStream, { videoBitsPerSecond: 8_000_000 });
+          ? new MediaRecorder(canvasStream, { mimeType: mime, videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 })
+          : new MediaRecorder(canvasStream, { videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 });
       } catch (err) {
         console.error('MediaRecorder init failed:', err);
         alert('Recording is not supported on this browser.');
@@ -3821,7 +3988,7 @@
       mediaRecorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) recordedChunks.push(e.data);
       };
-      mediaRecorder.onstop = () => {
+      mediaRecorder.onstop = async () => {
         // Stop only the canvas video track; keep the shared mic track alive
         try { canvasStream.getVideoTracks().forEach(t => t.stop()); } catch (_) {}
         recordVideoTrack = null;
@@ -3843,8 +4010,29 @@
 
         const type = mediaRecorder.mimeType || mime || 'video/webm';
         const ext = type.includes('mp4') ? 'mp4' : 'webm';
-        const blob = new Blob(recordedChunks, { type });
-        const url = URL.createObjectURL(blob);
+        const recordedBlob = new Blob(recordedChunks, { type });
+
+        // Fast-start remux for MP4 only. WebM is natively streamable and
+        // doesn't need this. On any failure we fall back to the original
+        // blob so the user always gets *something*.
+        let outputBlob = recordedBlob;
+        const remuxInd = document.getElementById('remuxIndicator');
+        if (type.includes('mp4')) {
+          if (remuxInd) remuxInd.classList.add('visible');
+          try {
+            outputBlob = await fastStartMp4(recordedBlob);
+            console.log('[record] mp4 fast-start remux ok',
+              'inBytes=', recordedBlob.size,
+              'outBytes=', outputBlob.size);
+          } catch (e) {
+            console.warn('[record] mp4 remux failed, using original:', e);
+            outputBlob = recordedBlob;
+          } finally {
+            if (remuxInd) remuxInd.classList.remove('visible');
+          }
+        }
+
+        const url = URL.createObjectURL(outputBlob);
         const a = document.createElement('a');
         a.href = url;
         const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -5431,11 +5619,3 @@
       document.getElementById('rulerCanvas').addEventListener('pointerup', () => {
         if (recordMode) scheduleSave();
       });
-
-      updateConfig();
-    }
-    
-    init();
-  </script>
-</body>
-</html>
