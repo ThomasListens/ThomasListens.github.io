@@ -934,7 +934,7 @@
     body.record-mode #droneRecordStrip {
       display: flex;
     }
-    #droneRecordStrip button#droneRecordToggle {
+    button#droneRecordToggle {
       width: 36px;
       height: 36px;
       border-radius: 50%;
@@ -951,12 +951,12 @@
       flex-shrink: 0;
       font-family: inherit;
     }
-    #droneRecordStrip button#droneRecordToggle.on {
+    button#droneRecordToggle.on {
       background: rgba(255, 255, 255, 0.9);
       color: #000;
       border-color: #fff;
     }
-    #droneRecordStrip button#droneRecordToggle:active {
+    button#droneRecordToggle:active {
       transform: scale(0.92);
     }
     #droneRecordStrip .dr-label {
@@ -1062,15 +1062,27 @@
     #audioFXRecordStrip button.afx-chip:active {
       transform: scale(0.92);
     }
-    #audioFXRecordStrip .afx-mix {
-      display: none;
+    /* Bottom record-row strip holding the always-visible drone toggle and
+       reverb mix slider. Marked .record-essential so it survives
+       body.settings-hidden alongside the rec/stop row. */
+    #recordOverlay .record-audio-row {
+      display: flex;
       align-items: center;
-      gap: 4px;
-      padding-left: 4px;
-      border-left: 1px solid rgba(255, 255, 255, 0.18);
+      gap: 12px;
+      padding: 0 8px;
+      max-width: 480px;
+      margin: 0 auto;
+      width: 100%;
     }
-    #audioFXRecordStrip.reverb-on .afx-mix {
-      display: inline-flex;
+    #recordOverlay .record-audio-row .ra-label {
+      font-size: 11px;
+      color: #aaa;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    #recordOverlay .record-audio-row #audioFXMixSlider {
+      flex: 1;
     }
     #audioFXRecordStrip .afx-label {
       font-size: 10px;
@@ -1382,9 +1394,11 @@
   <div id="recIndicator"><span id="recTime">0:00</span></div>
 
   <!-- Floating drone strip — only rendered (display:flex) in record mode.
-       Mirrors state of the main panel's drone controls. -->
+       Mirrors state of the main panel's drone controls. The on/off toggle
+       lives in the bottom record-audio row so it stays visible when
+       settings are hidden; this strip carries volume + filter only. -->
   <div id="droneRecordStrip" aria-label="Drone controls">
-    <button type="button" id="droneRecordToggle" title="Drone on/off" aria-label="Toggle drone">⏻</button>
+    <span class="dr-label" title="Volume">vol</span>
     <input type="range" id="droneRecordVolume" min="0" max="100" value="30" aria-label="Drone volume">
     <span class="dr-label" title="Filter cutoff">filter</span>
     <input type="range" id="droneRecordCutoff" min="0" max="100" value="56" step="0.5" aria-label="Drone filter cutoff">
@@ -1398,10 +1412,6 @@
     <button type="button" class="afx-chip" id="audioFXCmpBtn" title="Compression" aria-label="Toggle compression">CMP</button>
     <button type="button" class="afx-chip" id="audioFXVrbBtn" title="Shimmer reverb" aria-label="Toggle reverb">VRB</button>
     <button type="button" class="afx-chip on" id="rulerHideBtn" title="Show/hide tuning ruler" aria-label="Show or hide tuning ruler">📏</button>
-    <span class="afx-mix">
-      <span class="afx-label">Mix</span>
-      <input type="range" id="audioFXMixSlider" min="0" max="100" value="50" aria-label="Reverb mix">
-    </span>
   </div>
 
   <div id="recordOverlay">
@@ -1485,6 +1495,11 @@
     <div class="feather-row">
       <label>Label Sz</label>
       <input type="range" id="ratioSizeSlider" min="40" max="300" value="105">
+    </div>
+    <div class="record-audio-row record-essential">
+      <button type="button" id="droneRecordToggle" title="Drone on/off" aria-label="Toggle drone">⏻</button>
+      <span class="ra-label">Verb</span>
+      <input type="range" id="audioFXMixSlider" min="0" max="100" value="50" aria-label="Reverb mix">
     </div>
     <div class="record-row record-essential">
       <button class="icon" id="flipCamBtn" title="Flip camera">⟳</button>
@@ -4606,8 +4621,8 @@
       const vrbMain  = document.getElementById('voiceReverb');
       const mixMain  = document.getElementById('voiceReverbMix');
       const mixLbl   = document.getElementById('voiceReverbMixVal');
-      // Record strip
-      const strip    = document.getElementById('audioFXRecordStrip');
+      // Record-mode chips (top floating strip) and the always-visible
+      // mix slider in the bottom record-audio row.
       const lcChip   = document.getElementById('audioFXLcBtn');
       const cmpChip  = document.getElementById('audioFXCmpBtn');
       const vrbChip  = document.getElementById('audioFXVrbBtn');
@@ -4625,7 +4640,6 @@
       if (cmpChip)  cmpChip.classList.toggle('on', voiceFX.compression);
       if (vrbChip)  vrbChip.classList.toggle('on', voiceFX.reverb);
       if (mixStrip) mixStrip.value = mixPct;
-      if (strip)    strip.classList.toggle('reverb-on', voiceFX.reverb);
     }
 
     // -------- Feature 1: Settings hide toggle --------
