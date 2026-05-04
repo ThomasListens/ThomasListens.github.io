@@ -512,12 +512,14 @@
       display: block;
     }
 
-    /* "Stitching for upload..." pill — shown briefly while mp4box.js
-       converts the MediaRecorder fragmented MP4 (ftyp/moov-init/moof+mdat...)
-       into a single-moov, single-mdat non-fragmented MP4 with a full
-       sample table — the layout strict importers like Instagram require
-       in order to ingest the full clip. Hidden by default; .visible
-       toggles it on. */
+    /* "Optimizing video..." pill — shown while FFmpeg.wasm remuxes the
+       MediaRecorder fragmented MP4 (ftyp/moov-init/moof+mdat...) into a
+       non-fragmented MP4 with the moov atom at the front (faststart) —
+       the layout strict importers like Instagram require in order to
+       ingest the full clip. Hidden by default; .visible toggles it on.
+       The first time this runs in a session, FFmpeg.wasm (~30MB) is
+       downloaded, so the indicator can stay up for a while; subsequent
+       runs reuse the cached instance and complete quickly. */
     #remuxIndicator {
       position: fixed;
       top: 60px;
@@ -1414,7 +1416,7 @@
   <video id="cameraFeed" autoplay playsinline muted></video>
 
   <div id="recIndicator"><span id="recTime">0:00</span></div>
-  <div id="remuxIndicator">Stitching for upload...</div>
+  <div id="remuxIndicator">Optimizing video...</div>
 
   <!-- Floating drone strip — only rendered (display:flex) in record mode.
        Mirrors state of the main panel's drone controls. The on/off toggle
@@ -3733,7 +3735,7 @@
       draw();
     }
 
-    // -------- Fragmented-MP4 → non-fragmented MP4 stitcher --------
+    // -------- Fragmented-MP4 → non-fragmented MP4 remux (FFmpeg.wasm) --------
     //
     // MediaRecorder on Chrome/Android emits an *fMP4* file:
     //   ftyp → moov(mvex, no stbl) → moof → mdat → moof → mdat → ...
@@ -3742,153 +3744,66 @@
     // read the moov, see mvex, can't follow the fragments, and stop
     // after the first moof+mdat (so they import only ~3-5 seconds).
     //
-    // We use mp4box.js to parse the fragmented input, extract every
-    // sample (with its timing + sync flags), and re-pack into a
-    // standard, non-fragmented MP4:
-    //   ftyp → moov(full stbl per track) → mdat
-    // No re-encode — sample bytes pass through; only the container
-    // is rewritten. Handles both AVC video and AAC (or whatever else
-    // the recorder produced) by copying the original sample entry as
-    // the new track's `description`.
+    // We use FFmpeg.wasm with `-c copy -movflags +faststart` to remux
+    // the fragmented input into a standard non-fragmented MP4 with the
+    // moov atom up front (faststart). No re-encode — sample bytes pass
+    // through; only the container is rewritten.
+    //
+    // The single-threaded core is used (NOT @ffmpeg/core-mt) because
+    // multi-threaded ffmpeg.wasm requires SharedArrayBuffer, which in
+    // turn requires COOP/COEP cross-origin-isolation headers we don't
+    // have on GitHub Pages. The single-threaded build runs anywhere.
 
-    let _mp4boxPromise = null;
-    function loadMP4Box() {
-      if (_mp4boxPromise) return _mp4boxPromise;
-      _mp4boxPromise = new Promise((resolve, reject) => {
-        if (window.MP4Box) { resolve(window.MP4Box); return; }
-        const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js';
-        s.onload = () => {
-          if (window.MP4Box) resolve(window.MP4Box);
-          else reject(new Error('mp4box loaded but window.MP4Box undefined'));
-        };
-        s.onerror = () => reject(new Error('Failed to load mp4box.js'));
-        document.head.appendChild(s);
-      });
-      return _mp4boxPromise;
+    let _ffmpegPromise = null;
+    async function loadFFmpeg() {
+      if (_ffmpegPromise) return _ffmpegPromise;
+      _ffmpegPromise = (async () => {
+        // Dynamic import() works inside a regular <script> block — it's
+        // a runtime function call, not the static `import` statement.
+        const ffmpegMod = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js');
+        const utilMod = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js');
+        const { FFmpeg } = ffmpegMod;
+        const { toBlobURL } = utilMod;
+
+        const ffmpeg = new FFmpeg();
+        // Single-threaded core — does NOT require SharedArrayBuffer /
+        // crossOriginIsolated, so it works on GitHub Pages without
+        // COOP/COEP headers.
+        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+        await ffmpeg.load({
+          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        });
+        return ffmpeg;
+      })();
+      return _ffmpegPromise;
     }
 
-    function _getTrackSampleEntry(inTrack) {
-      // Walk down to the original SampleEntry box (avc1/hvc1/mp4a/...).
-      // mp4box.js parses this out of stsd inside the input file, and
-      // re-passing it as `description` on addTrack preserves codec config
-      // (avcC/SPS+PPS for H.264, esds with AudioSpecificConfig for AAC).
-      try {
-        return inTrack.mdia.minf.stbl.stsd.entries[0];
-      } catch (_) {
-        return null;
+    async function remuxToFastStartMP4(blob) {
+      const ffmpeg = await loadFFmpeg();
+      const inputData = new Uint8Array(await blob.arrayBuffer());
+      await ffmpeg.writeFile('input.mp4', inputData);
+
+      // -c copy: stream copy (no re-encoding, fast)
+      // -movflags +faststart: write moov atom first (non-fragmented, IG-friendly)
+      const exitCode = await ffmpeg.exec([
+        '-i', 'input.mp4',
+        '-c', 'copy',
+        '-movflags', '+faststart',
+        'output.mp4'
+      ]);
+
+      if (exitCode !== 0) {
+        throw new Error('ffmpeg exit code: ' + exitCode);
       }
-    }
 
-    async function stitchFragmentedMp4(blob) {
-      const MP4Box = await loadMP4Box();
-      const srcBuf = await blob.arrayBuffer();
+      const data = await ffmpeg.readFile('output.mp4');
+      // Clean up the in-memory FS to keep memory bounded across recordings.
+      try { await ffmpeg.deleteFile('input.mp4'); } catch (_) {}
+      try { await ffmpeg.deleteFile('output.mp4'); } catch (_) {}
 
-      return new Promise((resolve, reject) => {
-        const inFile = MP4Box.createFile();
-        const outFile = MP4Box.createFile();
-        const trackMap = {};                    // input trackId → output trackId
-        const totalSamplesPerTrack = {};
-        const receivedSamplesPerTrack = {};
-        let settled = false;
-
-        inFile.onError = (err) => {
-          if (settled) return;
-          settled = true;
-          reject(new Error('mp4box parse error: ' + err));
-        };
-
-        inFile.onReady = (info) => {
-          if (settled) return;
-          try {
-            for (const track of info.tracks) {
-              const inTrack = inFile.getTrackById(track.id);
-              const sampleEntry = _getTrackSampleEntry(inTrack);
-
-              // Prefer the parsed sample entry's actual type (avc1/hvc1/mp4a/...)
-              // since that already matches the codec_id family in the input.
-              const sampleEntryType = (sampleEntry && sampleEntry.type) ||
-                (track.codec.startsWith('avc') ? 'avc1' :
-                 track.codec.startsWith('hev') || track.codec.startsWith('hvc') ? 'hvc1' :
-                 track.codec.startsWith('vp09') ? 'vp09' :
-                 track.codec.startsWith('mp4a') ? 'mp4a' :
-                 track.codec.split('.')[0]);
-
-              const opts = {
-                type: sampleEntryType,
-                timescale: track.timescale,
-                duration: track.duration,
-                media_duration: track.duration,
-                language: track.language || 'und',
-                // The full SampleEntry box from the input — mp4box.js will
-                // serialize it back out verbatim, preserving avcC/esds/etc.
-                description: sampleEntry,
-              };
-
-              if (track.video) {
-                opts.width = track.video.width;
-                opts.height = track.video.height;
-              }
-              if (track.audio) {
-                opts.channel_count = track.audio.channel_count;
-                opts.samplerate = track.audio.sample_rate;
-                opts.samplesize = track.audio.sample_size || 16;
-                opts.hdlr = 'soun';
-              }
-
-              const outTrackId = outFile.addTrack(opts);
-              trackMap[track.id] = outTrackId;
-              totalSamplesPerTrack[track.id] = track.nb_samples;
-              receivedSamplesPerTrack[track.id] = 0;
-
-              // null user, batch up to 100 samples per onSamples callback
-              inFile.setExtractionOptions(track.id, null, { nbSamples: 100 });
-            }
-            inFile.start();
-          } catch (err) {
-            if (settled) return;
-            settled = true;
-            reject(err);
-          }
-        };
-
-        inFile.onSamples = (trackId, user, samples) => {
-          if (settled) return;
-          const outTrackId = trackMap[trackId];
-          try {
-            for (const s of samples) {
-              outFile.addSample(outTrackId, s.data, {
-                duration: s.duration,
-                dts: s.dts,
-                cts: s.cts,
-                is_sync: s.is_sync,
-              });
-              receivedSamplesPerTrack[trackId]++;
-            }
-
-            const trackIds = Object.keys(totalSamplesPerTrack);
-            const allDone = trackIds.length > 0 && trackIds.every(
-              (tid) => receivedSamplesPerTrack[tid] >= totalSamplesPerTrack[tid]
-            );
-            if (allDone) {
-              settled = true;
-              // mp4box.js getBuffer() returns an ArrayBuffer of the
-              // assembled file. Wrap it in a Blob for the caller.
-              const outBuf = outFile.getBuffer();
-              resolve(new Blob([outBuf], { type: 'video/mp4' }));
-            }
-          } catch (err) {
-            if (settled) return;
-            settled = true;
-            reject(err);
-          }
-        };
-
-        // mp4box.js requires fileStart on the buffer it receives.
-        srcBuf.fileStart = 0;
-        inFile.appendBuffer(srcBuf);
-        inFile.flush();
-      });
+      // data is a Uint8Array; wrap it in a Blob.
+      return new Blob([data.buffer], { type: 'video/mp4' });
     }
 
     function pickRecorderMime() {
@@ -4028,20 +3943,21 @@
         const ext = type.includes('mp4') ? 'mp4' : 'webm';
         const recordedBlob = new Blob(recordedChunks, { type });
 
-        // Stitch fragmented MP4 → non-fragmented MP4 with full sample
-        // table. MediaRecorder emits ftyp/moov-init/moof+mdat... which
-        // Instagram only partially imports (~3-5 seconds, then stops at
-        // the first moof). The stitcher rewrites it to ftyp/moov(stbl)/mdat.
-        // WebM and any unrecognized MP4 structures fall through unchanged.
+        // Remux fragmented MP4 → non-fragmented MP4 with moov-up-front
+        // (faststart). MediaRecorder emits ftyp/moov-init/moof+mdat...
+        // which Instagram only partially imports (~3-5 seconds, then
+        // stops at the first moof). FFmpeg.wasm rewrites the container
+        // with `-c copy -movflags +faststart` (no re-encode). WebM and
+        // any non-MP4 mime types fall through unchanged.
         let outputBlob = recordedBlob;
         const remuxIndicator = document.getElementById('remuxIndicator');
         if (type.includes('mp4')) {
           if (remuxIndicator) remuxIndicator.classList.add('visible');
           try {
-            outputBlob = await stitchFragmentedMp4(recordedBlob);
-            console.log('[record] stitched fMP4 → MP4, size:', outputBlob.size);
+            outputBlob = await remuxToFastStartMP4(recordedBlob);
+            console.log('[record] FFmpeg remux complete, size:', outputBlob.size);
           } catch (e) {
-            console.warn('[record] stitch failed, using original:', e);
+            console.warn('[record] FFmpeg remux failed, using original:', e);
             outputBlob = recordedBlob;
           } finally {
             if (remuxIndicator) remuxIndicator.classList.remove('visible');
