@@ -3833,19 +3833,30 @@
       // -movflags +faststart: write moov atom first (non-fragmented, IG-friendly)
       // 0.11.x's run() doesn't reliably return an exit code, so we detect
       // failure by trying to read output.mp4 below.
-      await ffmpeg.run(
-        '-i', 'input.mp4',
-        '-c', 'copy',
-        '-movflags', '+faststart',
-        'output.mp4'
-      );
-
-      let data;
       try {
-        data = ffmpeg.FS('readFile', 'output.mp4');
+        await ffmpeg.run(
+          '-i', 'input.mp4',
+          '-c', 'copy',
+          '-movflags', '+faststart',
+          'output.mp4'
+        );
       } catch (e) {
-        throw new Error('output.mp4 missing — ffmpeg likely failed: ' + e.message);
+        // FFmpeg.wasm 0.11.x sometimes throws "Program terminated with exit(0)"
+        // on subsequent run() calls in the same instance. exit(0) is success in
+        // Unix; check whether the output was actually written before treating
+        // this as a real failure.
+        let outputExists = false;
+        try {
+          ffmpeg.FS('stat', 'output.mp4');
+          outputExists = true;
+        } catch (_) {}
+        if (!outputExists) {
+          throw new Error('FFmpeg run failed: ' + (e && e.message ? e.message : String(e)));
+        }
+        // exit(0) but output is written — clean success.
       }
+
+      const data = ffmpeg.FS('readFile', 'output.mp4');
 
       // Clean up the in-memory FS to keep memory bounded across recordings.
       // 0.11.x has no deleteFile(); use FS('unlink', name).
