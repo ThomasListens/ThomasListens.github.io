@@ -3805,6 +3805,7 @@
         const { createFFmpeg, fetchFile } = window.FFmpeg;
         const ffmpeg = createFFmpeg({
           log: false,
+          mainName: 'main',
           // Single-threaded 0.11.0 core — does NOT require SharedArrayBuffer
           // or crossOriginIsolated, so it works on GitHub Pages without
           // COOP/COEP headers.
