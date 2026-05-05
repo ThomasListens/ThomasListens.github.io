@@ -776,19 +776,11 @@
         right: auto;
         max-width: none;
       }
-      /* In landscape we keep the new vertical-slider sizing — no
-         horizontal overrides. */
-      #audioFXRecordStrip {
-        top: 96px;
-        bottom: auto;
-        right: 12px;
-        left: auto;
-        max-width: none;
-      }
-      /* Standalone level slider: in landscape, drop to bottom-center
-         clear of the right-side record dock (280px wide). */
+      /* Standalone level slider: in landscape, drop near the bottom-right
+         clear of the right-side record dock. */
       #audioFXLevelStrip {
         bottom: calc(20px + env(safe-area-inset-bottom));
+        right: 12px;
       }
     }
 
@@ -970,7 +962,7 @@
       left: 12px;
       right: auto;
       top: auto;
-      max-width: calc(50% - 28px);  /* leaves >=32 px gap to the FX strip */
+      max-width: calc(100% - 24px);  /* unified strip: room for FILT/VOL/MIX */
       z-index: 200;
       flex-direction: column;
       align-items: center;
@@ -1081,46 +1073,15 @@
       padding: 0;
     }
     #droneRecordStrip #droneRecordVolume,
-    #droneRecordStrip #droneRecordCutoff { width: 30px; height: 90px; }
+    #droneRecordStrip #droneRecordCutoff,
+    #droneRecordStrip #audioFXMixSlider { width: 30px; height: 90px; }
 
     /* ====================================================================
-       Floating audio-FX strip — vertical mirror of #droneRecordStrip.
-       Single column: MIX vertical slider on top, ⏻ verb on/off button
-       at the bottom. LC and CMP are forced ON at audio bootstrap and
-       have no UI element here. The Mix slider stays visible when reverb
-       is off but greys out via [disabled] so the user can still see
-       the control exists. The Master Level slider has been hoisted out
-       into #audioFXLevelStrip just above the record button.
+       Unified strip: verb-toggle button + disabled-slider styles for the
+       MIX slider when reverb is off. Lives inside #droneRecordStrip now
+       that the verb strip is merged in. The verb button is the visual
+       twin of #droneRecordToggle (same circle/pill) with a 'v' glyph.
        ==================================================================== */
-    #audioFXRecordStrip {
-      display: none;
-      position: fixed;
-      /* Matched to #droneRecordStrip — sits just above the bottom
-         record-essential row to free vertical space for the ruler. */
-      bottom: calc(56px + env(safe-area-inset-bottom));
-      right: 12px;
-      left: auto;
-      top: auto;
-      z-index: 200;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      padding: 6px 8px;
-      background: rgba(20, 20, 20, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      border-radius: 8px;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-    }
-    body.record-mode #audioFXRecordStrip {
-      display: flex;
-    }
-    #audioFXRecordStrip .afx-col {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 2px;
-    }
     button#audioFXVrbBtn {
       width: 36px;
       height: 36px;
@@ -1139,96 +1100,60 @@
       font-family: inherit;
     }
     button#audioFXVrbBtn.on {
-      background: rgba(255, 255, 255, 0.9);
+      background: #22c55e;
       color: #000;
-      border-color: #fff;
+      border-color: #22c55e;
     }
     button#audioFXVrbBtn:active {
       transform: scale(0.92);
     }
-    #audioFXRecordStrip .afx-label {
-      font-size: 10px;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.55);
-      flex-shrink: 0;
-    }
-    #audioFXRecordStrip input[type="range"] {
-      -webkit-appearance: none;
-      appearance: none;
-      height: 36px;
-      background: transparent;
-      outline: none;
-      flex-shrink: 0;
-      margin: 0;
-    }
-    #audioFXRecordStrip input[type="range"]::-webkit-slider-runnable-track {
-      height: 4px;
-      background: rgba(255, 255, 255, 0.25);
-      border-radius: 2px;
-    }
-    #audioFXRecordStrip input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: #fff;
-      margin-top: -9px;
-      cursor: pointer;
-      border: none;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    }
-    #audioFXRecordStrip input[type="range"]::-moz-range-track {
-      height: 4px;
-      background: rgba(255, 255, 255, 0.25);
-      border-radius: 2px;
-    }
-    #audioFXRecordStrip input[type="range"]::-moz-range-thumb {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: #fff;
-      border: none;
-      cursor: pointer;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    }
-    /* Vertical orientation for the Mix slider — same sizing as the
-       drone strip's vertical sliders so the two strips read as a pair. */
-    #audioFXRecordStrip input[type="range"].vertical {
-      -webkit-appearance: slider-vertical;
-      appearance: slider-vertical;
-      writing-mode: bt-lr;
-      width: 30px;
-      height: 90px;
-      padding: 0;
-    }
-    #audioFXRecordStrip #audioFXMixSlider { width: 30px; height: 90px; }
-    /* Disabled-when-off styling: keeps the slider visible so the user
-       can see the control exists when reverb is off. */
-    #audioFXRecordStrip input[type="range"]:disabled {
+    /* Disabled-when-off styling for the in-strip MIX slider. */
+    #droneRecordStrip input[type="range"]:disabled {
       opacity: 0.35;
       cursor: not-allowed;
     }
-    #audioFXRecordStrip input[type="range"]:disabled::-webkit-slider-thumb {
+    #droneRecordStrip input[type="range"]:disabled::-webkit-slider-thumb {
       background: rgba(255, 255, 255, 0.5);
     }
-    #audioFXRecordStrip input[type="range"]:disabled::-moz-range-thumb {
+    #droneRecordStrip input[type="range"]:disabled::-moz-range-thumb {
       background: rgba(255, 255, 255, 0.5);
     }
+    /* Bottom-row layout: drone toggle on the left (under FILT+VOL), verb
+       'v' button on the right (under MIX). */
+    #droneRecordStrip .drs-btn-row {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      gap: 8px;
+    }
+    /* Slider color tints. accent-color drives Firefox + modern Chrome;
+       explicit ::-webkit rules ensure consistent paint on iOS/older Chrome. */
+    input[type="range"].slider-blue { accent-color: #4a9eff; }
+    input[type="range"].slider-green { accent-color: #22c55e; }
+    input[type="range"].slider-blue::-webkit-slider-thumb { background: #4a9eff; }
+    input[type="range"].slider-green::-webkit-slider-thumb { background: #22c55e; }
+    input[type="range"].slider-blue::-webkit-slider-runnable-track { background: rgba(74, 158, 255, 0.4); }
+    input[type="range"].slider-green::-webkit-slider-runnable-track { background: rgba(34, 197, 94, 0.4); }
+    input[type="range"].slider-blue::-moz-range-thumb { background: #4a9eff; }
+    input[type="range"].slider-green::-moz-range-thumb { background: #22c55e; }
+    input[type="range"].slider-blue::-moz-range-track { background: rgba(74, 158, 255, 0.4); }
+    input[type="range"].slider-green::-moz-range-track { background: rgba(34, 197, 94, 0.4); }
     /* ------------------------------------------------------------------
-       Standalone master output level slider — relocated from inside
-       #audioFXRecordStrip. Sits horizontally above the record button,
-       unlabelled. Same gain mapping (-20…+6 dB) and localStorage key
+       Standalone master output level slider — sits to the right of the
+       record button. Same gain mapping (-20…+6 dB) and localStorage key
        (tuner.outputLevelDb) as before. */
     #audioFXLevelStrip {
       display: none;
       position: fixed;
-      bottom: calc(110px + env(safe-area-inset-bottom));
-      left: 50%;
-      transform: translateX(-50%);
+      /* Right of the record button: upper half of record-button row. */
+      bottom: calc(80px + env(safe-area-inset-bottom));
+      right: 12px;
+      left: auto;
+      transform: none;
       z-index: 200;
-      width: 160px;
+      width: 130px;
       pointer-events: auto;
     }
     body.record-mode #audioFXLevelStrip {
@@ -1324,11 +1249,10 @@
     #audioFXMeter {
       display: none;
       position: fixed;
-      /* Sits ABOVE #audioFXRecordStrip (strip bottom 104 + strip
-         height ~90 + 8 px gap = 202 px). Moved up from below the
-         strip now that the strip occupies the bottom corner. */
-      bottom: calc(12px + env(safe-area-inset-bottom));
+      /* Below the level slider, right of the record button. */
+      bottom: calc(48px + env(safe-area-inset-bottom));
       right: 12px;
+      width: 130px;
       z-index: 250;
       pointer-events: none;
       font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -1337,7 +1261,7 @@
       color: rgba(255, 255, 255, 0.55);
       white-space: nowrap;
       min-width: 88px;
-      text-align: right;
+      text-align: center;
       font-variant-numeric: tabular-nums;
     }
     body.record-mode #audioFXMeter {
@@ -1605,50 +1529,43 @@
   <div id="recIndicator"><span id="recTime">0:00</span></div>
   <div id="remuxIndicator"></div>
 
-  <!-- Floating drone strip — only rendered (display:flex) in record mode.
-       Mirrors state of the main panel's drone controls. Vertical column:
-       FILT and VOL sliders side-by-side (vertical orientation), with the
-       ⏻ on/off toggle at the bottom of the column. -->
-  <div id="droneRecordStrip" aria-label="Drone controls">
+  <!-- Unified bottom-left strip — drone (FILT/VOL/⏻) and verb (MIX/v)
+       merged into a single container. Three vertical sliders in a row;
+       drone toggle on the left (under FILT+VOL), verb 'v' button on the
+       right (under MIX). Only rendered (display:flex) in record mode.
+       State mirrors the side panel via existing sync helpers; all wiring
+       (handlers, persistence, audio graph) is unchanged. -->
+  <div id="droneRecordStrip" aria-label="Drone and voice FX controls">
     <div class="drs-row">
       <div class="drs-col">
         <span class="dr-label" title="Filter cutoff">FILT</span>
-        <input type="range" id="droneRecordCutoff" class="vertical" orient="vertical" min="0" max="100" value="56" step="0.5" aria-label="Drone filter cutoff">
+        <input type="range" id="droneRecordCutoff" class="vertical slider-blue" orient="vertical" min="0" max="100" value="56" step="0.5" aria-label="Drone filter cutoff">
       </div>
       <div class="drs-col">
         <span class="dr-label" title="Volume">VOL</span>
-        <input type="range" id="droneRecordVolume" class="vertical" orient="vertical" min="0" max="100" value="30" aria-label="Drone volume">
+        <input type="range" id="droneRecordVolume" class="vertical slider-blue" orient="vertical" min="0" max="100" value="30" aria-label="Drone volume">
+      </div>
+      <div class="drs-col">
+        <span class="dr-label" title="Reverb mix">MIX</span>
+        <input type="range" id="audioFXMixSlider" class="vertical slider-green" orient="vertical" min="0" max="100" value="50" aria-label="Reverb mix">
       </div>
     </div>
-    <button type="button" id="droneRecordToggle" title="Drone on/off" aria-label="Toggle drone">⏻</button>
-  </div>
-
-  <!-- Floating audio-FX strip — vertical mirror of #droneRecordStrip.
-       Single column: MIX vertical slider on top, ⏻ verb on/off button
-       at the bottom. LC and CMP are forced ON at audio bootstrap and
-       have no UI element here; only reverb is user-controllable from
-       this strip. State mirrors the side panel via syncVoiceFXUI(). The
-       Mix slider greys out (disabled) when verb is off — visible but
-       not actionable. -->
-  <div id="audioFXRecordStrip" aria-label="Voice FX controls">
-    <div class="afx-col">
-      <span class="afx-label" title="Reverb mix">MIX</span>
-      <input type="range" id="audioFXMixSlider" class="vertical" orient="vertical" min="0" max="100" value="50" aria-label="Reverb mix">
+    <div class="drs-btn-row">
+      <button type="button" id="droneRecordToggle" title="Drone on/off" aria-label="Toggle drone">⏻</button>
+      <button type="button" id="audioFXVrbBtn" title="Shimmer reverb on/off" aria-label="Toggle reverb">v</button>
     </div>
-    <button type="button" id="audioFXVrbBtn" title="Shimmer reverb on/off" aria-label="Toggle reverb">⏻</button>
   </div>
 
-  <!-- Standalone master output level slider — relocated from inside
-       #audioFXRecordStrip. Sits horizontally above the record button,
-       no label. Wiring (id, range, mapping, localStorage key) unchanged. -->
+  <!-- Standalone master output level slider — sits to the right of the
+       record button, no label. Wiring (id, range, mapping, localStorage
+       key) unchanged. -->
   <div id="audioFXLevelStrip" aria-label="Master output level">
     <input type="range" id="audioFXOutputLevelSlider" min="0" max="100" value="77" step="1" title="Master output level" aria-label="Master output level">
   </div>
 
-  <!-- Standalone ruler-hide chip, fixed to the bottom-left corner. Hoisted
-       out of #audioFXRecordStrip so it sits at the absolute bottom edge
-       opposite the LUFS readout. The existing click handler binds via
-       getElementById('rulerHideBtn'), so wiring is unchanged. -->
+  <!-- Standalone ruler-hide chip, fixed to the bottom-left corner.
+       The existing click handler binds via getElementById('rulerHideBtn'),
+       so wiring is unchanged. -->
   <button type="button" class="on" id="rulerHideBtn" title="Show/hide tuning ruler" aria-label="Show or hide tuning ruler">📏</button>
 
   <!-- Standalone LUFS / peak dB readout, fixed to the bottom-right corner.
