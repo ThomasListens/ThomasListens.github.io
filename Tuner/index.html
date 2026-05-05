@@ -1446,6 +1446,8 @@
     <button type="button" class="afx-chip" id="audioFXCmpBtn" title="Compression" aria-label="Toggle compression">CMP</button>
     <button type="button" class="afx-chip" id="audioFXVrbBtn" title="Shimmer reverb" aria-label="Toggle reverb">VRB</button>
     <button type="button" class="afx-chip on" id="rulerHideBtn" title="Show/hide tuning ruler" aria-label="Show or hide tuning ruler">📏</button>
+    <span class="afx-label">Level</span>
+    <input type="range" id="audioFXOutputLevelSlider" min="0" max="100" value="77" step="1" title="Master output level" aria-label="Master output level">
   </div>
 
   <div id="recordOverlay">
@@ -1636,6 +1638,25 @@
     let voiceFX = { lowcut: true, compression: true, reverb: false };
     let voiceFXMix = 0.5;     // 0..1 wet/dry blend (50% default)
     let voiceFXTail = 0.6;    // 0..1 → mapped to feedback 0.5..0.78
+    // Master output trim. Range -20..+6 dB on the slider (0..100).
+    // Persisted under tuner.outputLevelDb. Applied via the
+    // masterOutputGain node inserted in buildMicProcessing.
+    let masterOutputLevelDb = 0;
+    function levelDbToLinear(db) { return Math.pow(10, db / 20); }
+    function sliderToDb(slider) { return -20 + (slider / 100) * 26; }
+    function dbToSlider(db) { return ((db + 20) / 26) * 100; }
+    function setMasterOutputLevelDb(db) {
+      masterOutputLevelDb = Math.max(-20, Math.min(6, db));
+      try { localStorage.setItem('tuner.outputLevelDb', String(masterOutputLevelDb)); } catch (_) {}
+      if (micProcessing && micProcessing.masterOutputGain && micProcessing.ctx) {
+        const t = micProcessing.ctx.currentTime;
+        try {
+          micProcessing.masterOutputGain.gain.setTargetAtTime(
+            levelDbToLinear(masterOutputLevelDb), t, 0.05
+          );
+        } catch (_) {}
+      }
+    }
 
     function voiceFXTailToFeedback(t) {
       const x = Math.max(0, Math.min(1, t));
@@ -3234,17 +3255,33 @@
       // the ring gone the four lines are independent parallel combs —
       // provably stable for any per-line FB < 1.0.
 
-      // -------- Shimmer self-loop (kept) --------
-      // Tap fdnSum, narrow BPF at 2 kHz (Q 0.6), fold back into fdnIn.
-      // Builds the AI-style upper-register halo without phasing.
+      // -------- Shimmer self-loop (kept, now LFO-swept) --------
+      // Tap fdnSum, narrow BPF folded back into fdnIn — builds the
+      // AI-style upper-register halo without phasing. The BPF centre
+      // is no longer pinned at 2 kHz: a slow sine LFO sweeps it
+      // 2 kHz ↔ 6 kHz over a 12 s period. As the band crosses the
+      // per-line lowpass damping (~5 kHz) the accumulated energy
+      // gets rolled off there — net effect is a shimmer that
+      // "rises" in pitch and exits via the lowpass, like light
+      // escaping. Q 0.6 stays — already wide enough not to ring.
       const shimmerBPF = ctx.createBiquadFilter();
       shimmerBPF.type = 'bandpass';
-      shimmerBPF.frequency.value = 2000;
+      shimmerBPF.frequency.value = 4000; // centre between 2k and 6k
       shimmerBPF.Q.value = 0.6;
+      const shimmerLFO = ctx.createOscillator();
+      shimmerLFO.type = 'sine';
+      shimmerLFO.frequency.value = 1 / 12; // 12-second period
+      const shimmerLFOGain = ctx.createGain();
+      shimmerLFOGain.gain.value = 2000; // ±2 kHz around 4 kHz centre
+      shimmerLFO.connect(shimmerLFOGain);
+      shimmerLFOGain.connect(shimmerBPF.frequency);
+      try { shimmerLFO.start(ctx.currentTime); } catch (_) {}
       const shimmerFB = ctx.createGain();
-      // Stability (worst case @ 2 kHz):
-      //   shimmerFB × |H_BPF|_peak × |H_FDN_at_2kHz|_peak
-      //   ≈ 0.08 × 1.0 × (per-line peak ~4.5 × sum gain ~1.5) ≈ 0.54 < 1.0.
+      // Stability (worst case across the swept band):
+      //   shimmerFB × |H_BPF|_peak × |H_FDN|_peak  ≈ 0.08 × 1.0 × ~6.75
+      //   ≈ 0.54 < 1.0. The lowpass damping further attenuates the
+      //   loop above ~5 kHz, so the upper half of the sweep is even
+      //   safer than the lower.
       shimmerFB.gain.value = 0.08;
       fdnSum.connect(shimmerBPF);
       shimmerBPF.connect(shimmerFB);
@@ -3278,9 +3315,31 @@
       wetLimiter.attack.value = 0.001;
       wetLimiter.release.value = 0.05;
 
-      // fdnSum → postShelf → wetComp → wetLimiter → output
-      // (no chorus, no waveshaper — those were the phasing/grit culprits)
-      fdnSum.connect(postShelf);
+      // -------- Subtle wet-bus saturation --------
+      // Soft tanh shaper inserted after the shimmer-tap point and
+      // before the post shelf. Drive 0.3 is conservative — at peak
+      // input ≈ -3 dB the curve's slope drops by roughly 1 dB, so
+      // it's musical harmonic enrichment, not crunch. 2× oversampling
+      // anti-aliases the harmonics added by the non-linearity.
+      const shimmerSat = ctx.createWaveShaper();
+      shimmerSat.curve = (function makeShimmerSatCurve(amount) {
+        const n = 4096;
+        const curve = new Float32Array(n);
+        const k = 1 + amount * 2;
+        const norm = Math.tanh(k);
+        for (let i = 0; i < n; i++) {
+          const x = (i / (n - 1)) * 2 - 1; // -1..1
+          curve[i] = Math.tanh(x * k) / norm;
+        }
+        return curve;
+      })(0.3);
+      shimmerSat.oversample = '2x';
+
+      // fdnSum → shimmerSat → postShelf → wetComp → wetLimiter → output
+      // (shimmer self-loop tap above is unaffected — it taps fdnSum
+      // directly, before the saturator.)
+      fdnSum.connect(shimmerSat);
+      shimmerSat.connect(postShelf);
       postShelf.connect(wetComp);
       wetComp.connect(wetLimiter);
       wetLimiter.connect(output);
@@ -3298,7 +3357,10 @@
         },
         dispose() {
           for (const o of lfos) { try { o.stop(); } catch (_) {} try { o.disconnect(); } catch (_) {} }
-          const all = [input, output, ap1, ap2, ap3, fdnIn, fdnSum, shimmerBPF, shimmerFB, postShelf, wetComp, wetLimiter]
+          try { shimmerLFO.stop(); } catch (_) {}
+          try { shimmerLFO.disconnect(); } catch (_) {}
+          try { shimmerLFOGain.disconnect(); } catch (_) {}
+          const all = [input, output, ap1, ap2, ap3, fdnIn, fdnSum, shimmerBPF, shimmerFB, shimmerSat, postShelf, wetComp, wetLimiter]
             .concat(delayNodes, lpfs, fbGains, panners, lfoGains);
           for (const n of all) { try { n.disconnect(); } catch (_) {} }
         }
@@ -3316,11 +3378,20 @@
         const dest = ctx.createMediaStreamDestination();
         const micOut = ctx.createGain();
         micOut.gain.value = 1.0;
-        micOut.connect(dest);
+        // Master output trim (-20..+6 dB) sits between the mic bus
+        // and the recorder destination so it scales the entire mix
+        // (drone + processed mic) just before MediaStreamDestination.
+        // Initial value is restored from localStorage in the load
+        // section; default 1.0 (= 0 dB) here covers the first run.
+        const masterOutputGain = ctx.createGain();
+        masterOutputGain.gain.value = 1.0;
+        micOut.connect(masterOutputGain);
+        masterOutputGain.connect(dest);
         const mp = {
           ctx,
           dest,
           micOut,
+          masterOutputGain,
           head: micOut,    // first node mic-source connects to; updated by applyVoiceFX
           chain: [],       // disposable nodes in the active chain
           reverb: null,    // shimmer FDN handle, if active
@@ -5559,6 +5630,36 @@
           setVoiceReverbMix(parseInt(e.target.value, 10) / 100);
           syncVoiceFXUI();
         });
+      }
+
+      // -------- Master output level (record strip) --------
+      // Persisted slider 0..100 → dB -20..+6. Drives masterOutputGain
+      // sitting between micOut and the MediaStreamDestination, so the
+      // entire mix (drone + processed mic) is scaled just before the
+      // recorder bus.
+      try {
+        const lv = localStorage.getItem('tuner.outputLevelDb');
+        if (lv !== null && !isNaN(parseFloat(lv))) {
+          masterOutputLevelDb = Math.max(-20, Math.min(6, parseFloat(lv)));
+        }
+      } catch (_) {}
+      const outputLevelSlider = document.getElementById('audioFXOutputLevelSlider');
+      if (outputLevelSlider) {
+        outputLevelSlider.value = Math.round(dbToSlider(masterOutputLevelDb));
+        outputLevelSlider.addEventListener('input', (e) => {
+          const db = sliderToDb(parseInt(e.target.value, 10));
+          setMasterOutputLevelDb(db);
+        });
+      }
+      // If the audio graph is already up by the time we restore (e.g.
+      // a fast reload), push the saved value into the live node now.
+      if (micProcessing && micProcessing.masterOutputGain && micProcessing.ctx) {
+        try {
+          micProcessing.masterOutputGain.gain.setValueAtTime(
+            levelDbToLinear(masterOutputLevelDb),
+            micProcessing.ctx.currentTime
+          );
+        } catch (_) {}
       }
 
       // -------- Feature 4: Tanpura drone --------
