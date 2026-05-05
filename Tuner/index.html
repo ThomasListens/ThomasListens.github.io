@@ -962,11 +962,11 @@
       left: 12px;
       right: auto;
       top: auto;
-      max-width: calc(100% - 24px);  /* unified strip: room for FILT/VOL/MIX */
+      max-width: calc(100% - 24px);  /* unified strip: FILT + VOL + button row */
       z-index: 200;
       flex-direction: column;
       align-items: center;
-      gap: 4px;
+      gap: 10px;
       padding: 6px 8px;
       background: rgba(20, 20, 20, 0.55);
       border: 1px solid rgba(255, 255, 255, 0.18);
@@ -982,6 +982,8 @@
       flex-direction: row;
       gap: 8px;
       align-items: flex-end;
+      position: relative;
+      z-index: 1;
     }
     #droneRecordStrip .drs-col {
       display: flex;
@@ -1073,8 +1075,7 @@
       padding: 0;
     }
     #droneRecordStrip #droneRecordVolume,
-    #droneRecordStrip #droneRecordCutoff,
-    #droneRecordStrip #audioFXMixSlider { width: 30px; height: 90px; }
+    #droneRecordStrip #droneRecordCutoff { width: 30px; height: 90px; }
 
     /* ====================================================================
        Unified strip: verb-toggle button + disabled-slider styles for the
@@ -1124,9 +1125,17 @@
       display: flex;
       flex-direction: row;
       align-items: center;
-      justify-content: space-between;
+      justify-content: space-around;
       width: 100%;
       gap: 8px;
+      /* Win the stacking battle against the vertical slider's UA
+         hit-area which on iOS Safari extends a few px below the
+         visible 30x90 thumb track — that overlap was eating taps
+         intended for the buttons. */
+      position: relative;
+      z-index: 2;
+      min-height: 36px;
+      pointer-events: auto;
     }
     /* Slider color tints. accent-color drives Firefox + modern Chrome;
        explicit ::-webkit rules ensure consistent paint on iOS/older Chrome. */
@@ -1140,6 +1149,78 @@
     input[type="range"].slider-green::-moz-range-thumb { background: #22c55e; }
     input[type="range"].slider-blue::-moz-range-track { background: rgba(74, 158, 255, 0.4); }
     input[type="range"].slider-green::-moz-range-track { background: rgba(34, 197, 94, 0.4); }
+    /* ------------------------------------------------------------------
+       Horizontal reverb-mix slider — pulled out of the unified strip and
+       parked between the strip (left) and the centred record button. At
+       narrow viewports the width compresses via min() so it never
+       overlaps the record button. Greys out via [disabled] when reverb
+       is off, identical UX to the old vertical version inside the strip. */
+    #audioFXMixWrap {
+      display: none;
+      position: fixed;
+      bottom: calc(80px + env(safe-area-inset-bottom));
+      /* Strip is left:12 + ~76px wide, so 96px clears it with 8px gap. */
+      left: 96px;
+      /* Cap at 110px on wide screens; on narrow phones, never get within
+         44px of the centred record button (72px wide, so its left edge =
+         50vw - 36, and we want 8px clearance: width <= 50vw - 36 - 8 - 96. */
+      width: min(110px, calc(50vw - 140px));
+      z-index: 200;
+      pointer-events: auto;
+    }
+    body.record-mode #audioFXMixWrap {
+      display: block;
+    }
+    #audioFXMixWrap input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 36px;
+      background: transparent;
+      outline: none;
+      margin: 0;
+    }
+    #audioFXMixWrap input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px;
+      background: rgba(34, 197, 94, 0.4);
+      border-radius: 2px;
+    }
+    #audioFXMixWrap input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #22c55e;
+      margin-top: -9px;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+    #audioFXMixWrap input[type="range"]::-moz-range-track {
+      height: 4px;
+      background: rgba(34, 197, 94, 0.4);
+      border-radius: 2px;
+    }
+    #audioFXMixWrap input[type="range"]::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #22c55e;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+    #audioFXMixWrap input[type="range"]:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+    #audioFXMixWrap input[type="range"]:disabled::-webkit-slider-thumb {
+      background: rgba(34, 197, 94, 0.5);
+    }
+    #audioFXMixWrap input[type="range"]:disabled::-moz-range-thumb {
+      background: rgba(34, 197, 94, 0.5);
+    }
     /* ------------------------------------------------------------------
        Standalone master output level slider — sits to the right of the
        record button. Same gain mapping (-20…+6 dB) and localStorage key
@@ -1266,6 +1347,40 @@
     }
     body.record-mode #audioFXMeter {
       display: block;
+    }
+    /* ------------------------------------------------------------------
+       Standalone flip-camera chip — sibling of #rulerHideBtn. Was
+       previously inside #recordOverlay .record-essential; pulled out so
+       it lives next to ruler-hide in the bottom-left corner. Same
+       chip-style appearance, same 36x36 tap target. Visible only in
+       record mode (matches ruler-hide). Click handler is unchanged —
+       JS still does getElementById('flipCamBtn'). */
+    #flipCamBtn {
+      display: none;
+      position: fixed;
+      bottom: calc(12px + env(safe-area-inset-bottom));
+      left: 56px;
+      z-index: 250;
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      background: transparent;
+      color: rgba(255, 255, 255, 0.75);
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-family: inherit;
+    }
+    body.record-mode #flipCamBtn {
+      display: inline-flex;
+    }
+    #flipCamBtn:active {
+      transform: scale(0.92);
     }
   </style>
 </head>
@@ -1529,12 +1644,12 @@
   <div id="recIndicator"><span id="recTime">0:00</span></div>
   <div id="remuxIndicator"></div>
 
-  <!-- Unified bottom-left strip — drone (FILT/VOL/⏻) and verb (MIX/v)
-       merged into a single container. Three vertical sliders in a row;
-       drone toggle on the left (under FILT+VOL), verb 'v' button on the
-       right (under MIX). Only rendered (display:flex) in record mode.
-       State mirrors the side panel via existing sync helpers; all wiring
-       (handlers, persistence, audio graph) is unchanged. -->
+  <!-- Unified bottom-left strip — drone (FILT/VOL/⏻) and verb 'v' toggle
+       in a single container. Two vertical sliders in a row; drone toggle
+       on the left, verb 'v' on the right. The MIX slider is now a
+       horizontal sibling (#audioFXMixWrap) beside the record button.
+       Only rendered (display:flex) in record mode. State mirrors the
+       side panel via existing sync helpers; wiring is unchanged. -->
   <div id="droneRecordStrip" aria-label="Drone and voice FX controls">
     <div class="drs-row">
       <div class="drs-col">
@@ -1545,15 +1660,19 @@
         <span class="dr-label" title="Volume">VOL</span>
         <input type="range" id="droneRecordVolume" class="vertical slider-blue" orient="vertical" min="0" max="100" value="30" aria-label="Drone volume">
       </div>
-      <div class="drs-col">
-        <span class="dr-label" title="Reverb mix">MIX</span>
-        <input type="range" id="audioFXMixSlider" class="vertical slider-green" orient="vertical" min="0" max="100" value="50" aria-label="Reverb mix">
-      </div>
     </div>
     <div class="drs-btn-row">
       <button type="button" id="droneRecordToggle" title="Drone on/off" aria-label="Toggle drone">⏻</button>
       <button type="button" id="audioFXVrbBtn" title="Shimmer reverb on/off" aria-label="Toggle reverb">v</button>
     </div>
+  </div>
+
+  <!-- Horizontal reverb-mix slider — pulled out of #droneRecordStrip
+       and parked between the strip and the record button. Same id and
+       wiring as before; the JS still does getElementById('audioFXMixSlider').
+       Greys out (disabled) when reverb is off, just like the old vertical. -->
+  <div id="audioFXMixWrap" aria-label="Reverb mix">
+    <input type="range" id="audioFXMixSlider" class="slider-green" min="0" max="100" value="50" aria-label="Reverb mix">
   </div>
 
   <!-- Standalone master output level slider — sits to the right of the
@@ -1567,6 +1686,12 @@
        The existing click handler binds via getElementById('rulerHideBtn'),
        so wiring is unchanged. -->
   <button type="button" class="on" id="rulerHideBtn" title="Show/hide tuning ruler" aria-label="Show or hide tuning ruler">📏</button>
+
+  <!-- Standalone flip-camera chip, fixed to the bottom-left next to
+       #rulerHideBtn. Pulled out of #recordOverlay .record-essential so
+       it lives in the same chip-row as the ruler-hide. The existing
+       click handler binds via getElementById('flipCamBtn'). -->
+  <button type="button" id="flipCamBtn" title="Flip camera" aria-label="Flip camera">⟳</button>
 
   <!-- Standalone LUFS / peak dB readout, fixed to the bottom-right corner.
        Hoisted out of the strip so it can sit at the absolute bottom edge
@@ -1657,7 +1782,6 @@
       <input type="range" id="ratioSizeSlider" min="40" max="300" value="105">
     </div>
     <div class="record-row record-essential">
-      <button class="icon" id="flipCamBtn" title="Flip camera">⟳</button>
       <button id="discardRecBtn" title="Discard recording" aria-label="Discard recording">🗑</button>
       <button id="recBtn" title="Record"></button>
       <button class="icon" id="exitRecBtn" title="Exit record mode">✕</button>
