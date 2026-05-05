@@ -387,7 +387,13 @@
       display: flex;
     }
 
-    #recordOverlay > * {
+    /* Only re-enable pointer events on the actual interactive controls.
+       Previously this targeted all direct children, but rows like
+       .record-row default to width:100% (flex) and therefore covered
+       the bottom band of the screen, blocking #audioFXLevelStrip taps
+       even though the row's visible buttons were centered. */
+    #recordOverlay button,
+    #recordOverlay input {
       pointer-events: auto;
     }
 
@@ -999,15 +1005,15 @@
       display: none;
       position: fixed;
       bottom: calc(12px + env(safe-area-inset-bottom));
-      left: 100px;
+      left: 48px;
       z-index: 250;
-      width: 36px;
-      height: 36px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       border: 1px solid rgba(255, 255, 255, 0.45);
       background: transparent;
       color: rgba(255, 255, 255, 0.75);
-      font-size: 17px;
+      font-size: 14px;
       line-height: 1;
       cursor: pointer;
       align-items: center;
@@ -1100,15 +1106,15 @@
       display: none;
       position: fixed;
       bottom: calc(12px + env(safe-area-inset-bottom));
-      left: 144px;
+      left: 84px;
       z-index: 250;
-      width: 36px;
-      height: 36px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       border: 1px solid rgba(255, 255, 255, 0.45);
       background: transparent;
       color: rgba(255, 255, 255, 0.75);
-      font-size: 17px;
+      font-size: 14px;
       line-height: 1;
       cursor: pointer;
       align-items: center;
@@ -1165,7 +1171,9 @@
       right: 12px;
       left: auto;
       transform: none;
-      z-index: 200;
+      /* Above #recordOverlay (z-index 200) so the slider always wins
+         hit-testing in the bottom band. */
+      z-index: 260;
       width: 130px;
       pointer-events: auto;
     }
@@ -1220,20 +1228,20 @@
     #rulerHideBtn {
       display: none;
       position: fixed;
-      /* Sits ABOVE #droneRecordStrip (strip bottom 104 + strip
-         height ~158 + 8 px gap = 270 px). Moved up from below the
-         strip now that the strip occupies the bottom corner. */
+      /* Bottom-left chip row: ruler is leftmost, then drone, verb,
+         flip-cam (closest to centered record button). All chips are
+         30x30 to leave clear space for the record button. */
       bottom: calc(12px + env(safe-area-inset-bottom));
       left: 12px;
       z-index: 250;
-      min-width: 36px;
-      height: 36px;
-      padding: 0 8px;
-      border-radius: 18px;
+      min-width: 30px;
+      height: 30px;
+      padding: 0 6px;
+      border-radius: 15px;
       border: 1px solid rgba(255, 255, 255, 0.45);
       background: transparent;
       color: rgba(255, 255, 255, 0.75);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
       letter-spacing: 0.5px;
       line-height: 1;
@@ -1291,17 +1299,19 @@
     #flipCamBtn {
       display: none;
       position: fixed;
+      /* Rightmost in the chip row, closest to the centered record
+         button. 30x30 like its siblings. */
       bottom: calc(12px + env(safe-area-inset-bottom));
-      left: 56px;
+      left: 120px;
       z-index: 250;
-      width: 36px;
-      height: 36px;
+      width: 30px;
+      height: 30px;
       padding: 0;
-      border-radius: 18px;
+      border-radius: 15px;
       border: 1px solid rgba(255, 255, 255, 0.45);
       background: transparent;
       color: rgba(255, 255, 255, 0.75);
-      font-size: 16px;
+      font-size: 14px;
       line-height: 1;
       cursor: pointer;
       align-items: center;
