@@ -1165,6 +1165,21 @@
       cursor: pointer;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     }
+    /* Real-time loudness readout next to the master Level slider.
+       Updated ~5 Hz from a parallel K-weighted analyser tap. Color
+       turns amber when momentary LUFS climbs above -10, red when peak
+       crosses -1 dBFS (clipping). */
+    #audioFXRecordStrip .afx-meter {
+      font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 9px;
+      letter-spacing: 0.3px;
+      color: rgba(255, 255, 255, 0.55);
+      white-space: nowrap;
+      min-width: 88px;
+      text-align: right;
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+    }
   </style>
 </head>
 <body>
@@ -1448,6 +1463,7 @@
     <button type="button" class="afx-chip on" id="rulerHideBtn" title="Show/hide tuning ruler" aria-label="Show or hide tuning ruler">📏</button>
     <span class="afx-label">Level</span>
     <input type="range" id="audioFXOutputLevelSlider" min="0" max="100" value="77" step="1" title="Master output level" aria-label="Master output level">
+    <span class="afx-meter" id="audioFXMeter" title="Momentary LUFS / peak dB (post-Level)">— LUFS / — dB</span>
   </div>
 
   <div id="recordOverlay">
@@ -2037,6 +2053,68 @@
     // (gain ramps and source connect/disconnect), no node creation or
     // destruction. Eliminates the rebuild churn that was causing
     // crackling and racing with the recorder.
+    // Real-time loudness meter for the post-Level signal. Reads the
+    // K-weighted analyser tap built in buildMicProcessing, computes a
+    // 400 ms momentary mean-square (BS.1770 momentary LUFS, mono) and
+    // an instantaneous peak, and writes the result into the audioFXMeter
+    // span. Cost is trivial: one Float32Array read + ~4096 multiplies
+    // per 200 ms tick. Started once, alongside buildMicProcessing.
+    let meterRunning = false;
+    let meterTimer = null;
+    const METER_UPDATE_MS = 200;
+    const METER_HISTORY_MS = 400;
+    function startMeterLoop() {
+      if (meterRunning || !micProcessing || !micProcessing.meterAnalyser) return;
+      meterRunning = true;
+      const an = micProcessing.meterAnalyser;
+      const buf = new Float32Array(an.fftSize);
+      const historyLen = Math.max(1, Math.ceil(METER_HISTORY_MS / METER_UPDATE_MS));
+      const msHistory = new Array(historyLen).fill(0);
+      let historyIdx = 0;
+      meterTimer = setInterval(() => {
+        try {
+          an.getFloatTimeDomainData(buf);
+        } catch (_) { return; }
+        let sumSq = 0;
+        let peak = 0;
+        for (let i = 0; i < buf.length; i++) {
+          const v = buf[i];
+          const a = v < 0 ? -v : v;
+          if (a > peak) peak = a;
+          sumSq += v * v;
+        }
+        const meanSq = sumSq / buf.length;
+        msHistory[historyIdx] = meanSq;
+        historyIdx = (historyIdx + 1) % historyLen;
+        let avgMs = 0;
+        for (let i = 0; i < historyLen; i++) avgMs += msHistory[i];
+        avgMs /= historyLen;
+        // BS.1770: LUFS = -0.691 + 10*log10(sum_per_channel * weights).
+        // Mono channel weight = 1.0, so LUFS = -0.691 + 10*log10(meanSq).
+        const lufsM = avgMs > 1e-12 ? -0.691 + 10 * Math.log10(avgMs) : -Infinity;
+        const peakDb = peak > 1e-9 ? 20 * Math.log10(peak) : -Infinity;
+        updateMeterDisplay(lufsM, peakDb);
+      }, METER_UPDATE_MS);
+    }
+    function stopMeterLoop() {
+      if (meterTimer) clearInterval(meterTimer);
+      meterTimer = null;
+      meterRunning = false;
+    }
+    function updateMeterDisplay(lufsM, peakDb) {
+      const el = document.getElementById('audioFXMeter');
+      if (!el) return;
+      const lufsStr = isFinite(lufsM) ? lufsM.toFixed(0) : '—';
+      const peakStr = isFinite(peakDb) ? peakDb.toFixed(0) : '—';
+      el.textContent = lufsStr + ' LUFS / ' + peakStr + ' dB';
+      if (isFinite(peakDb) && peakDb > -1) {
+        el.style.color = 'rgba(220, 80, 80, 0.95)';
+      } else if (isFinite(lufsM) && lufsM > -10) {
+        el.style.color = 'rgba(220, 160, 60, 0.95)';
+      } else {
+        el.style.color = '';
+      }
+    }
     let audioBootstrapped = false;
     function bootstrapAudio() {
       const ctx = getAudioContext();
@@ -2047,6 +2125,7 @@
         micProcessing = buildMicProcessing(ctx);
         if (micProcessing) {
           applyVoiceFX({ smooth: false });
+          startMeterLoop();
         }
       }
       if (!tanpuraNodes) {
@@ -3387,11 +3466,34 @@
         masterOutputGain.gain.value = 1.0;
         micOut.connect(masterOutputGain);
         masterOutputGain.connect(dest);
+        // Parallel K-weighting tap for the loudness meter (post-Level).
+        // Per ITU-R BS.1770 the K-weighting filter is a high-shelf
+        // (+4 dB @ 1.5 kHz) cascaded with a high-pass (~38 Hz, Q 0.5).
+        // The analyser node has no downstream connection, so this branch
+        // observes the post-Level signal without affecting the recorded
+        // / monitored output path.
+        const meterPre = ctx.createBiquadFilter();
+        meterPre.type = 'highshelf';
+        meterPre.frequency.value = 1500;
+        meterPre.gain.value = 4.0;
+        const meterHP = ctx.createBiquadFilter();
+        meterHP.type = 'highpass';
+        meterHP.frequency.value = 38;
+        meterHP.Q.value = 0.5;
+        const meterAnalyser = ctx.createAnalyser();
+        meterAnalyser.fftSize = 4096;
+        meterAnalyser.smoothingTimeConstant = 0;
+        masterOutputGain.connect(meterPre);
+        meterPre.connect(meterHP);
+        meterHP.connect(meterAnalyser);
         const mp = {
           ctx,
           dest,
           micOut,
           masterOutputGain,
+          meterPre,
+          meterHP,
+          meterAnalyser,
           head: micOut,    // first node mic-source connects to; updated by applyVoiceFX
           chain: [],       // disposable nodes in the active chain
           reverb: null,    // shimmer FDN handle, if active
