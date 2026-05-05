@@ -1345,7 +1345,7 @@
           <button type="button" id="audioInputRefresh" title="Re-scan input devices">⟳ Refresh</button>
         </div>
         <div id="audioInputActive" aria-live="polite"></div>
-        <div id="voiceProcNote">Voice: lo-cut + compression</div>
+        <div id="voiceProcNote">Voice: lo-cut + compression + de-ess</div>
         <div id="iosInputNote" style="display: none;">
           On iOS, audio input is controlled by the system. If your AirPods aren't being picked up correctly, set them to "Listen only" in iOS Bluetooth settings, or disconnect them while tuning.
         </div>
@@ -3749,6 +3749,51 @@
         }
         let chainEnd = stages[stages.length - 1] || null;
 
+        // De-esser: always-on 2-band split at 5 kHz. Low band passes
+        // through unchanged; high band is fed into a fast compressor
+        // that ducks sibilants, then summed back at unity gain. Sits
+        // after makeup gain, before any optional reverb branch. Skipped
+        // only when chainEnd is null (the all-FX-off bypass case).
+        if (chainEnd) {
+          const deEssIn = ctx.createGain();
+          deEssIn.gain.value = 1.0;
+
+          const deEssLow = ctx.createBiquadFilter();
+          deEssLow.type = 'lowpass';
+          deEssLow.frequency.value = 5000;
+          deEssLow.Q.value = 0.707;
+
+          const deEssHigh = ctx.createBiquadFilter();
+          deEssHigh.type = 'highpass';
+          deEssHigh.frequency.value = 5000;
+          deEssHigh.Q.value = 0.707;
+
+          const deEssComp = ctx.createDynamicsCompressor();
+          deEssComp.threshold.value = -28;
+          deEssComp.knee.value = 6;
+          deEssComp.ratio.value = 6;
+          deEssComp.attack.value = 0.001;
+          deEssComp.release.value = 0.04;
+
+          const deEssOut = ctx.createGain();
+          deEssOut.gain.value = 1.0;
+
+          // Wiring:
+          //   chainEnd -> deEssIn (split)
+          //   deEssIn  -> deEssLow  -> deEssOut                (low band, dry)
+          //   deEssIn  -> deEssHigh -> deEssComp -> deEssOut   (high band, ducked)
+          chainEnd.connect(deEssIn);
+          deEssIn.connect(deEssLow);
+          deEssLow.connect(deEssOut);
+          deEssIn.connect(deEssHigh);
+          deEssHigh.connect(deEssComp);
+          deEssComp.connect(deEssOut);
+
+          // Track for disposeVoiceChain() so disconnects are clean on rebuild.
+          stages.push(deEssIn, deEssLow, deEssHigh, deEssComp, deEssOut);
+          chainEnd = deEssOut;
+        }
+
         // Reverb-only edge case: if the user has lowcut + compression
         // both off and only reverb on, `stages` is empty and `chainEnd`
         // is null — the reverb branch below silently bails and the wet
@@ -3857,6 +3902,11 @@
       const parts = [];
       if (voiceFX.lowcut) parts.push('lo-cut');
       if (voiceFX.compression) parts.push('compression');
+      // De-esser is always on whenever the dry chain has any stage —
+      // i.e., whenever lo-cut or compression is on (which, post-refactor,
+      // is always). Mirror that condition here so the indicator only
+      // shows 'de-ess' when the de-esser is actually wired in.
+      if (voiceFX.lowcut || voiceFX.compression) parts.push('de-ess');
       if (voiceFX.reverb) parts.push('shimmer reverb');
       note.textContent = parts.length
         ? 'Voice: ' + parts.join(' + ')
