@@ -964,9 +964,11 @@
     #droneRecordStrip {
       display: none;
       position: fixed;
-      /* Anchored above the bottom record-essential row (rec/stop dock,
-         ~100 px tall) plus a small clearance + iOS safe-area inset. */
-      bottom: calc(116px + env(safe-area-inset-bottom));
+      /* Anchored just above the bottom record-essential row (rec/stop
+         dock, ~100 px tall) with a small clearance + iOS safe-area
+         inset. Dropped from 116px → 104px to free vertical space for
+         the ruler view. */
+      bottom: calc(104px + env(safe-area-inset-bottom));
       left: 12px;
       right: auto;
       top: auto;
@@ -1094,7 +1096,9 @@
     #audioFXRecordStrip {
       display: none;
       position: fixed;
-      bottom: calc(116px + env(safe-area-inset-bottom));
+      /* Matched to #droneRecordStrip — sits just above the bottom
+         record-essential row to free vertical space for the ruler. */
+      bottom: calc(104px + env(safe-area-inset-bottom));
       right: 12px;
       left: auto;
       top: auto;
@@ -1210,7 +1214,10 @@
     #rulerHideBtn {
       display: none;
       position: fixed;
-      bottom: calc(12px + env(safe-area-inset-bottom));
+      /* Sits ABOVE #droneRecordStrip (strip bottom 104 + strip
+         height ~158 + 8 px gap = 270 px). Moved up from below the
+         strip now that the strip occupies the bottom corner. */
+      bottom: calc(270px + env(safe-area-inset-bottom));
       left: 12px;
       z-index: 250;
       min-width: 36px;
@@ -1249,7 +1256,10 @@
     #audioFXMeter {
       display: none;
       position: fixed;
-      bottom: calc(12px + env(safe-area-inset-bottom));
+      /* Sits ABOVE #audioFXRecordStrip (strip bottom 104 + strip
+         height ~90 + 8 px gap = 202 px). Moved up from below the
+         strip now that the strip occupies the bottom corner. */
+      bottom: calc(202px + env(safe-area-inset-bottom));
       right: 12px;
       z-index: 250;
       pointer-events: none;
