@@ -766,18 +766,30 @@
       }
 
       /* Landscape ≥768px: the record dock occupies the right edge, so
-         the floating strips fall back to the original top-left layout
-         to avoid colliding with it. Portrait/mobile keeps the
-         right-handed default declared above. */
+         the floating strips fall back to a top-left layout to avoid
+         colliding with it. Portrait/mobile keeps the bottom-anchored
+         left/right split declared above. */
       #droneRecordStrip {
         top: 12px;
+        bottom: auto;
         left: 12px;
         right: auto;
+        max-width: none;
+        flex-wrap: nowrap;
       }
+      #droneRecordStrip #droneRecordVolume { width: 120px; }
+      #droneRecordStrip #droneRecordCutoff { width: 80px; }
       #audioFXRecordStrip {
         top: 60px;
+        bottom: auto;
         left: 12px;
         right: auto;
+        max-width: none;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+      }
+      #audioFXRecordStrip input[type="range"] {
+        width: 80px;
       }
     }
 
@@ -951,12 +963,20 @@
     #droneRecordStrip {
       display: none;
       position: fixed;
-      top: 50px;
-      right: 12px;
+      /* Anchored above the bottom record-essential rows
+         (~146 px tall: 14 pad + 36 audio-row + 10 gap + 72 rec-row + 14 pad)
+         plus 8-14 px clearance + iOS safe-area inset. */
+      bottom: calc(160px + env(safe-area-inset-bottom));
+      left: 12px;
+      right: auto;
+      top: auto;
+      max-width: calc(50% - 28px);  /* leaves >=32 px gap to the FX strip */
       z-index: 200;
       flex-direction: row;
       align-items: center;
-      gap: 8px;
+      flex-wrap: wrap;
+      gap: 6px;
+      row-gap: 4px;
       padding: 6px 10px;
       background: rgba(20, 20, 20, 0.55);
       border: 1px solid rgba(255, 255, 255, 0.18);
@@ -1039,8 +1059,8 @@
       cursor: pointer;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     }
-    #droneRecordStrip #droneRecordVolume { width: 120px; }
-    #droneRecordStrip #droneRecordCutoff { width: 80px; }
+    #droneRecordStrip #droneRecordVolume { width: 90px; }
+    #droneRecordStrip #droneRecordCutoff { width: 60px; }
 
     /* ====================================================================
        Floating audio-FX strip — mirrors the main panel's voice processing
@@ -1052,12 +1072,20 @@
     #audioFXRecordStrip {
       display: none;
       position: fixed;
-      top: 100px;    /* sits under #droneRecordStrip (top:50 + ~42 height) */
+      /* Bottom-right counterpart to #droneRecordStrip: same vertical
+         anchor so they sit on a single visual row above the record dock. */
+      bottom: calc(160px + env(safe-area-inset-bottom));
       right: 12px;
+      left: auto;
+      top: auto;
+      max-width: calc(50% - 28px);
       z-index: 200;
       flex-direction: row;
       align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
       gap: 6px;
+      row-gap: 4px;
       padding: 6px 10px;
       background: rgba(20, 20, 20, 0.55);
       border: 1px solid rgba(255, 255, 255, 0.18);
@@ -1132,7 +1160,7 @@
       outline: none;
       flex-shrink: 0;
       margin: 0;
-      width: 80px;
+      width: 60px;  /* compressed from 80px so the strip fits in half-viewport */
     }
     #audioFXRecordStrip input[type="range"]::-webkit-slider-runnable-track {
       height: 4px;
