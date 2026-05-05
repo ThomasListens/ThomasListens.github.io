@@ -781,16 +781,14 @@
       #audioFXRecordStrip {
         top: 96px;
         bottom: auto;
-        left: 12px;
-        right: auto;
+        right: 12px;
+        left: auto;
         max-width: none;
-        align-items: flex-start;
       }
-      #audioFXRecordStrip .afx-row {
-        justify-content: flex-start;
-      }
-      #audioFXRecordStrip input[type="range"] {
-        width: 80px;
+      /* Standalone level slider: in landscape, drop to bottom-center
+         clear of the right-side record dock (280px wide). */
+      #audioFXLevelStrip {
+        bottom: calc(20px + env(safe-area-inset-bottom));
       }
     }
 
@@ -1086,12 +1084,13 @@
     #droneRecordStrip #droneRecordCutoff { width: 30px; height: 90px; }
 
     /* ====================================================================
-       Floating audio-FX strip — mirrors the main panel's voice processing
-       toggles (lo-cut / compression / shimmer reverb) plus an in-strip
-       Mix slider (visible only when VRB is on) and master Level slider.
-       Two-row column at bottom-right: [LC|CMP|VRB] above [Mix|Level].
-       The ruler-hide chip is a standalone element at the bottom-left
-       corner (#rulerHideBtn), not part of this strip.
+       Floating audio-FX strip — vertical mirror of #droneRecordStrip.
+       Single column: MIX vertical slider on top, ⏻ verb on/off button
+       at the bottom. LC and CMP are forced ON at audio bootstrap and
+       have no UI element here. The Mix slider stays visible when reverb
+       is off but greys out via [disabled] so the user can still see
+       the control exists. The Master Level slider has been hoisted out
+       into #audioFXLevelStrip just above the record button.
        ==================================================================== */
     #audioFXRecordStrip {
       display: none;
@@ -1102,12 +1101,11 @@
       right: 12px;
       left: auto;
       top: auto;
-      max-width: calc(100% - 110px);  /* drone strip ~80px + margins */
       z-index: 200;
       flex-direction: column;
-      align-items: flex-end;
+      align-items: center;
       gap: 4px;
-      padding: 6px 10px;
+      padding: 6px 8px;
       background: rgba(20, 20, 20, 0.55);
       border: 1px solid rgba(255, 255, 255, 0.18);
       border-radius: 8px;
@@ -1117,38 +1115,35 @@
     body.record-mode #audioFXRecordStrip {
       display: flex;
     }
-    #audioFXRecordStrip .afx-row {
+    #audioFXRecordStrip .afx-col {
       display: flex;
-      flex-direction: row;
+      flex-direction: column;
       align-items: center;
-      gap: 6px;
-      justify-content: flex-end;
+      gap: 2px;
     }
-    #audioFXRecordStrip button.afx-chip {
-      min-width: 36px;
+    button#audioFXVrbBtn {
+      width: 36px;
       height: 36px;
-      padding: 0 8px;
-      border-radius: 18px;
+      border-radius: 50%;
       border: 1px solid rgba(255, 255, 255, 0.45);
       background: transparent;
       color: rgba(255, 255, 255, 0.75);
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
+      font-size: 17px;
       line-height: 1;
       cursor: pointer;
-      display: inline-flex;
+      display: flex;
       align-items: center;
       justify-content: center;
+      padding: 0;
       flex-shrink: 0;
       font-family: inherit;
     }
-    #audioFXRecordStrip button.afx-chip.on {
+    button#audioFXVrbBtn.on {
       background: rgba(255, 255, 255, 0.9);
       color: #000;
       border-color: #fff;
     }
-    #audioFXRecordStrip button.afx-chip:active {
+    button#audioFXVrbBtn:active {
       transform: scale(0.92);
     }
     #audioFXRecordStrip .afx-label {
@@ -1158,13 +1153,6 @@
       color: rgba(255, 255, 255, 0.55);
       flex-shrink: 0;
     }
-    /* Mix slider + label show only when reverb chip is on. Uses :has()
-       so we don't have to thread additional state through syncVoiceFXUI;
-       the .on class already lives on #audioFXVrbBtn. */
-    #audioFXRecordStrip .afx-verb-only { display: none; }
-    #audioFXRecordStrip:has(#audioFXVrbBtn.on) .afx-verb-only {
-      display: revert;
-    }
     #audioFXRecordStrip input[type="range"] {
       -webkit-appearance: none;
       appearance: none;
@@ -1173,7 +1161,6 @@
       outline: none;
       flex-shrink: 0;
       margin: 0;
-      width: 110px;
     }
     #audioFXRecordStrip input[type="range"]::-webkit-slider-runnable-track {
       height: 4px;
@@ -1206,11 +1193,92 @@
       cursor: pointer;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     }
+    /* Vertical orientation for the Mix slider — same sizing as the
+       drone strip's vertical sliders so the two strips read as a pair. */
+    #audioFXRecordStrip input[type="range"].vertical {
+      -webkit-appearance: slider-vertical;
+      appearance: slider-vertical;
+      writing-mode: bt-lr;
+      width: 30px;
+      height: 90px;
+      padding: 0;
+    }
+    #audioFXRecordStrip #audioFXMixSlider { width: 30px; height: 90px; }
+    /* Disabled-when-off styling: keeps the slider visible so the user
+       can see the control exists when reverb is off. */
+    #audioFXRecordStrip input[type="range"]:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+    #audioFXRecordStrip input[type="range"]:disabled::-webkit-slider-thumb {
+      background: rgba(255, 255, 255, 0.5);
+    }
+    #audioFXRecordStrip input[type="range"]:disabled::-moz-range-thumb {
+      background: rgba(255, 255, 255, 0.5);
+    }
+    /* ------------------------------------------------------------------
+       Standalone master output level slider — relocated from inside
+       #audioFXRecordStrip. Sits horizontally above the record button,
+       unlabelled. Same gain mapping (-20…+6 dB) and localStorage key
+       (tuner.outputLevelDb) as before. */
+    #audioFXLevelStrip {
+      display: none;
+      position: fixed;
+      bottom: calc(110px + env(safe-area-inset-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 200;
+      width: 160px;
+      pointer-events: auto;
+    }
+    body.record-mode #audioFXLevelStrip {
+      display: block;
+    }
+    #audioFXLevelStrip input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 36px;
+      background: transparent;
+      outline: none;
+      margin: 0;
+    }
+    #audioFXLevelStrip input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.25);
+      border-radius: 2px;
+    }
+    #audioFXLevelStrip input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #fff;
+      margin-top: -9px;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+    #audioFXLevelStrip input[type="range"]::-moz-range-track {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.25);
+      border-radius: 2px;
+    }
+    #audioFXLevelStrip input[type="range"]::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #fff;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
     /* ------------------------------------------------------------------
        Standalone ruler-hide chip (was inline in the FX strip slider row).
        Pinned to the bottom-left corner, mirroring #audioFXMeter on the
-       opposite side. Same styling as the in-strip .afx-chip class so the
-       look matches the LC/CMP/VRB chips above. Record-mode only. */
+       opposite side. Standalone styling (in-strip .afx-chip class is
+       gone); record-mode only. */
     #rulerHideBtn {
       display: none;
       position: fixed;
@@ -1555,33 +1623,33 @@
     <button type="button" id="droneRecordToggle" title="Drone on/off" aria-label="Toggle drone">⏻</button>
   </div>
 
-  <!-- Floating audio-FX strip — mirrors the side panel's Voice processing
-       section. State is shared (voiceFX / voiceFXMix); syncVoiceFXUI keeps
-       both UIs in lockstep regardless of which one was tapped. Two rows:
-       chips on top (LC/CMP/VRB), sliders below (Mix [VRB-only] / Level).
-       The ruler-hide chip lives in a standalone fixed-position element at
-       the bottom-left corner (#rulerHideBtn) — extracted from this strip
-       so the sliders have full width and the chip mirrors the LUFS
-       readout on the opposite corner. -->
+  <!-- Floating audio-FX strip — vertical mirror of #droneRecordStrip.
+       Single column: MIX vertical slider on top, ⏻ verb on/off button
+       at the bottom. LC and CMP are forced ON at audio bootstrap and
+       have no UI element here; only reverb is user-controllable from
+       this strip. State mirrors the side panel via syncVoiceFXUI(). The
+       Mix slider greys out (disabled) when verb is off — visible but
+       not actionable. -->
   <div id="audioFXRecordStrip" aria-label="Voice FX controls">
-    <div class="afx-row afx-row-chips">
-      <button type="button" class="afx-chip" id="audioFXLcBtn" title="Lo-cut (90 Hz)" aria-label="Toggle lo-cut">LC</button>
-      <button type="button" class="afx-chip" id="audioFXCmpBtn" title="Compression" aria-label="Toggle compression">CMP</button>
-      <button type="button" class="afx-chip" id="audioFXVrbBtn" title="Shimmer reverb" aria-label="Toggle reverb">VRB</button>
+    <div class="afx-col">
+      <span class="afx-label" title="Reverb mix">MIX</span>
+      <input type="range" id="audioFXMixSlider" class="vertical" orient="vertical" min="0" max="100" value="50" aria-label="Reverb mix">
     </div>
-    <div class="afx-row afx-row-sliders">
-      <span class="afx-label afx-verb-only">Mix</span>
-      <input type="range" id="audioFXMixSlider" class="afx-verb-only" min="0" max="100" value="50" aria-label="Reverb mix">
-      <span class="afx-label">Level</span>
-      <input type="range" id="audioFXOutputLevelSlider" min="0" max="100" value="77" step="1" title="Master output level" aria-label="Master output level">
-    </div>
+    <button type="button" id="audioFXVrbBtn" title="Shimmer reverb on/off" aria-label="Toggle reverb">⏻</button>
+  </div>
+
+  <!-- Standalone master output level slider — relocated from inside
+       #audioFXRecordStrip. Sits horizontally above the record button,
+       no label. Wiring (id, range, mapping, localStorage key) unchanged. -->
+  <div id="audioFXLevelStrip" aria-label="Master output level">
+    <input type="range" id="audioFXOutputLevelSlider" min="0" max="100" value="77" step="1" title="Master output level" aria-label="Master output level">
   </div>
 
   <!-- Standalone ruler-hide chip, fixed to the bottom-left corner. Hoisted
        out of #audioFXRecordStrip so it sits at the absolute bottom edge
        opposite the LUFS readout. The existing click handler binds via
        getElementById('rulerHideBtn'), so wiring is unchanged. -->
-  <button type="button" class="afx-chip on" id="rulerHideBtn" title="Show/hide tuning ruler" aria-label="Show or hide tuning ruler">📏</button>
+  <button type="button" class="on" id="rulerHideBtn" title="Show/hide tuning ruler" aria-label="Show or hide tuning ruler">📏</button>
 
   <!-- Standalone LUFS / peak dB readout, fixed to the bottom-right corner.
        Hoisted out of the strip so it can sit at the absolute bottom edge
@@ -5133,10 +5201,10 @@
       const vrbMain  = document.getElementById('voiceReverb');
       const mixMain  = document.getElementById('voiceReverbMix');
       const mixLbl   = document.getElementById('voiceReverbMixVal');
-      // Record-mode chips (top floating strip) and the always-visible
-      // mix slider in the bottom record-audio row.
-      const lcChip    = document.getElementById('audioFXLcBtn');
-      const cmpChip   = document.getElementById('audioFXCmpBtn');
+      // Record-mode floating strip: only the verb ⏻ button + Mix slider
+      // remain. LC/CMP have no UI here (forced on at bootstrap). The Mix
+      // slider greys out via [disabled] when reverb is off so the user
+      // can still see the control exists.
       const vrbChip   = document.getElementById('audioFXVrbBtn');
       const mixStrip  = document.getElementById('audioFXMixSlider');
 
@@ -5148,10 +5216,11 @@
       if (mixMain)  mixMain.value   = mixPct;
       if (mixLbl)   mixLbl.textContent = mixPct + '%';
 
-      if (lcChip)    lcChip.classList.toggle('on',  voiceFX.lowcut);
-      if (cmpChip)   cmpChip.classList.toggle('on', voiceFX.compression);
       if (vrbChip)   vrbChip.classList.toggle('on', voiceFX.reverb);
-      if (mixStrip)  mixStrip.value  = mixPct;
+      if (mixStrip) {
+        mixStrip.value = mixPct;
+        mixStrip.disabled = !voiceFX.reverb;
+      }
     }
 
     // -------- Feature 1: Settings hide toggle --------
@@ -5750,11 +5819,17 @@
 
       // -------- Voice processing: lo-cut / compression / shimmer reverb --------
       try {
-        const lc = localStorage.getItem('tuner.voice.lowcut');
-        const cm = localStorage.getItem('tuner.voice.compression');
+        // LC (lo-cut) and CMP (compression) are no longer user-facing —
+        // they're forced on at every bootstrap regardless of stored
+        // preference. We write '1' back so any other code path reading
+        // these keys sees the current truth.
+        voiceFX.lowcut = true;
+        voiceFX.compression = true;
+        try {
+          localStorage.setItem('tuner.voice.lowcut', '1');
+          localStorage.setItem('tuner.voice.compression', '1');
+        } catch (_) {}
         const rv = localStorage.getItem('tuner.voice.reverb');
-        if (lc !== null) voiceFX.lowcut = lc === '1';
-        if (cm !== null) voiceFX.compression = cm === '1';
         if (rv !== null) voiceFX.reverb = rv === '1';
         const mix = localStorage.getItem('tuner.voice.reverbMix');
         if (mix !== null && !isNaN(parseFloat(mix))) {
@@ -5807,23 +5882,19 @@
         });
       }
 
-      // Floating audio-FX strip — chip toggles + mini Mix slider.
-      // Mirrors the side panel via syncVoiceFXUI() in both directions.
-      const afxLcChip   = document.getElementById('audioFXLcBtn');
-      const afxCmpChip  = document.getElementById('audioFXCmpBtn');
+      // Floating audio-FX strip — single ⏻ verb on/off button + mini Mix
+      // slider. LC and CMP are forced on at bootstrap and have no UI
+      // element here. Mirrors the side panel via syncVoiceFXUI().
       const afxVrbChip  = document.getElementById('audioFXVrbBtn');
       const afxMixStrip = document.getElementById('audioFXMixSlider');
-      function makeAfxToggleHandler(key) {
-        return () => {
-          voiceFX[key] = !voiceFX[key];
+      if (afxVrbChip) {
+        afxVrbChip.addEventListener('click', () => {
+          voiceFX.reverb = !voiceFX.reverb;
           persistVoiceFXFlags();
           applyVoiceFX();
           syncVoiceFXUI();
-        };
+        });
       }
-      if (afxLcChip)  afxLcChip .addEventListener('click', makeAfxToggleHandler('lowcut'));
-      if (afxCmpChip) afxCmpChip.addEventListener('click', makeAfxToggleHandler('compression'));
-      if (afxVrbChip) afxVrbChip.addEventListener('click', makeAfxToggleHandler('reverb'));
 
       // -------- Hide-ruler toggle (record-mode only) --------
       // Independent of body.settings-hidden: lets the user blank the
