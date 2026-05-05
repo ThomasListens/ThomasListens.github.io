@@ -1365,6 +1365,10 @@
           <label for="voiceCompression">Compression</label>
         </div>
         <div class="checkbox-row">
+          <input type="checkbox" id="voiceDeess" checked>
+          <label for="voiceDeess">De-ess (5 kHz)</label>
+        </div>
+        <div class="checkbox-row">
           <input type="checkbox" id="voiceReverb">
           <label for="voiceReverb">Shimmer reverb</label>
         </div>
@@ -1373,10 +1377,13 @@
           <div class="slider-row" style="margin-bottom: 8px;">
             <input type="range" id="voiceReverbMix" min="0" max="100" value="50">
           </div>
-          <label style="font-size: 12px; color: #888; margin-bottom: 2px;">Tail <span id="voiceReverbTailVal" style="color: #aaa;">60%</span></label>
-          <div class="slider-row">
-            <input type="range" id="voiceReverbTail" min="0" max="100" value="60">
-          </div>
+        </div>
+        <!-- Verb tails: always visible (set-and-forget). Slider value is
+             persisted and live-updates the running reverb when reverb
+             is on; safely ignored when reverb is off. -->
+        <label style="font-size: 12px; color: #888; margin-top: 6px; margin-bottom: 2px;">Verb tails <span id="voiceReverbTailVal" style="color: #aaa;">60%</span></label>
+        <div class="slider-row">
+          <input type="range" id="voiceReverbTail" min="0" max="100" value="60">
         </div>
       </div>
 
@@ -1820,8 +1827,10 @@
     let currentMicSource = null;    // current MediaStreamAudioSourceNode
 
     // Voice FX state — persists in localStorage. Defaults: clean speech
-    // (lowcut + compression on, shimmer reverb off).
-    let voiceFX = { lowcut: true, compression: true, reverb: false };
+    // (lowcut + compression + de-ess on, shimmer reverb off). All three
+    // dry stages are individually togglable from the side-panel UI; when
+    // off, the corresponding node(s) are not created in applyVoiceFX().
+    let voiceFX = { lowcut: true, compression: true, deess: true, reverb: false };
     let voiceFXMix = 0.5;     // 0..1 wet/dry blend (50% default)
     let voiceFXTail = 0.6;    // 0..1 → mapped to feedback 0.5..0.78
     // Master output trim. Range -20..+6 dB on the slider (0..100).
@@ -1852,6 +1861,22 @@
       // with the new 0.08 shimmer self-loop and the wet-bus limiter the
       // worst-case closed-loop gain stays well under 1.0 at all freqs.
       return 0.5 + x * 0.28; // 0 → 0.50, 1 → 0.78  (default 0.6 → ~0.668)
+    }
+
+    // Map UI mix (0..1) to actual wet/dry bus gains. The raw slider
+    // value used to drive wet.gain = m / dry.gain = 1-m linearly, which
+    // made the upper third of the slider explode (linear-amplitude
+    // crossfade is perceptually exponential at the top). Two tweaks:
+    //   1. Cap the maximum wet gain at 0.45 — full slider is now a
+    //      "loud but musical" wet level rather than wet-overwhelms-dry.
+    //   2. Dry stays mostly present: at 100% mix, dry attenuates to 0.5
+    //      instead of all the way to 0 — keeps articulation legible.
+    // Net effect: the bottom 80% of slider travel covers the bottom
+    // ~80% of subjective wet level, and the top of the slider is
+    // useful instead of unstable.
+    function voiceFXMixGains(m) {
+      const x = Math.max(0, Math.min(1, m));
+      return { wet: x * 0.45, dry: 1 - x * 0.5 };
     }
     let featherAmount = 0.80;
     let featherWidth = 0.01; // -1..1 of canvas width: positive = feather outward (left), negative = feather inward (right)
@@ -3749,12 +3774,13 @@
         }
         let chainEnd = stages[stages.length - 1] || null;
 
-        // De-esser: always-on 2-band split at 5 kHz. Low band passes
-        // through unchanged; high band is fed into a fast compressor
-        // that ducks sibilants, then summed back at unity gain. Sits
-        // after makeup gain, before any optional reverb branch. Skipped
-        // only when chainEnd is null (the all-FX-off bypass case).
-        if (chainEnd) {
+        // De-esser: 2-band split at 5 kHz. Low band passes through
+        // unchanged; high band is fed into a fast compressor that ducks
+        // sibilants, then summed back at unity gain. Sits after makeup
+        // gain, before any optional reverb branch. Gated by
+        // voiceFX.deess (user toggle in the Settings panel) and by
+        // chainEnd being non-null (skip in the all-FX-off bypass case).
+        if (voiceFX.deess && chainEnd) {
           const deEssIn = ctx.createGain();
           deEssIn.gain.value = 1.0;
 
@@ -3812,9 +3838,9 @@
           });
           const wet = ctx.createGain();
           const dry = ctx.createGain();
-          const m = Math.max(0, Math.min(1, voiceFXMix));
-          wet.gain.value = m;
-          dry.gain.value = 1 - m;
+          const g = voiceFXMixGains(voiceFXMix);
+          wet.gain.value = g.wet;
+          dry.gain.value = g.dry;
           chainEnd.connect(reverb.input);
           chainEnd.connect(dry);
           reverb.output.connect(wet);
@@ -3874,9 +3900,10 @@
       if (lbl) lbl.textContent = Math.round(voiceFXMix * 100) + '%';
       if (micProcessing && micProcessing.wetGain && micProcessing.dryGain && micProcessing.ctx) {
         const t = micProcessing.ctx.currentTime;
+        const g = voiceFXMixGains(voiceFXMix);
         try {
-          micProcessing.wetGain.gain.setTargetAtTime(voiceFXMix, t, 0.03);
-          micProcessing.dryGain.gain.setTargetAtTime(1 - voiceFXMix, t, 0.03);
+          micProcessing.wetGain.gain.setTargetAtTime(g.wet, t, 0.03);
+          micProcessing.dryGain.gain.setTargetAtTime(g.dry, t, 0.03);
         } catch (_) {}
       }
     }
@@ -3902,15 +3929,15 @@
       const parts = [];
       if (voiceFX.lowcut) parts.push('lo-cut');
       if (voiceFX.compression) parts.push('compression');
-      // De-esser is always on whenever the dry chain has any stage —
-      // i.e., whenever lo-cut or compression is on (which, post-refactor,
-      // is always). Mirror that condition here so the indicator only
-      // shows 'de-ess' when the de-esser is actually wired in.
-      if (voiceFX.lowcut || voiceFX.compression) parts.push('de-ess');
+      // De-esser is now user-togglable. It's also skipped automatically
+      // when the dry chain is empty (no lowcut, no compression — the
+      // chainEnd-null guard in applyVoiceFX). Reflect both conditions
+      // here so the indicator matches what's actually wired.
+      if (voiceFX.deess && (voiceFX.lowcut || voiceFX.compression)) parts.push('de-ess');
       if (voiceFX.reverb) parts.push('shimmer reverb');
       note.textContent = parts.length
         ? 'Voice: ' + parts.join(' + ')
-        : 'Voice: clean (no processing)';
+        : 'Voice: dry';
     }
 
     // Wire (or rewire) a freshly-created mic source into the analyser
@@ -5232,13 +5259,14 @@
       // Side panel
       const lcMain   = document.getElementById('voiceLowcut');
       const cmpMain  = document.getElementById('voiceCompression');
+      const deMain   = document.getElementById('voiceDeess');
       const vrbMain  = document.getElementById('voiceReverb');
       const mixMain  = document.getElementById('voiceReverbMix');
       const mixLbl   = document.getElementById('voiceReverbMixVal');
       // Record-mode floating strip: only the verb ⏻ button + Mix slider
-      // remain. LC/CMP have no UI here (forced on at bootstrap). The Mix
-      // slider greys out via [disabled] when reverb is off so the user
-      // can still see the control exists.
+      // remain. LC/CMP/DE have no UI here — they live in the side
+      // (Settings) panel. The Mix slider greys out via [disabled] when
+      // reverb is off so the user can still see the control exists.
       const vrbChip   = document.getElementById('audioFXVrbBtn');
       const mixStrip  = document.getElementById('audioFXMixSlider');
 
@@ -5246,6 +5274,7 @@
 
       if (lcMain)   lcMain.checked  = voiceFX.lowcut;
       if (cmpMain)  cmpMain.checked = voiceFX.compression;
+      if (deMain)   deMain.checked  = voiceFX.deess;
       if (vrbMain)  vrbMain.checked = voiceFX.reverb;
       if (mixMain)  mixMain.value   = mixPct;
       if (mixLbl)   mixLbl.textContent = mixPct + '%';
@@ -5851,18 +5880,19 @@
         });
       }
 
-      // -------- Voice processing: lo-cut / compression / shimmer reverb --------
+      // -------- Voice processing: lo-cut / compression / de-ess / shimmer reverb --------
       try {
-        // LC (lo-cut) and CMP (compression) are no longer user-facing —
-        // they're forced on at every bootstrap regardless of stored
-        // preference. We write '1' back so any other code path reading
-        // these keys sees the current truth.
-        voiceFX.lowcut = true;
-        voiceFX.compression = true;
-        try {
-          localStorage.setItem('tuner.voice.lowcut', '1');
-          localStorage.setItem('tuner.voice.compression', '1');
-        } catch (_) {}
+        // All three dry stages are user-togglable. Defaults: ON. Read
+        // each from localStorage if a value has been written, otherwise
+        // keep the in-code default (true for lc/cmp/deess, false for
+        // reverb — see the voiceFX initializer). Missing keys are NOT
+        // treated as "off" — first-run users get the curated defaults.
+        const lc = localStorage.getItem('tuner.voice.lowcut');
+        if (lc !== null) voiceFX.lowcut = lc === '1';
+        const cmp = localStorage.getItem('tuner.voice.compression');
+        if (cmp !== null) voiceFX.compression = cmp === '1';
+        const de = localStorage.getItem('tuner.voice.deess');
+        if (de !== null) voiceFX.deess = de === '1';
         const rv = localStorage.getItem('tuner.voice.reverb');
         if (rv !== null) voiceFX.reverb = rv === '1';
         const mix = localStorage.getItem('tuner.voice.reverbMix');
@@ -5876,10 +5906,12 @@
       } catch (_) {}
       const lowcutCb = document.getElementById('voiceLowcut');
       const compressCb = document.getElementById('voiceCompression');
+      const deessCb = document.getElementById('voiceDeess');
       const reverbCb = document.getElementById('voiceReverb');
       const reverbMixSlider = document.getElementById('voiceReverbMix');
       const reverbTailSlider = document.getElementById('voiceReverbTail');
       const reverbTailLbl = document.getElementById('voiceReverbTailVal');
+      if (reverbMixSlider) reverbMixSlider.value = Math.round(voiceFXMix * 100);
       if (reverbTailSlider) reverbTailSlider.value = Math.round(voiceFXTail * 100);
       if (reverbTailLbl) reverbTailLbl.textContent = Math.round(voiceFXTail * 100) + '%';
       updateVoiceReverbControlsVisibility();
@@ -5890,12 +5922,14 @@
         try {
           localStorage.setItem('tuner.voice.lowcut', voiceFX.lowcut ? '1' : '0');
           localStorage.setItem('tuner.voice.compression', voiceFX.compression ? '1' : '0');
+          localStorage.setItem('tuner.voice.deess', voiceFX.deess ? '1' : '0');
           localStorage.setItem('tuner.voice.reverb', voiceFX.reverb ? '1' : '0');
         } catch (_) {}
       }
       function onVoiceFXToggle() {
         voiceFX.lowcut      = !!(lowcutCb   && lowcutCb.checked);
         voiceFX.compression = !!(compressCb && compressCb.checked);
+        voiceFX.deess       = !!(deessCb    && deessCb.checked);
         voiceFX.reverb      = !!(reverbCb   && reverbCb.checked);
         persistVoiceFXFlags();
         applyVoiceFX();
@@ -5903,6 +5937,7 @@
       }
       if (lowcutCb) lowcutCb.addEventListener('change', onVoiceFXToggle);
       if (compressCb) compressCb.addEventListener('change', onVoiceFXToggle);
+      if (deessCb) deessCb.addEventListener('change', onVoiceFXToggle);
       if (reverbCb) reverbCb.addEventListener('change', onVoiceFXToggle);
       if (reverbMixSlider) {
         reverbMixSlider.addEventListener('input', (e) => {
