@@ -1167,6 +1167,11 @@
       cursor: pointer;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     }
+    /* Verb-conditional controls inside the FX strip — only visible when
+       reverb is on, so the strip stays compact when reverb is off.
+       body.voice-reverb-on is toggled by syncVoiceFXUI(). */
+    #audioFXRecordStrip .afx-verb-only { display: none; }
+    body.voice-reverb-on #audioFXRecordStrip .afx-verb-only { display: inline-flex; }
   </style>
 </head>
 <body>
@@ -1447,6 +1452,12 @@
     <button type="button" class="afx-chip" id="audioFXLcBtn" title="Lo-cut (90 Hz)" aria-label="Toggle lo-cut">LC</button>
     <button type="button" class="afx-chip" id="audioFXCmpBtn" title="Compression" aria-label="Toggle compression">CMP</button>
     <button type="button" class="afx-chip" id="audioFXVrbBtn" title="Shimmer reverb" aria-label="Toggle reverb">VRB</button>
+    <!-- Tail mini-slider — appears only when VRB is on so the user has
+         full verb control (Mix lives in the bottom record-audio-row).
+         Visibility is driven by body.voice-reverb-on, toggled inside
+         syncVoiceFXUI(). Width matches existing afx range styling (80px). -->
+    <span class="afx-label afx-verb-only">Tail</span>
+    <input type="range" class="afx-verb-only" id="audioFXTailSlider" min="0" max="100" value="60" aria-label="Reverb tail">
     <button type="button" class="afx-chip on" id="rulerHideBtn" title="Show/hide tuning ruler" aria-label="Show or hide tuning ruler">📏</button>
   </div>
 
@@ -1677,6 +1688,12 @@
 
     // Feature 1: settings hide
     let settingsHidden = false;
+    // Snapshot of settingsHidden taken when entering record mode so the
+    // body class can be restored on exit. Record mode forces the panel
+    // hidden by default but the user may toggle it back on temporarily —
+    // those toggles are not persisted to localStorage (that key is the
+    // user's normal-mode preference).
+    let prevSettingsHiddenForRecord = false;
 
     // Hide-ruler toggle (independent of settingsHidden) — lets the user
     // blank just the ruler during recording without dismissing the rest
@@ -2126,19 +2143,42 @@
         suppressNextCanvasClick = false;
         return;
       }
-      if (recordMode) return;
+      // NOTE: Previously this handler bailed out entirely in record mode,
+      // which silently broke per-ratio drone toggles during recording.
+      // Camera-pan drags are still distinguished from taps by the
+      // suppressNextCanvasClick flag set in setupCameraPan's endDrag.
 
       const canvas = document.getElementById('rulerCanvas');
       const rect = canvas.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
 
-      const rulerX = rect.width * config.rulerX;
-      if (x > rulerX + 50) return;
+      // Ratio Y positions are stored in canvas-internal pixel units. In
+      // non-record mode the backing store is rect.size * dpr but the
+      // 2D context is pre-scaled by dpr so positions land in CSS pixels
+      // (scale = 1). In record mode the backing store is fixed at
+      // ASPECT_DIMS (e.g. 1080x1920) and CSS scales it down to fit the
+      // viewport — so we have to map the click y from screen CSS pixels
+      // up to canvas-internal pixels before comparing to ratioY.
+      const yScale = (recordMode && rect.height)
+        ? (canvas.height / rect.height)
+        : 1;
+      const xScale = (recordMode && rect.width)
+        ? (canvas.width / rect.width)
+        : 1;
+      const cy = y * yScale;
+      const cx = x * xScale;
+      const W = recordMode ? canvas.width : rect.width;
+      const rulerX = W * config.rulerX;
+      // Hit-area threshold: 20 CSS px in non-record mode, scaled to
+      // canvas units in record mode so taps feel the same on screen.
+      const hitR = 20 * yScale;
+      const xPad = 50 * xScale;
+      if (cx > rulerX + xPad) return;
 
       for (const ratio of config.ratios) {
         const ratioY = droneRatioYPositions[ratio.label];
-        if (ratioY !== undefined && Math.abs(y - ratioY) < 20) {
+        if (ratioY !== undefined && Math.abs(cy - ratioY) < hitR) {
           toggleDrone(ratio);
           return;
         }
@@ -3671,6 +3711,14 @@
       }
       document.body.classList.add('record-mode');
       document.body.classList.add('aspect-' + recordAspect.replace(':', '-'));
+      // Force settings-hidden ON when entering record mode. Save the
+      // previous in-memory state so exitRecordMode can restore it. We
+      // deliberately do NOT touch localStorage here — tuner.settingsHidden
+      // is the user's normal-mode preference and must not be clobbered by
+      // record-mode entry/exit.
+      prevSettingsHiddenForRecord = settingsHidden;
+      settingsHidden = true;
+      applySettingsHidden();
       // First-time hint: pulse the settings toggle once per page load so
       // users discover they can hide the panel while recording.
       if (!recordHintShown) {
@@ -3731,13 +3779,13 @@
       }
       const video = document.getElementById('cameraFeed');
       video.srcObject = null;
-      // Force the controls panel back when returning to the main screen.
-      // The settings-hidden state is record-mode-only now — without this
-      // reset, a hide click during a record session would leak into the
-      // main screen and squash the panel layout next page load.
-      if (settingsHidden) {
-        settingsHidden = false;
-        try { localStorage.removeItem('tuner.settingsHidden'); } catch (_) {}
+      // Restore settings-hidden to whatever it was before entering record
+      // mode. Toggles inside record mode were intentionally not persisted
+      // (see toggleSettingsHidden), so the saved localStorage preference
+      // for normal mode is untouched and we just snap back to the
+      // pre-record in-memory state.
+      if (settingsHidden !== prevSettingsHiddenForRecord) {
+        settingsHidden = prevSettingsHiddenForRecord;
         applySettingsHidden();
       }
       // Force canvas to repaint at normal dimensions
@@ -4809,12 +4857,14 @@
       const mixLbl   = document.getElementById('voiceReverbMixVal');
       // Record-mode chips (top floating strip) and the always-visible
       // mix slider in the bottom record-audio row.
-      const lcChip   = document.getElementById('audioFXLcBtn');
-      const cmpChip  = document.getElementById('audioFXCmpBtn');
-      const vrbChip  = document.getElementById('audioFXVrbBtn');
-      const mixStrip = document.getElementById('audioFXMixSlider');
+      const lcChip    = document.getElementById('audioFXLcBtn');
+      const cmpChip   = document.getElementById('audioFXCmpBtn');
+      const vrbChip   = document.getElementById('audioFXVrbBtn');
+      const mixStrip  = document.getElementById('audioFXMixSlider');
+      const tailStrip = document.getElementById('audioFXTailSlider');
 
-      const mixPct = Math.round(voiceFXMix * 100);
+      const mixPct  = Math.round(voiceFXMix * 100);
+      const tailPct = Math.round(voiceFXTail * 100);
 
       if (lcMain)   lcMain.checked  = voiceFX.lowcut;
       if (cmpMain)  cmpMain.checked = voiceFX.compression;
@@ -4822,10 +4872,16 @@
       if (mixMain)  mixMain.value   = mixPct;
       if (mixLbl)   mixLbl.textContent = mixPct + '%';
 
-      if (lcChip)   lcChip.classList.toggle('on',  voiceFX.lowcut);
-      if (cmpChip)  cmpChip.classList.toggle('on', voiceFX.compression);
-      if (vrbChip)  vrbChip.classList.toggle('on', voiceFX.reverb);
-      if (mixStrip) mixStrip.value = mixPct;
+      if (lcChip)    lcChip.classList.toggle('on',  voiceFX.lowcut);
+      if (cmpChip)   cmpChip.classList.toggle('on', voiceFX.compression);
+      if (vrbChip)   vrbChip.classList.toggle('on', voiceFX.reverb);
+      if (mixStrip)  mixStrip.value  = mixPct;
+      if (tailStrip) tailStrip.value = tailPct;
+
+      // Drive visibility of the Tail mini-slider in the FX strip — this
+      // body class is the single source of truth for the verb-only CSS
+      // gate (see #audioFXRecordStrip .afx-verb-only).
+      document.body.classList.toggle('voice-reverb-on', !!voiceFX.reverb);
     }
 
     // -------- Feature 1: Settings hide toggle --------
@@ -4851,7 +4907,15 @@
 
     function toggleSettingsHidden() {
       settingsHidden = !settingsHidden;
-      try { localStorage.setItem('tuner.settingsHidden', settingsHidden ? '1' : '0'); } catch (_) {}
+      // Persist only when toggling outside of record mode. In record
+      // mode the toggle is a temporary "show me the panel for a sec"
+      // affordance — settingsHidden flips back to prevSettingsHiddenForRecord
+      // on exitRecordMode regardless of how the user fiddled with it
+      // mid-session, and we must not clobber the user's normal-mode
+      // preference stored under tuner.settingsHidden.
+      if (!recordMode) {
+        try { localStorage.setItem('tuner.settingsHidden', settingsHidden ? '1' : '0'); } catch (_) {}
+      }
       applySettingsHidden();
     }
 
@@ -5514,6 +5578,18 @@
       if (afxMixStrip) {
         afxMixStrip.addEventListener('input', (e) => {
           setVoiceReverbMix(parseInt(e.target.value, 10) / 100);
+          syncVoiceFXUI();
+        });
+      }
+
+      // Tail mini-slider in the FX strip (visible only when VRB is on).
+      // Mirrors the side-panel reverbTail slider; both push through
+      // setVoiceReverbTail and call syncVoiceFXUI to keep all UIs in
+      // lockstep including the body.voice-reverb-on visibility gate.
+      const afxTailStrip = document.getElementById('audioFXTailSlider');
+      if (afxTailStrip) {
+        afxTailStrip.addEventListener('input', (e) => {
+          setVoiceReverbTail(parseInt(e.target.value, 10) / 100);
           syncVoiceFXUI();
         });
       }
