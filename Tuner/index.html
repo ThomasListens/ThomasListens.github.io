@@ -1087,7 +1087,9 @@
        Floating audio-FX strip — mirrors the main panel's voice processing
        toggles (lo-cut / compression / shimmer reverb) plus an in-strip
        Mix slider (visible only when VRB is on) and master Level slider.
-       Two-row column at bottom-right: [LC|CMP|VRB] above [📏|Mix|Level].
+       Two-row column at bottom-right: [LC|CMP|VRB] above [Mix|Level].
+       The ruler-hide chip is a standalone element at the bottom-left
+       corner (#rulerHideBtn), not part of this strip.
        ==================================================================== */
     #audioFXRecordStrip {
       display: none;
@@ -1167,7 +1169,7 @@
       outline: none;
       flex-shrink: 0;
       margin: 0;
-      width: 60px;
+      width: 80px;
     }
     #audioFXRecordStrip input[type="range"]::-webkit-slider-runnable-track {
       height: 4px;
@@ -1201,14 +1203,53 @@
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     }
     /* ------------------------------------------------------------------
+       Standalone ruler-hide chip (was inline in the FX strip slider row).
+       Pinned to the bottom-left corner, mirroring #audioFXMeter on the
+       opposite side. Same styling as the in-strip .afx-chip class so the
+       look matches the LC/CMP/VRB chips above. Record-mode only. */
+    #rulerHideBtn {
+      display: none;
+      position: fixed;
+      bottom: calc(12px + env(safe-area-inset-bottom));
+      left: 12px;
+      z-index: 250;
+      min-width: 36px;
+      height: 36px;
+      padding: 0 8px;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      background: transparent;
+      color: rgba(255, 255, 255, 0.75);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      line-height: 1;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-family: inherit;
+    }
+    body.record-mode #rulerHideBtn {
+      display: inline-flex;
+    }
+    #rulerHideBtn.on {
+      background: rgba(255, 255, 255, 0.9);
+      color: #000;
+      border-color: #fff;
+    }
+    #rulerHideBtn:active {
+      transform: scale(0.92);
+    }
+    /* ------------------------------------------------------------------
        Standalone real-time loudness readout (was inline in the strip).
-       Pinned to the bottom-right corner, lifted just enough to clear the
-       record-essential rec/stop row. Record-mode only; the meter loop's
+       Pinned to the bottom-right corner, mirroring #rulerHideBtn on the
+       opposite side. Record-mode only; the meter loop's
        updateMeterDisplay still targets #audioFXMeter by id. */
     #audioFXMeter {
       display: none;
       position: fixed;
-      bottom: calc(108px + env(safe-area-inset-bottom));
+      bottom: calc(12px + env(safe-area-inset-bottom));
       right: 12px;
       z-index: 250;
       pointer-events: none;
@@ -1507,7 +1548,11 @@
   <!-- Floating audio-FX strip — mirrors the side panel's Voice processing
        section. State is shared (voiceFX / voiceFXMix); syncVoiceFXUI keeps
        both UIs in lockstep regardless of which one was tapped. Two rows:
-       chips on top (LC/CMP/VRB), sliders below (📏 / Mix [VRB-only] / Level). -->
+       chips on top (LC/CMP/VRB), sliders below (Mix [VRB-only] / Level).
+       The ruler-hide chip lives in a standalone fixed-position element at
+       the bottom-left corner (#rulerHideBtn) — extracted from this strip
+       so the sliders have full width and the chip mirrors the LUFS
+       readout on the opposite corner. -->
   <div id="audioFXRecordStrip" aria-label="Voice FX controls">
     <div class="afx-row afx-row-chips">
       <button type="button" class="afx-chip" id="audioFXLcBtn" title="Lo-cut (90 Hz)" aria-label="Toggle lo-cut">LC</button>
@@ -1515,13 +1560,19 @@
       <button type="button" class="afx-chip" id="audioFXVrbBtn" title="Shimmer reverb" aria-label="Toggle reverb">VRB</button>
     </div>
     <div class="afx-row afx-row-sliders">
-      <button type="button" class="afx-chip on" id="rulerHideBtn" title="Show/hide tuning ruler" aria-label="Show or hide tuning ruler">📏</button>
       <span class="afx-label afx-verb-only">Mix</span>
       <input type="range" id="audioFXMixSlider" class="afx-verb-only" min="0" max="100" value="50" aria-label="Reverb mix">
       <span class="afx-label">Level</span>
       <input type="range" id="audioFXOutputLevelSlider" min="0" max="100" value="77" step="1" title="Master output level" aria-label="Master output level">
     </div>
   </div>
+
+  <!-- Standalone ruler-hide chip, fixed to the bottom-left corner. Hoisted
+       out of #audioFXRecordStrip so it sits at the absolute bottom edge
+       opposite the LUFS readout. The existing click handler binds via
+       getElementById('rulerHideBtn'), so wiring is unchanged. -->
+  <button type="button" class="afx-chip on" id="rulerHideBtn" title="Show/hide tuning ruler" aria-label="Show or hide tuning ruler">📏</button>
+
   <!-- Standalone LUFS / peak dB readout, fixed to the bottom-right corner.
        Hoisted out of the strip so it can sit at the absolute bottom edge
        above the rec/stop row without being constrained by the strip's
