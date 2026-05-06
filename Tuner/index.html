@@ -1949,11 +1949,22 @@
       return 100 * Math.log(hz / DRONE_CUTOFF_MIN) / Math.log(DRONE_CUTOFF_MAX / DRONE_CUTOFF_MIN);
     }
 
+    // Lo-fi capture: 540x960 (9:16) is the new default. Halved from the
+    // prior 1080x1920 to slash encoder load + bitrate while staying
+    // perfectly readable at IG/TikTok playback sizes. Other aspects
+    // halved proportionally to keep the same on-screen layout.
     const ASPECT_DIMS = {
-      '9:16': [1080, 1920],
-      '4:5':  [1080, 1350],
-      '1:1':  [1080, 1080]
+      '9:16': [540, 960],
+      '4:5':  [540, 675],
+      '1:1':  [540, 540]
     };
+    // Multiplier applied to all literal-pixel constants in the record-mode
+    // draw path (font sizes, stroke widths, bracket arms, etc.). Hardwired
+    // to 0.5 so the new 540-wide canvas renders the ruler / EDO / crosshair
+    // / labels at the same on-screen proportion they had on the old
+    // 1080-wide canvas. If we ever pick a different capture resolution,
+    // recompute this as (newCanvasWidth / 1080).
+    const CAPTURE_PIXEL_SCALE = 0.5;
     
     const noteNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
     const noteNamesFlat = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
@@ -2256,7 +2267,7 @@
     // per 200 ms tick. Started once, alongside buildMicProcessing.
     let meterRunning = false;
     let meterTimer = null;
-    const METER_UPDATE_MS = 200;
+    const METER_UPDATE_MS = 500;
     const METER_HISTORY_MS = 400;
     function startMeterLoop() {
       if (meterRunning || !micProcessing || !micProcessing.meterAnalyser) return;
@@ -2319,7 +2330,15 @@
       if (!micProcessing) {
         micProcessing = buildMicProcessing(ctx);
         if (micProcessing) {
-          applyVoiceFX({ smooth: false });
+          // Don't build the voice FX chain at bootstrap - defer until the
+          // user enters record mode (see enterRecordMode). Outside record
+          // mode, micProcessing.head stays === micOut, so a mic source
+          // routes mic -> micOut -> masterOutputGain -> recorder dest with
+          // zero compressors / biquads in the path. The K-weighting LUFS
+          // meter tap (already wired in buildMicProcessing) keeps working
+          // because it taps masterOutputGain - it observes the dry signal.
+          updateVoiceProcNote();
+          updateVoiceReverbControlsVisibility();
           startMeterLoop();
         }
       }
@@ -2720,7 +2739,13 @@
 
       if (config.ratios.length === 0) return true;
 
-      const S = recordMode ? rulerScale : 1;
+      // S folds the user's rulerScale slider together with
+      // CAPTURE_PIXEL_SCALE (the resolution-correction factor for lo-fi
+      // capture). Multiplying both into S lets every "* S" literal in the
+      // ruler / EDO / crosshair / ratio-line drawing keep its on-screen
+      // proportion identical to the old 1080-wide canvas without touching
+      // each constant.
+      const S = recordMode ? rulerScale * CAPTURE_PIXEL_SCALE : 1;
       ctx.save();
       if (recordMode && rulerOpacity < 1) ctx.globalAlpha = rulerOpacity;
 
@@ -3078,7 +3103,9 @@
       if (recordMode && showRatioLabel && nearestRatio && indicatorOpacity > 0.02) {
         const x = W * ratioLabelX;
         const y = H * ratioLabelY;
-        const fontSize = 96 * ratioLabelSize;
+        // Big nearest-ratio label. Base size scaled by CAPTURE_PIXEL_SCALE
+        // so on-screen proportion matches the old 1080-wide canvas.
+        const fontSize = 96 * CAPTURE_PIXEL_SCALE * ratioLabelSize;
 
         ctx.save();
         ctx.globalAlpha = indicatorOpacity;
@@ -3726,9 +3753,24 @@
     }
 
     // Rebuild the voice chain to match voiceFX state. Smooth: ramp
-    // micOut.gain to 0, swap, ramp back up — avoids pop on toggle.
+    // micOut.gain to 0, swap, ramp back up - avoids pop on toggle.
+    //
+    // Record-mode gate: the FX chain (highpass + compressor + makeup +
+    // de-esser + optional reverb) is the heaviest part of the audio
+    // graph. Outside record mode the user is in tuner / drone-monitor
+    // mode and the recording bus is irrelevant - running 4+ biquads
+    // and two DynamicsCompressors continuously was the #3 hotspot in
+    // the audit. So when !recordMode, this function only updates the
+    // UI labels (so toggle clicks feel responsive) and bails before
+    // touching any audio nodes. enterRecordMode/exitRecordMode handle
+    // the actual build/dispose around the recording window.
     function applyVoiceFX(opts) {
       if (!micProcessing) { updateVoiceProcNote(); return; }
+      if (!recordMode) {
+        updateVoiceProcNote();
+        updateVoiceReverbControlsVisibility();
+        return;
+      }
       const ctx = micProcessing.ctx;
       const smooth = !(opts && opts.smooth === false);
 
@@ -3890,6 +3932,24 @@
           micProcessing.micOut.gain.linearRampToValueAtTime(1, t2 + 0.03);
         } catch (_) {}
       }, 40);
+    }
+
+    // Tear down the FX chain on record-mode exit. Counterpart to the
+    // applyVoiceFX call in enterRecordMode. Disconnects every disposable
+    // FX node and reroutes the live mic source straight to micOut, so
+    // the tuner / drone-monitor path goes back to mic -> micOut -> recorder
+    // dest with no biquads or compressors burning CPU. Safe to call even
+    // when no chain is active - disposeVoiceChain is idempotent.
+    function teardownVoiceFXForExit() {
+      if (!micProcessing) return;
+      disposeVoiceChain();
+      if (currentMicSource) {
+        try { currentMicSource.disconnect(); } catch (_) {}
+        if (analyser) { try { currentMicSource.connect(analyser); } catch (_) {} }
+        try { currentMicSource.connect(micProcessing.head); } catch (_) {}
+      }
+      updateVoiceProcNote();
+      updateVoiceReverbControlsVisibility();
     }
 
     // Live update of mix/tail without rebuilding the graph.
@@ -4068,11 +4128,15 @@
         cameraStream = null;
       }
       try {
+        // Lo-fi capture: 540x960 portrait. Pairs with the new ASPECT_DIMS
+        // (canvas internal resolution) and the 3 Mbps MediaRecorder cap.
+        // Browsers with no exact match settle on the nearest portrait mode
+        // and we letterbox/scale on draw - see drawCameraBackground().
         cameraStream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: facingMode },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
+            width:  { ideal: 540 },
+            height: { ideal: 960 }
           },
           audio: false
         });
@@ -4110,6 +4174,13 @@
       if (!ok) return;
 
       recordMode = true;
+      // Build the voice FX chain now that we're in record mode. Outside
+      // record mode applyVoiceFX is a UI-only no-op; this is the call
+      // that materialises highpass/compressor/de-esser/reverb nodes and
+      // reroutes any live mic source through the new chain head. smooth:
+      // false because no audible monitoring is happening yet (recording
+      // hasn't started) - instant build is fine.
+      if (micProcessing) applyVoiceFX({ smooth: false });
       // Drop analyser FFT to halve YIN's quadratic cost while the
       // recorder + camera + drone are competing for CPU on Pixel 7.
       // 2048 still resolves down to ~47 Hz at 48 kHz, fine for voice.
@@ -4174,6 +4245,12 @@
         stopRecording();
       }
       recordMode = false;
+      // Tear down the voice FX subgraph and route the live mic source
+      // straight to micOut. Mirrors the applyVoiceFX call in
+      // enterRecordMode. After this returns, the audio graph is back to
+      // the lightweight tuner/drone-monitor configuration: no biquads,
+      // no compressors, no reverb network running in the background.
+      teardownVoiceFXForExit();
       // Restore the larger FFT for maximum pitch precision when not
       // bottlenecked by the recorder.
       if (analyser) {
@@ -4423,9 +4500,12 @@
       const mime = pickRecorderMime();
       recordedChunks = [];
       try {
+        // Lo-fi capture: 3 Mbps video. Plenty for 540x960 @ 30fps and a
+        // big drop from the prior 8 Mbps - keeps mobile encoders happy
+        // and shrinks output files for upload.
         mediaRecorder = mime
-          ? new MediaRecorder(canvasStream, { mimeType: mime, videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 })
-          : new MediaRecorder(canvasStream, { videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 });
+          ? new MediaRecorder(canvasStream, { mimeType: mime, videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 128_000 })
+          : new MediaRecorder(canvasStream, { videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 128_000 });
       } catch (err) {
         console.error('MediaRecorder init failed:', err);
         alert('Recording is not supported on this browser.');
