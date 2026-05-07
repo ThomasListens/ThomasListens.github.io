@@ -4488,6 +4488,33 @@
       }
 
       const canvas = document.getElementById('rulerCanvas');
+      // Force a paint at the final 540x960 dimensions BEFORE acquiring
+      // captureStream. Symptoms on the third 0-byte cycle: chunks were
+      // empty even though MediaRecorder.start() ran and onerror never
+      // fired. Hypothesis: on at least some Chrome (Android) builds,
+      // canvas.captureStream(fps) needs a non-empty initial frame
+      // already painted at the canvas's *current* dimensions, or the
+      // first encoder slice can't find a keyframe and the track stays
+      // silent for the entire recording. The render loop normally
+      // paints on rAF, but startRecording is invoked synchronously from
+      // a click handler — so without an explicit draw() here,
+      // captureStream is acquired before any frame has been pushed
+      // since the last canvas.width=0 reset in enterRecordMode.
+      // Bypass the in-record-mode 33 ms throttle so this paint runs
+      // even if the rAF loop just drew a few ms ago.
+      lastDrawTime = 0;
+      try { draw(); } catch (_) {}
+      // Belt-and-suspenders: if the canvas is somehow still 0-sized
+      // (e.g. enterRecordMode hasn't yet rebuilt the buffer because the
+      // user managed to slip a record press in before the first rAF),
+      // bail loudly instead of silently producing a 0-byte file.
+      if (!canvas.width || !canvas.height) {
+        showRemuxIndicator(
+          'Canvas not ready (' + canvas.width + 'x' + canvas.height + ') — try again.',
+          { warning: true });
+        setTimeout(hideRemuxIndicator, 6000);
+        return;
+      }
       // Browser-paced capture at 30 fps. The browser polls the canvas
       // on its own clock, independent of rAF / main-thread jitter, so
       // the muxer sees a steady video clock even when YIN, canvas blur,
@@ -4500,6 +4527,28 @@
       // clock stalls, and the muxer popped on each realignment.
       const canvasStream = canvas.captureStream(30);
       recordVideoTrack = canvasStream.getVideoTracks()[0] || null;
+      // Snapshot captureStream video-track health so the on-stop
+      // diagnostic can include it even after the track has been ended.
+      // Mobile users have no console; if the track was muted from the
+      // moment it was created, that's the smoking gun for the 0-byte
+      // case and we need to surface it visibly.
+      let captureVideoSettings = {};
+      let captureVideoTrackSummary = 'no-video-track';
+      try {
+        if (recordVideoTrack) {
+          captureVideoSettings = recordVideoTrack.getSettings
+            ? recordVideoTrack.getSettings() : {};
+          captureVideoTrackSummary =
+            'rs=' + recordVideoTrack.readyState +
+            ' muted=' + recordVideoTrack.muted +
+            ' enabled=' + recordVideoTrack.enabled +
+            ' ' + (captureVideoSettings.width || '?') + 'x' +
+            (captureVideoSettings.height || '?') +
+            ' @' + (captureVideoSettings.frameRate || '?') + 'fps';
+        }
+        console.log('[record] captureStream video-track', captureVideoTrackSummary,
+          'settings=', captureVideoSettings);
+      } catch (_) {}
 
       // Audio track selection. The Web Audio path
       // (MediaStreamAudioSourceNode → ... → MediaStreamAudioDestinationNode)
@@ -4547,6 +4596,11 @@
 
       const mime = pickRecorderMime();
       recordedChunks = [];
+      // Diagnostic counters — distinguish "ondataavailable never fired"
+      // from "fired but every chunk was empty". The size-guard at stop
+      // surfaces both; mobile users can read it without a console.
+      let dataEvents = 0;
+      let emptyEvents = 0;
       try {
         // Lo-fi capture: 3 Mbps video. Plenty for 540x960 @ 30fps and a
         // big drop from the prior 8 Mbps - keeps mobile encoders happy
@@ -4561,7 +4615,12 @@
       }
 
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+        if (e.data && e.data.size > 0) {
+          dataEvents++;
+          recordedChunks.push(e.data);
+        } else {
+          emptyEvents++;
+        }
       };
       // Surface MediaRecorder runtime errors. The canvas captureStream and
       // the AudioContext-backed audio track can both fault in ways that
@@ -4609,9 +4668,19 @@
         // "small unplayable file" symptom we were chasing - now logged
         // and surfaced rather than silently dumped to disk.
         if (totalBytes < 1024) {
-          console.warn('[record] empty/init-only stop — skipping save (chunks=' + chunks.length + ', bytes=' + totalBytes + ')');
-          showRemuxIndicator('Recording produced no data (' + totalBytes + ' bytes). Not saved.', { warning: true });
-          setTimeout(hideRemuxIndicator, 6000);
+          console.warn('[record] empty/init-only stop — skipping save (chunks=' + chunks.length +
+            ', bytes=' + totalBytes + ', dataEvents=' + dataEvents + ', emptyEvents=' + emptyEvents +
+            ', vt=' + captureVideoTrackSummary + ')');
+          // Surface every diagnostic the on-screen indicator can fit.
+          // dataEvents/emptyEvents tell us whether ondataavailable fired
+          // at all (encoder not started) versus fired-but-empty (encoder
+          // running but no frames). vt summary tells us if the canvas
+          // captureStream's video track was muted/ended from the start.
+          showRemuxIndicator(
+            'No data (' + totalBytes + 'b, data=' + dataEvents + ', empty=' + emptyEvents +
+            '; ' + captureVideoTrackSummary + '). Not saved.',
+            { warning: true });
+          setTimeout(hideRemuxIndicator, 9000);
           recordedChunks = [];
           return;
         }
@@ -4660,6 +4729,30 @@
 
         recordedChunks = [];
       };
+
+      // Yield one rAF tick before starting the encoder. captureStream
+      // was acquired moments ago and the canvas has been painted, but
+      // on Chromium-based browsers the captureStream's first sample
+      // happens on the *browser* clock, not synchronously. Letting the
+      // browser run one frame before MediaRecorder.start() guarantees
+      // the encoder sees a ready, non-muted track with at least one
+      // sampled frame buffered — without this, the third 0-byte cycle
+      // saw MediaRecorder.start() race past the captureStream's first
+      // sample and the encoder waited forever for a frame that the
+      // (now-paused-on-script) track never produced.
+      await new Promise(r => requestAnimationFrame(r));
+      // Force one explicit canvas paint immediately before start, then
+      // try requestFrame() if available. requestFrame() pushes a frame
+      // into the captureStream track unconditionally, kicking the
+      // encoder out of any "waiting for first frame" stall. It's a
+      // no-op if the browser doesn't expose it.
+      lastDrawTime = 0;
+      try { draw(); } catch (_) {}
+      try {
+        if (recordVideoTrack && typeof recordVideoTrack.requestFrame === 'function') {
+          recordVideoTrack.requestFrame();
+        }
+      } catch (_) {}
 
       // 1-second timeslice: the encoder flushes a chunk every second,
       // so the muxer never accumulates a long backlog of audio packets
