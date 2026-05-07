@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""
+Canonical rebuild for letterbox-aware ruler overlay.
+Reads index.html, applies three string replacements, writes new file.
+"""
+import os, sys, tempfile, shutil
+
+SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'index.html')
+
+with open(SRC, 'r', encoding='utf-8', newline='') as f:
+    text = f.read()
+
+orig_len = len(text)
+
+# 1. Add module-scope variable near other camera state.
+old1 = "    let recordAspect = '9:16';\n    let rulerOpacity = 1.0;\n"
+new1 = (
+    "    let recordAspect = '9:16';\n"
+    "    let rulerOpacity = 1.0;\n"
+    "\n"
+    "    // Visible camera rect after letterbox fit (set by\n"
+    "    // drawCameraBackground in record mode). After 62e0255 the camera\n"
+    "    // is FIT (Math.min) into the canvas with black bars top + bottom\n"
+    "    // in portrait aspects. The ruler/EDO/ratios overlay anchors to\n"
+    "    // this rect so the ruler doesn't drift into the bars.\n"
+    "    let cameraVisibleRect = null;\n"
+)
+assert old1 in text, 'patch 1 anchor not found'
+text = text.replace(old1, new1, 1)
+
+# 2. Inside drawCameraBackground, record the visible Y range right
+# after the letterbox math is computed.
+old2 = (
+    "      const dx = (W - drawW) / 2 + cameraPanX * (overflowX / 2);\n"
+    "      const dy = (H - drawH) / 2 + cameraPanY * (overflowY / 2);\n"
+    "\n"
+    "      if (trailAmount > 0.02) {\n"
+)
+new2 = (
+    "      const dx = (W - drawW) / 2 + cameraPanX * (overflowX / 2);\n"
+    "      const dy = (H - drawH) / 2 + cameraPanY * (overflowY / 2);\n"
+    "\n"
+    "      // Snapshot the visible (clamped) Y range of the camera image\n"
+    "      // for the ruler overlay. When zoom > 1 the image overflows the\n"
+    "      // canvas (no letterbox bars); when zoom <= 1 with a 4:3 source\n"
+    "      // there are bars top + bottom and the overlay confines itself\n"
+    "      // to [y0, y1] so it doesn't paint over them.\n"
+    "      cameraVisibleRect = {\n"
+    "        y0: Math.max(0, dy),\n"
+    "        y1: Math.min(H, dy + drawH)\n"
+    "      };\n"
+    "\n"
+    "      if (trailAmount > 0.02) {\n"
+)
+assert old2 in text, 'patch 2 anchor not found'
+text = text.replace(old2, new2, 1)
+
+# 3. Inside draw(), introduce topY/botY and rescale rulerTop/rulerBottom.
+old3 = (
+    "      const padding = 60;\n"
+    "      const rulerTop = padding;\n"
+    "      const rulerBottom = H - padding;\n"
+    "      const rulerHeight = rulerBottom - rulerTop;\n"
+)
+new3 = (
+    "      // Letterbox-aware vertical bounds. In record mode, after the\n"
+    "      // 4:3 camera is fit into the 9:16 (or 4:5 / 1:1) canvas, the\n"
+    "      // visible image only spans [y0, y1] -- everything else is\n"
+    "      // black bars. Anchor the ruler to that rect so the ruler /\n"
+    "      // EDO grid / ratio labels / crosshair / big nearest-ratio\n"
+    "      // label all stay inside the visible image and don't bleed\n"
+    "      // into the bars. Guarded so a non-letterboxed canvas (zoom\n"
+    "      // overflow, or non-record mode) keeps using the full height.\n"
+    "      let topY = 0, botY = H;\n"
+    "      if (recordMode && cameraVisibleRect) {\n"
+    "        const v0 = Math.max(0, cameraVisibleRect.y0);\n"
+    "        const v1 = Math.min(H, cameraVisibleRect.y1);\n"
+    "        if (v0 > 0 || v1 < H) {\n"
+    "          topY = v0;\n"
+    "          botY = v1;\n"
+    "        }\n"
+    "      }\n"
+    "\n"
+    "      const padding = 60;\n"
+    "      const rulerTop = topY + padding;\n"
+    "      const rulerBottom = botY - padding;\n"
+    "      const rulerHeight = rulerBottom - rulerTop;\n"
+)
+assert old3 in text, 'patch 3 anchor not found'
+text = text.replace(old3, new3, 1)
+
+# 4. Big nearest-ratio label uses topY/botY too so the bottom-right
+# "1/1" sits inside the visible image instead of over the lower bar.
+old4 = (
+    "      if (recordMode && showRatioLabel && nearestRatio && indicatorOpacity > 0.02) {\n"
+    "        const x = W * ratioLabelX;\n"
+    "        const y = H * ratioLabelY;\n"
+)
+new4 = (
+    "      if (recordMode && showRatioLabel && nearestRatio && indicatorOpacity > 0.02) {\n"
+    "        const x = W * ratioLabelX;\n"
+    "        // Anchor the big label to the letterbox-corrected visible rect\n"
+    "        // (topY/botY) so it doesn't sit on the lower black bar.\n"
+    "        const y = topY + (botY - topY) * ratioLabelY;\n"
+)
+assert old4 in text, 'patch 4 anchor not found'
+text = text.replace(old4, new4, 1)
+
+# Sanity: must still end with </html>
+assert text.rstrip().endswith('</html>'), 'output does not end with </html>'
+
+# Atomic write via tempfile in same directory (FUSE-safe).
+dirpath = os.path.dirname(SRC)
+fd, tmp = tempfile.mkstemp(prefix='.index.html.', suffix='.tmp', dir=dirpath)
+os.close(fd)
+with open(tmp, 'w', encoding='utf-8', newline='') as f:
+    f.write(text)
+shutil.move(tmp, SRC)
+
+new_len = len(text)
+print(f'OK: {orig_len} -> {new_len} bytes (delta {new_len - orig_len:+d})')

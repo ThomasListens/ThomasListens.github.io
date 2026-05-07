@@ -146,36 +146,10 @@
       border-radius: 50%;
       animation: pulse 1.4s ease-in-out infinite;
     }
-
+    
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.5; transform: scale(1.1); }
-    }
-
-    /* Secondary chip below #micBtn — quiet, neutral. Activates a candle-
-       warm border when spectrum view is active so the panel mirrors the
-       canvas state at a glance. */
-    #modeToggleBtn {
-      padding: 8px 14px;
-      border: 1px solid #333;
-      border-radius: 6px;
-      background: #1a1a1a;
-      color: #888;
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-      width: 100%;
-    }
-    #modeToggleBtn:hover {
-      background: #222;
-      color: #fff;
-      border-color: #444;
-    }
-    body.spectrum-mode #modeToggleBtn {
-      border-color: rgba(255, 165, 80, 0.55);
-      color: rgba(255, 200, 130, 0.95);
-      background: rgba(60, 30, 10, 0.4);
     }
     
     .checkbox-row {
@@ -235,47 +209,11 @@
       position: relative;
       background: #000;
     }
-
-    /* Static dark frame — a quiet inset shadow that gives the screen a
-       subtle border at all times. Pure decoration; pointer-events:none
-       means taps still go to the canvas. Sized small so it never
-       competes with the ruler / EDO grid for attention. */
-    #rulerContainer::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 1;
-      box-shadow: inset 0 0 28px rgba(0, 0, 0, 0.55);
-    }
-
-    /* Audio-reactive bloom. CSS custom property --mic-level (0..1) is
-       written each rAF tick by audioLoop from rawMicAnalyser RMS. Quiet
-       room → 0, full voice → ~1. Both blur radius and alpha scale with
-       level, so silence is genuinely invisible (0px blur paints nothing
-       regardless of color). transition smooths any jitter from the JS
-       writes; the JS already smooths asymmetrically so the transition is
-       just a final cushion. Inset only — bloom hugs the inside of the
-       frame, no outer halo. Color is candle-amber (Colossus, not
-       Mario). */
-    #rulerContainer::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 1;
-      box-shadow:
-        inset 0 0 calc(var(--mic-level, 0) * 70px) rgba(255, 165, 80, calc(var(--mic-level, 0) * 0.22)),
-        inset 0 0 calc(var(--mic-level, 0) * 18px) rgba(255, 200, 130, calc(var(--mic-level, 0) * 0.15));
-      transition: box-shadow 180ms ease-out;
-    }
-
+    
     #rulerCanvas {
       width: 100%;
       height: 100%;
       touch-action: none;
-      position: relative;
-      z-index: 0;
     }
     
     .button-row {
@@ -1352,33 +1290,6 @@
       display: block;
     }
     /* ------------------------------------------------------------------
-       Raw mic level readout. Mirrors #audioFXMeter visually but sits
-       16 px above it so both can be read at a glance, and is visible
-       whenever the mic is enabled (body.mic-listening) — NOT gated on
-       record mode. Lets the user verify the input chain end-to-end:
-       MIC shows pre-FX RMS dBFS off the mic source, while #audioFXMeter
-       shows post-Level LUFS off the master bus. */
-    #micRawMeter {
-      display: none;
-      position: fixed;
-      bottom: calc(64px + env(safe-area-inset-bottom) + 16px);
-      right: 12px;
-      width: 130px;
-      z-index: 250;
-      pointer-events: none;
-      font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 9px;
-      letter-spacing: 0.3px;
-      color: rgba(255, 255, 255, 0.55);
-      white-space: nowrap;
-      min-width: 88px;
-      text-align: center;
-      font-variant-numeric: tabular-nums;
-    }
-    body.mic-listening #micRawMeter {
-      display: block;
-    }
-    /* ------------------------------------------------------------------
        Standalone flip-camera chip — sibling of #rulerHideBtn. Was
        previously inside #recordOverlay .record-essential; pulled out so
        it lives next to ruler-hide in the bottom-left corner. Same
@@ -1424,13 +1335,6 @@
       <h1 id="title">JI Pitch Ruler</h1>
       
       <button id="micBtn">Microphone</button>
-      <!-- View mode toggle: flips the canvas between pitch view (ruler /
-           EDO / ratios / wake / crosshair) and spectrum view (a log-
-           spaced FFT curve for free listening). The spectrum path skips
-           YIN drawing entirely so it's strictly cheaper — useful when
-           working with percussive material or just listening, and
-           welcome on a hot phone mid-session. -->
-      <button id="modeToggleBtn" title="Switch between pitch and spectrum view">Pitch view</button>
 
       <div class="control-section">
         <div class="section-header">Audio input</div>
@@ -1745,13 +1649,6 @@
        inline-flex flow. updateMeterDisplay still targets it by id. -->
   <span class="afx-meter" id="audioFXMeter" title="Momentary LUFS / peak dB (post-Level)">— LUFS / — dB</span>
 
-  <!-- Raw mic level readout, fixed alongside #audioFXMeter but visible
-       whenever the mic is enabled (independent of record mode + FX).
-       Reads RMS dBFS directly off the mic source so the user can A/B
-       this against #audioFXMeter's post-Level LUFS to localise input
-       chain issues. Updated by updateMeterDisplay (see startMeterLoop). -->
-  <span class="afx-meter" id="micRawMeter" title="Raw mic level (RMS dBFS, pre-FX)">MIC — dB</span>
-
   <div id="recordOverlay">
     <div class="aspect-row">
       <button class="aspect-btn active" data-aspect="9:16">9:16</button>
@@ -1873,42 +1770,6 @@
     // Reusable buffer for analyser.getFloatTimeDomainData. Allocated once
     // and resized only when fftSize changes. See audioLoop.
     let pitchBuffer = null;
-    // Audio-reactive border state. Sampled per rAF off rawMicAnalyser so
-    // the CSS bloom on #rulerContainer breathes with the mic input. Buffer
-    // is reused across frames (same GC-avoidance pattern as pitchBuffer).
-    // smoothedMicLevel is the 0..1 value written to the --mic-level CSS
-    // custom property; asymmetric attack/decay lives in audioLoop.
-    let micLevelBuf = null;
-    let smoothedMicLevel = 0;
-    // App mode: 'pitch' (default — ruler / EDO / ratios / wake / crosshair)
-    // or 'spectrum' (free / listening view — log-spaced FFT curve, drone
-    // and recording still work). Toggled from the side panel button. The
-    // spectrum path is strictly cheaper than pitch (no YIN draw, just one
-    // getByteFrequencyData + one filled curve).
-    let appMode = 'pitch';
-    // Reusable Uint8Array for spectrum visualizer FFT reads. Same GC-
-    // avoidance pattern as pitchBuffer / micLevelBuf.
-    let spectrumBuf = null;
-    let spectrumYs = null;
-    // Pitch-detection bandpass: a highpass+lowpass biquad pair (80 / 1200 Hz)
-    // sitting between every pitch source (mic or decoded file) and the
-    // pitch `analyser`. Cuts wind / HVAC rumble below 80 Hz and sibilance /
-    // hiss above 1200 Hz BEFORE YIN sees the buffer, so the algorithm
-    // doesn't have to discriminate against environmental noise. The LUFS
-    // meter, raw MIC dBFS readout, recording chain, and audible playback
-    // are all parallel to this filter - they observe the original full-band
-    // signal. Built lazily once per AudioContext via ensurePitchBandpass().
-    // YIN itself is untouched.
-    let pitchBandpass = null;
-    const PITCH_BANDPASS_LOW_HZ  = 80;    // highpass cutoff
-    const PITCH_BANDPASS_HIGH_HZ = 1200;  // lowpass cutoff
-    // YIN confidence (= 1 - minVal; higher is better) thresholds. The
-    // pitch indicator only updates when probability >= PITCH_PROB_FLOOR;
-    // when probability >= PITCH_PROB_HIGH the smoothing alpha is doubled and
-    // the crosshair shows at full alpha; in between the alpha is halved
-    // and the crosshair dims to ~50%.
-    const PITCH_PROB_FLOOR = 0.60;
-    const PITCH_PROB_HIGH  = 0.85;
     let ratioExtensions = {}, lastNearestLabel = null;
     let indicatorY = null, indicatorOpacity = 0;
     let lastDisplayCents = null, lastDisplayFreq = null, smoothedProximity = 0;
@@ -2044,13 +1905,6 @@
     let recordAspect = '9:16';
     let rulerOpacity = 1.0;
 
-    // Visible camera rect after letterbox fit (set by
-    // drawCameraBackground in record mode). After 62e0255 the camera
-    // is FIT (Math.min) into the canvas with black bars top + bottom
-    // in portrait aspects. The ruler/EDO/ratios overlay anchors to
-    // this rect so the ruler doesn't drift into the bars.
-    let cameraVisibleRect = null;
-
     // Feature 1: settings hide
     let settingsHidden = false;
     // Snapshot of settingsHidden taken when entering record mode so the
@@ -2102,11 +1956,11 @@
     // dimensions not divisible by 16. 540 fails this; 544 = 16 * 34
     // does not. Symptom of the misalignment was 25-31 KB files that
     // open in a player as "video" but stay stuck at 0:00 with a black
-    // frame -- exactly what you see when the encoder emits data without
+    // frame — exactly what you see when the encoder emits data without
     // valid keyframes. All values below are also kept on a 16-pixel
     // grid for max compatibility (960=16*60, 680=16*42.5 -> 680 ok,
     // 544=16*34). The 4:5 height moved from 675 to 680 (5/4 of 544).
-    // Visually 4 extra pixels of width is a 0.7% change -- invisible.
+    // Visually 4 extra pixels of width is a 0.7% change — invisible.
     const ASPECT_DIMS = {
       '9:16': [544, 960],
       '4:5':  [544, 680],
@@ -2116,9 +1970,9 @@
     // draw path (font sizes, stroke widths, bracket arms, etc.). Hardwired
     // to 0.5 so the lo-fi 544-wide canvas renders the ruler / EDO /
     // crosshair / labels at the same on-screen proportion they had on
-    // the old 1080-wide canvas. 544/1088 ≈ 0.5 (0.7% drift; nobody
-    // will notice). If we ever pick a different capture resolution,
-    // recompute this as (newCanvasWidth / 1080).
+    // the old 1080-wide canvas. 544/1088 ≈ 0.5 (0.7% drift; nobody will
+    // notice). If we ever pick a different capture resolution, recompute
+    // this as (newCanvasWidth / 1080).
     const CAPTURE_PIXEL_SCALE = 0.5;
     
     const noteNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
@@ -2404,42 +2258,6 @@
       return audioContext;
     }
 
-    // Lazily build the pitch-detection bandpass for the current AudioContext.
-    // Returns { hp, lp } - hp.connect(lp) is permanent. Re-creates the pair
-    // if the AudioContext has changed under us (defensive; the context is
-    // currently never closed, but this avoids cross-context node errors if
-    // that ever changes). Q = 1/sqrt(2) gives a maximally-flat passband.
-    function ensurePitchBandpass(ctx) {
-      if (pitchBandpass && pitchBandpass.hp && pitchBandpass.hp.context === ctx) {
-        return pitchBandpass;
-      }
-      const hp = ctx.createBiquadFilter();
-      hp.type = 'highpass';
-      hp.frequency.value = PITCH_BANDPASS_LOW_HZ;
-      hp.Q.value = 0.7071;
-      const lp = ctx.createBiquadFilter();
-      lp.type = 'lowpass';
-      lp.frequency.value = PITCH_BANDPASS_HIGH_HZ;
-      lp.Q.value = 0.7071;
-      hp.connect(lp);
-      pitchBandpass = { hp, lp };
-      return pitchBandpass;
-    }
-
-    // Wire `source` into the pitch analyser via the bandpass. The lp tail
-    // is reconnected to the (possibly fresh) analyser on every call so that
-    // analyser recreation in toggleListening / startFilePlayback survives.
-    // Other taps (FX chain, raw mic meter, audible destination) are NOT
-    // routed through this - callers connect those in parallel as before.
-    function connectSourceToPitchAnalyser(source) {
-      if (!source || !audioContext || !analyser) return false;
-      const bp = ensurePitchBandpass(audioContext);
-      try { bp.lp.disconnect(); } catch (_) {}
-      try { source.connect(bp.hp); } catch (_) {}
-      try { bp.lp.connect(analyser); } catch (_) {}
-      return true;
-    }
-
     // One-time audio graph construction. Idempotent — every entry point
     // that needs audio (drone toggle, mic toggle, record start, per-ratio
     // drone tap) calls this first; first call builds the full permanent
@@ -2465,12 +2283,6 @@
       meterRunning = true;
       const an = micProcessing.meterAnalyser;
       const buf = new Float32Array(an.fftSize);
-      // Parallel raw-mic analyser buffer (same fftSize). Optional — only
-      // populated when buildMicProcessing succeeded and the analyser exists.
-      // The MIC readout shows instantaneous RMS in dBFS off the live mic
-      // source, before any FX or master gain.
-      const rawAn = micProcessing.rawMicAnalyser || null;
-      const rawBuf = rawAn ? new Float32Array(rawAn.fftSize) : null;
       const historyLen = Math.max(1, Math.ceil(METER_HISTORY_MS / METER_UPDATE_MS));
       const msHistory = new Array(historyLen).fill(0);
       let historyIdx = 0;
@@ -2496,22 +2308,7 @@
         // Mono channel weight = 1.0, so LUFS = -0.691 + 10*log10(meanSq).
         const lufsM = avgMs > 1e-12 ? -0.691 + 10 * Math.log10(avgMs) : -Infinity;
         const peakDb = peak > 1e-9 ? 20 * Math.log10(peak) : -Infinity;
-        // Raw mic level: instantaneous RMS in dBFS, no smoothing window.
-        // 500 ms refresh is plenty for diagnostic-grade visibility.
-        let rawDb = -Infinity;
-        if (rawAn && rawBuf) {
-          try {
-            rawAn.getFloatTimeDomainData(rawBuf);
-            let rsq = 0;
-            for (let i = 0; i < rawBuf.length; i++) {
-              const v = rawBuf[i];
-              rsq += v * v;
-            }
-            const rRms = Math.sqrt(rsq / rawBuf.length);
-            rawDb = rRms > 1e-9 ? 20 * Math.log10(rRms) : -Infinity;
-          } catch (_) { /* analyser disposed mid-tick — fine, skip */ }
-        }
-        updateMeterDisplay(lufsM, peakDb, rawDb);
+        updateMeterDisplay(lufsM, peakDb);
       }, METER_UPDATE_MS);
     }
     function stopMeterLoop() {
@@ -2519,35 +2316,18 @@
       meterTimer = null;
       meterRunning = false;
     }
-    function updateMeterDisplay(lufsM, peakDb, rawDb) {
+    function updateMeterDisplay(lufsM, peakDb) {
       const el = document.getElementById('audioFXMeter');
-      if (el) {
-        const lufsStr = isFinite(lufsM) ? lufsM.toFixed(0) : '—';
-        const peakStr = isFinite(peakDb) ? peakDb.toFixed(0) : '—';
-        el.textContent = lufsStr + ' LUFS / ' + peakStr + ' dB';
-        if (isFinite(peakDb) && peakDb > -1) {
-          el.style.color = 'rgba(220, 80, 80, 0.95)';
-        } else if (isFinite(lufsM) && lufsM > -10) {
-          el.style.color = 'rgba(220, 160, 60, 0.95)';
-        } else {
-          el.style.color = '';
-        }
-      }
-      // Raw mic readout (pre-FX RMS in dBFS). Always present in DOM but
-      // only visible via CSS when body has .mic-listening. Updated every
-      // tick regardless so the value is fresh the moment it appears.
-      const rawEl = document.getElementById('micRawMeter');
-      if (rawEl) {
-        const rawStr = (typeof rawDb === 'number' && isFinite(rawDb))
-          ? rawDb.toFixed(0)
-          : '—';
-        rawEl.textContent = 'MIC ' + rawStr + ' dB';
-        if (typeof rawDb === 'number' && isFinite(rawDb) && rawDb > -2) {
-          // Clipping warning. -2 dBFS gives a small headroom margin.
-          rawEl.style.color = 'rgba(220, 80, 80, 0.95)';
-        } else {
-          rawEl.style.color = '';
-        }
+      if (!el) return;
+      const lufsStr = isFinite(lufsM) ? lufsM.toFixed(0) : '—';
+      const peakStr = isFinite(peakDb) ? peakDb.toFixed(0) : '—';
+      el.textContent = lufsStr + ' LUFS / ' + peakStr + ' dB';
+      if (isFinite(peakDb) && peakDb > -1) {
+        el.style.color = 'rgba(220, 80, 80, 0.95)';
+      } else if (isFinite(lufsM) && lufsM > -10) {
+        el.style.color = 'rgba(220, 160, 60, 0.95)';
+      } else {
+        el.style.color = '';
       }
     }
     let audioBootstrapped = false;
@@ -2811,32 +2591,13 @@
       const vw = video.videoWidth, vh = video.videoHeight;
       if (!vw || !vh) return;
 
-      // Camera FOV decoupling, take 2: capture 4:3 landscape (wide
-      // horizontal field, see setupCamera constraints) and FIT it
-      // inside the 9:16 canvas with Math.min (contain). Black bars
-      // appear top + bottom — the encoder still emits a clean 9:16
-      // frame, but no horizontal sensor pixels are cropped. Switching
-      // from cover (Math.max) was the fix for the persistent
-      // 'still zoomed in' symptom on Pixel-class front cameras: those
-      // sensors are 4:3 native and Chrome was side-cropping the
-      // rejected 9:16 request, narrowing the effective FOV.
-      const baseScale = Math.min(W / vw, H / vh);
+      const baseScale = Math.max(W / vw, H / vh);
       const scale = baseScale * cameraZoom;
       const drawW = vw * scale, drawH = vh * scale;
       const overflowX = Math.max(0, drawW - W);
       const overflowY = Math.max(0, drawH - H);
       const dx = (W - drawW) / 2 + cameraPanX * (overflowX / 2);
       const dy = (H - drawH) / 2 + cameraPanY * (overflowY / 2);
-
-      // Snapshot the visible (clamped) Y range of the camera image
-      // for the ruler overlay. When zoom > 1 the image overflows the
-      // canvas (no letterbox bars); when zoom <= 1 with a 4:3 source
-      // there are bars top + bottom and the overlay confines itself
-      // to [y0, y1] so it doesn't paint over them.
-      cameraVisibleRect = {
-        y0: Math.max(0, dy),
-        y1: Math.min(H, dy + drawH)
-      };
 
       if (trailAmount > 0.02) {
         // Lazy-init / resize trail buffer
@@ -2862,104 +2623,6 @@
         trailSeeded = false; // reset so re-enabling trail seeds fresh
         drawCameraOnto(ctx, video, W, H, dx, dy, drawW, drawH, 1);
       }
-    }
-
-    // Spectrum view: log-spaced FFT curve painted into the visible
-    // letterbox rect. Strictly cheaper than the pitch path — one
-    // getByteFrequencyData read, one filled curve, one stroked
-    // outline. No YIN, no ruler, no ratio math. Uses rawMicAnalyser
-    // (full-band, raw mic) when listening so percussive transients
-    // and high-frequency content actually appear; falls back to the
-    // pitch analyser for file playback.
-    function drawSpectrum(ctx, W, H, topY, botY) {
-      const an = (isListening && micProcessing) ? micProcessing.rawMicAnalyser
-               : analyser;
-      const padX = W * 0.04;
-      const visibleW = W - 2 * padX;
-      const baseY = botY - (botY - topY) * 0.08;
-      const visibleH = (botY - topY) * 0.55;
-      const topAreaY = baseY - visibleH;
-
-      // No analyser yet (audio context not booted) — paint a faint
-      // baseline so the canvas isn't obviously dead, then bail.
-      if (!an) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(255, 165, 80, 0.12)';
-        ctx.fillRect(padX, baseY - 1, visibleW, 1);
-        ctx.restore();
-        return;
-      }
-
-      const binCount = an.frequencyBinCount;
-      if (!spectrumBuf || spectrumBuf.length !== binCount) {
-        spectrumBuf = new Uint8Array(binCount);
-      }
-      try {
-        an.getByteFrequencyData(spectrumBuf);
-      } catch (_) { return; }
-
-      const sr = (audioContext && audioContext.sampleRate) || 48000;
-      const binHz = sr / (binCount * 2); // == sampleRate / fftSize
-      const fLo = 60, fHi = 12000;
-      const logLo = Math.log(fLo);
-      const logSpan = Math.log(fHi) - logLo;
-      const cols = Math.max(48, Math.min(192, Math.floor(W / 4)));
-
-      if (!spectrumYs || spectrumYs.length !== cols + 1) {
-        spectrumYs = new Float32Array(cols + 1);
-      }
-
-      // Sample once into spectrumYs; both fill and stroke walk this.
-      for (let i = 0; i <= cols; i++) {
-        const t = i / cols;
-        const f0 = Math.exp(logLo + logSpan * t);
-        const f1 = Math.exp(logLo + logSpan * Math.min(1, t + 1 / cols));
-        const b0 = Math.max(1, Math.floor(f0 / binHz));
-        const b1 = Math.max(b0 + 1, Math.floor(f1 / binHz));
-        let sum = 0, n = 0;
-        for (let b = b0; b < b1 && b < binCount; b++) {
-          sum += spectrumBuf[b];
-          n++;
-        }
-        const v = n > 0 ? sum / n : 0;
-        // pow(0.85) lifts midrange so the floor doesn't always sit
-        // pegged at the bottom of the visible area.
-        const norm = Math.pow(v / 255, 0.85);
-        spectrumYs[i] = baseY - norm * visibleH;
-      }
-
-      ctx.save();
-
-      // Filled body, candle-amber gradient.
-      const grad = ctx.createLinearGradient(0, topAreaY, 0, baseY);
-      grad.addColorStop(0, 'rgba(255, 200, 130, 0.05)');
-      grad.addColorStop(0.6, 'rgba(255, 165, 80, 0.22)');
-      grad.addColorStop(1, 'rgba(220, 110, 50, 0.45)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.moveTo(padX, baseY);
-      for (let i = 0; i <= cols; i++) {
-        const x = padX + visibleW * (i / cols);
-        ctx.lineTo(x, spectrumYs[i]);
-      }
-      ctx.lineTo(padX + visibleW, baseY);
-      ctx.closePath();
-      ctx.fill();
-
-      // Bright outline along the curve top.
-      ctx.beginPath();
-      ctx.moveTo(padX, spectrumYs[0]);
-      for (let i = 1; i <= cols; i++) {
-        const x = padX + visibleW * (i / cols);
-        ctx.lineTo(x, spectrumYs[i]);
-      }
-      ctx.strokeStyle = 'rgba(255, 210, 150, 0.6)';
-      ctx.lineWidth = 1.5;
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-      ctx.stroke();
-
-      ctx.restore();
     }
 
     function drawRulerBackdrop(ctx, W, H) {
@@ -3058,19 +2721,6 @@
           // not draw()).
           return true;
         }
-        if (appMode === 'spectrum') {
-          // Spectrum view in record mode: paint the FFT curve over the
-          // camera, anchored to the letterboxed visible image rect.
-          // Skip ruler backdrop / ticks / ratios / wake / crosshair.
-          let sTop = 0, sBot = H;
-          if (cameraVisibleRect) {
-            const v0 = Math.max(0, cameraVisibleRect.y0);
-            const v1 = Math.min(H, cameraVisibleRect.y1);
-            if (v0 > 0 || v1 < H) { sTop = v0; sBot = v1; }
-          }
-          drawSpectrum(ctx, W, H, sTop, sBot);
-          return true;
-        }
         drawRulerBackdrop(ctx, W, H);
       } else {
         // Non-record mode: no camera preview here. The <video> element
@@ -3094,10 +2744,6 @@
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, W, H);
         if (rulerHidden) return true;
-        if (appMode === 'spectrum') {
-          drawSpectrum(ctx, W, H, 0, H);
-          return true;
-        }
       }
 
       if (config.ratios.length === 0) return true;
@@ -3128,27 +2774,9 @@
         displayMax = center + visibleSpan / 2;
       }
 
-      // Letterbox-aware vertical bounds. In record mode, after the
-      // 4:3 camera is fit into the 9:16 (or 4:5 / 1:1) canvas, the
-      // visible image only spans [y0, y1] -- everything else is
-      // black bars. Anchor the ruler to that rect so the ruler /
-      // EDO grid / ratio labels / crosshair / big nearest-ratio
-      // label all stay inside the visible image and don't bleed
-      // into the bars. Guarded so a non-letterboxed canvas (zoom
-      // overflow, or non-record mode) keeps using the full height.
-      let topY = 0, botY = H;
-      if (recordMode && cameraVisibleRect) {
-        const v0 = Math.max(0, cameraVisibleRect.y0);
-        const v1 = Math.min(H, cameraVisibleRect.y1);
-        if (v0 > 0 || v1 < H) {
-          topY = v0;
-          botY = v1;
-        }
-      }
-
       const padding = 60;
-      const rulerTop = topY + padding;
-      const rulerBottom = botY - padding;
+      const rulerTop = padding;
+      const rulerBottom = H - padding;
       const rulerHeight = rulerBottom - rulerTop;
       const rulerX = W * config.rulerX;
       
@@ -3176,16 +2804,7 @@
         displayProbability = timeSinceLastPitch < fadeTime ? Math.max(0, 1 - (timeSinceLastPitch / fadeTime)) : 0;
       }
       
-      // Active-frame opacity. When the freshest detection is in the
-      // borderline confidence band (FLOOR..HIGH) we halve the target
-      // alpha so the crosshair visibly dims - a quiet "I'm unsure right
-      // now" cue without changing the user-facing toggles. High-confidence
-      // frames still pop to full brightness.
-      const lowConf = isActive && displayProbability < PITCH_PROB_HIGH;
-      const baseTargetOpacity = isActive
-        ? Math.min(1, currentProbability * 1.2)
-        : displayProbability * 0.5;
-      const targetOpacity = lowConf ? baseTargetOpacity * 0.5 : baseTargetOpacity;
+      const targetOpacity = isActive ? Math.min(1, currentProbability * 1.2) : displayProbability * 0.5;
       indicatorOpacity += (targetOpacity - indicatorOpacity) * 0.2;
       
       let wrappedCents = displayCents;
@@ -3325,46 +2944,30 @@
         }
       }
       
-      // Wake trail: a single tapered, alpha-fading polyline through the
-      // recent ghost positions instead of N discrete halo+core dot pairs.
-      // ~length-1 stroke ops vs the old ~2*length fill ops — about half the
-      // cost, and reads as motion through a medium (contrail / swimmer's
-      // wake) instead of a string of beads.
-      if (config.showGhost && ghostTrail.length > 1) {
+      if (config.showGhost && ghostTrail.length > 0) {
         const ghostColor = (recordMode && nearestRatio) ? nearestRatio.color : null;
-        const N = ghostTrail.length;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        // Optional head extension: if there's a current pitch, treat it as
-        // the wake's leading edge so the trail visually connects into the
-        // crosshair instead of stopping ~40 ms behind it.
-        const hasHead = displayCents !== null && displayProbability > 0.3
-          && displayCents >= displayMin && displayCents <= displayMax;
-        const headCents = hasHead ? displayCents : ghostTrail[N - 1].cents;
-        for (let i = 0; i < N; i++) {
-          const a = ghostTrail[i];
-          const b = (i === N - 1)
-            ? (hasHead ? { cents: headCents } : null)
-            : ghostTrail[i + 1];
-          if (!b) break;
-          if (a.cents < displayMin || a.cents > displayMax) continue;
-          if (b.cents < displayMin || b.cents > displayMax) continue;
-          // Skip segments across big register jumps — those aren't legato
-          // motion, drawing a long line through them looks like a glitch.
-          if (Math.abs(b.cents - a.cents) > 600) continue;
-          // Newest segment (i = N-1) is age 0 → brightest, fattest.
-          const ageNorm = (N - 1 - i) / Math.max(1, N - 1); // 0 = head, 1 = tail
-          const alpha = Math.pow(1 - ageNorm, 1.6) * 0.55;
-          const width = (4.5 - ageNorm * 3.8) * S;
-          if (alpha < 0.02 || width < 0.3) continue;
-          ctx.lineWidth = width;
-          ctx.strokeStyle = ghostColor
-            ? hslToString(ghostColor, alpha)
-            : `rgba(255, 255, 255, ${alpha})`;
-          ctx.beginPath();
-          ctx.moveTo(rulerX, centsToY(a.cents));
-          ctx.lineTo(rulerX, centsToY(b.cents));
-          ctx.stroke();
+        for (let i = 0; i < ghostTrail.length; i++) {
+          const ghost = ghostTrail[i];
+          const age = ghostTrail.length - i;
+          const alpha = Math.pow(1 - age / 20, 1.5) * 0.5;
+          const size = 10 - age * 0.3;
+
+          if (ghost.cents >= displayMin && ghost.cents <= displayMax && size > 2) {
+            const y = centsToY(ghost.cents);
+
+            const haloColor = ghostColor ? hslToString(ghostColor, alpha * 0.4) : `rgba(255, 255, 255, ${alpha * 0.4})`;
+            const coreColor = ghostColor ? hslToString(ghostColor, alpha) : `rgba(255, 255, 255, ${alpha})`;
+
+            ctx.fillStyle = haloColor;
+            ctx.beginPath();
+            ctx.arc(rulerX, y, size + 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = coreColor;
+            ctx.beginPath();
+            ctx.arc(rulerX, y, size / 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
       }
       
@@ -3508,9 +3111,7 @@
 
       if (recordMode && showRatioLabel && nearestRatio && indicatorOpacity > 0.02) {
         const x = W * ratioLabelX;
-        // Anchor the big label to the letterbox-corrected visible rect
-        // (topY/botY) so it doesn't sit on the lower black bar.
-        const y = topY + (botY - topY) * ratioLabelY;
+        const y = H * ratioLabelY;
         // Big nearest-ratio label. Base size scaled by CAPTURE_PIXEL_SCALE
         // so on-screen proportion matches the old 1080-wide canvas.
         const fontSize = 96 * CAPTURE_PIXEL_SCALE * ratioLabelSize;
@@ -3574,27 +3175,12 @@
 
           const result = yinDetect(pitchBuffer, audioContext.sampleRate);
 
-          // Confidence gate: below the floor we treat the frame as "not
-          // sure" and don't touch the smoothed pitch - the previous valid
-          // value stays on screen and the existing fade-out logic in
-          // draw() handles long pauses. (YIN's `probability = 1 - minVal`,
-          // so HIGHER is cleaner.)
-          if (result.freq > 50 && result.freq < 2000 && result.probability >= PITCH_PROB_FLOOR) {
+          if (result.freq > 50 && result.freq < 2000 && result.probability > 0.5) {
             let rawCents = 1200 * Math.log2(result.freq / config.refFreq);
 
-            // Base lerp from user sliders (responsiveness / smoothing).
             const baseAlpha = 0.03 + (config.responsiveness / 10) * 0.25;
             const smoothingFactor = 16 / (config.smoothing + 1);
-            let alpha = Math.max(0.005, baseAlpha * Math.min(1, smoothingFactor));
-            // Adaptive smoothing: snappier when YIN is confident (captures
-            // vibrato / micro-pitch on clean singing), heavier when borderline
-            // (suppresses jumpy frames). Multiplicative modifier preserves
-            // the user's slider preferences as the baseline.
-            if (result.probability >= PITCH_PROB_HIGH) {
-              alpha = Math.min(0.5, alpha * 2.2);   // ~0.4 at default sliders
-            } else {
-              alpha = Math.max(0.04, alpha * 0.5);  // ~0.09 at default sliders
-            }
+            const alpha = Math.max(0.005, baseAlpha * Math.min(1, smoothingFactor));
 
             if (smoothedFreq === null) {
               smoothedFreq = result.freq;
@@ -3618,40 +3204,6 @@
         document.getElementById('seekBar').value = (currentTime / duration) * 100;
 
         if (currentTime >= duration) stopFilePlayback();
-      }
-
-      // Audio-reactive border: write a smoothed mic level into a CSS var.
-      // One getFloatTimeDomainData on the existing rawMicAnalyser, RMS,
-      // dB conversion, asymmetric exponential smoothing, one
-      // setProperty. Cheap relative to YIN above. CSS does the rest
-      // (#rulerContainer::after — see <style>). Decays toward 0 when the
-      // mic isn't listening so the bloom fades out cleanly.
-      {
-        const an = (isListening && micProcessing) ? micProcessing.rawMicAnalyser : null;
-        let target = 0;
-        if (an) {
-          if (!micLevelBuf || micLevelBuf.length !== an.fftSize) {
-            micLevelBuf = new Float32Array(an.fftSize);
-          }
-          try {
-            an.getFloatTimeDomainData(micLevelBuf);
-            let sq = 0;
-            for (let i = 0; i < micLevelBuf.length; i++) {
-              const v = micLevelBuf[i];
-              sq += v * v;
-            }
-            const rms = Math.sqrt(sq / micLevelBuf.length);
-            const db = rms > 1e-6 ? 20 * Math.log10(rms) : -90;
-            // -55..-5 dBFS → 0..1, clamped. Linear-in-dB feels like
-            // perceived loudness (log in amplitude).
-            target = Math.max(0, Math.min(1, (db + 55) / 50));
-          } catch (_) { /* analyser disposed mid-tick — skip */ }
-        }
-        // Asymmetric: fast swell when you sing, slower exhale.
-        const k = target > smoothedMicLevel ? 0.25 : 0.06;
-        smoothedMicLevel += (target - smoothedMicLevel) * k;
-        if (smoothedMicLevel < 0.001) smoothedMicLevel = 0;
-        document.documentElement.style.setProperty('--mic-level', smoothedMicLevel.toFixed(3));
       }
 
       draw();
@@ -3700,15 +3252,8 @@
       analyser = audioContext.createAnalyser();
       analyser.fftSize = 4096;
       
-      // Audible playback path stays full-band: source -> destination directly.
-      // Pitch tap (separate, parallel) runs through the 80-1200 Hz bandpass
-      // -> analyser, so YIN sees a cleaner spectrum without colouring what
-      // the user hears. The analyser is no longer in the speaker path.
-      sourceNode.connect(audioContext.destination);
-      if (!connectSourceToPitchAnalyser(sourceNode)) {
-        // Fallback if the bandpass couldn't be built - keep pitch detection alive.
-        sourceNode.connect(analyser);
-      }
+      sourceNode.connect(analyser);
+      analyser.connect(audioContext.destination);
       
       const offset = pauseTime;
       sourceNode.start(0, offset);
@@ -4172,16 +3717,6 @@
         masterOutputGain.connect(meterPre);
         meterPre.connect(meterHP);
         meterHP.connect(meterAnalyser);
-        // Parallel RAW mic tap. attachMicSource (and the FX-rebuild rewire
-        // sites) connect the live mic source into this analyser so the on-
-        // screen MIC readout sees the input chain BEFORE highpass / comp /
-        // de-ess / reverb / Level. Useful diagnostic: if MIC shows signal
-        // but LUFS doesn't, the FX chain or master gain is the culprit; if
-        // MIC stays at — dB the source itself is silent. No downstream
-        // connection — leaf node, no audio impact.
-        const rawMicAnalyser = ctx.createAnalyser();
-        rawMicAnalyser.fftSize = 4096;
-        rawMicAnalyser.smoothingTimeConstant = 0;
         const mp = {
           ctx,
           dest,
@@ -4190,7 +3725,6 @@
           meterPre,
           meterHP,
           meterAnalyser,
-          rawMicAnalyser,
           head: micOut,    // first node mic-source connects to; updated by applyVoiceFX
           chain: [],       // disposable nodes in the active chain
           reverb: null,    // shimmer FDN handle, if active
@@ -4380,16 +3914,8 @@
         // Re-route the live mic source through the rebuilt head.
         if (currentMicSource) {
           try { currentMicSource.disconnect(); } catch (_) {}
-          // Pitch tap goes through the 80-1200 Hz bandpass (see
-          // connectSourceToPitchAnalyser). Fallback to a direct connect
-          // if the bandpass isn't available yet.
-          if (analyser && !connectSourceToPitchAnalyser(currentMicSource)) {
-            try { currentMicSource.connect(analyser); } catch (_) {}
-          }
+          if (analyser) { try { currentMicSource.connect(analyser); } catch (_) {} }
           try { currentMicSource.connect(micProcessing.head); } catch (_) {}
-          if (micProcessing.rawMicAnalyser) {
-            try { currentMicSource.connect(micProcessing.rawMicAnalyser); } catch (_) {}
-          }
         }
 
         updateVoiceProcNote();
@@ -4428,14 +3954,8 @@
       disposeVoiceChain();
       if (currentMicSource) {
         try { currentMicSource.disconnect(); } catch (_) {}
-        // Pitch tap through bandpass (see connectSourceToPitchAnalyser).
-        if (analyser && !connectSourceToPitchAnalyser(currentMicSource)) {
-          try { currentMicSource.connect(analyser); } catch (_) {}
-        }
+        if (analyser) { try { currentMicSource.connect(analyser); } catch (_) {} }
         try { currentMicSource.connect(micProcessing.head); } catch (_) {}
-        if (micProcessing.rawMicAnalyser) {
-          try { currentMicSource.connect(micProcessing.rawMicAnalyser); } catch (_) {}
-        }
       }
       updateVoiceProcNote();
       updateVoiceReverbControlsVisibility();
@@ -4501,42 +4021,10 @@
         try { currentMicSource.disconnect(); } catch (_) {}
       }
       currentMicSource = source;
-      // Pitch tap: source -> bandpass(80-1200 Hz) -> analyser. Filters wind /
-      // HVAC rumble / sibilance before YIN sees the signal. Other taps
-      // (FX head, raw mic dBFS analyser) stay full-band.
-      if (!connectSourceToPitchAnalyser(source)) {
-        // Fallback: pre-bandpass behaviour, in case the bandpass couldn't be
-        // built (no audioContext / no analyser). Keeps pitch detection alive.
-        try { source.connect(analyser); } catch (_) {}
-      }
+      try { source.connect(analyser); } catch (_) {}
       if (micProcessing && micProcessing.head) {
         try { source.connect(micProcessing.head); } catch (_) {}
       }
-      // Parallel RAW mic tap for the on-screen MIC dBFS readout. Leaf node,
-      // doesn't disturb the audio path. Independent of FX state — measures
-      // the source directly so the user can verify the input chain even
-      // with all FX disabled.
-      if (micProcessing && micProcessing.rawMicAnalyser) {
-        try { source.connect(micProcessing.rawMicAnalyser); } catch (_) {}
-      }
-    }
-
-    // Flip the canvas between pitch view (ruler / EDO / ratios / wake /
-    // crosshair) and spectrum view (a log-spaced FFT curve over the
-    // visible image rect). Cheap state change: just sets a flag, a body
-    // class, the button label, and forces one paint so the new view
-    // appears immediately even if the rAF loop isn't running yet
-    // (e.g. mic off). No audio routing changes — drone, recording, and
-    // pitch detection all continue regardless of view.
-    function setAppMode(mode) {
-      if (mode !== 'pitch' && mode !== 'spectrum') return;
-      appMode = mode;
-      const btn = document.getElementById('modeToggleBtn');
-      if (btn) btn.textContent = (mode === 'pitch') ? 'Pitch view' : 'Spectrum view';
-      document.body.classList.toggle('spectrum-mode', mode === 'spectrum');
-      // Force one repaint so the new view appears even when the rAF
-      // loop is dormant (idle / no mic / no playback / no record).
-      try { draw(); } catch (_) {}
     }
 
     async function toggleListening() {
@@ -4593,10 +4081,6 @@
           isListening = true;
           btn.innerHTML = 'Listening';
           btn.classList.add('listening');
-          // Drive #micRawMeter visibility off the live mic state — the
-          // meter must be visible whenever the mic is on, NOT only during
-          // recording.
-          document.body.classList.add('mic-listening');
           lastDetectTime = 0;
           // Guard against double rAF chains. enterRecordMode may have
           // already started a loop for the camera; starting another here
@@ -4641,10 +4125,6 @@
 
         btn.innerHTML = 'Microphone';
         btn.classList.remove('listening');
-        // Mic stopped — hide the raw level readout and reset its text.
-        document.body.classList.remove('mic-listening');
-        const rawEl = document.getElementById('micRawMeter');
-        if (rawEl) rawEl.textContent = 'MIC — dB';
         updateAudioInputDiagnostic('', null, null, false);
 
         fadeOutIndicator();
@@ -4658,23 +4138,20 @@
       }
       try {
         // Camera capture is DECOUPLED from the lo-fi 544x960 canvas /
-        // encoder resolution. Earlier we asked for 1080x1920 portrait to
-        // try to get the sensor's native FOV, but Pixel-class front cams
-        // are 4:3 NATIVE — Chrome satisfies a portrait request by
-        // side-cropping the 4:3 frame, which was the actual cause of the
-        // "still zoomed in" symptom. Asking explicitly for 1280x960 (4:3
-        // landscape) gives us the full horizontal sensor; we then
-        // letterbox it into the 9:16 canvas in drawCameraBackground
-        // (Math.min / contain). The MediaRecorder still encodes the
-        // 544x960 canvas captureStream at 3 Mbps — only the capture-side
-        // pixel layout changes. Black bars top and bottom of the camera
-        // image are the cost; the win is much wider horizontal field
-        // (the user's whole upper body fits, not just their face).
+        // encoder resolution. We ask the camera for a normal-FOV portrait
+        // (1080x1920 ideal) so we get the sensor's native field of view;
+        // the canvas internal resolution stays at 544x960 (see ASPECT_DIMS
+        // / CAPTURE_PIXEL_SCALE) and drawCameraBackground does the uniform
+        // 9:16 → 9:16 downscale via drawImage. The MediaRecorder still
+        // encodes the 544x960 canvas captureStream at 3 Mbps — only the
+        // *capture-side* FOV changes. Without this, asking for {ideal:544}
+        // makes some Pixel cameras hand back a tighter 4:3 mode that the
+        // canvas's max-fill scaling crops, producing a "zoomed-in" look.
         cameraStream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: facingMode },
-            width:  { ideal: 1280 },
-            height: { ideal: 960 }
+            width:  { ideal: 1080 },
+            height: { ideal: 1920 }
           },
           audio: false
         });
@@ -4690,7 +4167,7 @@
           if (vt && vt.getSettings) {
             const s = vt.getSettings();
             console.log('[camera] track settings',
-              'requested=1280x960',
+              'requested=1080x1920',
               'actual=', (s.width || '?') + 'x' + (s.height || '?'),
               'frameRate=', s.frameRate,
               'facingMode=', s.facingMode,
@@ -6542,9 +6019,6 @@
       document.getElementById('advancedToggle').style.display = 'none';
       
       document.getElementById('micBtn').addEventListener('click', toggleListening);
-      document.getElementById('modeToggleBtn').addEventListener('click', () => {
-        setAppMode(appMode === 'pitch' ? 'spectrum' : 'pitch');
-      });
       document.getElementById('refFreq').addEventListener('input', handleFreqChange);
       document.getElementById('refPreset').addEventListener('change', handlePresetChange);
       document.getElementById('ratios').addEventListener('input', updateConfig);
@@ -6884,95 +6358,4 @@
         if (valSpan) valSpan.textContent = Math.round(tanpuraVolume * 100) + '%';
 
         // Restore drone cutoff
-        const c = localStorage.getItem('tuner.drone.cutoff');
-        const parsedC = c !== null ? parseFloat(c) : NaN;
-        if (!isNaN(parsedC)) {
-          droneCutoff = Math.max(DRONE_CUTOFF_MIN, Math.min(DRONE_CUTOFF_MAX, parsedC));
-        }
-        const cSlider = document.getElementById('droneCutoff');
-        if (cSlider) cSlider.value = droneCutoffToSlider(droneCutoff).toFixed(1);
-        const cVal = document.getElementById('droneCutoffVal');
-        if (cVal) cVal.textContent = (droneCutoff / 1000).toFixed(1) + ' kHz';
-      } catch (_) {}
-      document.getElementById('tanpuraEnabled').addEventListener('change', async (e) => {
-        await setTanpuraEnabled(e.target.checked);
-        syncDroneUI();
-      });
-      document.getElementById('tanpuraVolume').addEventListener('input', (e) => {
-        const v = parseInt(e.target.value, 10) / 100;
-        setTanpuraVolume(v);
-        syncDroneUI();
-      });
-      document.getElementById('droneCutoff').addEventListener('input', (e) => {
-        const sliderVal = parseFloat(e.target.value);
-        const hz = droneSliderToCutoff(sliderVal);
-        setDroneCutoff(hz);
-        syncDroneUI();
-      });
-
-      // Floating drone strip — mirrors the side panel. State is shared
-      // (tanpuraEnabled / tanpuraVolume / droneCutoff), syncDroneUI keeps
-      // both UIs in lockstep regardless of which one moved.
-      const droneStripToggle = document.getElementById('droneRecordToggle');
-      const droneStripVolume = document.getElementById('droneRecordVolume');
-      const droneStripCutoff = document.getElementById('droneRecordCutoff');
-      if (droneStripToggle) {
-        droneStripToggle.addEventListener('click', async () => {
-          await setTanpuraEnabled(!tanpuraEnabled);
-          syncDroneUI();
-        });
-      }
-      if (droneStripVolume) {
-        droneStripVolume.addEventListener('input', (e) => {
-          const v = parseInt(e.target.value, 10) / 100;
-          setTanpuraVolume(v);
-          syncDroneUI();
-        });
-      }
-      if (droneStripCutoff) {
-        droneStripCutoff.addEventListener('input', (e) => {
-          const hz = droneSliderToCutoff(parseFloat(e.target.value));
-          setDroneCutoff(hz);
-          syncDroneUI();
-        });
-      }
-      // Initial sync so the strip reflects restored state from localStorage
-      syncDroneUI();
-
-      const loaded = loadSession();
-      if (!loaded) {
-        document.getElementById('refFreq').value = DEFAULTS.refFreq;
-        document.getElementById('ratios').value = DEFAULTS.ratios;
-        document.getElementById('showCents').checked = DEFAULTS.showCents;
-        document.getElementById('show12EDO').checked = DEFAULTS.show12EDO;
-        document.getElementById('edoOffset').value = DEFAULTS.edoOffset * 100;
-      }
-
-      let saveTimeout;
-      function scheduleSave() {
-        clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(saveSession, 500);
-      }
-      const autoSaveTriggers = ['ratios', 'refFreq', 'showCents', 'showHz', 'showGhost', 'octaveWrap', 'show12EDO', 'edoOffset', 'rulerPosition', 'smoothing', 'responsiveness', 'showIndicatorHz', 'showIndicatorDeviation', 'showIndicatorRatio'];
-      autoSaveTriggers.forEach(id => {
-        document.getElementById(id).addEventListener('change', scheduleSave);
-      });
-
-      const recordOverlay = document.getElementById('recordOverlay');
-      recordOverlay.addEventListener('input', scheduleSave);
-      recordOverlay.addEventListener('click', (e) => {
-        if (e.target.closest('button.aspect-btn, #ratioLabelToggle, #bwToggle, #resetFramingBtn')) {
-          scheduleSave();
-        }
-      });
-      document.getElementById('rulerCanvas').addEventListener('pointerup', () => {
-        if (recordMode) scheduleSave();
-      });
-
-      updateConfig();
-    }
-    
-    init();
-  </script>
-</body>
-</html>
+        const c = localStorage.getItem('tuner.
