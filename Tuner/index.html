@@ -1939,6 +1939,13 @@
     let recordAspect = '9:16';
     let rulerOpacity = 1.0;
 
+    // Visible camera rect after letterbox fit (set by
+    // drawCameraBackground in record mode). After 62e0255 the camera
+    // is FIT (Math.min) into the canvas with black bars top + bottom
+    // in portrait aspects. The ruler/EDO/ratios overlay anchors to
+    // this rect so the ruler doesn't drift into the bars.
+    let cameraVisibleRect = null;
+
     // Feature 1: settings hide
     let settingsHidden = false;
     // Snapshot of settingsHidden taken when entering record mode so the
@@ -2680,6 +2687,16 @@
       const dx = (W - drawW) / 2 + cameraPanX * (overflowX / 2);
       const dy = (H - drawH) / 2 + cameraPanY * (overflowY / 2);
 
+      // Snapshot the visible (clamped) Y range of the camera image
+      // for the ruler overlay. When zoom > 1 the image overflows the
+      // canvas (no letterbox bars); when zoom <= 1 with a 4:3 source
+      // there are bars top + bottom and the overlay confines itself
+      // to [y0, y1] so it doesn't paint over them.
+      cameraVisibleRect = {
+        y0: Math.max(0, dy),
+        y1: Math.min(H, dy + drawH)
+      };
+
       if (trailAmount > 0.02) {
         // Lazy-init / resize trail buffer
         if (!trailCanvas || trailCanvas.width !== W || trailCanvas.height !== H) {
@@ -2855,9 +2872,27 @@
         displayMax = center + visibleSpan / 2;
       }
 
+      // Letterbox-aware vertical bounds. In record mode, after the
+      // 4:3 camera is fit into the 9:16 (or 4:5 / 1:1) canvas, the
+      // visible image only spans [y0, y1] -- everything else is
+      // black bars. Anchor the ruler to that rect so the ruler /
+      // EDO grid / ratio labels / crosshair / big nearest-ratio
+      // label all stay inside the visible image and don't bleed
+      // into the bars. Guarded so a non-letterboxed canvas (zoom
+      // overflow, or non-record mode) keeps using the full height.
+      let topY = 0, botY = H;
+      if (recordMode && cameraVisibleRect) {
+        const v0 = Math.max(0, cameraVisibleRect.y0);
+        const v1 = Math.min(H, cameraVisibleRect.y1);
+        if (v0 > 0 || v1 < H) {
+          topY = v0;
+          botY = v1;
+        }
+      }
+
       const padding = 60;
-      const rulerTop = padding;
-      const rulerBottom = H - padding;
+      const rulerTop = topY + padding;
+      const rulerBottom = botY - padding;
       const rulerHeight = rulerBottom - rulerTop;
       const rulerX = W * config.rulerX;
       
@@ -3192,7 +3227,9 @@
 
       if (recordMode && showRatioLabel && nearestRatio && indicatorOpacity > 0.02) {
         const x = W * ratioLabelX;
-        const y = H * ratioLabelY;
+        // Anchor the big label to the letterbox-corrected visible rect
+        // (topY/botY) so it doesn't sit on the lower black bar.
+        const y = topY + (botY - topY) * ratioLabelY;
         // Big nearest-ratio label. Base size scaled by CAPTURE_PIXEL_SCALE
         // so on-screen proportion matches the old 1080-wide canvas.
         const fontSize = 96 * CAPTURE_PIXEL_SCALE * ratioLabelSize;
