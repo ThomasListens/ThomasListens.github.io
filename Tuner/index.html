@@ -4316,7 +4316,21 @@
       el.classList.remove('warning');
     }
 
+    // _ffmpegPromise holds the *current* ffmpeg.wasm instance. We deliberately
+    // discard it after every remux (see remuxToFastStartMP4 finally) and
+    // rebuild a fresh one on the next call. Why: ffmpeg.wasm 0.11.x has an
+    // internal `runResolve` flag that's set by run() and only cleared when
+    // the wasm signals normal end-of-run. The single-threaded core-st 0.11.1
+    // ends each invocation via Emscripten exit(0), which throws "Program
+    // terminated with exit(0)" out of Core.ccall *before* runResolve gets
+    // cleared. Our exit(0)-tolerant catch handles the JS-side success, but
+    // the next run() call sees runResolve != null and throws "ffmpeg.wasm
+    // can only run one command at a time" — breaking every recording after
+    // the first in a session. Recreating the instance per run sidesteps the
+    // dangling flag entirely. The 25 MB core stays in the HTTP cache after
+    // first download, so re-init is fast (~hundreds of ms on a Pixel 7).
     let _ffmpegPromise = null;
+    let _ffmpegEverLoaded = false;
     async function loadFFmpeg() {
       if (_ffmpegPromise) return _ffmpegPromise;
       _ffmpegPromise = (async () => {
@@ -4350,53 +4364,66 @@
     }
 
     async function remuxToFastStartMP4(blob) {
-      // First-load detection: if _ffmpegPromise hasn't been kicked off yet,
-      // this call is going to download the ~25 MB core, so the indicator
-      // should say so. Subsequent calls reuse the cached instance.
-      const isFirstLoad = !_ffmpegPromise;
-      if (isFirstLoad) showRemuxIndicator('Loading optimizer (~25 MB)...');
+      // First-load detection: only the very first call in a session pays
+      // the ~25 MB download cost. Subsequent calls re-instantiate from the
+      // browser HTTP cache (fast) — see comment above _ffmpegPromise.
+      const isFirstLoadEver = !_ffmpegEverLoaded;
+      if (isFirstLoadEver) showRemuxIndicator('Loading optimizer (~25 MB)...');
+      else showRemuxIndicator('Optimizing video...');
       const { ffmpeg, fetchFile } = await loadFFmpeg();
+      _ffmpegEverLoaded = true;
       showRemuxIndicator('Optimizing video...');
 
-      // 0.11.x uses MEMFS-style helpers: FS('writeFile'/'readFile'/'unlink').
-      ffmpeg.FS('writeFile', 'input.mp4', await fetchFile(blob));
-
-      // -c copy: stream copy (no re-encoding, fast)
-      // -movflags +faststart: write moov atom first (non-fragmented, IG-friendly)
-      // 0.11.x's run() doesn't reliably return an exit code, so we detect
-      // failure by trying to read output.mp4 below.
       try {
-        await ffmpeg.run(
-          '-i', 'input.mp4',
-          '-c', 'copy',
-          '-movflags', '+faststart',
-          'output.mp4'
-        );
-      } catch (e) {
-        // FFmpeg.wasm 0.11.x sometimes throws "Program terminated with exit(0)"
-        // on subsequent run() calls in the same instance. exit(0) is success in
-        // Unix; check whether the output was actually written before treating
-        // this as a real failure.
-        let outputExists = false;
+        // 0.11.x uses MEMFS-style helpers: FS('writeFile'/'readFile'/'unlink').
+        ffmpeg.FS('writeFile', 'input.mp4', await fetchFile(blob));
+
+        // -c copy: stream copy (no re-encoding, fast)
+        // -movflags +faststart: write moov atom first (non-fragmented, IG-friendly)
+        // 0.11.x's run() doesn't reliably return an exit code, so we detect
+        // failure by trying to read output.mp4 below.
         try {
-          ffmpeg.FS('stat', 'output.mp4');
-          outputExists = true;
-        } catch (_) {}
-        if (!outputExists) {
-          throw new Error('FFmpeg run failed: ' + (e && e.message ? e.message : String(e)));
+          await ffmpeg.run(
+            '-i', 'input.mp4',
+            '-c', 'copy',
+            '-movflags', '+faststart',
+            'output.mp4'
+          );
+        } catch (e) {
+          // 0.11.x's single-threaded core ends every invocation with
+          // Emscripten exit(0), which surfaces as "Program terminated with
+          // exit(0)" thrown out of Core.ccall. exit(0) is success in Unix;
+          // confirm the output was written before treating this as a real
+          // failure.
+          let outputExists = false;
+          try {
+            ffmpeg.FS('stat', 'output.mp4');
+            outputExists = true;
+          } catch (_) {}
+          if (!outputExists) {
+            throw new Error('FFmpeg run failed: ' + (e && e.message ? e.message : String(e)));
+          }
+          // exit(0) but output is written — clean success.
         }
-        // exit(0) but output is written — clean success.
+
+        const data = ffmpeg.FS('readFile', 'output.mp4');
+
+        // Clean up the in-memory FS to keep memory bounded across recordings.
+        // 0.11.x has no deleteFile(); use FS('unlink', name).
+        try { ffmpeg.FS('unlink', 'input.mp4'); } catch (_) {}
+        try { ffmpeg.FS('unlink', 'output.mp4'); } catch (_) {}
+
+        // data is a Uint8Array; wrap it in a Blob.
+        return new Blob([data.buffer], { type: 'video/mp4' });
+      } finally {
+        // Always discard the instance, success or failure. The wasm runtime
+        // exited via exit(0) and its internal runResolve flag is dangling;
+        // calling run() on it again would throw "can only run one command
+        // at a time" and lock every subsequent recording in the session.
+        // Next remuxToFastStartMP4 call will rebuild a fresh instance via
+        // loadFFmpeg() — fast since the core is HTTP-cached.
+        _ffmpegPromise = null;
       }
-
-      const data = ffmpeg.FS('readFile', 'output.mp4');
-
-      // Clean up the in-memory FS to keep memory bounded across recordings.
-      // 0.11.x has no deleteFile(); use FS('unlink', name).
-      try { ffmpeg.FS('unlink', 'input.mp4'); } catch (_) {}
-      try { ffmpeg.FS('unlink', 'output.mp4'); } catch (_) {}
-
-      // data is a Uint8Array; wrap it in a Blob.
-      return new Blob([data.buffer], { type: 'video/mp4' });
     }
 
     function pickRecorderMime() {
