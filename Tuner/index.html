@@ -1804,6 +1804,25 @@
     // Reusable buffer for analyser.getFloatTimeDomainData. Allocated once
     // and resized only when fftSize changes. See audioLoop.
     let pitchBuffer = null;
+    // Pitch-detection bandpass: a highpass+lowpass biquad pair (80 / 1200 Hz)
+    // sitting between every pitch source (mic or decoded file) and the
+    // pitch `analyser`. Cuts wind / HVAC rumble below 80 Hz and sibilance /
+    // hiss above 1200 Hz BEFORE YIN sees the buffer, so the algorithm
+    // doesn't have to discriminate against environmental noise. The LUFS
+    // meter, raw MIC dBFS readout, recording chain, and audible playback
+    // are all parallel to this filter - they observe the original full-band
+    // signal. Built lazily once per AudioContext via ensurePitchBandpass().
+    // YIN itself is untouched.
+    let pitchBandpass = null;
+    const PITCH_BANDPASS_LOW_HZ  = 80;    // highpass cutoff
+    const PITCH_BANDPASS_HIGH_HZ = 1200;  // lowpass cutoff
+    // YIN confidence (= 1 - minVal; higher is better) thresholds. The
+    // pitch indicator only updates when probability >= PITCH_PROB_FLOOR;
+    // when probability >= PITCH_PROB_HIGH the smoothing alpha is doubled and
+    // the crosshair shows at full alpha; in between the alpha is halved
+    // and the crosshair dims to ~50%.
+    const PITCH_PROB_FLOOR = 0.60;
+    const PITCH_PROB_HIGH  = 0.85;
     let ratioExtensions = {}, lastNearestLabel = null;
     let indicatorY = null, indicatorOpacity = 0;
     let lastDisplayCents = null, lastDisplayFreq = null, smoothedProximity = 0;
@@ -2297,6 +2316,42 @@
         audioContext.resume().catch(() => {});
       }
       return audioContext;
+    }
+
+    // Lazily build the pitch-detection bandpass for the current AudioContext.
+    // Returns { hp, lp } - hp.connect(lp) is permanent. Re-creates the pair
+    // if the AudioContext has changed under us (defensive; the context is
+    // currently never closed, but this avoids cross-context node errors if
+    // that ever changes). Q = 1/sqrt(2) gives a maximally-flat passband.
+    function ensurePitchBandpass(ctx) {
+      if (pitchBandpass && pitchBandpass.hp && pitchBandpass.hp.context === ctx) {
+        return pitchBandpass;
+      }
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = PITCH_BANDPASS_LOW_HZ;
+      hp.Q.value = 0.7071;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = PITCH_BANDPASS_HIGH_HZ;
+      lp.Q.value = 0.7071;
+      hp.connect(lp);
+      pitchBandpass = { hp, lp };
+      return pitchBandpass;
+    }
+
+    // Wire `source` into the pitch analyser via the bandpass. The lp tail
+    // is reconnected to the (possibly fresh) analyser on every call so that
+    // analyser recreation in toggleListening / startFilePlayback survives.
+    // Other taps (FX chain, raw mic meter, audible destination) are NOT
+    // routed through this - callers connect those in parallel as before.
+    function connectSourceToPitchAnalyser(source) {
+      if (!source || !audioContext || !analyser) return false;
+      const bp = ensurePitchBandpass(audioContext);
+      try { bp.lp.disconnect(); } catch (_) {}
+      try { source.connect(bp.hp); } catch (_) {}
+      try { bp.lp.connect(analyser); } catch (_) {}
+      return true;
     }
 
     // One-time audio graph construction. Idempotent — every entry point
@@ -2920,7 +2975,16 @@
         displayProbability = timeSinceLastPitch < fadeTime ? Math.max(0, 1 - (timeSinceLastPitch / fadeTime)) : 0;
       }
       
-      const targetOpacity = isActive ? Math.min(1, currentProbability * 1.2) : displayProbability * 0.5;
+      // Active-frame opacity. When the freshest detection is in the
+      // borderline confidence band (FLOOR..HIGH) we halve the target
+      // alpha so the crosshair visibly dims - a quiet "I'm unsure right
+      // now" cue without changing the user-facing toggles. High-confidence
+      // frames still pop to full brightness.
+      const lowConf = isActive && displayProbability < PITCH_PROB_HIGH;
+      const baseTargetOpacity = isActive
+        ? Math.min(1, currentProbability * 1.2)
+        : displayProbability * 0.5;
+      const targetOpacity = lowConf ? baseTargetOpacity * 0.5 : baseTargetOpacity;
       indicatorOpacity += (targetOpacity - indicatorOpacity) * 0.2;
       
       let wrappedCents = displayCents;
@@ -3293,12 +3357,27 @@
 
           const result = yinDetect(pitchBuffer, audioContext.sampleRate);
 
-          if (result.freq > 50 && result.freq < 2000 && result.probability > 0.5) {
+          // Confidence gate: below the floor we treat the frame as "not
+          // sure" and don't touch the smoothed pitch - the previous valid
+          // value stays on screen and the existing fade-out logic in
+          // draw() handles long pauses. (YIN's `probability = 1 - minVal`,
+          // so HIGHER is cleaner.)
+          if (result.freq > 50 && result.freq < 2000 && result.probability >= PITCH_PROB_FLOOR) {
             let rawCents = 1200 * Math.log2(result.freq / config.refFreq);
 
+            // Base lerp from user sliders (responsiveness / smoothing).
             const baseAlpha = 0.03 + (config.responsiveness / 10) * 0.25;
             const smoothingFactor = 16 / (config.smoothing + 1);
-            const alpha = Math.max(0.005, baseAlpha * Math.min(1, smoothingFactor));
+            let alpha = Math.max(0.005, baseAlpha * Math.min(1, smoothingFactor));
+            // Adaptive smoothing: snappier when YIN is confident (captures
+            // vibrato / micro-pitch on clean singing), heavier when borderline
+            // (suppresses jumpy frames). Multiplicative modifier preserves
+            // the user's slider preferences as the baseline.
+            if (result.probability >= PITCH_PROB_HIGH) {
+              alpha = Math.min(0.5, alpha * 2.2);   // ~0.4 at default sliders
+            } else {
+              alpha = Math.max(0.04, alpha * 0.5);  // ~0.09 at default sliders
+            }
 
             if (smoothedFreq === null) {
               smoothedFreq = result.freq;
@@ -3370,8 +3449,15 @@
       analyser = audioContext.createAnalyser();
       analyser.fftSize = 4096;
       
-      sourceNode.connect(analyser);
-      analyser.connect(audioContext.destination);
+      // Audible playback path stays full-band: source -> destination directly.
+      // Pitch tap (separate, parallel) runs through the 80-1200 Hz bandpass
+      // -> analyser, so YIN sees a cleaner spectrum without colouring what
+      // the user hears. The analyser is no longer in the speaker path.
+      sourceNode.connect(audioContext.destination);
+      if (!connectSourceToPitchAnalyser(sourceNode)) {
+        // Fallback if the bandpass couldn't be built - keep pitch detection alive.
+        sourceNode.connect(analyser);
+      }
       
       const offset = pauseTime;
       sourceNode.start(0, offset);
@@ -4043,7 +4129,12 @@
         // Re-route the live mic source through the rebuilt head.
         if (currentMicSource) {
           try { currentMicSource.disconnect(); } catch (_) {}
-          if (analyser) { try { currentMicSource.connect(analyser); } catch (_) {} }
+          // Pitch tap goes through the 80-1200 Hz bandpass (see
+          // connectSourceToPitchAnalyser). Fallback to a direct connect
+          // if the bandpass isn't available yet.
+          if (analyser && !connectSourceToPitchAnalyser(currentMicSource)) {
+            try { currentMicSource.connect(analyser); } catch (_) {}
+          }
           try { currentMicSource.connect(micProcessing.head); } catch (_) {}
           if (micProcessing.rawMicAnalyser) {
             try { currentMicSource.connect(micProcessing.rawMicAnalyser); } catch (_) {}
@@ -4086,7 +4177,10 @@
       disposeVoiceChain();
       if (currentMicSource) {
         try { currentMicSource.disconnect(); } catch (_) {}
-        if (analyser) { try { currentMicSource.connect(analyser); } catch (_) {} }
+        // Pitch tap through bandpass (see connectSourceToPitchAnalyser).
+        if (analyser && !connectSourceToPitchAnalyser(currentMicSource)) {
+          try { currentMicSource.connect(analyser); } catch (_) {}
+        }
         try { currentMicSource.connect(micProcessing.head); } catch (_) {}
         if (micProcessing.rawMicAnalyser) {
           try { currentMicSource.connect(micProcessing.rawMicAnalyser); } catch (_) {}
@@ -4156,7 +4250,14 @@
         try { currentMicSource.disconnect(); } catch (_) {}
       }
       currentMicSource = source;
-      try { source.connect(analyser); } catch (_) {}
+      // Pitch tap: source -> bandpass(80-1200 Hz) -> analyser. Filters wind /
+      // HVAC rumble / sibilance before YIN sees the signal. Other taps
+      // (FX head, raw mic dBFS analyser) stay full-band.
+      if (!connectSourceToPitchAnalyser(source)) {
+        // Fallback: pre-bandpass behaviour, in case the bandpass couldn't be
+        // built (no audioContext / no analyser). Keeps pitch detection alive.
+        try { source.connect(analyser); } catch (_) {}
+      }
       if (micProcessing && micProcessing.head) {
         try { source.connect(micProcessing.head); } catch (_) {}
       }
