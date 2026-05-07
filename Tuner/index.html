@@ -4128,15 +4128,21 @@
         cameraStream = null;
       }
       try {
-        // Lo-fi capture: 540x960 portrait. Pairs with the new ASPECT_DIMS
-        // (canvas internal resolution) and the 3 Mbps MediaRecorder cap.
-        // Browsers with no exact match settle on the nearest portrait mode
-        // and we letterbox/scale on draw - see drawCameraBackground().
+        // Camera capture is DECOUPLED from the lo-fi 540x960 canvas /
+        // encoder resolution. We ask the camera for a normal-FOV portrait
+        // (1080x1920 ideal) so we get the sensor's native field of view;
+        // the canvas internal resolution stays at 540x960 (see ASPECT_DIMS
+        // / CAPTURE_PIXEL_SCALE) and drawCameraBackground does the uniform
+        // 9:16 → 9:16 downscale via drawImage. The MediaRecorder still
+        // encodes the 540x960 canvas captureStream at 3 Mbps — only the
+        // *capture-side* FOV changes. Without this, asking for {ideal:540}
+        // makes some Pixel cameras hand back a tighter 4:3 mode that the
+        // canvas's max-fill scaling crops, producing a "zoomed-in" look.
         cameraStream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: facingMode },
-            width:  { ideal: 540 },
-            height: { ideal: 960 }
+            width:  { ideal: 1080 },
+            height: { ideal: 1920 }
           },
           audio: false
         });
@@ -4144,6 +4150,21 @@
         const video = document.getElementById('cameraFeed');
         video.srcObject = cameraStream;
         await video.play().catch(() => {});
+        // Diagnostic: log what the camera actually picked. Useful when
+        // tuning ideal constraints across devices — the user can read it
+        // from chrome://inspect / desktop devtools when reproducing.
+        try {
+          const vt = cameraStream.getVideoTracks()[0];
+          if (vt && vt.getSettings) {
+            const s = vt.getSettings();
+            console.log('[camera] track settings',
+              'requested=1080x1920',
+              'actual=', (s.width || '?') + 'x' + (s.height || '?'),
+              'frameRate=', s.frameRate,
+              'facingMode=', s.facingMode,
+              'deviceId=', s.deviceId);
+          }
+        } catch (_) {}
         return true;
       } catch (err) {
         console.error('Camera error:', err);
@@ -4542,16 +4563,34 @@
       mediaRecorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) recordedChunks.push(e.data);
       };
+      // Surface MediaRecorder runtime errors. The canvas captureStream and
+      // the AudioContext-backed audio track can both fault in ways that
+      // would otherwise be silent on mobile; bubble them to the on-screen
+      // indicator so a user without a console has something to report.
+      mediaRecorder.onerror = (ev) => {
+        const err = (ev && ev.error) ? ev.error : ev;
+        console.error('[record] MediaRecorder error:', err);
+        const msg = (err && err.message) ? err.message : String(err);
+        showRemuxIndicator('Recorder error: ' + msg, { warning: true });
+        setTimeout(hideRemuxIndicator, 6000);
+      };
       mediaRecorder.onstop = async () => {
         // Stop only the canvas video track; keep the shared mic track alive
         try { canvasStream.getVideoTracks().forEach(t => t.stop()); } catch (_) {}
         recordVideoTrack = null;
 
+        // Snapshot the chunk list *before* doing anything async. If a new
+        // recording starts while we're still processing this one (FFmpeg
+        // can take seconds), startRecording reassigns the module-scope
+        // recordedChunks to []; the in-flight onstop must keep operating
+        // on its own captured array. The slice() also guarantees we never
+        // accidentally reach back into a mutated buffer.
+        const chunks = recordedChunks.slice();
         const elapsedMs = recordStartTime ? (performance.now() - recordStartTime) : 0;
-        const totalBytes = recordedChunks.reduce((n, c) => n + (c && c.size ? c.size : 0), 0);
+        const totalBytes = chunks.reduce((n, c) => n + (c && c.size ? c.size : 0), 0);
         console.log('[record] stop',
           'durMs=', Math.round(elapsedMs),
-          'chunks=', recordedChunks.length,
+          'chunks=', chunks.length,
           'bytes=', totalBytes,
           'discarded=', discardRequested,
           'droneEnabled=', tanpuraEnabled);
@@ -4562,9 +4601,24 @@
           return;
         }
 
+        // Empty / nearly-empty stop: never download a 0-byte (or
+        // ~init-segment-only) file. Some Pixel-class Android Chromiums
+        // can fire onstop without emitting any media chunks if the
+        // encoder fails to start (e.g. unsupported video size + bitrate
+        // combo). Saving a tiny init-only blob produced exactly the
+        // "small unplayable file" symptom we were chasing - now logged
+        // and surfaced rather than silently dumped to disk.
+        if (totalBytes < 1024) {
+          console.warn('[record] empty/init-only stop — skipping save (chunks=' + chunks.length + ', bytes=' + totalBytes + ')');
+          showRemuxIndicator('Recording produced no data (' + totalBytes + ' bytes). Not saved.', { warning: true });
+          setTimeout(hideRemuxIndicator, 6000);
+          recordedChunks = [];
+          return;
+        }
+
         const type = mediaRecorder.mimeType || mime || 'video/webm';
         const ext = type.includes('mp4') ? 'mp4' : 'webm';
-        const recordedBlob = new Blob(recordedChunks, { type });
+        const recordedBlob = new Blob(chunks, { type });
 
         // Remux fragmented MP4 → non-fragmented MP4 with moov-up-front
         // (faststart). MediaRecorder emits ftyp/moov-init/moof+mdat...
