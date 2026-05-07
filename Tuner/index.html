@@ -1290,6 +1290,33 @@
       display: block;
     }
     /* ------------------------------------------------------------------
+       Raw mic level readout. Mirrors #audioFXMeter visually but sits
+       16 px above it so both can be read at a glance, and is visible
+       whenever the mic is enabled (body.mic-listening) — NOT gated on
+       record mode. Lets the user verify the input chain end-to-end:
+       MIC shows pre-FX RMS dBFS off the mic source, while #audioFXMeter
+       shows post-Level LUFS off the master bus. */
+    #micRawMeter {
+      display: none;
+      position: fixed;
+      bottom: calc(64px + env(safe-area-inset-bottom) + 16px);
+      right: 12px;
+      width: 130px;
+      z-index: 250;
+      pointer-events: none;
+      font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 9px;
+      letter-spacing: 0.3px;
+      color: rgba(255, 255, 255, 0.55);
+      white-space: nowrap;
+      min-width: 88px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    body.mic-listening #micRawMeter {
+      display: block;
+    }
+    /* ------------------------------------------------------------------
        Standalone flip-camera chip — sibling of #rulerHideBtn. Was
        previously inside #recordOverlay .record-essential; pulled out so
        it lives next to ruler-hide in the bottom-left corner. Same
@@ -1648,6 +1675,13 @@
        above the rec/stop row without being constrained by the strip's
        inline-flex flow. updateMeterDisplay still targets it by id. -->
   <span class="afx-meter" id="audioFXMeter" title="Momentary LUFS / peak dB (post-Level)">— LUFS / — dB</span>
+
+  <!-- Raw mic level readout, fixed alongside #audioFXMeter but visible
+       whenever the mic is enabled (independent of record mode + FX).
+       Reads RMS dBFS directly off the mic source so the user can A/B
+       this against #audioFXMeter's post-Level LUFS to localise input
+       chain issues. Updated by updateMeterDisplay (see startMeterLoop). -->
+  <span class="afx-meter" id="micRawMeter" title="Raw mic level (RMS dBFS, pre-FX)">MIC — dB</span>
 
   <div id="recordOverlay">
     <div class="aspect-row">
@@ -2283,6 +2317,12 @@
       meterRunning = true;
       const an = micProcessing.meterAnalyser;
       const buf = new Float32Array(an.fftSize);
+      // Parallel raw-mic analyser buffer (same fftSize). Optional — only
+      // populated when buildMicProcessing succeeded and the analyser exists.
+      // The MIC readout shows instantaneous RMS in dBFS off the live mic
+      // source, before any FX or master gain.
+      const rawAn = micProcessing.rawMicAnalyser || null;
+      const rawBuf = rawAn ? new Float32Array(rawAn.fftSize) : null;
       const historyLen = Math.max(1, Math.ceil(METER_HISTORY_MS / METER_UPDATE_MS));
       const msHistory = new Array(historyLen).fill(0);
       let historyIdx = 0;
@@ -2308,7 +2348,22 @@
         // Mono channel weight = 1.0, so LUFS = -0.691 + 10*log10(meanSq).
         const lufsM = avgMs > 1e-12 ? -0.691 + 10 * Math.log10(avgMs) : -Infinity;
         const peakDb = peak > 1e-9 ? 20 * Math.log10(peak) : -Infinity;
-        updateMeterDisplay(lufsM, peakDb);
+        // Raw mic level: instantaneous RMS in dBFS, no smoothing window.
+        // 500 ms refresh is plenty for diagnostic-grade visibility.
+        let rawDb = -Infinity;
+        if (rawAn && rawBuf) {
+          try {
+            rawAn.getFloatTimeDomainData(rawBuf);
+            let rsq = 0;
+            for (let i = 0; i < rawBuf.length; i++) {
+              const v = rawBuf[i];
+              rsq += v * v;
+            }
+            const rRms = Math.sqrt(rsq / rawBuf.length);
+            rawDb = rRms > 1e-9 ? 20 * Math.log10(rRms) : -Infinity;
+          } catch (_) { /* analyser disposed mid-tick — fine, skip */ }
+        }
+        updateMeterDisplay(lufsM, peakDb, rawDb);
       }, METER_UPDATE_MS);
     }
     function stopMeterLoop() {
@@ -2316,18 +2371,35 @@
       meterTimer = null;
       meterRunning = false;
     }
-    function updateMeterDisplay(lufsM, peakDb) {
+    function updateMeterDisplay(lufsM, peakDb, rawDb) {
       const el = document.getElementById('audioFXMeter');
-      if (!el) return;
-      const lufsStr = isFinite(lufsM) ? lufsM.toFixed(0) : '—';
-      const peakStr = isFinite(peakDb) ? peakDb.toFixed(0) : '—';
-      el.textContent = lufsStr + ' LUFS / ' + peakStr + ' dB';
-      if (isFinite(peakDb) && peakDb > -1) {
-        el.style.color = 'rgba(220, 80, 80, 0.95)';
-      } else if (isFinite(lufsM) && lufsM > -10) {
-        el.style.color = 'rgba(220, 160, 60, 0.95)';
-      } else {
-        el.style.color = '';
+      if (el) {
+        const lufsStr = isFinite(lufsM) ? lufsM.toFixed(0) : '—';
+        const peakStr = isFinite(peakDb) ? peakDb.toFixed(0) : '—';
+        el.textContent = lufsStr + ' LUFS / ' + peakStr + ' dB';
+        if (isFinite(peakDb) && peakDb > -1) {
+          el.style.color = 'rgba(220, 80, 80, 0.95)';
+        } else if (isFinite(lufsM) && lufsM > -10) {
+          el.style.color = 'rgba(220, 160, 60, 0.95)';
+        } else {
+          el.style.color = '';
+        }
+      }
+      // Raw mic readout (pre-FX RMS in dBFS). Always present in DOM but
+      // only visible via CSS when body has .mic-listening. Updated every
+      // tick regardless so the value is fresh the moment it appears.
+      const rawEl = document.getElementById('micRawMeter');
+      if (rawEl) {
+        const rawStr = (typeof rawDb === 'number' && isFinite(rawDb))
+          ? rawDb.toFixed(0)
+          : '—';
+        rawEl.textContent = 'MIC ' + rawStr + ' dB';
+        if (typeof rawDb === 'number' && isFinite(rawDb) && rawDb > -2) {
+          // Clipping warning. -2 dBFS gives a small headroom margin.
+          rawEl.style.color = 'rgba(220, 80, 80, 0.95)';
+        } else {
+          rawEl.style.color = '';
+        }
       }
     }
     let audioBootstrapped = false;
@@ -2591,7 +2663,16 @@
       const vw = video.videoWidth, vh = video.videoHeight;
       if (!vw || !vh) return;
 
-      const baseScale = Math.max(W / vw, H / vh);
+      // Camera FOV decoupling, take 2: capture 4:3 landscape (wide
+      // horizontal field, see setupCamera constraints) and FIT it
+      // inside the 9:16 canvas with Math.min (contain). Black bars
+      // appear top + bottom — the encoder still emits a clean 9:16
+      // frame, but no horizontal sensor pixels are cropped. Switching
+      // from cover (Math.max) was the fix for the persistent
+      // 'still zoomed in' symptom on Pixel-class front cameras: those
+      // sensors are 4:3 native and Chrome was side-cropping the
+      // rejected 9:16 request, narrowing the effective FOV.
+      const baseScale = Math.min(W / vw, H / vh);
       const scale = baseScale * cameraZoom;
       const drawW = vw * scale, drawH = vh * scale;
       const overflowX = Math.max(0, drawW - W);
@@ -3717,6 +3798,16 @@
         masterOutputGain.connect(meterPre);
         meterPre.connect(meterHP);
         meterHP.connect(meterAnalyser);
+        // Parallel RAW mic tap. attachMicSource (and the FX-rebuild rewire
+        // sites) connect the live mic source into this analyser so the on-
+        // screen MIC readout sees the input chain BEFORE highpass / comp /
+        // de-ess / reverb / Level. Useful diagnostic: if MIC shows signal
+        // but LUFS doesn't, the FX chain or master gain is the culprit; if
+        // MIC stays at — dB the source itself is silent. No downstream
+        // connection — leaf node, no audio impact.
+        const rawMicAnalyser = ctx.createAnalyser();
+        rawMicAnalyser.fftSize = 4096;
+        rawMicAnalyser.smoothingTimeConstant = 0;
         const mp = {
           ctx,
           dest,
@@ -3725,6 +3816,7 @@
           meterPre,
           meterHP,
           meterAnalyser,
+          rawMicAnalyser,
           head: micOut,    // first node mic-source connects to; updated by applyVoiceFX
           chain: [],       // disposable nodes in the active chain
           reverb: null,    // shimmer FDN handle, if active
@@ -3916,6 +4008,9 @@
           try { currentMicSource.disconnect(); } catch (_) {}
           if (analyser) { try { currentMicSource.connect(analyser); } catch (_) {} }
           try { currentMicSource.connect(micProcessing.head); } catch (_) {}
+          if (micProcessing.rawMicAnalyser) {
+            try { currentMicSource.connect(micProcessing.rawMicAnalyser); } catch (_) {}
+          }
         }
 
         updateVoiceProcNote();
@@ -3956,6 +4051,9 @@
         try { currentMicSource.disconnect(); } catch (_) {}
         if (analyser) { try { currentMicSource.connect(analyser); } catch (_) {} }
         try { currentMicSource.connect(micProcessing.head); } catch (_) {}
+        if (micProcessing.rawMicAnalyser) {
+          try { currentMicSource.connect(micProcessing.rawMicAnalyser); } catch (_) {}
+        }
       }
       updateVoiceProcNote();
       updateVoiceReverbControlsVisibility();
@@ -4025,6 +4123,13 @@
       if (micProcessing && micProcessing.head) {
         try { source.connect(micProcessing.head); } catch (_) {}
       }
+      // Parallel RAW mic tap for the on-screen MIC dBFS readout. Leaf node,
+      // doesn't disturb the audio path. Independent of FX state — measures
+      // the source directly so the user can verify the input chain even
+      // with all FX disabled.
+      if (micProcessing && micProcessing.rawMicAnalyser) {
+        try { source.connect(micProcessing.rawMicAnalyser); } catch (_) {}
+      }
     }
 
     async function toggleListening() {
@@ -4081,6 +4186,10 @@
           isListening = true;
           btn.innerHTML = 'Listening';
           btn.classList.add('listening');
+          // Drive #micRawMeter visibility off the live mic state — the
+          // meter must be visible whenever the mic is on, NOT only during
+          // recording.
+          document.body.classList.add('mic-listening');
           lastDetectTime = 0;
           // Guard against double rAF chains. enterRecordMode may have
           // already started a loop for the camera; starting another here
@@ -4125,6 +4234,10 @@
 
         btn.innerHTML = 'Microphone';
         btn.classList.remove('listening');
+        // Mic stopped — hide the raw level readout and reset its text.
+        document.body.classList.remove('mic-listening');
+        const rawEl = document.getElementById('micRawMeter');
+        if (rawEl) rawEl.textContent = 'MIC — dB';
         updateAudioInputDiagnostic('', null, null, false);
 
         fadeOutIndicator();
@@ -4138,20 +4251,23 @@
       }
       try {
         // Camera capture is DECOUPLED from the lo-fi 544x960 canvas /
-        // encoder resolution. We ask the camera for a normal-FOV portrait
-        // (1080x1920 ideal) so we get the sensor's native field of view;
-        // the canvas internal resolution stays at 544x960 (see ASPECT_DIMS
-        // / CAPTURE_PIXEL_SCALE) and drawCameraBackground does the uniform
-        // 9:16 → 9:16 downscale via drawImage. The MediaRecorder still
-        // encodes the 544x960 canvas captureStream at 3 Mbps — only the
-        // *capture-side* FOV changes. Without this, asking for {ideal:544}
-        // makes some Pixel cameras hand back a tighter 4:3 mode that the
-        // canvas's max-fill scaling crops, producing a "zoomed-in" look.
+        // encoder resolution. Earlier we asked for 1080x1920 portrait to
+        // try to get the sensor's native FOV, but Pixel-class front cams
+        // are 4:3 NATIVE — Chrome satisfies a portrait request by
+        // side-cropping the 4:3 frame, which was the actual cause of the
+        // "still zoomed in" symptom. Asking explicitly for 1280x960 (4:3
+        // landscape) gives us the full horizontal sensor; we then
+        // letterbox it into the 9:16 canvas in drawCameraBackground
+        // (Math.min / contain). The MediaRecorder still encodes the
+        // 544x960 canvas captureStream at 3 Mbps — only the capture-side
+        // pixel layout changes. Black bars top and bottom of the camera
+        // image are the cost; the win is much wider horizontal field
+        // (the user's whole upper body fits, not just their face).
         cameraStream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: facingMode },
-            width:  { ideal: 1080 },
-            height: { ideal: 1920 }
+            width:  { ideal: 1280 },
+            height: { ideal: 960 }
           },
           audio: false
         });
@@ -4167,7 +4283,7 @@
           if (vt && vt.getSettings) {
             const s = vt.getSettings();
             console.log('[camera] track settings',
-              'requested=1080x1920',
+              'requested=1280x960',
               'actual=', (s.width || '?') + 'x' + (s.height || '?'),
               'frameRate=', s.frameRate,
               'facingMode=', s.facingMode,
