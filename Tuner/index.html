@@ -1949,20 +1949,29 @@
       return 100 * Math.log(hz / DRONE_CUTOFF_MIN) / Math.log(DRONE_CUTOFF_MAX / DRONE_CUTOFF_MIN);
     }
 
-    // Lo-fi capture: 540x960 (9:16) is the new default. Halved from the
-    // prior 1080x1920 to slash encoder load + bitrate while staying
-    // perfectly readable at IG/TikTok playback sizes. Other aspects
-    // halved proportionally to keep the same on-screen layout.
+    // Lo-fi capture: 544x960 (9:16) is the new default. Originally halved
+    // from 1080x1920 to 540x960, but H.264 encoders work in 16x16
+    // macroblocks and many hardware encoders (Pixel-class Android in
+    // particular) silently produce undecodable output when given
+    // dimensions not divisible by 16. 540 fails this; 544 = 16 * 34
+    // does not. Symptom of the misalignment was 25-31 KB files that
+    // open in a player as "video" but stay stuck at 0:00 with a black
+    // frame -- exactly what you see when the encoder emits data without
+    // valid keyframes. All values below are also kept on a 16-pixel
+    // grid for max compatibility (960=16*60, 680=16*42.5 -> 680 ok,
+    // 544=16*34). The 4:5 height moved from 675 to 680 (5/4 of 544).
+    // Visually 4 extra pixels of width is a 0.7% change -- invisible.
     const ASPECT_DIMS = {
-      '9:16': [540, 960],
-      '4:5':  [540, 675],
-      '1:1':  [540, 540]
+      '9:16': [544, 960],
+      '4:5':  [544, 680],
+      '1:1':  [544, 544]
     };
     // Multiplier applied to all literal-pixel constants in the record-mode
     // draw path (font sizes, stroke widths, bracket arms, etc.). Hardwired
-    // to 0.5 so the new 540-wide canvas renders the ruler / EDO / crosshair
-    // / labels at the same on-screen proportion they had on the old
-    // 1080-wide canvas. If we ever pick a different capture resolution,
+    // to 0.5 so the lo-fi 544-wide canvas renders the ruler / EDO /
+    // crosshair / labels at the same on-screen proportion they had on
+    // the old 1080-wide canvas. 544/1088 ≈ 0.5 (0.7% drift; nobody
+    // will notice). If we ever pick a different capture resolution,
     // recompute this as (newCanvasWidth / 1080).
     const CAPTURE_PIXEL_SCALE = 0.5;
     
@@ -4128,14 +4137,14 @@
         cameraStream = null;
       }
       try {
-        // Camera capture is DECOUPLED from the lo-fi 540x960 canvas /
+        // Camera capture is DECOUPLED from the lo-fi 544x960 canvas /
         // encoder resolution. We ask the camera for a normal-FOV portrait
         // (1080x1920 ideal) so we get the sensor's native field of view;
-        // the canvas internal resolution stays at 540x960 (see ASPECT_DIMS
+        // the canvas internal resolution stays at 544x960 (see ASPECT_DIMS
         // / CAPTURE_PIXEL_SCALE) and drawCameraBackground does the uniform
         // 9:16 → 9:16 downscale via drawImage. The MediaRecorder still
-        // encodes the 540x960 canvas captureStream at 3 Mbps — only the
-        // *capture-side* FOV changes. Without this, asking for {ideal:540}
+        // encodes the 544x960 canvas captureStream at 3 Mbps — only the
+        // *capture-side* FOV changes. Without this, asking for {ideal:544}
         // makes some Pixel cameras hand back a tighter 4:3 mode that the
         // canvas's max-fill scaling crops, producing a "zoomed-in" look.
         cameraStream = await navigator.mediaDevices.getUserMedia({
@@ -4337,6 +4346,37 @@
       el.classList.remove('warning');
     }
 
+    // -------- Save-path diagnostics --------
+    //
+    // The "two downloads per recording" symptom (one at "press record",
+    // one at stop) is hard to root-cause without seeing exactly which
+    // save path fires when. There is only ONE createObjectURL/<a>.click()
+    // site in this file (inside mediaRecorder.onstop), so two downloads
+    // means either onstop is being entered twice (e.g. two MediaRecorder
+    // instances both stopping) or onstop's body is being re-run.
+    //
+    // flashDLToast() runs at every actual save site and bumps a
+    // session-wide counter. The on-screen text shows "#1", "#2", ...
+    // and the trigger label ("ffmpeg success" / "ffmpeg fail fallback"
+    // / "onstop (raw)"), so a screenshot will pinpoint the cause:
+    //   - two toasts in a row with the same trigger -> onstop fired twice
+    //   - two toasts with different triggers       -> two recordings
+    //                                                  produced two saves
+    //
+    // The counter is page-session scoped (resets on reload). A second
+    // save in the same session is highlighted as a warning to make it
+    // visually obvious in screenshots.
+    let _dlCount = 0;
+    let _onstopEntries = 0;
+    function flashDLToast(label, sizeBytes) {
+      _dlCount++;
+      const sizeKB = Math.round((sizeBytes || 0) / 1024);
+      const text = '#' + _dlCount + ' ' + label + ' (' + sizeKB + 'KB)';
+      console.log('[record] SAVE', text);
+      showRemuxIndicator(text, { warning: _dlCount > 1 });
+      setTimeout(hideRemuxIndicator, 5000);
+    }
+
     // _ffmpegPromise holds the *current* ffmpeg.wasm instance. We deliberately
     // discard it after every remux (see remuxToFastStartMP4 finally) and
     // rebuild a fresh one on the next call. Why: ffmpeg.wasm 0.11.x has an
@@ -4488,7 +4528,7 @@
       }
 
       const canvas = document.getElementById('rulerCanvas');
-      // Force a paint at the final 540x960 dimensions BEFORE acquiring
+      // Force a paint at the final 544x960 dimensions BEFORE acquiring
       // captureStream. Symptoms on the third 0-byte cycle: chunks were
       // empty even though MediaRecorder.start() ran and onerror never
       // fired. Hypothesis: on at least some Chrome (Android) builds,
@@ -4602,7 +4642,7 @@
       let dataEvents = 0;
       let emptyEvents = 0;
       try {
-        // Lo-fi capture: 3 Mbps video. Plenty for 540x960 @ 30fps and a
+        // Lo-fi capture: 3 Mbps video. Plenty for 544x960 @ 30fps and a
         // big drop from the prior 8 Mbps - keeps mobile encoders happy
         // and shrinks output files for upload.
         mediaRecorder = mime
@@ -4634,6 +4674,15 @@
         setTimeout(hideRemuxIndicator, 6000);
       };
       mediaRecorder.onstop = async () => {
+        // Diagnostic: count every onstop entry across the page session
+        // so screenshots can show "this is the 2nd onstop the page has
+        // seen" — that alone confirms whether the double-save symptom
+        // is a doubled onstop (same recorder firing twice or two
+        // recorders both ending) versus something downstream of save.
+        _onstopEntries++;
+        const onstopIdx = _onstopEntries;
+        console.log('[record] onstop entered #' + onstopIdx);
+
         // Stop only the canvas video track; keep the shared mic track alive
         try { canvasStream.getVideoTracks().forEach(t => t.stop()); } catch (_) {}
         recordVideoTrack = null;
@@ -4647,7 +4696,7 @@
         const chunks = recordedChunks.slice();
         const elapsedMs = recordStartTime ? (performance.now() - recordStartTime) : 0;
         const totalBytes = chunks.reduce((n, c) => n + (c && c.size ? c.size : 0), 0);
-        console.log('[record] stop',
+        console.log('[record] stop #' + onstopIdx,
           'durMs=', Math.round(elapsedMs),
           'chunks=', chunks.length,
           'bytes=', totalBytes,
@@ -4655,7 +4704,9 @@
           'droneEnabled=', tanpuraEnabled);
 
         if (discardRequested) {
-          // Throw away — no save
+          // Throw away — no save. Console-only log so the user can
+          // confirm no DL toast fires for a discarded recording.
+          console.log('[record] onstop #' + onstopIdx + ' early-return: discarded');
           finalizeDiscard();
           return;
         }
@@ -4668,7 +4719,8 @@
         // "small unplayable file" symptom we were chasing - now logged
         // and surfaced rather than silently dumped to disk.
         if (totalBytes < 1024) {
-          console.warn('[record] empty/init-only stop — skipping save (chunks=' + chunks.length +
+          console.warn('[record] empty/init-only stop #' + onstopIdx +
+            ' — skipping save (chunks=' + chunks.length +
             ', bytes=' + totalBytes + ', dataEvents=' + dataEvents + ', emptyEvents=' + emptyEvents +
             ', vt=' + captureVideoTrackSummary + ')');
           // Surface every diagnostic the on-screen indicator can fit.
@@ -4688,6 +4740,12 @@
         const type = mediaRecorder.mimeType || mime || 'video/webm';
         const ext = type.includes('mp4') ? 'mp4' : 'webm';
         const recordedBlob = new Blob(chunks, { type });
+        // Track which branch produced outputBlob so the on-screen DL
+        // toast can name the trigger. Three possibilities:
+        //   - "onstop (raw)"        : non-MP4 mime, no remux attempted
+        //   - "ffmpeg success"      : MP4, remux returned a new blob
+        //   - "ffmpeg fail fallback": MP4, remux threw, original blob saved
+        let saveTrigger = 'DL: onstop (raw)';
 
         // Remux fragmented MP4 → non-fragmented MP4 with moov-up-front
         // (faststart). MediaRecorder emits ftyp/moov-init/moof+mdat...
@@ -4706,14 +4764,23 @@
             outputBlob = await remuxToFastStartMP4(recordedBlob);
             console.log('[record] FFmpeg remux complete, size:', outputBlob.size);
             hideRemuxIndicator();
+            saveTrigger = 'DL: ffmpeg success';
           } catch (e) {
             console.warn('[record] FFmpeg remux failed, using original:', e);
             outputBlob = recordedBlob;
             const msg = (e && e.message) ? e.message : String(e);
             showRemuxIndicator('Optimizer error: ' + msg + '. Saved original.', { warning: true });
+            // Don't keep the optimizer-error toast around — flashDLToast
+            // below will repaint the indicator with the named trigger.
             setTimeout(hideRemuxIndicator, 6000);
+            saveTrigger = 'DL: ffmpeg fail fallback';
           }
         }
+
+        // Flash the named save-trigger toast just before the actual
+        // a.click(). Counter is page-session scoped — a second toast
+        // in the same session means a second download fired.
+        flashDLToast(saveTrigger, outputBlob.size);
 
         const url = URL.createObjectURL(outputBlob);
         const a = document.createElement('a');
