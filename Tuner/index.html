@@ -2912,22 +2912,137 @@
     // yellow, 12 kHz -> 30 deg amber.
     function cloudFreqToHue(hz) {
       const lf = Math.log2(Math.max(20, Math.min(20000, hz)));
+      // Tatooine palette: warm-leaning sunset arc that cools at the top.
+      // Hues are kept strictly increasing across the wrap (350 -> 25 is
+      // expressed as 350 -> 385) so the linear-in-log2 interpolator stays
+      // monotonic; we modulo back to [0,360) on return.
       const stops = [
-        [5.9070, 280], // ~60 Hz
-        [7.9658, 220], // ~250 Hz
-        [9.9658, 160], // ~1 kHz
-        [11.9658, 60], // ~4 kHz
-        [13.5507, 30], // ~12 kHz
+        [5.9070, 350], // ~60 Hz   - deep maroon
+        [7.9658, 385], // ~250 Hz  - rust/copper        (=25 mod 360)
+        [9.9658, 410], // ~1 kHz   - sand/amber         (=50 mod 360)
+        [11.9658, 430], // ~4 kHz  - pale gold          (=70 mod 360)
+        [13.5507, 540], // ~12 kHz - faded teal twilight (=180 mod 360)
       ];
-      if (lf <= stops[0][0]) return stops[0][1];
-      if (lf >= stops[stops.length - 1][0]) return stops[stops.length - 1][1];
-      for (let i = 1; i < stops.length; i++) {
-        if (lf <= stops[i][0]) {
-          const t = (lf - stops[i - 1][0]) / (stops[i][0] - stops[i - 1][0]);
-          return stops[i - 1][1] + t * (stops[i][1] - stops[i - 1][1]);
+      let h;
+      if (lf <= stops[0][0]) h = stops[0][1];
+      else if (lf >= stops[stops.length - 1][0]) h = stops[stops.length - 1][1];
+      else {
+        h = stops[stops.length - 1][1];
+        for (let i = 1; i < stops.length; i++) {
+          if (lf <= stops[i][0]) {
+            const t = (lf - stops[i - 1][0]) / (stops[i][0] - stops[i - 1][0]);
+            h = stops[i - 1][1] + t * (stops[i][1] - stops[i - 1][1]);
+            break;
+          }
         }
       }
-      return 200;
+      return ((h % 360) + 360) % 360;
+    }
+
+    // Per-particle saturation/lightness for the Tatooine palette. Keeps
+    // the hue function pure-hue and lets the gradient stops modulate
+    // S/L by the same hue so each anchor lands close to its spec
+    // (sat <= ~60%, gentle lightness range). Used by the radial gradient
+    // below.
+    function cloudHueToSL(hue) {
+      // Same control points as cloudFreqToHue, in unwrapped hue space:
+      // 350->50/50, 385->55/50, 410->55/60, 430->50/65, 540->40/55.
+      // Caller passes the already-modulated hue [0,360); we lift it
+      // back into the unwrapped space [350,540] by adding 360 to small
+      // hues so the lerp lines up with the same anchor sequence.
+      let h = hue;
+      if (h < 200) h += 360; // anything in [0,200) is past the wrap
+      const sStops = [
+        [350, 50], [385, 55], [410, 55], [430, 50], [540, 40],
+      ];
+      const lStops = [
+        [350, 50], [385, 50], [410, 60], [430, 65], [540, 55],
+      ];
+      function interp(stops, x) {
+        if (x <= stops[0][0]) return stops[0][1];
+        if (x >= stops[stops.length - 1][0]) return stops[stops.length - 1][1];
+        for (let i = 1; i < stops.length; i++) {
+          if (x <= stops[i][0]) {
+            const t = (x - stops[i - 1][0]) / (stops[i][0] - stops[i - 1][0]);
+            return stops[i - 1][1] + t * (stops[i][1] - stops[i - 1][1]);
+          }
+        }
+        return stops[stops.length - 1][1];
+      }
+      return { s: interp(sStops, h), l: interp(lStops, h) };
+    }
+
+    // Sparse Hz frame ruler. Octave-spaced reference ticks, parchment
+    // off-white, drawn only while spectrumMix > 0 and faded with both
+    // spectrumMix and the caller's alphaMul so it cross-fades cleanly
+    // with the rest of the spectrum-mode visuals. Tick set is the
+    // standard octave ladder; anything outside the cloud field's
+    // visible Hz range (60..12 kHz) is skipped. Cost: ~9 ticks/frame,
+    // straight 1d strokes + small fillText calls. Negligible.
+    function drawHzFrameRuler(ctx, geom, alphaMul) {
+      const S = geom.S;
+      const rulerX = geom.rulerX;
+      const rulerTop = geom.rulerTop;
+      const rulerBottom = geom.rulerBottom;
+      const rulerHeight = rulerBottom - rulerTop;
+      if (rulerHeight <= 0 || alphaMul <= 0.001) return;
+
+      // Same Hz range as the cloud field's spawn-Y mapping.
+      const minHz = 60;
+      const maxHz = 12000;
+      const minLf = Math.log2(minHz);
+      const maxLf = Math.log2(maxHz);
+      const lfSpan = maxLf - minLf;
+
+      const TICKS = [62.5, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+      const PARCHMENT = '220, 200, 170';
+
+      const oldAlpha = ctx.globalAlpha;
+      ctx.save();
+      ctx.globalAlpha = oldAlpha * alphaMul;
+      ctx.lineWidth = 1;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      // Match the EDO/ratio Hz label sizing - the pitch view uses 11*S
+      // for those labels - but in IBM Plex Mono so the ruler reads as
+      // schematic stencil rather than a UI chrome element.
+      ctx.font = `${11 * S}px 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+
+      // Thin vertical rail just to the right of rulerX, low contrast.
+      const railX = rulerX + 1.5 * S;
+      ctx.strokeStyle = `rgba(${PARCHMENT}, 0.10)`;
+      ctx.beginPath();
+      ctx.moveTo(railX, rulerTop);
+      ctx.lineTo(railX, rulerBottom);
+      ctx.stroke();
+
+      const tickLen = 14 * S;
+      for (let i = 0; i < TICKS.length; i++) {
+        const hz = TICKS[i];
+        if (hz < minHz || hz > maxHz) continue;
+        const lf = Math.log2(hz);
+        const yNorm = (lf - minLf) / lfSpan;
+        const y = rulerBottom - yNorm * rulerHeight;
+        if (y < rulerTop - 0.5 || y > rulerBottom + 0.5) continue;
+
+        // Major octave marks (>=1 kHz read in 'Nk' form) get a touch
+        // more presence - hierarchy without the ruler ever shouting.
+        const isMajor = hz >= 1000;
+        const tickAlpha = isMajor ? 0.22 : 0.12;
+        const labelAlpha = isMajor ? 0.25 : 0.13;
+
+        ctx.strokeStyle = `rgba(${PARCHMENT}, ${tickAlpha})`;
+        ctx.beginPath();
+        ctx.moveTo(railX, y);
+        ctx.lineTo(railX + tickLen, y);
+        ctx.stroke();
+
+        const label = hz >= 1000 ? `${Math.round(hz / 1000)}k` : `${hz}`;
+        ctx.fillStyle = `rgba(${PARCHMENT}, ${labelAlpha})`;
+        ctx.fillText(label, railX + tickLen + 4 * S, y);
+      }
+
+      ctx.restore();
     }
 
     // Build a single particle. hz=0 means "ambient/idle" (caller should
@@ -2963,11 +3078,18 @@
       const rulerHeight = rulerBottom - rulerTop;
       if (rulerHeight <= 0) return null;
 
-      // Visible spawn / display rect: a small margin off the rail to a
-      // small margin off the canvas's left edge.
-      const xMax = rulerX - 6 * S;
-      const xMin = 6 * S;
-      if (xMax <= xMin) return null;
+      // Spawn column: particles emerge from a tight vertical band at
+      // rulerX (the same rail the pitch ladder hangs off). Drift+sway in
+      // the update step still let long-lived blobs wander outward, but
+      // the spawn mass reads as a rising column rather than a wash. The
+      // column's half-width is the smaller of ~40 px (scale-aware) or
+      // 12% of the rail-to-canvas-left-edge distance, so it stays a
+      // column on phones and a column on desktop.
+      const colDistLeft = Math.max(0, rulerX - 6 * S);
+      const colHalfWidth = Math.min(40 * S, colDistLeft * 0.12);
+      const xColMin = rulerX - colHalfWidth;
+      const xColMax = rulerX - 2 * S; // never quite touch the rail
+      if (xColMax <= xColMin) return null;
 
       // Frame timestep (seconds). Capped at 100 ms so a tab-resume can't
       // launch every particle off-screen on a single integration step.
@@ -3051,7 +3173,7 @@
         const hz = Math.pow(2, centerLf);
         const yNorm = (centerLf - minLf) / lfSpan;
         const y = rulerBottom - yNorm * rulerHeight;
-        const x = xMin + Math.random() * (xMax - xMin);
+        const x = xColMin + Math.random() * (xColMax - xColMin);
         const energy = Math.max(0.25, Math.min(1, cloudBandEnergy[bIdx] * 1.2));
         cloudParticles.push(makeCloudParticle(x, y, hz, energy, S));
       }
@@ -3066,7 +3188,7 @@
         } else if ((tNow - cloudLastIdleSpawnTime) / 1000 > cloudNextIdleInterval) {
           cloudLastIdleSpawnTime = tNow;
           cloudNextIdleInterval = 5 + Math.random() * 4;
-          const cx = (xMin + xMax) * 0.5 + (Math.random() - 0.5) * (xMax - xMin) * 0.4;
+          const cx = xColMin + Math.random() * (xColMax - xColMin);
           const cy = (rulerTop + rulerBottom) * 0.5 + (Math.random() - 0.5) * rulerHeight * 0.3;
           const ambient = makeCloudParticle(cx, cy, 0, 0.32, S);
           ambient.life = 3.0 + Math.random() * 1.5;
@@ -3109,9 +3231,19 @@
         if (r <= 0.5) continue;
         const aCenter = env * p.energy * 0.85;
         const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-        grad.addColorStop(0,    `hsla(${p.hue}, 92%, 65%, ${aCenter})`);
-        grad.addColorStop(0.45, `hsla(${p.hue}, 88%, 56%, ${aCenter * 0.45})`);
-        grad.addColorStop(1,    `hsla(${p.hue}, 80%, 45%, 0)`);
+        // Tatooine palette: pull S/L from per-hue anchors and damp the
+        // saturation toward the rim so each particle reads as sun-bleached
+        // ink rather than a saturated neon dot.
+        const sl = cloudHueToSL(p.hue);
+        const sCore = Math.min(65, sl.s + 8);
+        const lCore = Math.min(70, sl.l + 8);
+        const sMid  = Math.max(20, sl.s - 5);
+        const lMid  = sl.l;
+        const sEdge = Math.max(15, sl.s - 15);
+        const lEdge = Math.max(35, sl.l - 8);
+        grad.addColorStop(0,    `hsla(${p.hue}, ${sCore}%, ${lCore}%, ${aCenter})`);
+        grad.addColorStop(0.45, `hsla(${p.hue}, ${sMid}%, ${lMid}%, ${aCenter * 0.45})`);
+        grad.addColorStop(1,    `hsla(${p.hue}, ${sEdge}%, ${lEdge}%, 0)`);
         ctx.fillStyle = grad;
         ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
       }
@@ -3529,6 +3661,9 @@
           displayMax: displayMax,
           centsToY: centsToY,
         };
+        // Frame first, field on top - the ruler reads as a stencil
+        // sitting behind the aurora rather than a label over it.
+        drawHzFrameRuler(ctx, geom, spectrumMix);
         spectrumResult = drawSpectrum(ctx, geom, spectrumMix);
       }
       spectrumPeakRatio = spectrumResult ? spectrumResult.loudest : null;
