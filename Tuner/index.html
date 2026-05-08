@@ -1896,6 +1896,12 @@
     let appMode = 'pitch';
     // Reusable Uint8Array for FFT byte reads (cloud-field spawning).
     let spectrumBuf = null;
+    // Per-tick band-energy state for the Hz frame ruler. Sized to match
+    // drawHzFrameRuler's TICKS array (8 reachable ticks: 62.5..8k; the
+    // 16k entry is culled by the maxHz=12k window). Fast attack, slow
+    // release (0.92/frame) - held tones brighten the corresponding tick;
+    // silence settles in ~0.5s.
+    const hzTickEnergy = new Float32Array(9);
     // "Aurora ink-in-water" particle cloud state. Sparse (~20-40 in flight),
     // each particle drifts upward, blooms, and dissolves over ~2-3 sec.
     // The FFT energy still drives the system - it just expresses itself
@@ -2906,22 +2912,22 @@
     // overlapping particles brighten and color-mix. No ratios, no labels, no
     // measurement readouts in this mode - the language is generative art.
 
-    // Maps a frequency in Hz to an aurora-style hue (degrees). Piecewise
-    // linear in log2(hz). Anchors: 60 Hz -> 280 deg deep violet, 250 Hz ->
-    // 220 deg royal blue, 1 kHz -> 160 deg cyan/teal, 4 kHz -> 60 deg warm
-    // yellow, 12 kHz -> 30 deg amber.
+    // Maps a frequency in Hz to a hue (degrees). Piecewise linear in
+    // log2(hz). 'Rust dissipating into refracted light' palette:
+    //   60 Hz   -> 0   deg (deep rust)
+    //   250 Hz  -> 20  deg (rusted copper)
+    //   1 kHz   -> 40  deg (warm sand)
+    //   4 kHz   -> 50  deg (pale parchment)
+    //   12 kHz  -> 200 deg (refracted sky-haze)
+    // Hues are strictly increasing 0..200 so no wrap juggling needed.
     function cloudFreqToHue(hz) {
       const lf = Math.log2(Math.max(20, Math.min(20000, hz)));
-      // Tatooine palette: warm-leaning sunset arc that cools at the top.
-      // Hues are kept strictly increasing across the wrap (350 -> 25 is
-      // expressed as 350 -> 385) so the linear-in-log2 interpolator stays
-      // monotonic; we modulo back to [0,360) on return.
       const stops = [
-        [5.9070, 350], // ~60 Hz   - deep maroon
-        [7.9658, 385], // ~250 Hz  - rust/copper        (=25 mod 360)
-        [9.9658, 410], // ~1 kHz   - sand/amber         (=50 mod 360)
-        [11.9658, 430], // ~4 kHz  - pale gold          (=70 mod 360)
-        [13.5507, 540], // ~12 kHz - faded teal twilight (=180 mod 360)
+        [5.9070, 0],   // ~60 Hz   - deep rust
+        [7.9658, 20],  // ~250 Hz  - rusted copper
+        [9.9658, 40],  // ~1 kHz   - warm sand
+        [11.9658, 50], // ~4 kHz   - pale parchment
+        [13.5507, 200],// ~12 kHz  - refracted sky-haze
       ];
       let h;
       if (lf <= stops[0][0]) h = stops[0][1];
@@ -2939,24 +2945,25 @@
       return ((h % 360) + 360) % 360;
     }
 
-    // Per-particle saturation/lightness for the Tatooine palette. Keeps
-    // the hue function pure-hue and lets the gradient stops modulate
-    // S/L by the same hue so each anchor lands close to its spec
-    // (sat <= ~60%, gentle lightness range). Used by the radial gradient
-    // below.
+    // Per-particle saturation/lightness for the rust-to-refracted-light
+    // palette. Anchors keyed to the same hue values cloudFreqToHue
+    // produces (0/20/40/50/200), so each spawning band lands near its
+    // S/L spec without requiring a separate frequency pass.
+    //   hue   sat%  light%
+    //   0     30    45      deep rust
+    //   20    30    55      rusted copper
+    //   40    30    60      warm sand
+    //   50    22    68      pale parchment
+    //   200   18    72      refracted sky-haze
+    // Saturation is held under ~30% across the board - 'faded photograph,
+    // bleached by desert sun, rust dissolving into bright light'.
     function cloudHueToSL(hue) {
-      // Same control points as cloudFreqToHue, in unwrapped hue space:
-      // 350->50/50, 385->55/50, 410->55/60, 430->50/65, 540->40/55.
-      // Caller passes the already-modulated hue [0,360); we lift it
-      // back into the unwrapped space [350,540] by adding 360 to small
-      // hues so the lerp lines up with the same anchor sequence.
-      let h = hue;
-      if (h < 200) h += 360; // anything in [0,200) is past the wrap
+      const h = hue; // already in [0,360); our anchors are 0..200, monotonic.
       const sStops = [
-        [350, 50], [385, 55], [410, 55], [430, 50], [540, 40],
+        [0, 30], [20, 30], [40, 30], [50, 22], [200, 18],
       ];
       const lStops = [
-        [350, 50], [385, 50], [410, 60], [430, 65], [540, 55],
+        [0, 45], [20, 55], [40, 60], [50, 68], [200, 72],
       ];
       function interp(stops, x) {
         if (x <= stops[0][0]) return stops[0][1];
@@ -2997,12 +3004,52 @@
       const TICKS = [62.5, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
       const PARCHMENT = '220, 200, 170';
 
+      // --- Live tick reactivity: pull current FFT and compute per-tick
+      // energy in a quarter-octave window around each tick frequency.
+      // Fast attack, slow release (release coefficient 0.92/frame).
+      // Cost: 8 ticks x ~5 bin lookups + 8 lerps = trivial.
+      const an = (typeof micProcessing !== 'undefined' && micProcessing && micProcessing.rawMicAnalyser)
+                   ? micProcessing.rawMicAnalyser
+                   : (typeof analyser !== 'undefined' ? analyser : null);
+      if (an) {
+        const binCount = an.frequencyBinCount;
+        if (!spectrumBuf || spectrumBuf.length !== binCount) {
+          spectrumBuf = new Uint8Array(binCount);
+        }
+        try { an.getByteFrequencyData(spectrumBuf); } catch (_) {}
+        const sr = (typeof audioContext !== 'undefined' && audioContext && audioContext.sampleRate) || 48000;
+        const binHz = sr / (binCount * 2); // sampleRate / fftSize
+        const QUARTER_OCT = Math.pow(2, 0.125); // +/- 1/8 octave window
+        for (let i = 0; i < TICKS.length; i++) {
+          const f = TICKS[i];
+          if (f < minHz || f > maxHz) { hzTickEnergy[i] *= 0.92; continue; }
+          const fLo = f / QUARTER_OCT;
+          const fHi = f * QUARTER_OCT;
+          let bLo = Math.max(1, Math.floor(fLo / binHz));
+          let bHi = Math.min(binCount - 1, Math.ceil(fHi / binHz));
+          // Always cover at least the closest 5 bins around the center.
+          const bC = Math.round(f / binHz);
+          if (bHi - bLo < 4) { bLo = Math.max(1, bC - 2); bHi = Math.min(binCount - 1, bC + 2); }
+          let sum = 0, cnt = 0;
+          for (let b = bLo; b <= bHi; b++) { sum += spectrumBuf[b]; cnt++; }
+          const raw = cnt > 0 ? (sum / cnt) / 255 : 0;
+          const decayed = hzTickEnergy[i] * 0.92;
+          hzTickEnergy[i] = raw > decayed ? raw : decayed;
+        }
+      } else {
+        for (let i = 0; i < TICKS.length; i++) hzTickEnergy[i] *= 0.92;
+      }
+
       const oldAlpha = ctx.globalAlpha;
       ctx.save();
       ctx.globalAlpha = oldAlpha * alphaMul;
       ctx.lineWidth = 1;
       ctx.textBaseline = 'middle';
-      ctx.textAlign = 'left';
+      // Hz numerals sit on the LEFT side of the rail, mirroring the
+      // EDO/ratio label convention (textAlign='right', anchored just
+      // inboard of rulerX). The tick lines themselves stay to the
+      // right of the rail so they still read as a stencil.
+      ctx.textAlign = 'right';
       // Match the EDO/ratio Hz label sizing - the pitch view uses 11*S
       // for those labels - but in IBM Plex Mono so the ruler reads as
       // schematic stencil rather than a UI chrome element.
@@ -3028,9 +3075,15 @@
         // Major octave marks (>=1 kHz read in 'Nk' form) get a touch
         // more presence - hierarchy without the ruler ever shouting.
         const isMajor = hz >= 1000;
-        const tickAlpha = isMajor ? 0.22 : 0.12;
-        const labelAlpha = isMajor ? 0.25 : 0.13;
+        const baseTickAlpha = isMajor ? 0.22 : 0.12;
+        const baseLabelAlpha = isMajor ? 0.25 : 0.13;
 
+        // Live boost from the band-energy probe. Clamped at 1.0.
+        const e = hzTickEnergy[i];
+        const tickAlpha = Math.min(1, baseTickAlpha + 0.5 * e);
+        const labelAlpha = Math.min(1, baseLabelAlpha + 0.5 * e);
+
+        ctx.lineWidth = 1 + e * 0.6;
         ctx.strokeStyle = `rgba(${PARCHMENT}, ${tickAlpha})`;
         ctx.beginPath();
         ctx.moveTo(railX, y);
@@ -3039,7 +3092,7 @@
 
         const label = hz >= 1000 ? `${Math.round(hz / 1000)}k` : `${hz}`;
         ctx.fillStyle = `rgba(${PARCHMENT}, ${labelAlpha})`;
-        ctx.fillText(label, railX + tickLen + 4 * S, y);
+        ctx.fillText(label, rulerX - 8 * S, y);
       }
 
       ctx.restore();
