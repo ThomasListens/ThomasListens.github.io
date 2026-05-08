@@ -2901,6 +2901,55 @@
     // paints in 3/2's color, and so on. EMA peak-decay (~0.75/frame)
     // gives a brief wake after each transient.
     //
+    // Idle-state hint for spectrum view. Drawn whenever drawSpectrum has
+    // no audio source (cold load, mic toggled off) or all-zero energy.
+    // A faint baseline tick at the rail's center Y plus a quiet hint
+    // tells the user "your sound goes here" without the curve being
+    // hidden behind the rail. Respects geom + alphaMul so it cross-fades
+    // with the rest of spectrum view.
+    function drawSpectrumIdleHint(ctx, geom, alphaMul) {
+      const S = geom.S;
+      const rulerX = geom.rulerX;
+      const rulerTop = geom.rulerTop;
+      const rulerBottom = geom.rulerBottom;
+      const rulerHeight = rulerBottom - rulerTop;
+      if (rulerHeight <= 0) return;
+      const a = (alphaMul == null ? 1 : alphaMul);
+      if (a <= 0.01) return;
+
+      ctx.save();
+      ctx.globalAlpha = (ctx.globalAlpha || 1) * a;
+
+      // Faint horizontal baseline tick — emanates leftward off the rail
+      // at the rail's vertical center so the user reads it as "this is
+      // where the curve will appear." ~36 px out, candle-amber, low
+      // alpha so it sits well behind the ratio ladder.
+      const cy = rulerTop + rulerHeight * 0.5;
+      const tickLen = Math.min(36 * S, Math.max(0, rulerX - 8 * S));
+      if (tickLen > 1) {
+        ctx.strokeStyle = 'rgba(255, 200, 140, 0.30)';
+        ctx.lineWidth = 1.2 * S;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(rulerX - tickLen, cy);
+        ctx.lineTo(rulerX - 4 * S, cy);
+        ctx.stroke();
+      }
+
+      // Quiet hint text in IBM Plex Mono, right-aligned just left of
+      // the rail near the bottom of the visible band — off the rail,
+      // out of the way, in the leftward direction the curve will grow.
+      const fontSize = 10 * S;
+      ctx.font = `${fontSize}px 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+      ctx.fillStyle = 'rgba(255, 230, 200, 0.40)';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'alphabetic';
+      const ty = rulerBottom - 8 * S;
+      ctx.fillText('tap mic to listen', rulerX - 10 * S, ty);
+
+      ctx.restore();
+    }
+
     // Returns { loudest, peakStrength } so the big nearest-ratio label
     // can swap in spectrum mode without re-running the FFT.
     function drawSpectrum(ctx, geom, alphaMul) {
@@ -2919,7 +2968,13 @@
       const an = (micProcessing && micProcessing.rawMicAnalyser)
                    ? micProcessing.rawMicAnalyser
                    : analyser;
-      if (!an) return null;
+      if (!an) {
+        // Cold load (mic never enabled) — nothing to FFT yet. Draw
+        // the idle hint so spectrum view reads as "ready, waiting"
+        // rather than blank.
+        drawSpectrumIdleHint(ctx, geom, alphaMul);
+        return null;
+      }
 
       const binCount = an.frequencyBinCount;
       if (!spectrumBuf || spectrumBuf.length !== binCount) {
@@ -2980,6 +3035,16 @@
         const v = live > held ? live : held;
         spectrumEnergyEMA[i] = v;
         if (v > peakVal) { peakVal = v; peakIdx = i; }
+      }
+
+      // Analyser exists but its upstream is silent / disconnected — all
+      // buckets decayed to ~0. The filled body would render as a
+      // zero-width path tucked behind the rail and the user would see
+      // nothing. Show the idle hint instead so spectrum view stays
+      // legible when the source goes quiet.
+      if (peakVal < 1e-4) {
+        drawSpectrumIdleHint(ctx, geom, alphaMul);
+        return { loudest: null, peakStrength: 0 };
       }
 
       // Per-bucket Y, cents and color so we don't recompute inside the
@@ -4727,6 +4792,15 @@
       // this each frame; the previous value persists if the user
       // re-toggles mid-fade so the animation feels continuous.
       modeTransitionTarget = (mode === 'spectrum') ? 1 : 0;
+      // No active rAF loop means draw() runs exactly once below — the
+      // tween code never gets a second tick and would freeze the
+      // crossfade mid-way (~18%). Snap to the target so the single
+      // forced repaint shows the final state. When the user IS active
+      // (mic / playback / record), the rAF loop animates normally.
+      if (!isListening && !isPlaying && !recordMode) {
+        modeTransition = modeTransitionTarget;
+        modeTransitionLastTime = 0;
+      }
       const btn = document.getElementById('modeToggleBtn');
       if (btn) btn.textContent = (mode === 'pitch') ? 'Pitch view' : 'Spectrum view';
       document.body.classList.toggle('spectrum-mode', mode === 'spectrum');
