@@ -1321,6 +1321,14 @@
       color: #000;
       border-color: #fff;
     }
+    /* Spectrum view: candle-amber fill, mirrors the in-canvas spectrum
+       gradient and the audio-reactive border so the chip always reads
+       as a single piece of UI with the visualizer it controls. */
+    #rulerHideBtn.spectrum {
+      background: rgba(255, 165, 80, 0.85);
+      color: #1a0a00;
+      border-color: rgba(255, 200, 130, 0.95);
+    }
     #rulerHideBtn:active {
       transform: scale(0.92);
     }
@@ -1731,7 +1739,7 @@
   <!-- Standalone ruler-hide chip, fixed to the bottom-left corner.
        The existing click handler binds via getElementById('rulerHideBtn'),
        so wiring is unchanged. -->
-  <button type="button" class="on" id="rulerHideBtn" title="Show/hide tuning ruler" aria-label="Show or hide tuning ruler">📏</button>
+  <button type="button" class="on" id="rulerHideBtn" title="View: ruler → frequency → off" aria-label="Cycle view mode">📏</button>
 
   <!-- Standalone flip-camera chip, fixed to the bottom-left next to
        #rulerHideBtn. Pulled out of #recordOverlay .record-essential so
@@ -1890,6 +1898,25 @@
     // avoidance pattern as pitchBuffer / micLevelBuf.
     let spectrumBuf = null;
     let spectrumYs = null;
+    // Per-Y energy buckets for the vertical spectrum curve. Allocated
+    // lazily in drawSpectrum() once we know the bucket count. The EMA
+    // is a peak-decay-style "wake": each frame the held value drops to
+    // 75% of itself but jumps instantly when live energy exceeds it,
+    // so transients leave a brief contrail in the curve.
+    let spectrumEnergyEMA = null;
+    // Loudest-band detection state, written by drawSpectrum() and read
+    // by the big nearest-ratio label so spectrum mode shows the FFT
+    // peak's ratio with the same typography as the YIN-driven label.
+    let spectrumPeakRatio = null;
+    let spectrumPeakStrength = 0;
+    // Mode-transition tween (0 = pitch view, 1 = spectrum view).
+    // setAppMode flips the target; draw() lerps toward it each frame so
+    // toggling crossfades over ~250 ms instead of snapping. The ratio
+    // ladder dims, the spectrum curve fades in, the crosshair fades
+    // out, all driven from this single value.
+    let modeTransition = 0;
+    let modeTransitionTarget = 0;
+    let modeTransitionLastTime = 0;
     // Pitch-detection bandpass: a highpass+lowpass biquad pair (80 / 1200 Hz)
     // sitting between every pitch source (mic or decoded file) and the
     // pitch `analyser`. Cuts wind / HVAC rumble below 80 Hz and sibilance /
@@ -2864,102 +2891,186 @@
       }
     }
 
-    // Spectrum view: log-spaced FFT curve painted into the visible
-    // letterbox rect. Strictly cheaper than the pitch path — one
-    // getByteFrequencyData read, one filled curve, one stroked
-    // outline. No YIN, no ruler, no ratio math. Uses rawMicAnalyser
-    // (full-band, raw mic) when listening so percussive transients
-    // and high-frequency content actually appear; falls back to the
-    // pitch analyser for file playback.
-    function drawSpectrum(ctx, W, H, topY, botY) {
-      const an = (isListening && micProcessing) ? micProcessing.rawMicAnalyser
-               : analyser;
-      const padX = W * 0.04;
-      const visibleW = W - 2 * padX;
-      const baseY = botY - (botY - topY) * 0.08;
-      const visibleH = (botY - topY) * 0.55;
-      const topAreaY = baseY - visibleH;
+    // Spectrum view: a vertical curve emanating leftward from the rail
+    // at rulerX, sampled along the ratio ladder's own Y axis. For each
+    // FFT bin we compute hz, convert to cents-from-tonic, octave-wrap
+    // (when config.octaveWrap is on) so all octaves fold onto the
+    // visible range, and accumulate into per-Y energy buckets. The
+    // bucket array drives one filled body and a per-segment colored
+    // outline — energy at 5/4 paints in 5/4's color, energy at 3/2
+    // paints in 3/2's color, and so on. EMA peak-decay (~0.75/frame)
+    // gives a brief wake after each transient.
+    //
+    // Returns { loudest, peakStrength } so the big nearest-ratio label
+    // can swap in spectrum mode without re-running the FFT.
+    function drawSpectrum(ctx, geom, alphaMul) {
+      const S = geom.S;
+      const rulerX = geom.rulerX;
+      const rulerTop = geom.rulerTop;
+      const rulerBottom = geom.rulerBottom;
+      const displayMin = geom.displayMin;
+      const displayMax = geom.displayMax;
+      const centsToY = geom.centsToY;
 
-      // No analyser yet (audio context not booted) — paint a faint
-      // baseline so the canvas isn't obviously dead, then bail.
-      if (!an) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(255, 165, 80, 0.12)';
-        ctx.fillRect(padX, baseY - 1, visibleW, 1);
-        ctx.restore();
-        return;
-      }
+      // Pick the widest-band analyser available. rawMicAnalyser is the
+      // full-band leaf node that mic source AND file source connect to
+      // (see attachMicSource / startFilePlayback). Falls back to the
+      // pitch-band analyser only if rawMicAnalyser couldn't be built.
+      const an = (micProcessing && micProcessing.rawMicAnalyser)
+                   ? micProcessing.rawMicAnalyser
+                   : analyser;
+      if (!an) return null;
 
       const binCount = an.frequencyBinCount;
       if (!spectrumBuf || spectrumBuf.length !== binCount) {
         spectrumBuf = new Uint8Array(binCount);
       }
-      try {
-        an.getByteFrequencyData(spectrumBuf);
-      } catch (_) { return; }
+      try { an.getByteFrequencyData(spectrumBuf); } catch (_) { return null; }
 
       const sr = (audioContext && audioContext.sampleRate) || 48000;
-      const binHz = sr / (binCount * 2); // == sampleRate / fftSize
-      const fLo = 60, fHi = 12000;
-      const logLo = Math.log(fLo);
-      const logSpan = Math.log(fHi) - logLo;
-      const cols = Math.max(48, Math.min(192, Math.floor(W / 4)));
+      const binHz = sr / (binCount * 2); // sampleRate / fftSize
+      const rulerHeight = rulerBottom - rulerTop;
+      if (rulerHeight <= 0) return null;
 
-      if (!spectrumYs || spectrumYs.length !== cols + 1) {
-        spectrumYs = new Float32Array(cols + 1);
+      // ~5 px per bucket gives a smooth curve at typical canvas sizes
+      // without over-sampling. Clamped so very tall or very short
+      // letterboxes still render reasonably.
+      const N = Math.max(48, Math.min(180, Math.floor(rulerHeight / 5)));
+      if (!spectrumEnergyEMA || spectrumEnergyEMA.length !== N) {
+        spectrumEnergyEMA = new Float32Array(N);
       }
 
-      // Sample once into spectrumYs; both fill and stroke walk this.
-      for (let i = 0; i <= cols; i++) {
-        const t = i / cols;
-        const f0 = Math.exp(logLo + logSpan * t);
-        const f1 = Math.exp(logLo + logSpan * Math.min(1, t + 1 / cols));
-        const b0 = Math.max(1, Math.floor(f0 / binHz));
-        const b1 = Math.max(b0 + 1, Math.floor(f1 / binHz));
-        let sum = 0, n = 0;
-        for (let b = b0; b < b1 && b < binCount; b++) {
-          sum += spectrumBuf[b];
-          n++;
+      const tonicHz = config.refFreq;
+      const ratios = config.ratios;
+      const wrap = config.octaveWrap && ratios.length >= 2;
+      const minVisible = ratios.length ? ratios[0].cents : 0;
+      const maxVisible = ratios.length ? ratios[ratios.length - 1].cents : 1200;
+
+      // Accumulate this frame's per-bucket energy. Higher Y values are
+      // lower in the canvas; bucket 0 = top of visible range.
+      const newEnergy = new Float32Array(N);
+      const startBin = Math.max(1, Math.floor(40 / binHz));
+      for (let i = startBin; i < binCount; i++) {
+        const v = spectrumBuf[i];
+        if (v < 8) continue; // noise-floor cull
+        const hz = i * binHz;
+        if (hz < 30 || hz > 12000) continue;
+        let cents = 1200 * Math.log2(hz / tonicHz);
+        if (wrap) {
+          while (cents < minVisible - 50) cents += 1200;
+          while (cents > maxVisible + 50) cents -= 1200;
         }
-        const v = n > 0 ? sum / n : 0;
-        // pow(0.85) lifts midrange so the floor doesn't always sit
-        // pegged at the bottom of the visible area.
-        const norm = Math.pow(v / 255, 0.85);
-        spectrumYs[i] = baseY - norm * visibleH;
+        if (cents < displayMin || cents > displayMax) continue;
+        const y = centsToY(cents);
+        let idx = Math.floor((y - rulerTop) / rulerHeight * N);
+        if (idx < 0) idx = 0;
+        else if (idx >= N) idx = N - 1;
+        const m = v / 255;
+        if (m > newEnergy[idx]) newEnergy[idx] = m;
       }
+
+      // Peak-decay persistence: each frame the held value drops to
+      // 75% of itself, but jumps instantly if the live energy exceeds
+      // it. Reads as a soft contrail off transients without lingering.
+      const decay = 0.75;
+      let peakIdx = 0, peakVal = 0;
+      for (let i = 0; i < N; i++) {
+        const held = spectrumEnergyEMA[i] * decay;
+        const live = newEnergy[i];
+        const v = live > held ? live : held;
+        spectrumEnergyEMA[i] = v;
+        if (v > peakVal) { peakVal = v; peakIdx = i; }
+      }
+
+      // Per-bucket Y, cents and color so we don't recompute inside the
+      // stroke loop. bucketColors[i] = nearest ratio HSL or null when
+      // no ratio is within 35 cents (which falls back to amber).
+      const bucketY = new Float32Array(N);
+      const bucketCents = new Float32Array(N);
+      const bucketColors = new Array(N);
+      for (let i = 0; i < N; i++) {
+        const y = rulerTop + ((i + 0.5) / N) * rulerHeight;
+        bucketY[i] = y;
+        const norm = (rulerBottom - y) / rulerHeight;
+        const cents = displayMin + norm * (displayMax - displayMin);
+        bucketCents[i] = cents;
+        let best = null, bestDiff = Infinity;
+        for (const r of ratios) {
+          const d = Math.abs(r.cents - cents);
+          if (d < bestDiff) { bestDiff = d; best = r; }
+        }
+        bucketColors[i] = (best && bestDiff < 35) ? best.color : null;
+      }
+
+      // Bulge inward off the rail toward the camera-visible region on
+      // the left. Capped so even on a wider canvas the curve doesn't
+      // overshoot past the visible image.
+      const maxBulge = Math.min(rulerX - 12 * S, 280 * S);
+      if (maxBulge <= 0) return { loudest: null, peakStrength: peakVal };
 
       ctx.save();
+      ctx.globalAlpha = (ctx.globalAlpha || 1) * alphaMul;
 
-      // Filled body, candle-amber gradient.
-      const grad = ctx.createLinearGradient(0, topAreaY, 0, baseY);
-      grad.addColorStop(0, 'rgba(255, 200, 130, 0.05)');
-      grad.addColorStop(0.6, 'rgba(255, 165, 80, 0.22)');
-      grad.addColorStop(1, 'rgba(220, 110, 50, 0.45)');
-      ctx.fillStyle = grad;
+      // Filled body: subtle amber wash, single closed path tracing the
+      // curve and back along the rail.
       ctx.beginPath();
-      ctx.moveTo(padX, baseY);
-      for (let i = 0; i <= cols; i++) {
-        const x = padX + visibleW * (i / cols);
-        ctx.lineTo(x, spectrumYs[i]);
+      ctx.moveTo(rulerX, rulerTop);
+      for (let i = 0; i < N; i++) {
+        const e = spectrumEnergyEMA[i];
+        const x = rulerX - Math.pow(e, 0.85) * maxBulge;
+        ctx.lineTo(x, bucketY[i]);
       }
-      ctx.lineTo(padX + visibleW, baseY);
+      ctx.lineTo(rulerX, rulerBottom);
       ctx.closePath();
+      const grad = ctx.createLinearGradient(rulerX - maxBulge, 0, rulerX, 0);
+      grad.addColorStop(0, 'rgba(255, 200, 130, 0.04)');
+      grad.addColorStop(0.7, 'rgba(255, 165, 80, 0.14)');
+      grad.addColorStop(1, 'rgba(220, 110, 50, 0.32)');
+      ctx.fillStyle = grad;
       ctx.fill();
 
-      // Bright outline along the curve top.
-      ctx.beginPath();
-      ctx.moveTo(padX, spectrumYs[0]);
-      for (let i = 1; i <= cols; i++) {
-        const x = padX + visibleW * (i / cols);
-        ctx.lineTo(x, spectrumYs[i]);
-      }
-      ctx.strokeStyle = 'rgba(255, 210, 150, 0.6)';
-      ctx.lineWidth = 1.5;
-      ctx.lineJoin = 'round';
+      // Outline: per-segment color = nearest ratio. Where no ratio is
+      // close, fall back to candle-amber so the curve still reads as
+      // continuous. lineWidth + alpha both modulate with energy so
+      // resonant ratios "ring out" visually.
       ctx.lineCap = 'round';
-      ctx.stroke();
+      ctx.lineJoin = 'round';
+      for (let i = 0; i < N - 1; i++) {
+        const e0 = spectrumEnergyEMA[i];
+        const e1 = spectrumEnergyEMA[i + 1];
+        const eMax = e0 > e1 ? e0 : e1;
+        const a = Math.min(0.9, 0.25 + eMax * 0.85);
+        if (a < 0.05) continue;
+        const x0 = rulerX - Math.pow(e0, 0.85) * maxBulge;
+        const x1 = rulerX - Math.pow(e1, 0.85) * maxBulge;
+        const c = bucketColors[i] || bucketColors[i + 1];
+        ctx.strokeStyle = c
+          ? hslToString(c, a)
+          : `rgba(255, 200, 140, ${a * 0.7})`;
+        ctx.lineWidth = (1.4 + eMax * 1.4) * S;
+        ctx.beginPath();
+        ctx.moveTo(x0, bucketY[i]);
+        ctx.lineTo(x1, bucketY[i + 1]);
+        ctx.stroke();
+      }
+
+      // Loudest-band detection for the big label. Need a clear peak
+      // (>= ~12% relative energy) AND it has to land near a ratio
+      // (< 30 cents). Otherwise the label gracefully doesn't draw.
+      let loudest = null;
+      if (peakVal > 0.12) {
+        const cents = bucketCents[peakIdx];
+        let best = null, bestDiff = Infinity;
+        for (const r of ratios) {
+          const d = Math.abs(r.cents - cents);
+          if (d < bestDiff) { bestDiff = d; best = r; }
+        }
+        if (best && bestDiff < 30) loudest = best;
+      }
 
       ctx.restore();
+
+      return { loudest: loudest, peakStrength: peakVal };
     }
 
     function drawRulerBackdrop(ctx, W, H) {
@@ -3058,19 +3169,11 @@
           // not draw()).
           return true;
         }
-        if (appMode === 'spectrum') {
-          // Spectrum view in record mode: paint the FFT curve over the
-          // camera, anchored to the letterboxed visible image rect.
-          // Skip ruler backdrop / ticks / ratios / wake / crosshair.
-          let sTop = 0, sBot = H;
-          if (cameraVisibleRect) {
-            const v0 = Math.max(0, cameraVisibleRect.y0);
-            const v1 = Math.min(H, cameraVisibleRect.y1);
-            if (v0 > 0 || v1 < H) { sTop = v0; sBot = v1; }
-          }
-          drawSpectrum(ctx, W, H, sTop, sBot);
-          return true;
-        }
+        // Spectrum view runs through the same ladder/geometry pass as
+        // pitch view now (just with the wake/crosshair/deviation label
+        // skipped and the ratio ladder dimmed) so the visual frame is
+        // shared between modes. drawSpectrum is invoked from inside
+        // that pass below, once centsToY is built.
         drawRulerBackdrop(ctx, W, H);
       } else {
         // Non-record mode: no camera preview here. The <video> element
@@ -3094,13 +3197,39 @@
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, W, H);
         if (rulerHidden) return true;
-        if (appMode === 'spectrum') {
-          drawSpectrum(ctx, W, H, 0, H);
-          return true;
-        }
+        // Spectrum view shares the geometry pass with pitch view; see
+        // the matching note in the record-mode branch above.
       }
 
       if (config.ratios.length === 0) return true;
+
+      // Mode-transition tween. setAppMode flips modeTransitionTarget
+      // (0 = pitch, 1 = spectrum); each frame we lerp toward it with a
+      // ~80 ms time-constant so the perceived crossfade settles in
+      // ~250 ms. The single value drives ladder dimming, spectrum-curve
+      // fade-in, and crosshair fade-out.
+      {
+        const tNow = performance.now();
+        const dt = modeTransitionLastTime > 0
+          ? Math.min(80, tNow - modeTransitionLastTime)
+          : 16;
+        modeTransitionLastTime = tNow;
+        const k = 1 - Math.exp(-dt / 80);
+        modeTransition += (modeTransitionTarget - modeTransition) * k;
+        if (Math.abs(modeTransitionTarget - modeTransition) < 0.002) {
+          modeTransition = modeTransitionTarget;
+        }
+      }
+      const spectrumMix = modeTransition;     // 1 in spectrum, 0 in pitch
+      const pitchMix    = 1 - modeTransition; // 1 in pitch, 0 in spectrum
+      // Ratio ladder: 100% in pitch view, ~45% in spectrum view (so it
+      // still reads as the user's reference frame even with the FFT
+      // curve dominating the canvas).
+      const ladderAlpha = 1 - 0.55 * spectrumMix;
+      // EDO grid: dimmer than the ratio ladder. We fade it to ~25% in
+      // spectrum mode rather than hiding it entirely so the chromatic
+      // bones are still visible without competing with the curve.
+      const edoAlpha = 1 - 0.75 * spectrumMix;
 
       // S folds the user's rulerScale slider together with
       // CAPTURE_PIXEL_SCALE (the resolution-correction factor for lo-fi
@@ -3210,7 +3339,9 @@
       
       displayCents = wrappedCents;
       
-      if (config.show12EDO) {
+      if (config.show12EDO && edoAlpha > 0.01) {
+        ctx.save();
+        ctx.globalAlpha *= edoAlpha;
         const startSemitone = Math.floor(displayMin / 100);
         const endSemitone = Math.ceil(displayMax / 100);
         const isCustomMode = !document.getElementById('refPreset').value;
@@ -3264,8 +3395,14 @@
         }
 
         ctx.setLineDash([]);
+        ctx.restore();
       }
       
+      // Ratio ladder + Hz/cents labels. Wrapped so we can dim the
+      // whole ladder when the spectrum curve is in front
+      // (ladderAlpha = 1 in pitch view, ~0.45 in spectrum view).
+      ctx.save();
+      ctx.globalAlpha *= ladderAlpha;
       for (const ratio of config.ratios) {
         const y = centsToY(ratio.cents);
         const isNearest = (nearestRatio === ratio && nearestDiff < 25);
@@ -3324,13 +3461,37 @@
           ctx.fillText(`${ratio.cents.toFixed(0)}¢`, centsX, y);
         }
       }
+      ctx.restore();
+
+      // Spectrum curve: drawn on top of the (dimmed) ladder, beneath
+      // the wake / crosshair (which are skipped anyway when fully in
+      // spectrum view). Returns the FFT peak ratio + strength so the
+      // big nearest-ratio label can swap source below.
+      let spectrumResult = null;
+      if (spectrumMix > 0.01) {
+        const geom = {
+          S: S,
+          rulerX: rulerX,
+          rulerTop: rulerTop,
+          rulerBottom: rulerBottom,
+          displayMin: displayMin,
+          displayMax: displayMax,
+          centsToY: centsToY,
+        };
+        spectrumResult = drawSpectrum(ctx, geom, spectrumMix);
+      }
+      spectrumPeakRatio = spectrumResult ? spectrumResult.loudest : null;
+      spectrumPeakStrength = spectrumResult ? spectrumResult.peakStrength : 0;
       
       // Wake trail: a single tapered, alpha-fading polyline through the
       // recent ghost positions instead of N discrete halo+core dot pairs.
       // ~length-1 stroke ops vs the old ~2*length fill ops — about half the
       // cost, and reads as motion through a medium (contrail / swimmer's
-      // wake) instead of a string of beads.
-      if (config.showGhost && ghostTrail.length > 1) {
+      // wake) instead of a string of beads. Gated by pitchMix so it
+      // fades out as we cross into spectrum view.
+      if (pitchMix > 0.01 && config.showGhost && ghostTrail.length > 1) {
+        ctx.save();
+        ctx.globalAlpha *= pitchMix;
         const ghostColor = (recordMode && nearestRatio) ? nearestRatio.color : null;
         const N = ghostTrail.length;
         ctx.lineCap = 'round';
@@ -3366,9 +3527,12 @@
           ctx.lineTo(rulerX, centsToY(b.cents));
           ctx.stroke();
         }
+        ctx.restore();
       }
       
-      if (displayCents !== null && displayFreq !== null && indicatorOpacity > 0.02) {
+      if (pitchMix > 0.01 && displayCents !== null && displayFreq !== null && indicatorOpacity > 0.02) {
+        ctx.save();
+        ctx.globalAlpha *= pitchMix;
         const targetY = centsToY(displayCents);
         
         if (indicatorY === null) indicatorY = targetY;
@@ -3502,29 +3666,45 @@
 
           ctx.fillText(infoText, rulerX, y + bracketSize + 8 * S);
         }
+        ctx.restore();
       }
 
       ctx.restore();
 
-      if (recordMode && showRatioLabel && nearestRatio && indicatorOpacity > 0.02) {
+      // Big nearest-ratio label. In pitch mode this is the YIN-derived
+      // nearestRatio at indicatorOpacity. In spectrum mode it switches
+      // to the FFT-detected loudest band at an opacity derived from the
+      // peak's relative strength. The two sources cross-fade through
+      // pitchMix / spectrumMix so the label doesn't pop on toggle.
+      let labelRatio, labelOpacity;
+      if (spectrumMix > 0.5) {
+        labelRatio = spectrumPeakRatio;
+        labelOpacity = Math.min(1, spectrumPeakStrength * 4) * spectrumMix;
+      } else {
+        labelRatio = nearestRatio;
+        labelOpacity = indicatorOpacity * pitchMix;
+      }
+      if (recordMode && showRatioLabel && labelRatio && labelOpacity > 0.02) {
         const x = W * ratioLabelX;
         // Anchor the big label to the letterbox-corrected visible rect
         // (topY/botY) so it doesn't sit on the lower black bar.
         const y = topY + (botY - topY) * ratioLabelY;
-        // Big nearest-ratio label. Base size scaled by CAPTURE_PIXEL_SCALE
-        // so on-screen proportion matches the old 1080-wide canvas.
+        // Big label. Base size scaled by CAPTURE_PIXEL_SCALE so the
+        // on-screen proportion matches the old 1080-wide canvas. Same
+        // typography in pitch and spectrum mode by design — only the
+        // source ratio (and thus color) changes.
         const fontSize = 96 * CAPTURE_PIXEL_SCALE * ratioLabelSize;
 
         ctx.save();
-        ctx.globalAlpha = indicatorOpacity;
+        ctx.globalAlpha = labelOpacity;
         ctx.font = `bold ${fontSize}px system-ui`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.shadowColor = 'rgba(0,0,0,0.7)';
         ctx.shadowBlur = fontSize * 0.18;
         ctx.shadowOffsetY = Math.max(2, fontSize * 0.04);
-        ctx.fillStyle = hslToString(nearestRatio.color, 1);
-        ctx.fillText(nearestRatio.label, x, y);
+        ctx.fillStyle = hslToString(labelRatio.color, 1);
+        ctx.fillText(labelRatio.label, x, y);
         ctx.restore();
       }
 
@@ -3692,6 +3872,11 @@
       if (!audioBuffer || !audioContext) return;
       
       if (audioContext.state === 'suspended') audioContext.resume();
+
+      // Make sure micProcessing exists so the file source can also tap
+      // rawMicAnalyser below — that's what feeds the full-band spectrum
+      // view. bootstrapAudio is idempotent so this is cheap.
+      try { bootstrapAudio(); } catch (_) {}
       
       sourceNode = audioContext.createBufferSource();
       sourceNode.buffer = audioBuffer;
@@ -3708,6 +3893,13 @@
       if (!connectSourceToPitchAnalyser(sourceNode)) {
         // Fallback if the bandpass couldn't be built - keep pitch detection alive.
         sourceNode.connect(analyser);
+      }
+      // Spectrum tap: feed the file source pre-bandpass into the same
+      // full-band analyser the mic uses, so spectrum view sees the
+      // entire 60 Hz – 12 kHz axis instead of dying above 1.2 kHz.
+      // Leaf-node, no audible side effect.
+      if (micProcessing && micProcessing.rawMicAnalyser) {
+        try { sourceNode.connect(micProcessing.rawMicAnalyser); } catch (_) {}
       }
       
       const offset = pauseTime;
@@ -4531,12 +4723,42 @@
     function setAppMode(mode) {
       if (mode !== 'pitch' && mode !== 'spectrum') return;
       appMode = mode;
+      // Drive the soft crossfade. draw() lerps modeTransition toward
+      // this each frame; the previous value persists if the user
+      // re-toggles mid-fade so the animation feels continuous.
+      modeTransitionTarget = (mode === 'spectrum') ? 1 : 0;
       const btn = document.getElementById('modeToggleBtn');
       if (btn) btn.textContent = (mode === 'pitch') ? 'Pitch view' : 'Spectrum view';
       document.body.classList.toggle('spectrum-mode', mode === 'spectrum');
+      // Keep the record-mode chip in sync. The chip cycles ruler →
+      // frequency → off; this branch is reached when the panel button
+      // (or another flow) flips the mode, so the chip needs to update
+      // its icon/class to match.
+      refreshRulerHideBtn();
       // Force one repaint so the new view appears even when the rAF
       // loop is dormant (idle / no mic / no playback / no record).
       try { draw(); } catch (_) {}
+    }
+
+    // Sync the 3-state record-mode chip's icon + class to (rulerHidden,
+    // appMode). Called from the chip's own click handler and from
+    // setAppMode. Idempotent / safe before the chip exists in the DOM.
+    function refreshRulerHideBtn() {
+      const btn = document.getElementById('rulerHideBtn');
+      if (!btn) return;
+      btn.classList.remove('on', 'spectrum');
+      if (rulerHidden) {
+        btn.textContent = '⊘';
+        btn.title = 'View: off — tap for ruler';
+      } else if (appMode === 'spectrum') {
+        btn.classList.add('spectrum');
+        btn.textContent = '∿';
+        btn.title = 'View: frequency — tap for off';
+      } else {
+        btn.classList.add('on');
+        btn.textContent = '📏';
+        btn.title = 'View: ruler — tap for frequency';
+      }
     }
 
     async function toggleListening() {
@@ -6823,13 +7045,31 @@
       document.body.classList.toggle('ruler-hidden', rulerHidden);
       const rulerHideBtn = document.getElementById('rulerHideBtn');
       if (rulerHideBtn) {
-        // Filled when ruler is showing (default), hollow when hidden.
-        rulerHideBtn.classList.toggle('on', !rulerHidden);
+        // 3-state cycle button: ruler (pitch view) → frequency (spectrum
+        // view) → off (overlays hidden, camera only). Shares appMode with
+        // the side-panel toggle, so flipping either one keeps both in
+        // sync. setAppMode also calls refreshRulerHideBtn so the chip
+        // visuals always match the global state.
+        refreshRulerHideBtn();
         rulerHideBtn.addEventListener('click', () => {
-          rulerHidden = !rulerHidden;
-          try { localStorage.setItem('tuner.rulerHidden', rulerHidden ? '1' : '0'); } catch (_) {}
-          document.body.classList.toggle('ruler-hidden', rulerHidden);
-          rulerHideBtn.classList.toggle('on', !rulerHidden);
+          if (rulerHidden) {
+            // off → ruler (pitch view)
+            rulerHidden = false;
+            try { localStorage.setItem('tuner.rulerHidden', '0'); } catch (_) {}
+            document.body.classList.toggle('ruler-hidden', false);
+            setAppMode('pitch');
+          } else if (appMode === 'pitch') {
+            // ruler → frequency (spectrum view)
+            setAppMode('spectrum');
+          } else {
+            // frequency → off (overlays hidden; appMode preserved
+            // underneath so the next tap returns to ruler unless
+            // setAppMode flips it).
+            rulerHidden = true;
+            try { localStorage.setItem('tuner.rulerHidden', '1'); } catch (_) {}
+            document.body.classList.toggle('ruler-hidden', true);
+            refreshRulerHideBtn();
+          }
         });
       }
       if (afxMixStrip) {
