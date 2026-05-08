@@ -1894,19 +1894,21 @@
     // spectrum path is strictly cheaper than pitch (no YIN draw, just one
     // getByteFrequencyData + one filled curve).
     let appMode = 'pitch';
-    // Reusable Uint8Array for spectrum visualizer FFT reads. Same GC-
-    // avoidance pattern as pitchBuffer / micLevelBuf.
+    // Reusable Uint8Array for FFT byte reads (cloud-field spawning).
     let spectrumBuf = null;
-    let spectrumYs = null;
-    // Per-Y energy buckets for the vertical spectrum curve. Allocated
-    // lazily in drawSpectrum() once we know the bucket count. The EMA
-    // is a peak-decay-style "wake": each frame the held value drops to
-    // 75% of itself but jumps instantly when live energy exceeds it,
-    // so transients leave a brief contrail in the curve.
-    let spectrumEnergyEMA = null;
-    // Loudest-band detection state, written by drawSpectrum() and read
-    // by the big nearest-ratio label so spectrum mode shows the FFT
-    // peak's ratio with the same typography as the YIN-driven label.
+    // "Aurora ink-in-water" particle cloud state. Sparse (~20-40 in flight),
+    // each particle drifts upward, blooms, and dissolves over ~2-3 sec.
+    // The FFT energy still drives the system - it just expresses itself
+    // as drifting light instead of a measured curve. Color is a smooth
+    // function of the spawning band's frequency (NOT ratio-aligned).
+    const cloudParticles = [];
+    const CLOUD_BANDS = 24;             // log-frequency analysis bands
+    let cloudBandEnergy = null;         // Float32Array, EMA per band
+    let cloudLastFrameTime = 0;
+    let cloudLastIdleSpawnTime = 0;     // ambient-star pacing
+    let cloudNextIdleInterval = 6;      // sec between ambient stars
+    // Kept for back-compat with any stray reader; the cloud field has
+    // no "loudest band" concept - both stay null/0.
     let spectrumPeakRatio = null;
     let spectrumPeakStrength = 0;
     // Mode-transition tween (0 = pitch view, 1 = spectrum view).
@@ -2897,245 +2899,229 @@
     // (when config.octaveWrap is on) so all octaves fold onto the
     // visible range, and accumulate into per-Y energy buckets. The
     // bucket array drives one filled body and a per-segment colored
-    // outline — energy at 5/4 paints in 5/4's color, energy at 3/2
-    // paints in 3/2's color, and so on. EMA peak-decay (~0.75/frame)
-    // gives a brief wake after each transient.
-    //
-    // Idle-state hint for spectrum view. Drawn whenever drawSpectrum has
-    // no audio source (cold load, mic toggled off) or all-zero energy.
-    // A faint baseline tick at the rail's center Y plus a quiet hint
-    // tells the user "your sound goes here" without the curve being
-    // hidden behind the rail. Respects geom + alphaMul so it cross-fades
-    // with the rest of spectrum view.
-    function drawSpectrumIdleHint(ctx, geom, alphaMul) {
-      const S = geom.S;
-      const rulerX = geom.rulerX;
-      const rulerTop = geom.rulerTop;
-      const rulerBottom = geom.rulerBottom;
-      const rulerHeight = rulerBottom - rulerTop;
-      if (rulerHeight <= 0) return;
-      const a = (alphaMul == null ? 1 : alphaMul);
-      if (a <= 0.01) return;
+    // outline - replaced: was a per-segment ratio-colored sawtooth curve off
+    // the rail. Now a sparse aurora ink-in-water particle cloud. FFT energy
+    // spawns soft, drifting blobs whose hue is a smooth function of frequency
+    // (deep violet at the bass end -> amber at the top), drawn additively so
+    // overlapping particles brighten and color-mix. No ratios, no labels, no
+    // measurement readouts in this mode - the language is generative art.
 
-      ctx.save();
-      ctx.globalAlpha = (ctx.globalAlpha || 1) * a;
-
-      // Faint horizontal baseline tick — emanates leftward off the rail
-      // at the rail's vertical center so the user reads it as "this is
-      // where the curve will appear." ~36 px out, candle-amber, low
-      // alpha so it sits well behind the ratio ladder.
-      const cy = rulerTop + rulerHeight * 0.5;
-      const tickLen = Math.min(36 * S, Math.max(0, rulerX - 8 * S));
-      if (tickLen > 1) {
-        ctx.strokeStyle = 'rgba(255, 200, 140, 0.30)';
-        ctx.lineWidth = 1.2 * S;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(rulerX - tickLen, cy);
-        ctx.lineTo(rulerX - 4 * S, cy);
-        ctx.stroke();
+    // Maps a frequency in Hz to an aurora-style hue (degrees). Piecewise
+    // linear in log2(hz). Anchors: 60 Hz -> 280 deg deep violet, 250 Hz ->
+    // 220 deg royal blue, 1 kHz -> 160 deg cyan/teal, 4 kHz -> 60 deg warm
+    // yellow, 12 kHz -> 30 deg amber.
+    function cloudFreqToHue(hz) {
+      const lf = Math.log2(Math.max(20, Math.min(20000, hz)));
+      const stops = [
+        [5.9070, 280], // ~60 Hz
+        [7.9658, 220], // ~250 Hz
+        [9.9658, 160], // ~1 kHz
+        [11.9658, 60], // ~4 kHz
+        [13.5507, 30], // ~12 kHz
+      ];
+      if (lf <= stops[0][0]) return stops[0][1];
+      if (lf >= stops[stops.length - 1][0]) return stops[stops.length - 1][1];
+      for (let i = 1; i < stops.length; i++) {
+        if (lf <= stops[i][0]) {
+          const t = (lf - stops[i - 1][0]) / (stops[i][0] - stops[i - 1][0]);
+          return stops[i - 1][1] + t * (stops[i][1] - stops[i - 1][1]);
+        }
       }
-
-      // Quiet hint text in IBM Plex Mono, right-aligned just left of
-      // the rail near the bottom of the visible band — off the rail,
-      // out of the way, in the leftward direction the curve will grow.
-      const fontSize = 10 * S;
-      ctx.font = `${fontSize}px 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
-      ctx.fillStyle = 'rgba(255, 230, 200, 0.40)';
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'alphabetic';
-      const ty = rulerBottom - 8 * S;
-      ctx.fillText('tap mic to listen', rulerX - 10 * S, ty);
-
-      ctx.restore();
+      return 200;
     }
 
-    // Returns { loudest, peakStrength } so the big nearest-ratio label
-    // can swap in spectrum mode without re-running the FFT.
+    // Build a single particle. hz=0 means "ambient/idle" (caller should
+    // override hue to a cool wandering tone).
+    function makeCloudParticle(x, y, hz, energy, S) {
+      return {
+        x: x,
+        y: y,
+        vx: 0,
+        // Slow upward drift (canvas Y decreases upward). 7-13 px/sec at S=1.
+        vy: -(7 + Math.random() * 6) * S,
+        // Sinusoidal horizontal sway - period ~3-6 sec, amplitude ~3-8 px/sec.
+        // Reads as suspended ink shifting in slow currents.
+        swayPhase: Math.random() * Math.PI * 2,
+        swaySpeed: 1.0 + Math.random() * 1.5,
+        swayAmp: (3 + Math.random() * 5) * S,
+        age: 0,
+        life: 2.0 + Math.random() * 1.5,
+        hue: hz > 0 ? cloudFreqToHue(hz) : (210 + Math.random() * 50),
+        peakSize: (45 + energy * 60) * S,
+        energy: energy,
+      };
+    }
+
+    // Aurora ink-in-water cloud field. Returns null - there's no peak
+    // ratio to surface; the big-label code path sticks to the YIN source
+    // and fades out via pitchMix while in spectrum mode.
     function drawSpectrum(ctx, geom, alphaMul) {
       const S = geom.S;
       const rulerX = geom.rulerX;
       const rulerTop = geom.rulerTop;
       const rulerBottom = geom.rulerBottom;
-      const displayMin = geom.displayMin;
-      const displayMax = geom.displayMax;
-      const centsToY = geom.centsToY;
-
-      // Pick the widest-band analyser available. rawMicAnalyser is the
-      // full-band leaf node that mic source AND file source connect to
-      // (see attachMicSource / startFilePlayback). Falls back to the
-      // pitch-band analyser only if rawMicAnalyser couldn't be built.
-      const an = (micProcessing && micProcessing.rawMicAnalyser)
-                   ? micProcessing.rawMicAnalyser
-                   : analyser;
-      if (!an) {
-        // Cold load (mic never enabled) — nothing to FFT yet. Draw
-        // the idle hint so spectrum view reads as "ready, waiting"
-        // rather than blank.
-        drawSpectrumIdleHint(ctx, geom, alphaMul);
-        return null;
-      }
-
-      const binCount = an.frequencyBinCount;
-      if (!spectrumBuf || spectrumBuf.length !== binCount) {
-        spectrumBuf = new Uint8Array(binCount);
-      }
-      try { an.getByteFrequencyData(spectrumBuf); } catch (_) { return null; }
-
-      const sr = (audioContext && audioContext.sampleRate) || 48000;
-      const binHz = sr / (binCount * 2); // sampleRate / fftSize
       const rulerHeight = rulerBottom - rulerTop;
       if (rulerHeight <= 0) return null;
 
-      // ~5 px per bucket gives a smooth curve at typical canvas sizes
-      // without over-sampling. Clamped so very tall or very short
-      // letterboxes still render reasonably.
-      const N = Math.max(48, Math.min(180, Math.floor(rulerHeight / 5)));
-      if (!spectrumEnergyEMA || spectrumEnergyEMA.length !== N) {
-        spectrumEnergyEMA = new Float32Array(N);
-      }
+      // Visible spawn / display rect: a small margin off the rail to a
+      // small margin off the canvas's left edge.
+      const xMax = rulerX - 6 * S;
+      const xMin = 6 * S;
+      if (xMax <= xMin) return null;
 
-      const tonicHz = config.refFreq;
-      const ratios = config.ratios;
-      const wrap = config.octaveWrap && ratios.length >= 2;
-      const minVisible = ratios.length ? ratios[0].cents : 0;
-      const maxVisible = ratios.length ? ratios[ratios.length - 1].cents : 1200;
+      // Frame timestep (seconds). Capped at 100 ms so a tab-resume can't
+      // launch every particle off-screen on a single integration step.
+      const tNow = performance.now();
+      const dt = cloudLastFrameTime > 0
+        ? Math.min(0.1, (tNow - cloudLastFrameTime) / 1000)
+        : 0.016;
+      cloudLastFrameTime = tNow;
 
-      // Accumulate this frame's per-bucket energy. Higher Y values are
-      // lower in the canvas; bucket 0 = top of visible range.
-      const newEnergy = new Float32Array(N);
-      const startBin = Math.max(1, Math.floor(40 / binHz));
-      for (let i = startBin; i < binCount; i++) {
-        const v = spectrumBuf[i];
-        if (v < 8) continue; // noise-floor cull
-        const hz = i * binHz;
-        if (hz < 30 || hz > 12000) continue;
-        let cents = 1200 * Math.log2(hz / tonicHz);
-        if (wrap) {
-          while (cents < minVisible - 50) cents += 1200;
-          while (cents > maxVisible + 50) cents -= 1200;
+      // Same FFT source as the old curve - rawMicAnalyser is the full-band
+      // leaf node; falls back to the pitch-band analyser if needed.
+      const an = (micProcessing && micProcessing.rawMicAnalyser)
+                   ? micProcessing.rawMicAnalyser
+                   : analyser;
+
+      // Pull FFT and accumulate per-band energy. If no analyser yet (cold
+      // load), totalEnergy stays 0 and we fall through to the ambient-star
+      // path so the canvas still feels alive.
+      let totalEnergy = 0;
+      const minLf = Math.log2(60);
+      const maxLf = Math.log2(12000);
+      const lfSpan = maxLf - minLf;
+      if (an) {
+        const binCount = an.frequencyBinCount;
+        if (!spectrumBuf || spectrumBuf.length !== binCount) {
+          spectrumBuf = new Uint8Array(binCount);
         }
-        if (cents < displayMin || cents > displayMax) continue;
-        const y = centsToY(cents);
-        let idx = Math.floor((y - rulerTop) / rulerHeight * N);
-        if (idx < 0) idx = 0;
-        else if (idx >= N) idx = N - 1;
-        const m = v / 255;
-        if (m > newEnergy[idx]) newEnergy[idx] = m;
-      }
-
-      // Peak-decay persistence: each frame the held value drops to
-      // 75% of itself, but jumps instantly if the live energy exceeds
-      // it. Reads as a soft contrail off transients without lingering.
-      const decay = 0.75;
-      let peakIdx = 0, peakVal = 0;
-      for (let i = 0; i < N; i++) {
-        const held = spectrumEnergyEMA[i] * decay;
-        const live = newEnergy[i];
-        const v = live > held ? live : held;
-        spectrumEnergyEMA[i] = v;
-        if (v > peakVal) { peakVal = v; peakIdx = i; }
-      }
-
-      // Analyser exists but its upstream is silent / disconnected — all
-      // buckets decayed to ~0. The filled body would render as a
-      // zero-width path tucked behind the rail and the user would see
-      // nothing. Show the idle hint instead so spectrum view stays
-      // legible when the source goes quiet.
-      if (peakVal < 1e-4) {
-        drawSpectrumIdleHint(ctx, geom, alphaMul);
-        return { loudest: null, peakStrength: 0 };
-      }
-
-      // Per-bucket Y, cents and color so we don't recompute inside the
-      // stroke loop. bucketColors[i] = nearest ratio HSL or null when
-      // no ratio is within 35 cents (which falls back to amber).
-      const bucketY = new Float32Array(N);
-      const bucketCents = new Float32Array(N);
-      const bucketColors = new Array(N);
-      for (let i = 0; i < N; i++) {
-        const y = rulerTop + ((i + 0.5) / N) * rulerHeight;
-        bucketY[i] = y;
-        const norm = (rulerBottom - y) / rulerHeight;
-        const cents = displayMin + norm * (displayMax - displayMin);
-        bucketCents[i] = cents;
-        let best = null, bestDiff = Infinity;
-        for (const r of ratios) {
-          const d = Math.abs(r.cents - cents);
-          if (d < bestDiff) { bestDiff = d; best = r; }
+        try { an.getByteFrequencyData(spectrumBuf); } catch (_) {}
+        if (!cloudBandEnergy || cloudBandEnergy.length !== CLOUD_BANDS) {
+          cloudBandEnergy = new Float32Array(CLOUD_BANDS);
         }
-        bucketColors[i] = (best && bestDiff < 35) ? best.color : null;
+        const sr = (audioContext && audioContext.sampleRate) || 48000;
+        const binHz = sr / (binCount * 2); // sampleRate / fftSize
+
+        const frameBands = new Float32Array(CLOUD_BANDS);
+        for (let i = 1; i < binCount; i++) {
+          const v = spectrumBuf[i];
+          if (v < 12) continue;          // noise-floor cull
+          const hz = i * binHz;
+          if (hz < 60 || hz > 12000) continue;
+          const lf = Math.log2(hz);
+          let bIdx = Math.floor((lf - minLf) / lfSpan * CLOUD_BANDS);
+          if (bIdx < 0) bIdx = 0;
+          else if (bIdx >= CLOUD_BANDS) bIdx = CLOUD_BANDS - 1;
+          const m = v / 255;
+          if (m > frameBands[bIdx]) frameBands[bIdx] = m;
+        }
+
+        // EMA: rises instantly to a louder live value, decays at ~0.55/frame
+        // when quieter. Held tones keep spawning; silence settles in ~0.5s.
+        const decay = 0.55;
+        for (let i = 0; i < CLOUD_BANDS; i++) {
+          const held = cloudBandEnergy[i] * decay;
+          const live = frameBands[i];
+          const v = live > held ? live : held;
+          cloudBandEnergy[i] = v;
+          totalEnergy += v;
+        }
       }
 
-      // Bulge inward off the rail toward the camera-visible region on
-      // the left. Capped so even on a wider canvas the curve doesn't
-      // overshoot past the visible image.
-      const maxBulge = Math.min(rulerX - 12 * S, 280 * S);
-      if (maxBulge <= 0) return { loudest: null, peakStrength: peakVal };
+      // Spawn rate scales with total energy. Cap at ~6/sec total - even
+      // when very loud, sparse > frantic. Hard particle ceiling at 60.
+      const spawnRate = Math.min(6, 0.4 + totalEnergy * 1.6);
+      let spawnBudget = spawnRate * dt;
+      let attempts = 0;
+      while (spawnBudget > 0 && cloudParticles.length < 60 && attempts < 4) {
+        attempts++;
+        const p = Math.min(1, spawnBudget);
+        if (Math.random() > p) break;
+        spawnBudget -= 1;
+        if (!an || totalEnergy <= 0.05) break;
 
+        // Pick a band weighted by its energy.
+        let pick = Math.random() * totalEnergy;
+        let bIdx = 0;
+        for (let i = 0; i < CLOUD_BANDS; i++) {
+          pick -= cloudBandEnergy[i];
+          if (pick <= 0) { bIdx = i; break; }
+        }
+        const centerLf = minLf + ((bIdx + 0.5 + (Math.random() - 0.5) * 0.5) / CLOUD_BANDS) * lfSpan;
+        const hz = Math.pow(2, centerLf);
+        const yNorm = (centerLf - minLf) / lfSpan;
+        const y = rulerBottom - yNorm * rulerHeight;
+        const x = xMin + Math.random() * (xMax - xMin);
+        const energy = Math.max(0.25, Math.min(1, cloudBandEnergy[bIdx] * 1.2));
+        cloudParticles.push(makeCloudParticle(x, y, hz, energy, S));
+      }
+
+      // Ambient stars: when nothing's coming through, drop one low-energy
+      // particle every ~5-9 sec near canvas center. Cool wandering hue,
+      // longer lifetime - reads as distant atmosphere, not measurement.
+      if (totalEnergy < 0.04) {
+        if (cloudLastIdleSpawnTime === 0) {
+          cloudLastIdleSpawnTime = tNow;
+          cloudNextIdleInterval = 5 + Math.random() * 4;
+        } else if ((tNow - cloudLastIdleSpawnTime) / 1000 > cloudNextIdleInterval) {
+          cloudLastIdleSpawnTime = tNow;
+          cloudNextIdleInterval = 5 + Math.random() * 4;
+          const cx = (xMin + xMax) * 0.5 + (Math.random() - 0.5) * (xMax - xMin) * 0.4;
+          const cy = (rulerTop + rulerBottom) * 0.5 + (Math.random() - 0.5) * rulerHeight * 0.3;
+          const ambient = makeCloudParticle(cx, cy, 0, 0.32, S);
+          ambient.life = 3.0 + Math.random() * 1.5;
+          cloudParticles.push(ambient);
+        }
+      } else {
+        // Reset idle clock so a noisy moment doesn't immediately fire an
+        // ambient star the instant things go quiet again.
+        cloudLastIdleSpawnTime = tNow;
+      }
+
+      // Update + cull. Reverse iteration so splice-while-walking is safe.
+      for (let i = cloudParticles.length - 1; i >= 0; i--) {
+        const p = cloudParticles[i];
+        p.age += dt;
+        if (p.age >= p.life) { cloudParticles.splice(i, 1); continue; }
+        p.x += p.vx * dt + Math.cos(p.swayPhase + p.age * p.swaySpeed) * p.swayAmp * dt;
+        p.y += p.vy * dt;
+      }
+
+      if (cloudParticles.length === 0) return null;
+
+      // Render: additive blending so overlapping clouds brighten and
+      // color-mix where they meet. globalAlpha bakes in the mode-cross-
+      // fade so the field eases in/out with spectrumMix.
+      const a0 = ctx.globalAlpha || 1;
+      const oldComp = ctx.globalCompositeOperation;
       ctx.save();
-      ctx.globalAlpha = (ctx.globalAlpha || 1) * alphaMul;
+      ctx.globalAlpha = a0 * alphaMul;
+      ctx.globalCompositeOperation = 'lighter';
 
-      // Filled body: subtle amber wash, single closed path tracing the
-      // curve and back along the rail.
-      ctx.beginPath();
-      ctx.moveTo(rulerX, rulerTop);
-      for (let i = 0; i < N; i++) {
-        const e = spectrumEnergyEMA[i];
-        const x = rulerX - Math.pow(e, 0.85) * maxBulge;
-        ctx.lineTo(x, bucketY[i]);
-      }
-      ctx.lineTo(rulerX, rulerBottom);
-      ctx.closePath();
-      const grad = ctx.createLinearGradient(rulerX - maxBulge, 0, rulerX, 0);
-      grad.addColorStop(0, 'rgba(255, 200, 130, 0.04)');
-      grad.addColorStop(0.7, 'rgba(255, 165, 80, 0.14)');
-      grad.addColorStop(1, 'rgba(220, 110, 50, 0.32)');
-      ctx.fillStyle = grad;
-      ctx.fill();
-
-      // Outline: per-segment color = nearest ratio. Where no ratio is
-      // close, fall back to candle-amber so the curve still reads as
-      // continuous. lineWidth + alpha both modulate with energy so
-      // resonant ratios "ring out" visually.
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      for (let i = 0; i < N - 1; i++) {
-        const e0 = spectrumEnergyEMA[i];
-        const e1 = spectrumEnergyEMA[i + 1];
-        const eMax = e0 > e1 ? e0 : e1;
-        const a = Math.min(0.9, 0.25 + eMax * 0.85);
-        if (a < 0.05) continue;
-        const x0 = rulerX - Math.pow(e0, 0.85) * maxBulge;
-        const x1 = rulerX - Math.pow(e1, 0.85) * maxBulge;
-        const c = bucketColors[i] || bucketColors[i + 1];
-        ctx.strokeStyle = c
-          ? hslToString(c, a)
-          : `rgba(255, 200, 140, ${a * 0.7})`;
-        ctx.lineWidth = (1.4 + eMax * 1.4) * S;
-        ctx.beginPath();
-        ctx.moveTo(x0, bucketY[i]);
-        ctx.lineTo(x1, bucketY[i + 1]);
-        ctx.stroke();
+      for (let i = 0; i < cloudParticles.length; i++) {
+        const p = cloudParticles[i];
+        const t = p.age / p.life;
+        // Bell envelope: sin(pi*t)^0.65 - fast bloom, slow fade. Reads as
+        // the swell of a sung note rather than a flicker.
+        const env = Math.pow(Math.sin(Math.PI * t), 0.65);
+        if (env <= 0.001) continue;
+        const r = p.peakSize * (0.35 + 0.65 * Math.pow(Math.sin(Math.PI * t), 0.5));
+        if (r <= 0.5) continue;
+        const aCenter = env * p.energy * 0.85;
+        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+        grad.addColorStop(0,    `hsla(${p.hue}, 92%, 65%, ${aCenter})`);
+        grad.addColorStop(0.45, `hsla(${p.hue}, 88%, 56%, ${aCenter * 0.45})`);
+        grad.addColorStop(1,    `hsla(${p.hue}, 80%, 45%, 0)`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
       }
 
-      // Loudest-band detection for the big label. Need a clear peak
-      // (>= ~12% relative energy) AND it has to land near a ratio
-      // (< 30 cents). Otherwise the label gracefully doesn't draw.
-      let loudest = null;
-      if (peakVal > 0.12) {
-        const cents = bucketCents[peakIdx];
-        let best = null, bestDiff = Infinity;
-        for (const r of ratios) {
-          const d = Math.abs(r.cents - cents);
-          if (d < bestDiff) { bestDiff = d; best = r; }
-        }
-        if (best && bestDiff < 30) loudest = best;
-      }
-
+      ctx.globalCompositeOperation = oldComp;
       ctx.restore();
 
-      return { loudest: loudest, peakStrength: peakVal };
+      spectrumPeakRatio = null;
+      spectrumPeakStrength = 0;
+      return null;
     }
 
     function drawRulerBackdrop(ctx, W, H) {
@@ -3287,14 +3273,13 @@
       }
       const spectrumMix = modeTransition;     // 1 in spectrum, 0 in pitch
       const pitchMix    = 1 - modeTransition; // 1 in pitch, 0 in spectrum
-      // Ratio ladder: 100% in pitch view, ~45% in spectrum view (so it
-      // still reads as the user's reference frame even with the FFT
-      // curve dominating the canvas).
-      const ladderAlpha = 1 - 0.55 * spectrumMix;
-      // EDO grid: dimmer than the ratio ladder. We fade it to ~25% in
-      // spectrum mode rather than hiding it entirely so the chromatic
-      // bones are still visible without competing with the curve.
-      const edoAlpha = 1 - 0.75 * spectrumMix;
+      // Ratio ladder: 100% in pitch view, ~5% in spectrum view (barely
+      // perceptible - the cloud field is the visual; the ladder is a
+      // ghost of structure, not a reference frame).
+      const ladderAlpha = 1 - 0.95 * spectrumMix;
+      // EDO grid: hidden entirely in spectrum mode. The cloud field
+      // deliberately strips all measurement scaffolding.
+      const edoAlpha = pitchMix;
 
       // S folds the user's rulerScale slider together with
       // CAPTURE_PIXEL_SCALE (the resolution-correction factor for lo-fi
@@ -3464,8 +3449,9 @@
       }
       
       // Ratio ladder + Hz/cents labels. Wrapped so we can dim the
-      // whole ladder when the spectrum curve is in front
-      // (ladderAlpha = 1 in pitch view, ~0.45 in spectrum view).
+      // whole ladder when the cloud field is in front
+      // (ladderAlpha = 1 in pitch view, ~0.05 in spectrum view -
+      // barely-perceptible ghost so the structure isn't visible).
       ctx.save();
       ctx.globalAlpha *= ladderAlpha;
       for (const ratio of config.ratios) {
@@ -3736,19 +3722,11 @@
 
       ctx.restore();
 
-      // Big nearest-ratio label. In pitch mode this is the YIN-derived
-      // nearestRatio at indicatorOpacity. In spectrum mode it switches
-      // to the FFT-detected loudest band at an opacity derived from the
-      // peak's relative strength. The two sources cross-fade through
-      // pitchMix / spectrumMix so the label doesn't pop on toggle.
-      let labelRatio, labelOpacity;
-      if (spectrumMix > 0.5) {
-        labelRatio = spectrumPeakRatio;
-        labelOpacity = Math.min(1, spectrumPeakStrength * 4) * spectrumMix;
-      } else {
-        labelRatio = nearestRatio;
-        labelOpacity = indicatorOpacity * pitchMix;
-      }
+      // Big nearest-ratio label. Pitch-mode only - the cloud field
+      // deliberately surfaces no measurement readout, so the label fades
+      // out smoothly via pitchMix when crossing into spectrum mode.
+      const labelRatio = nearestRatio;
+      const labelOpacity = indicatorOpacity * pitchMix;
       if (recordMode && showRatioLabel && labelRatio && labelOpacity > 0.02) {
         const x = W * ratioLabelX;
         // Anchor the big label to the letterbox-corrected visible rect
