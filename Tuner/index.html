@@ -1422,6 +1422,71 @@
     #flipCamBtn:active {
       transform: scale(0.92);
     }
+
+    /* Harmony stacking — chip + indicator. The chip sits inside the
+       record-essential row alongside discard/rec/exit; matches the
+       existing 48px circular icon-button look. Visible only when the
+       user has a take to push and the stack isn't full. */
+    #layerAddBtn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 1px solid #2a4a6a;
+      background: rgba(20, 40, 70, 0.85);
+      color: #8fc8ff;
+      font-size: 22px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 0;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    #layerAddBtn.visible { display: inline-flex; }
+    #layerAddBtn:active { transform: scale(0.92); background: rgba(40, 70, 110, 0.95); }
+
+    /* Stack indicator pill — sits just above the LUFS readout. Hidden
+       until at least one layer is on the stack. */
+    #stackIndicator {
+      position: fixed;
+      right: calc(10px + env(safe-area-inset-right));
+      bottom: calc(94px + env(safe-area-inset-bottom));
+      z-index: 201;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 6px 4px 10px;
+      background: rgba(20, 40, 70, 0.85);
+      border: 1px solid #2a4a6a;
+      border-radius: 14px;
+      color: #cfe6ff;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      pointer-events: auto;
+    }
+    #stackIndicator.visible { display: inline-flex; }
+    #stackIndicator .stack-count { line-height: 1; }
+    #stackIndicator #stackClearBtn {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(80, 30, 30, 0.9);
+      color: #ffb3b3;
+      font-size: 11px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      line-height: 1;
+    }
+    #stackIndicator #stackClearBtn:active { background: rgba(140, 50, 50, 0.95); }
   </style>
 </head>
 <body>
@@ -1496,6 +1561,17 @@
         <label style="font-size: 12px; color: #888; margin-top: 6px; margin-bottom: 2px;">Spectrum opacity <span id="spectrumOpacityVal" style="color: #aaa;">85%</span></label>
         <div class="slider-row">
           <input type="range" id="spectrumOpacity" min="20" max="100" value="85">
+        </div>
+        <!-- Bluetooth headphone output-latency compensation. Layer
+             playback during stacked recording is shifted forward by this
+             amount on the recording-bus branch so it lines up with the
+             mic input (the user's voice arrives at MSAD with the BT lag
+             baked in because they sing to what they hear). 200ms is a
+             reasonable AirPods default; wired headphones might want 20.
+             Persists under tuner.btLatencyMs. -->
+        <label style="font-size: 12px; color: #888; margin-top: 6px; margin-bottom: 2px;">Headphone delay <span id="btLatencyVal" style="color: #aaa;">200 ms</span></label>
+        <div class="slider-row">
+          <input type="range" id="btLatencySlider" min="0" max="400" value="200" step="5">
         </div>
       </div>
 
@@ -1755,6 +1831,14 @@
        click handler binds via getElementById('flipCamBtn'). -->
   <button type="button" id="flipCamBtn" title="Flip camera" aria-label="Flip camera">⟳</button>
 
+  <!-- Stack indicator — hidden when no harmony layers are queued, shows
+       "Layers: N" with a small ✕ to clear the stack. Anchored above the
+       LUFS readout so it lives in the same bottom-right cluster. -->
+  <div id="stackIndicator" aria-live="polite">
+    <span class="stack-count">Layers: 0</span>
+    <button type="button" id="stackClearBtn" title="Clear all harmony layers" aria-label="Clear harmony stack">✕</button>
+  </div>
+
   <!-- Standalone LUFS / peak dB readout, fixed to the bottom-right corner.
        Hoisted out of the strip so it can sit at the absolute bottom edge
        above the rec/stop row without being constrained by the strip's
@@ -1851,6 +1935,7 @@
       <input type="range" id="ratioSizeSlider" min="40" max="300" value="105">
     </div>
     <div class="record-row record-essential">
+      <button type="button" id="layerAddBtn" title="Add this take as a harmony layer" aria-label="Add layer">⊕</button>
       <button id="discardRecBtn" title="Discard recording" aria-label="Discard recording">🗑</button>
       <button id="recBtn" title="Record"></button>
       <button class="icon" id="exitRecBtn" title="Exit record mode">✕</button>
@@ -1987,6 +2072,29 @@
     let mediaRecorder = null;
     let recordedChunks = [];
     let recordStartTime = 0;
+
+    // -------- Harmony stacking state --------
+    // The stacking system lets the user record one voice, then sing along
+    // with that recording while singing a second voice; the resulting MP4
+    // contains the new video and a mix of all stacked layers. See
+    // STACK_MODE.md in the repo for the full architecture.
+    //
+    // harmonyStack:        decoded AudioBuffers, oldest first
+    // lastRecordedBlob:    most recent saved MP4 blob, fed to "+ layer"
+    // activeLayerSources:  AudioBufferSourceNode + DelayNode handles for the
+    //                      currently-playing layers (so we can stop them on
+    //                      record-stop or discard without leaking nodes)
+    // btLatencyMs:         Bluetooth output delay compensation, persisted
+    //                      under tuner.btLatencyMs (default 200ms)
+    // HARMONY_STACK_MAX:   cap on stacked layers — ~8 × 30s × stereo × 48kHz
+    //                      × 4 bytes ≈ 92 MB, comfortable on Pixel-class
+    //                      devices. Each layer also costs one
+    //                      BufferSourceNode + DelayNode, both cheap.
+    const HARMONY_STACK_MAX = 8;
+    const harmonyStack = [];
+    let lastRecordedBlob = null;
+    let activeLayerSources = [];
+    let btLatencyMs = 200;
     let recordTimerId = null;
     // Reference to the canvas captureStream's video track during a
     // recording, so audioLoop can call .requestFrame() after each paint
@@ -5867,6 +5975,16 @@
           URL.revokeObjectURL(url);
         }, 100);
 
+        // Capture the saved take so the "+ layer" chip can decode it on
+        // the next tap. We hold the *post-FFmpeg* blob (faststart MP4)
+        // because that's the canonical artifact the user just saved —
+        // pushLastTakeAsLayer feeds it to decodeAudioData. If the
+        // optimizer fell back to the raw MediaRecorder blob the same
+        // path still works (Chrome decodes both fragmented and faststart
+        // MP4 audio tracks via decodeAudioData).
+        lastRecordedBlob = outputBlob;
+        try { updateStackIndicator(); } catch (_) {}
+
         recordedChunks = [];
       };
 
@@ -5900,6 +6018,16 @@
       // working setting — the no-timeslice variant tried later was
       // looking for a click that turned out to be elsewhere
       // (captureStream(0) main-thread pacing, see above).
+      //
+      // Stacked harmony: if the user has at least one layer queued,
+      // play three audible count-in clicks (only through speakers, NOT
+      // recorded) and then begin layer playback simultaneously with
+      // mediaRecorder.start(). In non-stacked mode this is skipped,
+      // preserving the existing instant-record behaviour.
+      if (harmonyStack.length > 0) {
+        try { await playCountIn(3, 1.0); } catch (e) { console.warn('[stack] count-in failed:', e); }
+        try { scheduleLayerPlayback(); } catch (e) { console.warn('[stack] layer schedule failed:', e); }
+      }
       mediaRecorder.start(1000);
       recordStartTime = performance.now();
       document.getElementById('recBtn').classList.add('recording');
@@ -5919,6 +6047,10 @@
 
     function stopRecording() {
       if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
+      // Cut layer playback the instant the user taps stop — otherwise the
+      // last few hundred ms of the layer would leak through the speakers
+      // after the recorder closes.
+      stopActiveLayerSources();
       mediaRecorder.stop();
       document.getElementById('recBtn').classList.remove('recording');
       document.getElementById('recIndicator').classList.remove('visible');
@@ -5979,6 +6111,9 @@
       if (!mediaRecorder) return;
 
       discardRequested = true;
+      // Same as stop: kill any in-flight layer playback so the user
+      // doesn't hear leftover layer audio after a discard.
+      stopActiveLayerSources();
       try {
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
@@ -5999,6 +6134,135 @@
       }
 
       if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
+    }
+
+    // -------- Harmony stacking helpers --------
+
+    // Push the most recent saved take onto the stack as a decoded
+    // AudioBuffer. Surfaces decode failures via the on-screen indicator
+    // rather than crashing — Chrome should decode MP4/AAC, but if a
+    // browser refuses we want the user to see why instead of a dead chip.
+    async function pushLastTakeAsLayer() {
+      if (!lastRecordedBlob) return;
+      if (harmonyStack.length >= HARMONY_STACK_MAX) {
+        showRemuxIndicator('Stack full (' + HARMONY_STACK_MAX + ' layers max)', { warning: true });
+        setTimeout(hideRemuxIndicator, 3000);
+        return;
+      }
+      try {
+        getAudioContext();
+        const arrayBuffer = await lastRecordedBlob.arrayBuffer();
+        // decodeAudioData consumes the buffer, so feed it a fresh copy.
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+        harmonyStack.push({ audioBuffer, durationSec: audioBuffer.duration });
+        updateStackIndicator();
+        showRemuxIndicator('Layer ' + harmonyStack.length + ' added');
+        setTimeout(hideRemuxIndicator, 1500);
+      } catch (err) {
+        console.warn('[stack] decode failed:', err);
+        const msg = (err && err.message) ? err.message : String(err);
+        showRemuxIndicator('Couldn\'t decode layer: ' + msg, { warning: true });
+        setTimeout(hideRemuxIndicator, 6000);
+      }
+    }
+
+    function clearHarmonyStack() {
+      stopActiveLayerSources();
+      harmonyStack.length = 0;
+      updateStackIndicator();
+    }
+
+    // Disconnect every currently-playing layer source. Safe to call
+    // multiple times. Triggered from both stopRecording (normal stop)
+    // and discardRecording (so the speakers go quiet immediately).
+    function stopActiveLayerSources() {
+      for (const handle of activeLayerSources) {
+        try { handle.source.stop(); } catch (_) {}
+        try { handle.source.disconnect(); } catch (_) {}
+        try { handle.delay.disconnect(); } catch (_) {}
+      }
+      activeLayerSources.length = 0;
+    }
+
+    // Audible click train — three short square-wave clicks at 1s
+    // intervals. Routed only to audioContext.destination so the user
+    // hears them through their headphones with normal output latency,
+    // but they never enter the masterOutputGain → MediaStreamDestination
+    // recording bus. After the third click, recording starts immediately.
+    async function playCountIn(beats, intervalSec) {
+      if (typeof beats !== 'number') beats = 3;
+      if (typeof intervalSec !== 'number') intervalSec = 1.0;
+      getAudioContext();
+      if (!audioContext) return;
+      for (let i = 0; i < beats; i++) {
+        const click = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        click.frequency.value = 800;
+        click.type = 'square';
+        const startTime = audioContext.currentTime;
+        gain.gain.setValueAtTime(0.4, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.08);
+        click.connect(gain).connect(audioContext.destination);
+        click.start(startTime);
+        click.stop(startTime + 0.1);
+        if (i < beats - 1) await new Promise(r => setTimeout(r, intervalSec * 1000));
+      }
+    }
+
+    // Schedule every stacked layer to play simultaneously with the start
+    // of recording. Two branches per layer:
+    //   Branch A → audioContext.destination
+    //              user hears it through speakers/BT (with whatever output
+    //              latency the device has)
+    //   Branch B → DelayNode(btLatencyMs/1000) → masterOutputGain
+    //              the same audio is shifted forward by the BT compensation
+    //              and routed into the recording bus, so the user's mic
+    //              voice (which arrives at the recording bus with the BT
+    //              lag baked in, because the user sings to what they hear)
+    //              and the layer line up tightly in the final MP4.
+    // Returns nothing; populates module-scope activeLayerSources for cleanup.
+    function scheduleLayerPlayback() {
+      if (!harmonyStack.length) return;
+      getAudioContext();
+      if (!audioContext) return;
+      const mp = micProcessing;
+      if (!mp || !mp.masterOutputGain) {
+        console.warn('[stack] masterOutputGain unavailable; skipping layer schedule');
+        return;
+      }
+      const startTime = audioContext.currentTime + 0.05;
+      const delaySec = Math.max(0, Math.min(1.0, btLatencyMs / 1000));
+      for (const layer of harmonyStack) {
+        const source = audioContext.createBufferSource();
+        source.buffer = layer.audioBuffer;
+        // Branch A — monitor (user hears the layer through BT/speakers)
+        source.connect(audioContext.destination);
+        // Branch B — recording bus (delayed by BT compensation)
+        const delay = audioContext.createDelay(1.0);
+        delay.delayTime.value = delaySec;
+        source.connect(delay).connect(mp.masterOutputGain);
+        source.start(startTime);
+        activeLayerSources.push({ source, delay });
+      }
+    }
+
+    // Update the on-screen stack pill. Hidden when stack is empty;
+    // visible with "Layers: N" otherwise. Also toggles the "+ layer"
+    // chip's visibility (only present when there's a take to push and
+    // the stack isn't already full).
+    function updateStackIndicator() {
+      const ind = document.getElementById('stackIndicator');
+      if (ind) {
+        const n = harmonyStack.length;
+        const label = ind.querySelector('.stack-count');
+        if (label) label.textContent = 'Layers: ' + n;
+        ind.classList.toggle('visible', n > 0);
+      }
+      const chip = document.getElementById('layerAddBtn');
+      if (chip) {
+        const canAdd = !!lastRecordedBlob && harmonyStack.length < HARMONY_STACK_MAX;
+        chip.classList.toggle('visible', canAdd);
+      }
     }
 
     function finalizeDiscard() {
@@ -7367,6 +7631,41 @@
           try { localStorage.setItem('tuner.spectrumOpacity', String(spectrumOpacity)); } catch (_) {}
         });
       }
+
+      // Harmony-stack init — restore btLatencyMs from localStorage,
+      // wire the slider, the "+ layer" chip, and the clear-X button.
+      try {
+        const saved = localStorage.getItem('tuner.btLatencyMs');
+        if (saved !== null && !isNaN(parseInt(saved, 10))) {
+          btLatencyMs = Math.max(0, Math.min(400, parseInt(saved, 10)));
+        }
+      } catch (_) {}
+      const btSlider = document.getElementById('btLatencySlider');
+      const btLabel  = document.getElementById('btLatencyVal');
+      if (btSlider) {
+        btSlider.value = String(btLatencyMs);
+        if (btLabel) btLabel.textContent = btLatencyMs + ' ms';
+        btSlider.addEventListener('input', (e) => {
+          const v = parseInt(e.target.value, 10);
+          btLatencyMs = isNaN(v) ? 200 : Math.max(0, Math.min(400, v));
+          if (btLabel) btLabel.textContent = btLatencyMs + ' ms';
+          try { localStorage.setItem('tuner.btLatencyMs', String(btLatencyMs)); } catch (_) {}
+        });
+      }
+      const layerAddBtn = document.getElementById('layerAddBtn');
+      if (layerAddBtn) {
+        layerAddBtn.addEventListener('click', () => {
+          pushLastTakeAsLayer();
+        });
+      }
+      const stackClearBtn = document.getElementById('stackClearBtn');
+      if (stackClearBtn) {
+        stackClearBtn.addEventListener('click', () => {
+          clearHarmonyStack();
+        });
+      }
+      // Initial paint of the stack chip/indicator state (both empty).
+      try { updateStackIndicator(); } catch (_) {}
 
       // Floating audio-FX strip — single ⏻ verb on/off button + mini Mix
       // slider. LC and CMP are forced on at bootstrap and have no UI
