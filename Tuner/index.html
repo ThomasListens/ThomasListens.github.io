@@ -2096,6 +2096,12 @@
     let activeLayerSources = [];
     let btLatencyMs = 200;
     let recordTimerId = null;
+    // Visual count-in state. Set by playVisualCountIn during the
+    // pre-record pause; consumed by draw() to paint a fading
+    // numeral over the canvas. Both reset to null/0 once the
+    // count-in finishes, just before mediaRecorder.start().
+    let countInNumeral = null;
+    let countInProgress = 0;
     // Reference to the canvas captureStream's video track during a
     // recording, so audioLoop can call .requestFrame() after each paint
     // and sync video timestamps to actual paint times.
@@ -4135,6 +4141,37 @@
         ctx.restore();
       }
 
+      // Visual count-in numerals. Drawn last so they sit on top of
+      // camera, ruler, spectrum, and ratio labels. countInNumeral is
+      // populated by playVisualCountIn during the pre-record pause;
+      // mediaRecorder hasn't started yet, so these never enter the
+      // captured stream — the recording opens cleanly on "0".
+      if (countInNumeral !== null) {
+        let cx = W / 2;
+        let cy = H / 2;
+        if (recordMode && cameraVisibleRect) {
+          const v0 = Math.max(0, cameraVisibleRect.y0);
+          const v1 = Math.min(H, cameraVisibleRect.y1);
+          if (v1 > v0) cy = (v0 + v1) / 2;
+        }
+        // sin(pi*t)^0.5 gives a soft rise / plateau / fall envelope
+        // across the [0,1] beat window — fades in over the first
+        // ~17%, holds, fades out over the last ~17%.
+        const t = Math.max(0, Math.min(1, countInProgress));
+        const alpha = Math.max(0, Math.pow(Math.sin(Math.PI * t), 0.5));
+        const fontPx = 110 * S;
+        ctx.save();
+        ctx.font = `600 ${fontPx}px 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0,0,0,0.85)';
+        ctx.shadowBlur = fontPx * 0.18;
+        ctx.shadowOffsetY = Math.max(2, fontPx * 0.04);
+        ctx.fillStyle = `rgba(255, 200, 130, ${(0.92 * alpha).toFixed(3)})`;
+        ctx.fillText(countInNumeral, cx, cy);
+        ctx.restore();
+      }
+
       return true;
     }
     
@@ -6020,12 +6057,13 @@
       // (captureStream(0) main-thread pacing, see above).
       //
       // Stacked harmony: if the user has at least one layer queued,
-      // play three audible count-in clicks (only through speakers, NOT
-      // recorded) and then begin layer playback simultaneously with
-      // mediaRecorder.start(). In non-stacked mode this is skipped,
-      // preserving the existing instant-record behaviour.
+      // run a *visual* 3-2-1 count-in (no audio — see
+      // playVisualCountIn comment for why) and then begin layer
+      // playback simultaneously with mediaRecorder.start(). In
+      // non-stacked mode this is skipped, preserving the existing
+      // instant-record behaviour.
       if (harmonyStack.length > 0) {
-        try { await playCountIn(3, 1.0); } catch (e) { console.warn('[stack] count-in failed:', e); }
+        try { await playVisualCountIn(3, 900); } catch (e) { console.warn('[stack] count-in failed:', e); }
         try { scheduleLayerPlayback(); } catch (e) { console.warn('[stack] layer schedule failed:', e); }
       }
       mediaRecorder.start(1000);
@@ -6184,29 +6222,38 @@
       activeLayerSources.length = 0;
     }
 
-    // Audible click train — three short square-wave clicks at 1s
-    // intervals. Routed only to audioContext.destination so the user
-    // hears them through their headphones with normal output latency,
-    // but they never enter the masterOutputGain → MediaStreamDestination
-    // recording bus. After the third click, recording starts immediately.
-    async function playCountIn(beats, intervalSec) {
+    // Visual count-in — paints "3", "2", "1" onto the canvas
+    // before mediaRecorder.start(). The previous audio click train
+    // routed to audioContext.destination, but on Bluetooth headsets
+    // running in HFP profile the BT mic picks up the click being
+    // played through the BT speaker (a hardware-side acoustic loop
+    // we cannot block from JS), and the click ends up in the
+    // recording. Switching to a purely visual cue avoids that path
+    // entirely. Updates module-scope countInNumeral / countInProgress
+    // each rAF tick; the actual rendering happens in draw().
+    // Resolves once the final numeral has finished its hold, at
+    // which point the call site starts the recorder.
+    async function playVisualCountIn(beats, intervalMs) {
       if (typeof beats !== 'number') beats = 3;
-      if (typeof intervalSec !== 'number') intervalSec = 1.0;
-      getAudioContext();
-      if (!audioContext) return;
-      for (let i = 0; i < beats; i++) {
-        const click = audioContext.createOscillator();
-        const gain = audioContext.createGain();
-        click.frequency.value = 800;
-        click.type = 'square';
-        const startTime = audioContext.currentTime;
-        gain.gain.setValueAtTime(0.4, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.08);
-        click.connect(gain).connect(audioContext.destination);
-        click.start(startTime);
-        click.stop(startTime + 0.1);
-        if (i < beats - 1) await new Promise(r => setTimeout(r, intervalSec * 1000));
-      }
+      if (typeof intervalMs !== 'number') intervalMs = 900;
+      return new Promise((resolve) => {
+        const startTime = performance.now();
+        function tick(now) {
+          const elapsed = now - startTime;
+          const idx = Math.floor(elapsed / intervalMs);
+          if (idx >= beats) {
+            countInNumeral = null;
+            countInProgress = 0;
+            resolve();
+            return;
+          }
+          const local = (elapsed % intervalMs) / intervalMs;
+          countInNumeral = String(beats - idx); // "3", "2", "1"
+          countInProgress = local; // 0..1 within this beat
+          requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      });
     }
 
     // Schedule every stacked layer to play simultaneously with the start
