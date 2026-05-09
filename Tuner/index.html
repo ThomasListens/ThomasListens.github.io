@@ -5731,155 +5731,141 @@
       }
     }
 
-    // -------- Stacked-reel export (FFmpeg.wasm composite) --------
+    // -------- Stacked-reel export (canvas + MediaRecorder composite) --------
     //
     // Each take in harmonyStack is a complete MP4 (videoBlob). When the
-    // user taps "Export reel", we run a one-shot FFmpeg filter graph that
-    // arranges N takes into a portrait 544x960 grid. The MOST RECENT take
-    // is placed in the prominent slot (top of asymmetric grids, top-left
-    // of symmetric grids) and its audio track is mapped through unchanged
-    // — that audio already contains the running mix because each take
-    // was recorded with the prior layers playing back into the recording
-    // bus (see scheduleLayerPlayback). Older takes fill the grid in order
-    // of recency, top-to-bottom, left-to-right.
+    // user taps "Export reel", we composite N takes into a portrait
+    // 544x960 grid using a hidden HTMLVideoElement per layer drawn into
+    // an offscreen canvas, capture the canvas into a MediaStream, mux
+    // in the most-recent take's audio, and record with MediaRecorder.
     //
-    // Why composite once at export time instead of streaming during
-    // record? Recording stays cheap (one camera, no per-take cost) and
-    // composition is a bounded one-time job — the Pixel can comfortably
-    // stack 8 takes because nothing changes during recording.
+    // Why canvas + MediaRecorder instead of FFmpeg.wasm? FFmpeg.wasm
+    // re-encodes with libx264 in single-threaded WASM and takes minutes
+    // per export — unusable for an IG-reel pipeline. Canvas captureStream
+    // hands the encode to the browser's hardware video encoder, which is
+    // 10-30x faster on mobile.
     //
-    // Output: 544x960 H.264 + AAC (audio copied from the most recent take).
-    // FFmpeg core-st 0.11.x ships xstack/vstack/hstack/scale/libx264 in
-    // the standard build, so the filter graph below is portable.
+    // The most recent take is placed in the prominent slot (top of
+    // asymmetric grids, top-left of symmetric grids) and its audio track
+    // is mapped through unchanged — that audio already contains the
+    // running mix because each take was recorded with the prior layers
+    // playing back into the recording bus (see scheduleLayerPlayback).
+    //
+    // Output: 544x960 MP4 (or WebM where MP4 isn't supported) at 3 Mbps.
+    // FFmpeg.wasm is still used at the tail end for the faststart remux
+    // — that's a fast `-c copy` job, not a re-encode.
 
-    // Returns an FFmpeg filter graph string + dimensions for an N-layer
-    // stack. The filter assumes inputs are already ordered most-recent-
-    // first ([0:v] = newest take). Output width is always 544 and height
-    // is always 960 for symmetric/asymmetric layouts. n=1 returns null
-    // (no composition needed — caller falls back to a passthrough save).
-    function getStackLayout(n) {
+    // Returns canvas cell positions for an N-layer stack. Cell index 0
+    // is always the most recent take (top/prominent slot). Coords are
+    // in 544x960 canvas pixels. Layouts mirror the prior FFmpeg layouts
+    // (same prominence ordering and grid shapes).
+    function getStackCells(n) {
       const W = 544, H = 960;
       if (n <= 1) {
-        return { filter: null, outputW: W, outputH: H, audioInput: 0 };
+        return { cells: [{ x: 0, y: 0, w: W, h: H }], outputW: W, outputH: H };
       }
-      // For n>1, audio always comes from input 0 (the most recent take,
-      // which contains the running mix the user heard while recording).
-      const audioInput = 0;
-
       if (n === 2) {
         // 2 rows, full width — most recent on top.
         return {
-          filter:
-            '[0:v]scale=544:480,setsar=1[v0];' +
-            '[1:v]scale=544:480,setsar=1[v1];' +
-            '[v0][v1]vstack=inputs=2[v]',
-          outputW: W, outputH: H, audioInput,
+          cells: [
+            { x: 0, y: 0,   w: W, h: 480 },
+            { x: 0, y: 480, w: W, h: 480 },
+          ],
+          outputW: W, outputH: H,
         };
       }
       if (n === 3) {
         // 3 rows, full width.
         return {
-          filter:
-            '[0:v]scale=544:320,setsar=1[v0];' +
-            '[1:v]scale=544:320,setsar=1[v1];' +
-            '[2:v]scale=544:320,setsar=1[v2];' +
-            '[v0][v1][v2]vstack=inputs=3[v]',
-          outputW: W, outputH: H, audioInput,
+          cells: [
+            { x: 0, y: 0,   w: W, h: 320 },
+            { x: 0, y: 320, w: W, h: 320 },
+            { x: 0, y: 640, w: W, h: 320 },
+          ],
+          outputW: W, outputH: H,
         };
       }
       if (n === 4) {
-        // 2x2 grid — most recent top-left, newest fills row-major.
+        // 2x2 grid — most recent top-left, fills row-major.
         return {
-          filter:
-            '[0:v]scale=272:480,setsar=1[v0];' +
-            '[1:v]scale=272:480,setsar=1[v1];' +
-            '[2:v]scale=272:480,setsar=1[v2];' +
-            '[3:v]scale=272:480,setsar=1[v3];' +
-            '[v0][v1]hstack=inputs=2[r1];' +
-            '[v2][v3]hstack=inputs=2[r2];' +
-            '[r1][r2]vstack=inputs=2[v]',
-          outputW: W, outputH: H, audioInput,
+          cells: [
+            { x: 0,   y: 0,   w: 272, h: 480 },
+            { x: 272, y: 0,   w: 272, h: 480 },
+            { x: 0,   y: 480, w: 272, h: 480 },
+            { x: 272, y: 480, w: 272, h: 480 },
+          ],
+          outputW: W, outputH: H,
         };
       }
       if (n === 5) {
-        // Top row spans full width (most recent), then 2x2 grid below.
-        // 320 + 320 + 320 = 960 ✓, 272+272 = 544 ✓.
+        // Top row full-width (most recent), then 2x2 grid below.
+        // 320 + 320 + 320 = 960; 272 + 272 = 544.
         return {
-          filter:
-            '[0:v]scale=544:320,setsar=1[v0];' +
-            '[1:v]scale=272:320,setsar=1[v1];' +
-            '[2:v]scale=272:320,setsar=1[v2];' +
-            '[3:v]scale=272:320,setsar=1[v3];' +
-            '[4:v]scale=272:320,setsar=1[v4];' +
-            '[v1][v2]hstack=inputs=2[mid];' +
-            '[v3][v4]hstack=inputs=2[bot];' +
-            '[v0][mid][bot]vstack=inputs=3[v]',
-          outputW: W, outputH: H, audioInput,
+          cells: [
+            { x: 0,   y: 0,   w: W,   h: 320 },
+            { x: 0,   y: 320, w: 272, h: 320 },
+            { x: 272, y: 320, w: 272, h: 320 },
+            { x: 0,   y: 640, w: 272, h: 320 },
+            { x: 272, y: 640, w: 272, h: 320 },
+          ],
+          outputW: W, outputH: H,
         };
       }
       if (n === 6) {
-        // 3 rows x 2 cols. 320 * 3 = 960 ✓, 272 * 2 = 544 ✓.
+        // 3 rows x 2 cols. 320 * 3 = 960; 272 * 2 = 544.
         return {
-          filter:
-            '[0:v]scale=272:320,setsar=1[v0];' +
-            '[1:v]scale=272:320,setsar=1[v1];' +
-            '[2:v]scale=272:320,setsar=1[v2];' +
-            '[3:v]scale=272:320,setsar=1[v3];' +
-            '[4:v]scale=272:320,setsar=1[v4];' +
-            '[5:v]scale=272:320,setsar=1[v5];' +
-            '[v0][v1]hstack=inputs=2[r1];' +
-            '[v2][v3]hstack=inputs=2[r2];' +
-            '[v4][v5]hstack=inputs=2[r3];' +
-            '[r1][r2][r3]vstack=inputs=3[v]',
-          outputW: W, outputH: H, audioInput,
+          cells: [
+            { x: 0,   y: 0,   w: 272, h: 320 },
+            { x: 272, y: 0,   w: 272, h: 320 },
+            { x: 0,   y: 320, w: 272, h: 320 },
+            { x: 272, y: 320, w: 272, h: 320 },
+            { x: 0,   y: 640, w: 272, h: 320 },
+            { x: 272, y: 640, w: 272, h: 320 },
+          ],
+          outputW: W, outputH: H,
         };
       }
       if (n === 7) {
         // Top spans full (most recent), then 3 rows x 2 cols below.
-        // 240 + 240 * 3 = 960 ✓, 272 * 2 = 544 ✓.
+        // 240 + 240 * 3 = 960; 272 * 2 = 544.
         return {
-          filter:
-            '[0:v]scale=544:240,setsar=1[v0];' +
-            '[1:v]scale=272:240,setsar=1[v1];' +
-            '[2:v]scale=272:240,setsar=1[v2];' +
-            '[3:v]scale=272:240,setsar=1[v3];' +
-            '[4:v]scale=272:240,setsar=1[v4];' +
-            '[5:v]scale=272:240,setsar=1[v5];' +
-            '[6:v]scale=272:240,setsar=1[v6];' +
-            '[v1][v2]hstack=inputs=2[r1];' +
-            '[v3][v4]hstack=inputs=2[r2];' +
-            '[v5][v6]hstack=inputs=2[r3];' +
-            '[v0][r1][r2][r3]vstack=inputs=4[v]',
-          outputW: W, outputH: H, audioInput,
+          cells: [
+            { x: 0,   y: 0,   w: W,   h: 240 },
+            { x: 0,   y: 240, w: 272, h: 240 },
+            { x: 272, y: 240, w: 272, h: 240 },
+            { x: 0,   y: 480, w: 272, h: 240 },
+            { x: 272, y: 480, w: 272, h: 240 },
+            { x: 0,   y: 720, w: 272, h: 240 },
+            { x: 272, y: 720, w: 272, h: 240 },
+          ],
+          outputW: W, outputH: H,
         };
       }
       if (n === 8) {
-        // 4 rows x 2 cols. 240 * 4 = 960 ✓, 272 * 2 = 544 ✓.
+        // 4 rows x 2 cols. 240 * 4 = 960; 272 * 2 = 544.
         return {
-          filter:
-            '[0:v]scale=272:240,setsar=1[v0];' +
-            '[1:v]scale=272:240,setsar=1[v1];' +
-            '[2:v]scale=272:240,setsar=1[v2];' +
-            '[3:v]scale=272:240,setsar=1[v3];' +
-            '[4:v]scale=272:240,setsar=1[v4];' +
-            '[5:v]scale=272:240,setsar=1[v5];' +
-            '[6:v]scale=272:240,setsar=1[v6];' +
-            '[7:v]scale=272:240,setsar=1[v7];' +
-            '[v0][v1]hstack=inputs=2[r1];' +
-            '[v2][v3]hstack=inputs=2[r2];' +
-            '[v4][v5]hstack=inputs=2[r3];' +
-            '[v6][v7]hstack=inputs=2[r4];' +
-            '[r1][r2][r3][r4]vstack=inputs=4[v]',
-          outputW: W, outputH: H, audioInput,
+          cells: [
+            { x: 0,   y: 0,   w: 272, h: 240 },
+            { x: 272, y: 0,   w: 272, h: 240 },
+            { x: 0,   y: 240, w: 272, h: 240 },
+            { x: 272, y: 240, w: 272, h: 240 },
+            { x: 0,   y: 480, w: 272, h: 240 },
+            { x: 272, y: 480, w: 272, h: 240 },
+            { x: 0,   y: 720, w: 272, h: 240 },
+            { x: 272, y: 720, w: 272, h: 240 },
+          ],
+          outputW: W, outputH: H,
         };
       }
       // n > 8 — should never happen given HARMONY_STACK_MAX === 8, but
-      // fall back to an n=8 layout on the most recent 8 takes.
-      return getStackLayout(8);
+      // fall back to the n=8 layout on the most recent 8 takes.
+      return getStackCells(8);
     }
 
     // Guard so a second tap on Export reel doesn't kick off a parallel
-    // FFmpeg invocation (the wasm runtime can only run one job at a time).
+    // composite (canvas captureStream + MediaRecorder don't share global
+    // state, but two simultaneous remuxes would still fight over the
+    // single FFmpeg.wasm runtime used at the tail).
     let _exportInFlight = false;
 
     // Save a Blob as <name> via the same anchor-click pattern the per-take
@@ -5907,8 +5893,8 @@
       if (n === 0) return;
 
       // Verify every layer carries a videoBlob. Older entries pushed
-      // before this build won't — surface a clear message instead of
-      // crashing FFmpeg with a missing file.
+      // before stack-mode shipped won't — surface a clear message
+      // instead of crashing the canvas pipeline with a missing source.
       for (let i = 0; i < n; i++) {
         if (!harmonyStack[i] || !harmonyStack[i].videoBlob) {
           showRemuxIndicator(
@@ -5924,12 +5910,10 @@
       const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const outName = 'reel-stacked-' + ts + '.mp4';
 
-      // Reverse so input 0 = most recent (harmonyStack is oldest-first).
+      // Reverse so cells[0] = most recent (harmonyStack is oldest-first).
       const ordered = harmonyStack.slice().reverse();
 
-      // n=1 fast path: nothing to composite, just save the single videoBlob.
-      // We still rename the download so the user can tell it apart from the
-      // per-take save that already fired.
+      // n=1 fast path: nothing to composite.
       if (n === 1) {
         try {
           downloadBlob(ordered[0].videoBlob, outName);
@@ -5941,88 +5925,227 @@
         return;
       }
 
-      const layout = getStackLayout(n);
-      if (!layout || !layout.filter) {
-        showRemuxIndicator('No layout for ' + n + ' layers', { warning: true });
-        setTimeout(hideRemuxIndicator, 4000);
-        _exportInFlight = false;
-        return;
-      }
+      const layout = getStackCells(n);
+      const W = layout.outputW, H = layout.outputH;
 
       showRemuxIndicator('Compositing ' + n + ' layers…');
-      let ffmpeg = null;
-      let writtenFiles = [];
+
+      // Resource bookkeeping. Populated as we acquire things so the
+      // finally block can release whatever we got, even if a later
+      // step throws.
+      const videoEls = [];
+      const objectUrls = [];
+      const audioNodes = [];   // MediaElementAudioSourceNode + MediaStreamAudioDestinationNode
+      let canvas = null;
+      let mediaRecorder = null;
+      let rafId = null;
+      let stopRequested = false;
+      let outputBlob = null;
+
       try {
-        const loaded = await loadFFmpeg();
-        ffmpeg = loaded.ffmpeg;
-        const fetchFile = loaded.fetchFile;
-        _ffmpegEverLoaded = true;
-
-        // Wire the 0.11.x progress callback so the user sees forward
-        // motion. ratio is 0..1 during a run, jumps back near 0 between
-        // passes; we clamp/round for display.
-        try {
-          ffmpeg.setProgress(({ ratio }) => {
-            if (typeof ratio !== 'number' || !isFinite(ratio)) return;
-            const pct = Math.max(0, Math.min(99, Math.round(ratio * 100)));
-            showRemuxIndicator('Compositing ' + n + ' layers… ' + pct + '%');
-          });
-        } catch (_) {}
-
-        // Write each input. Names are in0.mp4..inN-1.mp4 in input order
-        // (input 0 = most recent take).
+        // 1. Build a hidden video element per layer. Some browsers
+        //    (Safari/iOS) won't decode video that isn't attached to the
+        //    document, so we attach off-screen.
         for (let i = 0; i < ordered.length; i++) {
-          const name = 'in' + i + '.mp4';
-          ffmpeg.FS('writeFile', name, await fetchFile(ordered[i].videoBlob));
-          writtenFiles.push(name);
+          const url = URL.createObjectURL(ordered[i].videoBlob);
+          objectUrls.push(url);
+
+          const v = document.createElement('video');
+          v.src = url;
+          v.muted = (i !== 0);     // only the most-recent take provides audio
+          v.playsInline = true;
+          v.preload = 'auto';
+          v.crossOrigin = 'anonymous';
+          v.style.position = 'absolute';
+          v.style.left = '-9999px';
+          v.style.top = '-9999px';
+          v.style.width = '1px';
+          v.style.height = '1px';
+          document.body.appendChild(v);
+          videoEls.push(v);
         }
 
-        // Build the FFmpeg command. -i for each input, then filter_complex,
-        // then map video [v] + audio from input audioInput. Re-encode
-        // video (we filtered it). Copy audio so we don't waste cycles
-        // reencoding AAC — quality identical to source.
-        const args = [];
-        for (let i = 0; i < ordered.length; i++) {
-          args.push('-i', 'in' + i + '.mp4');
-        }
-        args.push('-filter_complex', layout.filter);
-        args.push('-map', '[v]');
-        args.push('-map', layout.audioInput + ':a');
-        args.push('-c:v', 'libx264');
-        args.push('-preset', 'ultrafast');
-        args.push('-crf', '23');
-        args.push('-pix_fmt', 'yuv420p');
-        args.push('-c:a', 'copy');
-        args.push('-shortest');
-        args.push('-movflags', '+faststart');
-        args.push('out.mp4');
+        // Wait for metadata on every input — durations and intrinsic
+        // dimensions aren't available before HAVE_METADATA.
+        await Promise.all(videoEls.map(v => new Promise((resolve, reject) => {
+          if (v.readyState >= 1 /* HAVE_METADATA */) return resolve();
+          const onMeta = () => { cleanup(); resolve(); };
+          const onErr  = () => { cleanup(); reject(new Error('video metadata load failed')); };
+          const cleanup = () => {
+            v.removeEventListener('loadedmetadata', onMeta);
+            v.removeEventListener('error', onErr);
+          };
+          v.addEventListener('loadedmetadata', onMeta);
+          v.addEventListener('error', onErr);
+        })));
 
-        try {
-          await ffmpeg.run.apply(ffmpeg, args);
-        } catch (e) {
-          // 0.11.x core ends every invocation with exit(0); confirm
-          // output exists before treating as failure (same pattern as
-          // remuxToFastStartMP4).
-          let outputExists = false;
-          try {
-            ffmpeg.FS('stat', 'out.mp4');
-            outputExists = true;
-          } catch (_) {}
-          if (!outputExists) {
-            throw new Error('FFmpeg run failed: ' + (e && e.message ? e.message : String(e)));
+        // -shortest semantics: stop when the shortest input ends. Prefer
+        // the actual decoded duration; fall back to harmonyStack
+        // durationSec if a video reports a non-finite duration.
+        let shortestSec = Infinity;
+        for (const v of videoEls) {
+          const d = v.duration;
+          if (isFinite(d) && d > 0 && d < shortestSec) shortestSec = d;
+        }
+        if (!isFinite(shortestSec) || shortestSec <= 0) {
+          for (const layer of ordered) {
+            if (layer.durationSec && layer.durationSec > 0 && layer.durationSec < shortestSec) {
+              shortestSec = layer.durationSec;
+            }
           }
         }
-
-        const data = ffmpeg.FS('readFile', 'out.mp4');
-        const outputBlob = new Blob([data.buffer], { type: 'video/mp4' });
-
-        // Free MEMFS buffers before we hand the blob back (8 inputs at
-        // ~10MB each is up to 80MB sitting in wasm memory).
-        for (const name of writtenFiles) {
-          try { ffmpeg.FS('unlink', name); } catch (_) {}
+        if (!isFinite(shortestSec) || shortestSec <= 0) {
+          throw new Error('Could not determine layer duration');
         }
-        writtenFiles = [];
-        try { ffmpeg.FS('unlink', 'out.mp4'); } catch (_) {}
+
+        // 2. Offscreen canvas for compositing. Paint a black initial
+        //    frame so canvas.captureStream gets a non-empty first frame
+        //    (mirrors the precaution in startRecording for the live
+        //    ruler canvas).
+        canvas = document.createElement('canvas');
+        canvas.width = W;
+        canvas.height = H;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, W, H);
+
+        // 3. Audio routing. Use the existing shared audioContext, NOT a
+        //    new one — see getAudioContext(). createMediaElementSource
+        //    is one-shot per element, but every videoEl in this run is
+        //    freshly created above, so it's safe across re-exports.
+        //    Deliberately not connecting audioSrc to audioCtx.destination
+        //    so the export stays silent (the user's mic shouldn't pick
+        //    up the playback if they happen to be on a speaker).
+        const audioCtx = getAudioContext();
+        const audioSrc = audioCtx.createMediaElementSource(videoEls[0]);
+        const audioDest = audioCtx.createMediaStreamDestination();
+        audioSrc.connect(audioDest);
+        audioNodes.push(audioSrc, audioDest);
+
+        // 4. Combined MediaStream: canvas video track + audio dest's
+        //    audio track. captureStream(30) requests 30fps but mobile
+        //    may not honour it exactly — acceptable.
+        const videoStream = canvas.captureStream(30);
+        const combined = new MediaStream();
+        for (const t of videoStream.getVideoTracks()) combined.addTrack(t);
+        for (const t of audioDest.stream.getAudioTracks()) combined.addTrack(t);
+
+        // 5. MediaRecorder. Reuse pickRecorderMime so the per-take and
+        //    composite recorders agree on codec preference.
+        const mime = pickRecorderMime();
+        const recOpts = { videoBitsPerSecond: 3_000_000 };
+        if (mime) recOpts.mimeType = mime;
+        mediaRecorder = new MediaRecorder(combined, recOpts);
+
+        const chunks = [];
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) chunks.push(e.data);
+        };
+
+        const recordingDone = new Promise((resolve, reject) => {
+          mediaRecorder.onstop = () => resolve();
+          mediaRecorder.onerror = (e) => reject(
+            new Error('MediaRecorder error: ' +
+              ((e && e.error && e.error.message) || 'unknown')));
+        });
+
+        // 6. Start the recorder, then start playback. Playing AFTER
+        //    MediaRecorder.start() guarantees the recorder doesn't miss
+        //    the first frames.
+        mediaRecorder.start();
+
+        for (const v of videoEls) {
+          try { v.currentTime = 0; } catch (_) {}
+        }
+        // play() returns a Promise — await all so we know playback
+        // actually started before the rAF loop checks elapsed time.
+        await Promise.all(videoEls.map(v => v.play().catch(() => {})));
+
+        // 7. Compose loop. clear -> for each cell, draw the matching
+        //    video element with letterboxing. Browser uses its hardware
+        //    decoder for each video and its hardware encoder via
+        //    captureStream/MediaRecorder.
+        const startMs = performance.now();
+        let lastUI = 0;
+        const drawFrame = () => {
+          if (stopRequested) return;
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, W, H);
+          for (let i = 0; i < videoEls.length && i < layout.cells.length; i++) {
+            const cell = layout.cells[i];
+            const v = videoEls[i];
+            if (v.videoWidth > 0 && v.videoHeight > 0) {
+              // cover-fit: scale to fill the cell, crop the overhang.
+              // Source video is portrait 544x960 (the recorder paints
+              // at that AR), and most cells are also portrait, so crop
+              // is small in practice.
+              const srcAR = v.videoWidth / v.videoHeight;
+              const cellAR = cell.w / cell.h;
+              let dw, dh, dx, dy;
+              if (srcAR > cellAR) {
+                dh = cell.h;
+                dw = dh * srcAR;
+                dx = cell.x + (cell.w - dw) / 2;
+                dy = cell.y;
+              } else {
+                dw = cell.w;
+                dh = dw / srcAR;
+                dx = cell.x;
+                dy = cell.y + (cell.h - dh) / 2;
+              }
+              ctx.save();
+              ctx.beginPath();
+              ctx.rect(cell.x, cell.y, cell.w, cell.h);
+              ctx.clip();
+              try {
+                ctx.drawImage(v, dx, dy, dw, dh);
+              } catch (_) { /* video not ready for this frame */ }
+              ctx.restore();
+            }
+          }
+
+          const elapsed = (performance.now() - startMs) / 1000;
+          if (performance.now() - lastUI > 120) {
+            lastUI = performance.now();
+            const pct = Math.max(0, Math.min(99,
+              Math.round(elapsed / shortestSec * 100)));
+            showRemuxIndicator('Compositing ' + n + ' layers… ' + pct + '%');
+          }
+
+          if (elapsed >= shortestSec) {
+            stopRequested = true;
+            for (const v of videoEls) { try { v.pause(); } catch (_) {} }
+            try { mediaRecorder.stop(); } catch (_) {}
+            return;
+          }
+          rafId = requestAnimationFrame(drawFrame);
+        };
+        rafId = requestAnimationFrame(drawFrame);
+
+        // 8. Wait for the recorder to flush.
+        await recordingDone;
+
+        if (!chunks.length) {
+          throw new Error('Recorder produced no data');
+        }
+        const recType = mediaRecorder.mimeType || mime || 'video/mp4';
+        const recordedBlob = new Blob(chunks, { type: recType });
+
+        // 9. Faststart remux. MediaRecorder's MP4 output is fragmented
+        //    (same as the per-take recorder), so we run it through the
+        //    existing remuxToFastStartMP4 helper for IG-friendly moov-
+        //    first MP4. WebM fallback skips remux (the faststart concept
+        //    only applies to MP4 container).
+        if (recType.indexOf('mp4') >= 0) {
+          try {
+            outputBlob = await remuxToFastStartMP4(recordedBlob);
+          } catch (e) {
+            console.warn('[export] faststart remux failed, using fragmented MP4:', e);
+            outputBlob = recordedBlob;
+          }
+        } else {
+          outputBlob = recordedBlob;
+        }
 
         downloadBlob(outputBlob, outName);
         showRemuxIndicator(
@@ -6036,17 +6159,27 @@
         showRemuxIndicator('Export failed: ' + msg, { warning: true });
         setTimeout(hideRemuxIndicator, 8000);
       } finally {
-        // Best-effort cleanup of any input files left behind by an early
-        // throw. Always discard the ffmpeg instance — same dangling-
-        // runResolve workaround as remuxToFastStartMP4.
-        if (ffmpeg) {
-          for (const name of writtenFiles) {
-            try { ffmpeg.FS('unlink', name); } catch (_) {}
-          }
-          try { ffmpeg.FS('unlink', 'out.mp4'); } catch (_) {}
-          try { ffmpeg.setProgress(() => {}); } catch (_) {}
+        // Best-effort cleanup. Run regardless of success/failure so we
+        // don't leak object URLs, video elements, or audio nodes if the
+        // composite throws partway through.
+        stopRequested = true;
+        if (rafId) {
+          try { cancelAnimationFrame(rafId); } catch (_) {}
         }
-        _ffmpegPromise = null;
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+          try { mediaRecorder.stop(); } catch (_) {}
+        }
+        for (const v of videoEls) {
+          try { v.pause(); } catch (_) {}
+          try { v.removeAttribute('src'); v.load(); } catch (_) {}
+          try { if (v.parentNode) v.parentNode.removeChild(v); } catch (_) {}
+        }
+        for (const u of objectUrls) {
+          try { URL.revokeObjectURL(u); } catch (_) {}
+        }
+        for (const node of audioNodes) {
+          try { node.disconnect(); } catch (_) {}
+        }
         _exportInFlight = false;
       }
     }
@@ -6540,9 +6673,9 @@
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
         // Each layer carries both an audioBuffer (used for next-take
         // playback into the recording bus) and the original videoBlob
-        // (used by exportStackedReel for the FFmpeg composite). We hold
-        // a reference, not a clone — the blob backing data is GC'd when
-        // the stack drops it.
+        // (used by exportStackedReel for the canvas+MediaRecorder
+        // composite). We hold a reference, not a clone — the blob
+        // backing data is GC'd when the stack drops it.
         harmonyStack.push({
           audioBuffer,
           videoBlob: lastRecordedBlob,
