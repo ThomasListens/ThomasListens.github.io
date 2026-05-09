@@ -1487,6 +1487,31 @@
       line-height: 1;
     }
     #stackIndicator #stackClearBtn:active { background: rgba(140, 50, 50, 0.95); }
+    /* Export-reel button — sibling to #stackClearBtn inside the
+       indicator pill. Green tint reads as a positive action vs. the
+       red clear chip. Hidden until at least one layer is on the stack. */
+    #stackIndicator #stackExportBtn {
+      height: 20px;
+      padding: 0 8px;
+      border-radius: 10px;
+      border: none;
+      background: rgba(30, 80, 50, 0.9);
+      color: #b3ffcc;
+      font-size: 11px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      font-family: inherit;
+      letter-spacing: 0.02em;
+    }
+    #stackIndicator #stackExportBtn.visible { display: inline-flex; }
+    #stackIndicator #stackExportBtn:active { background: rgba(50, 140, 80, 0.95); }
+    #stackIndicator #stackExportBtn[disabled] {
+      opacity: 0.55;
+      cursor: default;
+    }
   </style>
 </head>
 <body>
@@ -1836,6 +1861,7 @@
        LUFS readout so it lives in the same bottom-right cluster. -->
   <div id="stackIndicator" aria-live="polite">
     <span class="stack-count">Layers: 0</span>
+    <button type="button" id="stackExportBtn" title="Composite all layers into one MP4" aria-label="Export stacked reel">Export reel</button>
     <button type="button" id="stackClearBtn" title="Clear all harmony layers" aria-label="Clear harmony stack">✕</button>
   </div>
 
@@ -5705,6 +5731,326 @@
       }
     }
 
+    // -------- Stacked-reel export (FFmpeg.wasm composite) --------
+    //
+    // Each take in harmonyStack is a complete MP4 (videoBlob). When the
+    // user taps "Export reel", we run a one-shot FFmpeg filter graph that
+    // arranges N takes into a portrait 544x960 grid. The MOST RECENT take
+    // is placed in the prominent slot (top of asymmetric grids, top-left
+    // of symmetric grids) and its audio track is mapped through unchanged
+    // — that audio already contains the running mix because each take
+    // was recorded with the prior layers playing back into the recording
+    // bus (see scheduleLayerPlayback). Older takes fill the grid in order
+    // of recency, top-to-bottom, left-to-right.
+    //
+    // Why composite once at export time instead of streaming during
+    // record? Recording stays cheap (one camera, no per-take cost) and
+    // composition is a bounded one-time job — the Pixel can comfortably
+    // stack 8 takes because nothing changes during recording.
+    //
+    // Output: 544x960 H.264 + AAC (audio copied from the most recent take).
+    // FFmpeg core-st 0.11.x ships xstack/vstack/hstack/scale/libx264 in
+    // the standard build, so the filter graph below is portable.
+
+    // Returns an FFmpeg filter graph string + dimensions for an N-layer
+    // stack. The filter assumes inputs are already ordered most-recent-
+    // first ([0:v] = newest take). Output width is always 544 and height
+    // is always 960 for symmetric/asymmetric layouts. n=1 returns null
+    // (no composition needed — caller falls back to a passthrough save).
+    function getStackLayout(n) {
+      const W = 544, H = 960;
+      if (n <= 1) {
+        return { filter: null, outputW: W, outputH: H, audioInput: 0 };
+      }
+      // For n>1, audio always comes from input 0 (the most recent take,
+      // which contains the running mix the user heard while recording).
+      const audioInput = 0;
+
+      if (n === 2) {
+        // 2 rows, full width — most recent on top.
+        return {
+          filter:
+            '[0:v]scale=544:480,setsar=1[v0];' +
+            '[1:v]scale=544:480,setsar=1[v1];' +
+            '[v0][v1]vstack=inputs=2[v]',
+          outputW: W, outputH: H, audioInput,
+        };
+      }
+      if (n === 3) {
+        // 3 rows, full width.
+        return {
+          filter:
+            '[0:v]scale=544:320,setsar=1[v0];' +
+            '[1:v]scale=544:320,setsar=1[v1];' +
+            '[2:v]scale=544:320,setsar=1[v2];' +
+            '[v0][v1][v2]vstack=inputs=3[v]',
+          outputW: W, outputH: H, audioInput,
+        };
+      }
+      if (n === 4) {
+        // 2x2 grid — most recent top-left, newest fills row-major.
+        return {
+          filter:
+            '[0:v]scale=272:480,setsar=1[v0];' +
+            '[1:v]scale=272:480,setsar=1[v1];' +
+            '[2:v]scale=272:480,setsar=1[v2];' +
+            '[3:v]scale=272:480,setsar=1[v3];' +
+            '[v0][v1]hstack=inputs=2[r1];' +
+            '[v2][v3]hstack=inputs=2[r2];' +
+            '[r1][r2]vstack=inputs=2[v]',
+          outputW: W, outputH: H, audioInput,
+        };
+      }
+      if (n === 5) {
+        // Top row spans full width (most recent), then 2x2 grid below.
+        // 320 + 320 + 320 = 960 ✓, 272+272 = 544 ✓.
+        return {
+          filter:
+            '[0:v]scale=544:320,setsar=1[v0];' +
+            '[1:v]scale=272:320,setsar=1[v1];' +
+            '[2:v]scale=272:320,setsar=1[v2];' +
+            '[3:v]scale=272:320,setsar=1[v3];' +
+            '[4:v]scale=272:320,setsar=1[v4];' +
+            '[v1][v2]hstack=inputs=2[mid];' +
+            '[v3][v4]hstack=inputs=2[bot];' +
+            '[v0][mid][bot]vstack=inputs=3[v]',
+          outputW: W, outputH: H, audioInput,
+        };
+      }
+      if (n === 6) {
+        // 3 rows x 2 cols. 320 * 3 = 960 ✓, 272 * 2 = 544 ✓.
+        return {
+          filter:
+            '[0:v]scale=272:320,setsar=1[v0];' +
+            '[1:v]scale=272:320,setsar=1[v1];' +
+            '[2:v]scale=272:320,setsar=1[v2];' +
+            '[3:v]scale=272:320,setsar=1[v3];' +
+            '[4:v]scale=272:320,setsar=1[v4];' +
+            '[5:v]scale=272:320,setsar=1[v5];' +
+            '[v0][v1]hstack=inputs=2[r1];' +
+            '[v2][v3]hstack=inputs=2[r2];' +
+            '[v4][v5]hstack=inputs=2[r3];' +
+            '[r1][r2][r3]vstack=inputs=3[v]',
+          outputW: W, outputH: H, audioInput,
+        };
+      }
+      if (n === 7) {
+        // Top spans full (most recent), then 3 rows x 2 cols below.
+        // 240 + 240 * 3 = 960 ✓, 272 * 2 = 544 ✓.
+        return {
+          filter:
+            '[0:v]scale=544:240,setsar=1[v0];' +
+            '[1:v]scale=272:240,setsar=1[v1];' +
+            '[2:v]scale=272:240,setsar=1[v2];' +
+            '[3:v]scale=272:240,setsar=1[v3];' +
+            '[4:v]scale=272:240,setsar=1[v4];' +
+            '[5:v]scale=272:240,setsar=1[v5];' +
+            '[6:v]scale=272:240,setsar=1[v6];' +
+            '[v1][v2]hstack=inputs=2[r1];' +
+            '[v3][v4]hstack=inputs=2[r2];' +
+            '[v5][v6]hstack=inputs=2[r3];' +
+            '[v0][r1][r2][r3]vstack=inputs=4[v]',
+          outputW: W, outputH: H, audioInput,
+        };
+      }
+      if (n === 8) {
+        // 4 rows x 2 cols. 240 * 4 = 960 ✓, 272 * 2 = 544 ✓.
+        return {
+          filter:
+            '[0:v]scale=272:240,setsar=1[v0];' +
+            '[1:v]scale=272:240,setsar=1[v1];' +
+            '[2:v]scale=272:240,setsar=1[v2];' +
+            '[3:v]scale=272:240,setsar=1[v3];' +
+            '[4:v]scale=272:240,setsar=1[v4];' +
+            '[5:v]scale=272:240,setsar=1[v5];' +
+            '[6:v]scale=272:240,setsar=1[v6];' +
+            '[7:v]scale=272:240,setsar=1[v7];' +
+            '[v0][v1]hstack=inputs=2[r1];' +
+            '[v2][v3]hstack=inputs=2[r2];' +
+            '[v4][v5]hstack=inputs=2[r3];' +
+            '[v6][v7]hstack=inputs=2[r4];' +
+            '[r1][r2][r3][r4]vstack=inputs=4[v]',
+          outputW: W, outputH: H, audioInput,
+        };
+      }
+      // n > 8 — should never happen given HARMONY_STACK_MAX === 8, but
+      // fall back to an n=8 layout on the most recent 8 takes.
+      return getStackLayout(8);
+    }
+
+    // Guard so a second tap on Export reel doesn't kick off a parallel
+    // FFmpeg invocation (the wasm runtime can only run one job at a time).
+    let _exportInFlight = false;
+
+    // Save a Blob as <name> via the same anchor-click pattern the per-take
+    // path uses. Caller is expected to hide its own progress UI.
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        try { document.body.removeChild(a); } catch (_) {}
+        URL.revokeObjectURL(url);
+      }, 100);
+    }
+
+    async function exportStackedReel() {
+      if (_exportInFlight) {
+        showRemuxIndicator('Already exporting…', { warning: true });
+        setTimeout(hideRemuxIndicator, 2500);
+        return;
+      }
+      const n = harmonyStack.length;
+      if (n === 0) return;
+
+      // Verify every layer carries a videoBlob. Older entries pushed
+      // before this build won't — surface a clear message instead of
+      // crashing FFmpeg with a missing file.
+      for (let i = 0; i < n; i++) {
+        if (!harmonyStack[i] || !harmonyStack[i].videoBlob) {
+          showRemuxIndicator(
+            'Layer ' + (i + 1) + ' has no video blob — re-add it after recording.',
+            { warning: true }
+          );
+          setTimeout(hideRemuxIndicator, 6000);
+          return;
+        }
+      }
+
+      _exportInFlight = true;
+      const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const outName = 'reel-stacked-' + ts + '.mp4';
+
+      // Reverse so input 0 = most recent (harmonyStack is oldest-first).
+      const ordered = harmonyStack.slice().reverse();
+
+      // n=1 fast path: nothing to composite, just save the single videoBlob.
+      // We still rename the download so the user can tell it apart from the
+      // per-take save that already fired.
+      if (n === 1) {
+        try {
+          downloadBlob(ordered[0].videoBlob, outName);
+          showRemuxIndicator('Reel exported (single layer)');
+          setTimeout(hideRemuxIndicator, 2500);
+        } finally {
+          _exportInFlight = false;
+        }
+        return;
+      }
+
+      const layout = getStackLayout(n);
+      if (!layout || !layout.filter) {
+        showRemuxIndicator('No layout for ' + n + ' layers', { warning: true });
+        setTimeout(hideRemuxIndicator, 4000);
+        _exportInFlight = false;
+        return;
+      }
+
+      showRemuxIndicator('Compositing ' + n + ' layers…');
+      let ffmpeg = null;
+      let writtenFiles = [];
+      try {
+        const loaded = await loadFFmpeg();
+        ffmpeg = loaded.ffmpeg;
+        const fetchFile = loaded.fetchFile;
+        _ffmpegEverLoaded = true;
+
+        // Wire the 0.11.x progress callback so the user sees forward
+        // motion. ratio is 0..1 during a run, jumps back near 0 between
+        // passes; we clamp/round for display.
+        try {
+          ffmpeg.setProgress(({ ratio }) => {
+            if (typeof ratio !== 'number' || !isFinite(ratio)) return;
+            const pct = Math.max(0, Math.min(99, Math.round(ratio * 100)));
+            showRemuxIndicator('Compositing ' + n + ' layers… ' + pct + '%');
+          });
+        } catch (_) {}
+
+        // Write each input. Names are in0.mp4..inN-1.mp4 in input order
+        // (input 0 = most recent take).
+        for (let i = 0; i < ordered.length; i++) {
+          const name = 'in' + i + '.mp4';
+          ffmpeg.FS('writeFile', name, await fetchFile(ordered[i].videoBlob));
+          writtenFiles.push(name);
+        }
+
+        // Build the FFmpeg command. -i for each input, then filter_complex,
+        // then map video [v] + audio from input audioInput. Re-encode
+        // video (we filtered it). Copy audio so we don't waste cycles
+        // reencoding AAC — quality identical to source.
+        const args = [];
+        for (let i = 0; i < ordered.length; i++) {
+          args.push('-i', 'in' + i + '.mp4');
+        }
+        args.push('-filter_complex', layout.filter);
+        args.push('-map', '[v]');
+        args.push('-map', layout.audioInput + ':a');
+        args.push('-c:v', 'libx264');
+        args.push('-preset', 'ultrafast');
+        args.push('-crf', '23');
+        args.push('-pix_fmt', 'yuv420p');
+        args.push('-c:a', 'copy');
+        args.push('-shortest');
+        args.push('-movflags', '+faststart');
+        args.push('out.mp4');
+
+        try {
+          await ffmpeg.run.apply(ffmpeg, args);
+        } catch (e) {
+          // 0.11.x core ends every invocation with exit(0); confirm
+          // output exists before treating as failure (same pattern as
+          // remuxToFastStartMP4).
+          let outputExists = false;
+          try {
+            ffmpeg.FS('stat', 'out.mp4');
+            outputExists = true;
+          } catch (_) {}
+          if (!outputExists) {
+            throw new Error('FFmpeg run failed: ' + (e && e.message ? e.message : String(e)));
+          }
+        }
+
+        const data = ffmpeg.FS('readFile', 'out.mp4');
+        const outputBlob = new Blob([data.buffer], { type: 'video/mp4' });
+
+        // Free MEMFS buffers before we hand the blob back (8 inputs at
+        // ~10MB each is up to 80MB sitting in wasm memory).
+        for (const name of writtenFiles) {
+          try { ffmpeg.FS('unlink', name); } catch (_) {}
+        }
+        writtenFiles = [];
+        try { ffmpeg.FS('unlink', 'out.mp4'); } catch (_) {}
+
+        downloadBlob(outputBlob, outName);
+        showRemuxIndicator(
+          'Reel exported (' + n + ' layers, ' +
+          Math.round(outputBlob.size / 1024) + 'KB)'
+        );
+        setTimeout(hideRemuxIndicator, 4000);
+      } catch (err) {
+        console.warn('[export] composite failed:', err);
+        const msg = (err && err.message) ? err.message : String(err);
+        showRemuxIndicator('Export failed: ' + msg, { warning: true });
+        setTimeout(hideRemuxIndicator, 8000);
+      } finally {
+        // Best-effort cleanup of any input files left behind by an early
+        // throw. Always discard the ffmpeg instance — same dangling-
+        // runResolve workaround as remuxToFastStartMP4.
+        if (ffmpeg) {
+          for (const name of writtenFiles) {
+            try { ffmpeg.FS('unlink', name); } catch (_) {}
+          }
+          try { ffmpeg.FS('unlink', 'out.mp4'); } catch (_) {}
+          try { ffmpeg.setProgress(() => {}); } catch (_) {}
+        }
+        _ffmpegPromise = null;
+        _exportInFlight = false;
+      }
+    }
+
     function pickRecorderMime() {
       // Pin H.264 Baseline @ L3.0 + AAC-LC first — the broadly safe combo
       // for Instagram and other social importers. avc1.42E01E = Baseline
@@ -6192,7 +6538,16 @@
         const arrayBuffer = await lastRecordedBlob.arrayBuffer();
         // decodeAudioData consumes the buffer, so feed it a fresh copy.
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
-        harmonyStack.push({ audioBuffer, durationSec: audioBuffer.duration });
+        // Each layer carries both an audioBuffer (used for next-take
+        // playback into the recording bus) and the original videoBlob
+        // (used by exportStackedReel for the FFmpeg composite). We hold
+        // a reference, not a clone — the blob backing data is GC'd when
+        // the stack drops it.
+        harmonyStack.push({
+          audioBuffer,
+          videoBlob: lastRecordedBlob,
+          durationSec: audioBuffer.duration,
+        });
         updateStackIndicator();
         showRemuxIndicator('Layer ' + harmonyStack.length + ' added');
         setTimeout(hideRemuxIndicator, 1500);
@@ -6309,6 +6664,15 @@
       if (chip) {
         const canAdd = !!lastRecordedBlob && harmonyStack.length < HARMONY_STACK_MAX;
         chip.classList.toggle('visible', canAdd);
+      }
+      // Export-reel button — present whenever the stack has at least one
+      // layer with a videoBlob (i.e. recorded under this build). Layers
+      // pushed before the videoBlob field shipped will fail the export
+      // pre-flight; we still show the button so the user gets the
+      // failure message instead of a silently absent control.
+      const expBtn = document.getElementById('stackExportBtn');
+      if (expBtn) {
+        expBtn.classList.toggle('visible', harmonyStack.length > 0);
       }
     }
 
@@ -7709,6 +8073,18 @@
       if (stackClearBtn) {
         stackClearBtn.addEventListener('click', () => {
           clearHarmonyStack();
+        });
+      }
+      const stackExportBtn = document.getElementById('stackExportBtn');
+      if (stackExportBtn) {
+        stackExportBtn.addEventListener('click', () => {
+          // Visually mark the button busy so a panicked second tap does
+          // nothing (the in-flight guard inside exportStackedReel also
+          // covers this, but the button state is the clearer signal).
+          stackExportBtn.setAttribute('disabled', 'disabled');
+          exportStackedReel().finally(() => {
+            stackExportBtn.removeAttribute('disabled');
+          });
         });
       }
       // Initial paint of the stack chip/indicator state (both empty).
