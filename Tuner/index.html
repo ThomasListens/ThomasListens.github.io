@@ -1489,6 +1489,14 @@
         <div class="slider-row">
           <input type="range" id="voiceReverbTail" min="0" max="100" value="60">
         </div>
+        <!-- Spectrum opacity: live multiplier on every listening-view
+             visual. Drag down to push the spectrum into the background
+             when the camera footage is busy; drag up for foreground.
+             Persists under tuner.spectrumOpacity. -->
+        <label style="font-size: 12px; color: #888; margin-top: 6px; margin-bottom: 2px;">Spectrum opacity <span id="spectrumOpacityVal" style="color: #aaa;">85%</span></label>
+        <div class="slider-row">
+          <input type="range" id="spectrumOpacity" min="20" max="100" value="85">
+        </div>
       </div>
 
       <div class="control-section">
@@ -2007,6 +2015,12 @@
     let voiceFX = { lowcut: true, compression: true, deess: true, reverb: false };
     let voiceFXMix = 0.5;     // 0..1 wet/dry blend (50% default)
     let voiceFXTail = 0.6;    // 0..1 → mapped to feedback 0.5..0.78
+    // Spectrum-mode opacity. Single user-controlled multiplier on every
+    // listening-view visual (Hz ruler ticks/labels, rail energy strip,
+    // cloud particles, and the dim ratio ladder ghost). Lets Thomas tune
+    // whether the spectrum competes with the camera footage or recedes
+    // into the background. Persisted under tuner.spectrumOpacity.
+    let spectrumOpacity = 0.85;
     // Master output trim. Range -20..+6 dB on the slider (0..100).
     // Persisted under tuner.outputLevelDb. Applied via the
     // masterOutputGain node inserted in buildMicProcessing.
@@ -3042,7 +3056,7 @@
 
       const oldAlpha = ctx.globalAlpha;
       ctx.save();
-      ctx.globalAlpha = oldAlpha * alphaMul;
+      ctx.globalAlpha = oldAlpha * alphaMul * spectrumOpacity;
       ctx.lineWidth = 1;
       ctx.textBaseline = 'middle';
       // Hz numerals sit on the LEFT side of the rail, mirroring the
@@ -3053,7 +3067,7 @@
       // Match the EDO/ratio Hz label sizing - the pitch view uses 11*S
       // for those labels - but in IBM Plex Mono so the ruler reads as
       // schematic stencil rather than a UI chrome element.
-      ctx.font = `${11 * S}px 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+      ctx.font = `${13 * S}px 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
 
       // Thin vertical rail just to the right of rulerX, low contrast.
       const railX = rulerX + 1.5 * S;
@@ -3074,14 +3088,17 @@
 
         // Major octave marks (>=1 kHz read in 'Nk' form) get a touch
         // more presence - hierarchy without the ruler ever shouting.
+        // Bumped baselines so the ruler reads against bright camera
+        // footage; the rail energy strip carries the immediate-feedback
+        // work, so the ticks just need to be visible.
         const isMajor = hz >= 1000;
-        const baseTickAlpha = isMajor ? 0.22 : 0.12;
-        const baseLabelAlpha = isMajor ? 0.25 : 0.13;
+        const baseTickAlpha = isMajor ? 0.50 : 0.32;
+        const baseLabelAlpha = isMajor ? 0.50 : 0.32;
 
         // Live boost from the band-energy probe. Clamped at 1.0.
         const e = hzTickEnergy[i];
-        const tickAlpha = Math.min(1, baseTickAlpha + 0.5 * e);
-        const labelAlpha = Math.min(1, baseLabelAlpha + 0.5 * e);
+        const tickAlpha = Math.min(1, baseTickAlpha + 0.7 * e);
+        const labelAlpha = Math.min(1, baseLabelAlpha + 0.7 * e);
 
         ctx.lineWidth = 1 + e * 0.6;
         ctx.strokeStyle = `rgba(${PARCHMENT}, ${tickAlpha})`;
@@ -3091,8 +3108,16 @@
         ctx.stroke();
 
         const label = hz >= 1000 ? `${Math.round(hz / 1000)}k` : `${hz}`;
+        // Shadow scoped to the numeric text only - keep the tick line
+        // crisp. Negligible cost for 8 fillText calls/frame.
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur = 3 * S;
+        ctx.shadowOffsetX = 0.5 * S;
+        ctx.shadowOffsetY = 0.5 * S;
         ctx.fillStyle = `rgba(${PARCHMENT}, ${labelAlpha})`;
         ctx.fillText(label, rulerX - 8 * S, y);
+        ctx.restore();
       }
 
       ctx.restore();
@@ -3254,12 +3279,66 @@
       }
 
       // Update + cull. Reverse iteration so splice-while-walking is safe.
+      // Spawn-linger: drift is damped ~30% for the first 0.3s of a
+      // particle's life so the spawn moment is the loudest visual
+      // event - the particle hangs near its origin before easing out.
       for (let i = cloudParticles.length - 1; i >= 0; i--) {
         const p = cloudParticles[i];
         p.age += dt;
         if (p.age >= p.life) { cloudParticles.splice(i, 1); continue; }
-        p.x += p.vx * dt + Math.cos(p.swayPhase + p.age * p.swaySpeed) * p.swayAmp * dt;
-        p.y += p.vy * dt;
+        const driftScale = p.age < 0.3 ? (0.7 + (p.age / 0.3) * 0.3) : 1.0;
+        p.x += (p.vx * dt + Math.cos(p.swayPhase + p.age * p.swaySpeed) * p.swayAmp * dt) * driftScale;
+        p.y += p.vy * dt * driftScale;
+      }
+
+      // ---- Live energy strip on the rail ----
+      // A continuous vertical strip at rulerX showing real-time FFT
+      // energy. Drawn BEFORE the particle render so particles bloom
+      // on top. Uses raw per-frame FFT (no EMA) - let it be alive.
+      // Hue mapping is the same one the particles use so the strip
+      // and the spawning column read as a single object. Cost is
+      // ~80 fillRects/frame, gated to spectrum mode only. Trivial.
+      if (an && spectrumBuf && rulerHeight > 0) {
+        const sr = (audioContext && audioContext.sampleRate) || 48000;
+        const binCount = an.frequencyBinCount;
+        const binHz = sr / (binCount * 2);
+        const fftEnergyAtHz = (hz) => {
+          const bf = hz / binHz;
+          if (bf < 1 || bf > binCount - 1) return 0;
+          const bLo = Math.floor(bf);
+          const bHi = bLo + 1;
+          const t = bf - bLo;
+          const a = spectrumBuf[bLo] / 255;
+          const b = spectrumBuf[bHi] / 255;
+          return a + (b - a) * t;
+        };
+        const yToHz = (yPx) => {
+          const yNorm = (rulerBottom - yPx) / rulerHeight;
+          return Math.pow(2, minLf + yNorm * lfSpan);
+        };
+        const stripWidth = 6 * S;
+        const numSlices = 80;
+        const sliceHeight = rulerHeight / numSlices;
+        const stripBaseAlpha = alphaMul * spectrumOpacity * 0.55;
+        if (stripBaseAlpha > 0.001) {
+          const oldA = ctx.globalAlpha;
+          ctx.save();
+          ctx.globalAlpha = oldA;
+          for (let i = 0; i < numSlices; i++) {
+            const ySlice = rulerTop + i * sliceHeight;
+            const yMid = ySlice + sliceHeight * 0.5;
+            const hzMid = yToHz(yMid);
+            if (hzMid < 60 || hzMid > 16000) continue;
+            const energy = fftEnergyAtHz(hzMid);
+            if (energy < 0.05) continue;
+            const hue = cloudFreqToHue(hzMid);
+            const sl = cloudHueToSL(hue);
+            const a = Math.min(1, energy * 1.4) * stripBaseAlpha;
+            ctx.fillStyle = `hsla(${hue}, ${sl.s}%, ${sl.l}%, ${a})`;
+            ctx.fillRect(rulerX - stripWidth / 2, ySlice, stripWidth, sliceHeight + 0.5);
+          }
+          ctx.restore();
+        }
       }
 
       if (cloudParticles.length === 0) return null;
@@ -3276,13 +3355,19 @@
       for (let i = 0; i < cloudParticles.length; i++) {
         const p = cloudParticles[i];
         const t = p.age / p.life;
-        // Bell envelope: sin(pi*t)^0.65 - fast bloom, slow fade. Reads as
-        // the swell of a sung note rather than a flicker.
-        const env = Math.pow(Math.sin(Math.PI * t), 0.65);
-        if (env <= 0.001) continue;
-        const r = p.peakSize * (0.35 + 0.65 * Math.pow(Math.sin(Math.PI * t), 0.5));
+        // Spawn-emphasized envelope. Size: starts at peak, briefly grows
+        // to 1.2x peak inside the first 10% of life, then shrinks to 0.
+        // Alpha: ramps to full within ~200ms of life and decays as
+        // (1-t)^1.5 - the spawn moment is now the loudest visual event.
+        const sizeEnv = t < 0.1
+          ? 1.0 + 2.0 * t                                  // 1.0 -> 1.2 over first 10%
+          : 1.2 * Math.pow(1.0 - (t - 0.1) / 0.9, 1.5);    // 1.2 -> 0 over remaining 90%
+        if (sizeEnv <= 0.001) continue;
+        const r = p.peakSize * sizeEnv;
         if (r <= 0.5) continue;
-        const aCenter = env * p.energy * 0.85;
+        const alphaEnv = Math.min(1, t * 5) * Math.pow(1 - t, 1.5);
+        if (alphaEnv <= 0.001) continue;
+        const aCenter = alphaEnv * p.energy * 0.85 * spectrumOpacity;
         const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
         // Tatooine palette: pull S/L from per-hue anchors and damp the
         // saturation toward the rim so each particle reads as sun-bleached
@@ -3461,7 +3546,10 @@
       // Ratio ladder: 100% in pitch view, ~5% in spectrum view (barely
       // perceptible - the cloud field is the visual; the ladder is a
       // ghost of structure, not a reference frame).
-      const ladderAlpha = 1 - 0.95 * spectrumMix;
+      // spectrumOpacity scales the dim factor so a low-opacity spectrum
+      // brings the ratio ladder back up - the structure is still readable
+      // when Thomas dials the listening view into the background.
+      const ladderAlpha = 1 - 0.95 * spectrumMix * spectrumOpacity;
       // EDO grid: hidden entirely in spectrum mode. The cloud field
       // deliberately strips all measurement scaffolding.
       const edoAlpha = pitchMix;
@@ -7212,6 +7300,10 @@
         if (tail !== null && !isNaN(parseFloat(tail))) {
           voiceFXTail = Math.max(0, Math.min(1, parseFloat(tail)));
         }
+        const sopa = localStorage.getItem('tuner.spectrumOpacity');
+        if (sopa !== null && !isNaN(parseFloat(sopa))) {
+          spectrumOpacity = Math.max(0.2, Math.min(1, parseFloat(sopa)));
+        }
       } catch (_) {}
       const lowcutCb = document.getElementById('voiceLowcut');
       const compressCb = document.getElementById('voiceCompression');
@@ -7257,6 +7349,22 @@
       if (reverbTailSlider) {
         reverbTailSlider.addEventListener('input', (e) => {
           setVoiceReverbTail(parseInt(e.target.value, 10) / 100);
+        });
+      }
+
+      // Spectrum opacity slider: live multiplier on every listening-view
+      // visual. Persists under tuner.spectrumOpacity. No rebuild needed -
+      // every frame already reads the current spectrumOpacity value.
+      const spectrumOpacitySlider = document.getElementById('spectrumOpacity');
+      const spectrumOpacityLbl = document.getElementById('spectrumOpacityVal');
+      if (spectrumOpacitySlider) {
+        spectrumOpacitySlider.value = Math.round(spectrumOpacity * 100);
+        if (spectrumOpacityLbl) spectrumOpacityLbl.textContent = Math.round(spectrumOpacity * 100) + '%';
+        spectrumOpacitySlider.addEventListener('input', (e) => {
+          const v = parseInt(e.target.value, 10) / 100;
+          spectrumOpacity = Math.max(0.2, Math.min(1, v));
+          if (spectrumOpacityLbl) spectrumOpacityLbl.textContent = Math.round(spectrumOpacity * 100) + '%';
+          try { localStorage.setItem('tuner.spectrumOpacity', String(spectrumOpacity)); } catch (_) {}
         });
       }
 
