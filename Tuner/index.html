@@ -1470,7 +1470,82 @@
       pointer-events: auto;
     }
     #stackIndicator.visible { display: inline-flex; }
-    #stackIndicator .stack-count { line-height: 1; }
+    /* The stack count is now a button (tap to open per-layer volume
+       panel). Strip default button chrome so it still reads as a
+       label inside the indicator pill. */
+    #stackIndicator .stack-count {
+      line-height: 1;
+      background: transparent;
+      border: none;
+      color: inherit;
+      font: inherit;
+      padding: 0;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+    }
+    #stackIndicator .stack-count:active { opacity: 0.6; }
+    #stackIndicator .stack-count[aria-expanded="true"] {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    /* Per-layer volume panel — floats above #stackIndicator. Hidden
+       by default; .visible toggled in JS. Vertically scrollable so
+       eight layers always fit on small screens. */
+    #layerVolumePanel {
+      position: fixed;
+      right: calc(10px + env(safe-area-inset-right));
+      bottom: calc(126px + env(safe-area-inset-bottom));
+      z-index: 202;
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      width: min(280px, calc(100vw - 24px));
+      max-height: 50vh;
+      overflow-y: auto;
+      padding: 10px 12px;
+      background: rgba(20, 30, 50, 0.95);
+      border: 1px solid #2a4a6a;
+      border-radius: 12px;
+      color: #cfe6ff;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+      pointer-events: auto;
+    }
+    #layerVolumePanel.visible { display: flex; }
+    #layerVolumePanel .lv-row {
+      display: grid;
+      grid-template-columns: 56px 1fr 36px;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+    }
+    #layerVolumePanel .lv-row + .lv-row {
+      border-top: 1px solid rgba(80, 110, 150, 0.25);
+    }
+    #layerVolumePanel .lv-label { color: #cfe6ff; }
+    #layerVolumePanel .lv-dur { color: #889bb0; font-size: 11px; }
+    #layerVolumePanel .lv-slider { width: 100%; margin: 0; }
+    #layerVolumePanel .lv-readout {
+      text-align: right;
+      color: #cfe6ff;
+      font-size: 11px;
+    }
+    #layerVolumePanel .lv-empty {
+      color: #889bb0;
+      text-align: center;
+      padding: 6px 0;
+    }
+    #layerVolumePanel .lv-foot {
+      margin-top: 6px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(80, 110, 150, 0.35);
+      color: #8aa0ba;
+      font-size: 10px;
+      line-height: 1.35;
+    }
     #stackIndicator #stackClearBtn {
       width: 20px;
       height: 20px;
@@ -1621,6 +1696,22 @@
         <label style="font-size: 12px; color: #888; margin-top: 6px; margin-bottom: 2px;">Headphone delay <span id="btLatencyVal" style="color: #aaa;">200 ms</span></label>
         <div class="slider-row">
           <input type="range" id="btLatencySlider" min="0" max="400" value="200" step="5">
+        </div>
+        <!-- Reel length mode. "Shortest" (default) ends the composed
+             reel when the shortest layer ends — the historical
+             behaviour, preserves audio sync. "Longest" runs until the
+             longest layer ends; cells whose video has finished are
+             painted black for the remainder of the reel. Audio still
+             follows the most-recent take, so in longest mode the
+             trailing visuals will be silent if later layers are longer
+             than the most-recent take. Persists under
+             tuner.reelLengthMode. -->
+        <label style="font-size: 12px; color: #888; margin-top: 6px; margin-bottom: 2px;">Reel length</label>
+        <div style="display: flex; gap: 8px;">
+          <select id="reelLengthMode" style="flex: 1;">
+            <option value="shortest" selected>Shortest layer (default)</option>
+            <option value="longest">Longest layer (later cells go black)</option>
+          </select>
         </div>
       </div>
 
@@ -1884,11 +1975,18 @@
        "Layers: N" with a small ✕ to clear the stack. Anchored above the
        LUFS readout so it lives in the same bottom-right cluster. -->
   <div id="stackIndicator" aria-live="polite">
-    <span class="stack-count">Layers: 0</span>
+    <button type="button" class="stack-count" id="stackCountBtn" title="Adjust per-layer playback volume" aria-label="Adjust per-layer playback volume" aria-expanded="false">Layers: 0</button>
     <button type="button" id="stackExportBtn" title="Composite all layers into one MP4" aria-label="Export stacked reel">Export reel</button>
     <button type="button" id="downloadReelBtn" title="Save the composed reel to your device" aria-label="Download reel">Download reel</button>
     <button type="button" id="stackClearBtn" title="Clear all harmony layers" aria-label="Clear harmony stack">✕</button>
   </div>
+
+  <!-- Per-layer volume panel. Toggled by tapping the "Layers: N" chip
+       inside #stackIndicator. Anchored above the indicator. Each row
+       is one stacked layer with a slider that drives layer.gain
+       (range 0–1.5, default 1.0). The slider takes effect on the next
+       record pass — see the footer note. Tap-outside collapses. -->
+  <div id="layerVolumePanel" role="dialog" aria-label="Per-layer volume" aria-hidden="true"></div>
 
   <!-- Standalone LUFS / peak dB readout, fixed to the bottom-right corner.
        Hoisted out of the strip so it can sit at the absolute bottom edge
@@ -2155,6 +2253,13 @@
     let pendingExportFilename = null;
     let activeLayerSources = [];
     let btLatencyMs = 200;
+    // reelLengthMode: 'shortest' (current behavior — reel ends when the
+    // shortest layer ends, audio always sync'd) or 'longest' (reel runs
+    // until the longest layer ends; layers that have ended are painted
+    // black for the remainder; audio still follows the most-recent take
+    // so trailing visuals may be silent). Persisted under
+    // tuner.reelLengthMode.
+    let reelLengthMode = 'shortest';
     let recordTimerId = null;
     // Visual count-in state. Set by playVisualCountIn during the
     // pre-record pause; consumed by draw() to paint a fading
@@ -6039,22 +6144,37 @@
           v.addEventListener('error', onErr);
         })));
 
-        // -shortest semantics: stop when the shortest input ends. Prefer
-        // the actual decoded duration; fall back to harmonyStack
-        // durationSec if a video reports a non-finite duration.
-        let shortestSec = Infinity;
-        for (const v of videoEls) {
+        // Per-layer duration table. Prefer the decoded video.duration;
+        // fall back to harmonyStack.durationSec if a browser reports a
+        // non-finite duration (Chrome on some MediaRecorder MP4s does
+        // this until the first seek). Length used by both branches of
+        // the reel-length toggle.
+        const layerDurations = [];
+        for (let i = 0; i < videoEls.length; i++) {
+          const v = videoEls[i];
           const d = v.duration;
-          if (isFinite(d) && d > 0 && d < shortestSec) shortestSec = d;
-        }
-        if (!isFinite(shortestSec) || shortestSec <= 0) {
-          for (const layer of ordered) {
-            if (layer.durationSec && layer.durationSec > 0 && layer.durationSec < shortestSec) {
-              shortestSec = layer.durationSec;
-            }
+          if (isFinite(d) && d > 0) {
+            layerDurations.push(d);
+          } else {
+            const fb = ordered[i] && ordered[i].durationSec;
+            layerDurations.push((fb && fb > 0) ? fb : 0);
           }
         }
-        if (!isFinite(shortestSec) || shortestSec <= 0) {
+        // Reel length resolves the compose-loop end time.
+        //   shortest mode → stop when the shortest layer ends (legacy)
+        //   longest  mode → stop when the longest  layer ends (new)
+        // In longest mode, finished layers are painted black per frame
+        // (see drawFrame) so the rest of the reel still has the layout
+        // grid, just with empty cells.
+        let shortestSec = Infinity;
+        let longestSec = 0;
+        for (const d of layerDurations) {
+          if (d > 0 && d < shortestSec) shortestSec = d;
+          if (d > longestSec) longestSec = d;
+        }
+        const useLongest = (reelLengthMode === 'longest');
+        const targetSec = useLongest ? longestSec : shortestSec;
+        if (!isFinite(targetSec) || targetSec <= 0) {
           throw new Error('Could not determine layer duration');
         }
 
@@ -6131,9 +6251,20 @@
           if (stopRequested) return;
           ctx.fillStyle = '#000';
           ctx.fillRect(0, 0, W, H);
+          let allEnded = true;
           for (let i = 0; i < videoEls.length && i < layout.cells.length; i++) {
             const cell = layout.cells[i];
             const v = videoEls[i];
+            const dur = layerDurations[i] || 0;
+            // In longest mode, treat layers as "done" once they have
+            // played past their declared duration (videoEl.ended is
+            // unreliable on iOS Safari) and leave their cell black
+            // for the remainder of the reel. The cell rect is already
+            // black from the fillRect above, so the skip is enough.
+            const layerEnded = useLongest && dur > 0 &&
+              (v.ended || v.currentTime >= dur);
+            if (!layerEnded) allEnded = false;
+            if (layerEnded) continue;
             if (v.videoWidth > 0 && v.videoHeight > 0) {
               // cover-fit: scale to fill the cell, crop the overhang.
               // Source video is portrait 544x960 (the recorder paints
@@ -6168,11 +6299,21 @@
           if (performance.now() - lastUI > 120) {
             lastUI = performance.now();
             const pct = Math.max(0, Math.min(99,
-              Math.round(elapsed / shortestSec * 100)));
+              Math.round(elapsed / targetSec * 100)));
             showRemuxIndicator('Compositing ' + n + ' layers… ' + pct + '%');
           }
 
-          if (elapsed >= shortestSec) {
+          // Two termination paths:
+          //  - shortest mode: stop the moment elapsed hits the shortest
+          //    layer's duration (matches the legacy behaviour exactly).
+          //  - longest  mode: stop when every layer has ended OR we've
+          //    exceeded the longest duration (defensive backstop —
+          //    rounding/jitter can leave one cell stuck just shy of
+          //    its end).
+          const done = useLongest
+            ? (allEnded || elapsed >= targetSec)
+            : (elapsed >= targetSec);
+          if (done) {
             stopRequested = true;
             for (const v of videoEls) { try { v.pause(); } catch (_) {} }
             try { mediaRecorder.stop(); } catch (_) {}
@@ -6749,6 +6890,13 @@
           audioBuffer,
           videoBlob: lastRecordedBlob,
           durationSec: audioBuffer.duration,
+          // gain: per-layer playback volume during the next recording
+          // pass. Wired through scheduleLayerPlayback as a per-source
+          // GainNode so the user can rebalance loud/quiet harmonies
+          // before re-recording the lead. The export pipeline does
+          // not honour this field — it bakes the most-recent take's
+          // audio as-is. See the panel footer note.
+          gain: 1.0,
         });
         updateStackIndicator();
         showRemuxIndicator('Layer ' + harmonyStack.length + ' added');
@@ -6774,6 +6922,7 @@
       for (const handle of activeLayerSources) {
         try { handle.source.stop(); } catch (_) {}
         try { handle.source.disconnect(); } catch (_) {}
+        if (handle.gainNode) { try { handle.gainNode.disconnect(); } catch (_) {} }
         try { handle.delay.disconnect(); } catch (_) {}
       }
       activeLayerSources.length = 0;
@@ -6839,15 +6988,143 @@
       for (const layer of harmonyStack) {
         const source = audioContext.createBufferSource();
         source.buffer = layer.audioBuffer;
+        // Per-layer gain node. Sits at the head of both monitor and
+        // recording branches so a single slider rebalances both. The
+        // panel slider writes to layer.gain AND, when a node exists,
+        // drives gainNode.gain.value live; the live write keeps the
+        // user's tweak audible during the take they're rehearsing.
+        const gainNode = audioContext.createGain();
+        const safeGain = (typeof layer.gain === 'number' && isFinite(layer.gain))
+          ? Math.max(0, Math.min(2, layer.gain)) : 1.0;
+        gainNode.gain.value = safeGain;
+        source.connect(gainNode);
         // Branch A — monitor (user hears the layer through BT/speakers)
-        source.connect(audioContext.destination);
+        gainNode.connect(audioContext.destination);
         // Branch B — recording bus (delayed by BT compensation)
         const delay = audioContext.createDelay(1.0);
         delay.delayTime.value = delaySec;
-        source.connect(delay).connect(mp.masterOutputGain);
+        gainNode.connect(delay).connect(mp.masterOutputGain);
         source.start(startTime);
-        activeLayerSources.push({ source, delay });
+        // Stash the layer reference on the handle so the panel slider
+        // can find the live gain node by identity (handle.layer === layer).
+        activeLayerSources.push({ source, gainNode, delay, layer });
       }
+    }
+
+    // ---- Per-layer volume panel ----
+    // _layerVolPanelOpen mirrors the panel's visibility for code that
+    // wants to react to it without poking the DOM. The actual show/hide
+    // is via #layerVolumePanel.classList. Outside-tap collapse is wired
+    // once at boot (see boot section).
+    let _layerVolPanelOpen = false;
+
+    function openLayerVolumePanel() {
+      const panel = document.getElementById('layerVolumePanel');
+      const btn = document.getElementById('stackCountBtn');
+      if (!panel) return;
+      if (!harmonyStack.length) return;
+      _layerVolPanelOpen = true;
+      panel.classList.add('visible');
+      panel.setAttribute('aria-hidden', 'false');
+      if (btn) btn.setAttribute('aria-expanded', 'true');
+      renderLayerVolumePanel();
+    }
+
+    function closeLayerVolumePanel() {
+      const panel = document.getElementById('layerVolumePanel');
+      const btn = document.getElementById('stackCountBtn');
+      if (!panel) return;
+      _layerVolPanelOpen = false;
+      panel.classList.remove('visible');
+      panel.setAttribute('aria-hidden', 'true');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+
+    function toggleLayerVolumePanel() {
+      if (_layerVolPanelOpen) closeLayerVolumePanel();
+      else openLayerVolumePanel();
+    }
+
+    // Build the panel DOM from harmonyStack. Called on open and on any
+    // stack-count change while the panel is open. Each row displays:
+    //   "L<n>"  duration (s)   slider   readout
+    // The slider writes layer.gain immediately; if a live source for
+    // that layer is currently scheduled (rehearsal pass running) the
+    // matching activeLayerSources handle's gainNode.gain is updated
+    // live so the user hears the rebalance without having to re-take.
+    function renderLayerVolumePanel() {
+      const panel = document.getElementById('layerVolumePanel');
+      if (!panel) return;
+      // Reverse so the most-recent layer (newest) shows first — same
+      // visual order as the export grid (cells[0] = most recent).
+      const rows = harmonyStack.slice().reverse();
+      panel.textContent = '';
+      if (!rows.length) {
+        const empty = document.createElement('div');
+        empty.className = 'lv-empty';
+        empty.textContent = 'No layers yet.';
+        panel.appendChild(empty);
+        return;
+      }
+      rows.forEach((layer, visIdx) => {
+        // origIdx maps the visual (reversed) index back to harmonyStack
+        // for the user-facing layer number. Layer 1 = oldest, layer N =
+        // newest, matching the order the user added them.
+        const origIdx = harmonyStack.length - 1 - visIdx;
+        const row = document.createElement('div');
+        row.className = 'lv-row';
+        const label = document.createElement('span');
+        label.className = 'lv-label';
+        label.textContent = 'L' + (origIdx + 1);
+        const dur = document.createElement('span');
+        dur.className = 'lv-dur';
+        const ds = (typeof layer.durationSec === 'number' && layer.durationSec > 0)
+          ? layer.durationSec.toFixed(1) + 's' : '—';
+        dur.textContent = ds;
+        // Pack label + duration into a vertical stack inside the first
+        // column so the slider gets a wide track.
+        const labelCol = document.createElement('div');
+        labelCol.style.display = 'flex';
+        labelCol.style.flexDirection = 'column';
+        labelCol.style.gap = '2px';
+        labelCol.appendChild(label);
+        labelCol.appendChild(dur);
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '0';
+        slider.max = '1.5';
+        slider.step = '0.05';
+        slider.className = 'lv-slider';
+        const initial = (typeof layer.gain === 'number' && isFinite(layer.gain))
+          ? layer.gain : 1.0;
+        slider.value = String(initial);
+        const readout = document.createElement('span');
+        readout.className = 'lv-readout';
+        readout.textContent = Number(initial).toFixed(2);
+        slider.addEventListener('input', (e) => {
+          const v = parseFloat(e.target.value);
+          const safe = isFinite(v) ? Math.max(0, Math.min(1.5, v)) : 1.0;
+          layer.gain = safe;
+          readout.textContent = safe.toFixed(2);
+          // Live update — find the active handle by layer identity
+          // and write the new gain so the rehearsal pass rebalances
+          // in real time. AudioParam.value is fine here; we don't
+          // need a ramp for a slider drag.
+          for (const handle of activeLayerSources) {
+            if (handle.layer === layer && handle.gainNode) {
+              try { handle.gainNode.gain.value = safe; } catch (_) {}
+            }
+          }
+        });
+        row.appendChild(labelCol);
+        row.appendChild(slider);
+        row.appendChild(readout);
+        panel.appendChild(row);
+      });
+      const foot = document.createElement('div');
+      foot.className = 'lv-foot';
+      foot.textContent = 'Volumes apply when recording your next layer. Re-record latest take to rebalance the export.';
+      panel.appendChild(foot);
     }
 
     // Update the on-screen stack pill. Hidden when stack is empty;
@@ -6861,6 +7138,13 @@
         const label = ind.querySelector('.stack-count');
         if (label) label.textContent = 'Layers: ' + n;
         ind.classList.toggle('visible', n > 0);
+      }
+      // Keep the per-layer volume panel in sync if it's open — layer
+      // count may have changed (push, clear) and we want the rows to
+      // reflect harmonyStack right now. If it's closed this is a noop.
+      if (_layerVolPanelOpen) {
+        if (!harmonyStack.length) closeLayerVolumePanel();
+        else renderLayerVolumePanel();
       }
       const chip = document.getElementById('layerAddBtn');
       if (chip) {
@@ -8289,6 +8573,23 @@
           try { localStorage.setItem('tuner.btLatencyMs', String(btLatencyMs)); } catch (_) {}
         });
       }
+      // Reel length mode — restore from localStorage, wire the
+      // <select>. Persists under tuner.reelLengthMode.
+      try {
+        const savedMode = localStorage.getItem('tuner.reelLengthMode');
+        if (savedMode === 'shortest' || savedMode === 'longest') {
+          reelLengthMode = savedMode;
+        }
+      } catch (_) {}
+      const reelLenSel = document.getElementById('reelLengthMode');
+      if (reelLenSel) {
+        reelLenSel.value = reelLengthMode;
+        reelLenSel.addEventListener('change', (e) => {
+          const v = e.target.value;
+          reelLengthMode = (v === 'longest') ? 'longest' : 'shortest';
+          try { localStorage.setItem('tuner.reelLengthMode', reelLengthMode); } catch (_) {}
+        });
+      }
       const layerAddBtn = document.getElementById('layerAddBtn');
       if (layerAddBtn) {
         layerAddBtn.addEventListener('click', () => {
@@ -8301,6 +8602,26 @@
           clearHarmonyStack();
         });
       }
+      // Per-layer volume panel — tap the layer-count chip to open,
+      // tap outside to close. The outside-tap listener is registered
+      // unconditionally; it cheaply early-outs when the panel is
+      // closed.
+      const stackCountBtn = document.getElementById('stackCountBtn');
+      if (stackCountBtn) {
+        stackCountBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleLayerVolumePanel();
+        });
+      }
+      const layerVolPanel = document.getElementById('layerVolumePanel');
+      if (layerVolPanel) {
+        // Clicks inside the panel must not bubble to the outside-tap
+        // collapse handler below.
+        layerVolPanel.addEventListener('click', (e) => { e.stopPropagation(); });
+      }
+      document.addEventListener('click', () => {
+        if (_layerVolPanelOpen) closeLayerVolumePanel();
+      }, true);
       const stackExportBtn = document.getElementById('stackExportBtn');
       if (stackExportBtn) {
         stackExportBtn.addEventListener('click', () => {
