@@ -1512,6 +1512,30 @@
       opacity: 0.55;
       cursor: default;
     }
+    /* Download-reel button — sibling to #stackExportBtn. Sized
+       larger than the export/clear chips and tinted primary blue
+       so it reads as the next action after "Export reel" finishes
+       compositing. Hidden until pendingExportBlob is populated. */
+    #stackIndicator #downloadReelBtn {
+      height: 26px;
+      padding: 0 12px;
+      border-radius: 13px;
+      border: none;
+      background: rgba(30, 110, 200, 0.95);
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      font-family: inherit;
+      letter-spacing: 0.02em;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    }
+    #stackIndicator #downloadReelBtn.visible { display: inline-flex; }
+    #stackIndicator #downloadReelBtn:active { background: rgba(50, 140, 230, 1); transform: scale(0.97); }
   </style>
 </head>
 <body>
@@ -1862,6 +1886,7 @@
   <div id="stackIndicator" aria-live="polite">
     <span class="stack-count">Layers: 0</span>
     <button type="button" id="stackExportBtn" title="Composite all layers into one MP4" aria-label="Export stacked reel">Export reel</button>
+    <button type="button" id="downloadReelBtn" title="Save the composed reel to your device" aria-label="Download reel">Download reel</button>
     <button type="button" id="stackClearBtn" title="Clear all harmony layers" aria-label="Clear harmony stack">✕</button>
   </div>
 
@@ -2119,6 +2144,15 @@
     const HARMONY_STACK_MAX = 8;
     const harmonyStack = [];
     let lastRecordedBlob = null;
+    // Reel export — the composed Blob is parked here after
+    // exportStackedReel finishes and the user has to tap the
+    // dedicated Download button to actually save it. Auto-triggering
+    // an <a>.click() download silently failed on long sessions in
+    // Chrome (multi-download quota), and the loss was invisible
+    // because the status pill still said "Reel exported". Gating on
+    // a real user gesture sidesteps the quota entirely.
+    let pendingExportBlob = null;
+    let pendingExportFilename = null;
     let activeLayerSources = [];
     let btLatencyMs = 200;
     let recordTimerId = null;
@@ -4833,7 +4867,24 @@
         const masterOutputGain = ctx.createGain();
         masterOutputGain.gain.value = 1.0;
         micOut.connect(masterOutputGain);
-        masterOutputGain.connect(dest);
+        // Brick-wall limiter on the RECORDING branch only. Stacked
+        // playback (scheduleLayerPlayback) sums every harmony layer
+        // into masterOutputGain alongside the live mic, so with 8
+        // layers the bus can easily clip 0 dBFS in the recorded MP4
+        // even if each take was clean on its own. Threshold -3 dBFS,
+        // hard knee, ratio 20:1, 1ms attack / 50ms release acts as a
+        // ceiling without colouring normal-level material. The
+        // monitor path (audioContext.destination, attached per-source
+        // by scheduleLayerPlayback) is intentionally unlimited so the
+        // user's live ears stay transparent.
+        const recordingLimiter = ctx.createDynamicsCompressor();
+        recordingLimiter.threshold.value = -3;     // dBFS
+        recordingLimiter.knee.value = 0;            // hard knee
+        recordingLimiter.ratio.value = 20;          // brick-wall
+        recordingLimiter.attack.value = 0.001;      // 1ms
+        recordingLimiter.release.value = 0.05;      // 50ms
+        masterOutputGain.connect(recordingLimiter);
+        recordingLimiter.connect(dest);
         // Parallel K-weighting tap for the loudness meter (post-Level).
         // Per ITU-R BS.1770 the K-weighting filter is a high-shelf
         // (+4 dB @ 1.5 kHz) cascaded with a high-pass (~38 Hz, Q 0.5).
@@ -4869,6 +4920,7 @@
           dest,
           micOut,
           masterOutputGain,
+          recordingLimiter,
           meterPre,
           meterHP,
           meterAnalyser,
@@ -5916,9 +5968,17 @@
       // n=1 fast path: nothing to composite.
       if (n === 1) {
         try {
-          downloadBlob(ordered[0].videoBlob, outName);
-          showRemuxIndicator('Reel exported (single layer)');
-          setTimeout(hideRemuxIndicator, 2500);
+          // Park the single-take blob for the gated Download button
+          // instead of auto-triggering the download. Same UX as the
+          // multi-layer path below.
+          pendingExportBlob = ordered[0].videoBlob;
+          pendingExportFilename = outName;
+          updateDownloadReelBtn();
+          showRemuxIndicator(
+            'Reel exported (1 layer, ' +
+            Math.round(pendingExportBlob.size / 1024) + 'KB)'
+          );
+          setTimeout(hideRemuxIndicator, 4000);
         } finally {
           _exportInFlight = false;
         }
@@ -6147,7 +6207,16 @@
           outputBlob = recordedBlob;
         }
 
-        downloadBlob(outputBlob, outName);
+        // Park the composed blob for the gated Download button
+        // instead of auto-triggering an <a>.click() download. After
+        // ~4-6 reel exports in a session Chrome silently denies the
+        // synthetic click (multi-download quota) while the export
+        // pipeline still reports success — the file just never
+        // appears in Downloads. Routing through a real button click
+        // turns every save into a fresh user gesture.
+        pendingExportBlob = outputBlob;
+        pendingExportFilename = outName;
+        updateDownloadReelBtn();
         showRemuxIndicator(
           'Reel exported (' + n + ' layers, ' +
           Math.round(outputBlob.size / 1024) + 'KB)'
@@ -6807,6 +6876,30 @@
       if (expBtn) {
         expBtn.classList.toggle('visible', harmonyStack.length > 0);
       }
+      updateDownloadReelBtn();
+    }
+
+    // Show / hide the gated reel-download button. Visible whenever
+    // pendingExportBlob holds a composed reel; label includes the
+    // file size so the user has visual confirmation the artifact
+    // actually exists. Click handler is wired in the boot section.
+    function updateDownloadReelBtn() {
+      const btn = document.getElementById('downloadReelBtn');
+      if (!btn) return;
+      if (!pendingExportBlob) {
+        btn.classList.remove('visible');
+        btn.textContent = 'Download reel';
+        return;
+      }
+      const bytes = pendingExportBlob.size;
+      let sizeLabel;
+      if (bytes >= 1024 * 1024) {
+        sizeLabel = (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+      } else {
+        sizeLabel = Math.round(bytes / 1024) + ' KB';
+      }
+      btn.textContent = 'Download reel (' + sizeLabel + ')';
+      btn.classList.add('visible');
     }
 
     function finalizeDiscard() {
@@ -8218,6 +8311,24 @@
           exportStackedReel().finally(() => {
             stackExportBtn.removeAttribute('disabled');
           });
+        });
+      }
+      const downloadReelBtn = document.getElementById('downloadReelBtn');
+      if (downloadReelBtn) {
+        // User-gated reel save. The actual blob lives in module-scope
+        // pendingExportBlob; downloadBlob() does the anchor-click
+        // dance. Because this fires inside a real click handler
+        // Chrome's multi-download quota lets the save through even
+        // after several reels in the same session. The blob is left
+        // parked so a fumbled first download can be retried; it gets
+        // replaced when the user composes a new reel.
+        downloadReelBtn.addEventListener('click', () => {
+          if (!pendingExportBlob || !pendingExportFilename) return;
+          try {
+            downloadBlob(pendingExportBlob, pendingExportFilename);
+          } catch (e) {
+            console.warn('[export] downloadReelBtn click failed:', e);
+          }
         });
       }
       // Initial paint of the stack chip/indicator state (both empty).
