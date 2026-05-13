@@ -2167,6 +2167,14 @@
     let modeTransition = 0;
     let modeTransitionTarget = 0;
     let modeTransitionLastTime = 0;
+    // EDO-grid offscreen cache. The 12-EDO grid is a dashed line + label
+    // per visible semitone; rebuilding this every frame burns CPU on
+    // setLineDash (forces path discretization) and fillText. Inputs that
+    // matter are geometry + config; while none change we blit the
+    // cached canvas instead of re-walking the loop. _edoCacheSig is the
+    // composite signature of all inputs; mismatch triggers a rebuild.
+    let _edoCacheCanvas = null;
+    let _edoCacheSig = '';
     // Pitch-detection bandpass: a highpass+lowpass biquad pair (80 / 1200 Hz)
     // sitting between every pitch source (mic or decoded file) and the
     // pitch `analyser`. Cuts wind / HVAC rumble below 80 Hz and sibilance /
@@ -3970,61 +3978,76 @@
       displayCents = wrappedCents;
       
       if (config.show12EDO && edoAlpha > 0.01) {
-        ctx.save();
-        ctx.globalAlpha *= edoAlpha;
-        const startSemitone = Math.floor(displayMin / 100);
-        const endSemitone = Math.ceil(displayMax / 100);
         const isCustomMode = !document.getElementById('refPreset').value;
+        // Cache signature. Any input that changes the rendered grid must
+        // appear here; alpha is NOT included (it's applied at blit time).
+        const sig = `${W}|${H}|${S.toFixed(3)}|${displayMin.toFixed(2)}|${displayMax.toFixed(2)}|${rulerX.toFixed(2)}|${recordMode?1:0}|${backdropEdge.toFixed(3)}|${config.refNote}|${config.edoOffset}|${isCustomMode?1:0}`;
+        const needsRebuild = sig !== _edoCacheSig
+          || !_edoCacheCanvas
+          || _edoCacheCanvas.width !== W
+          || _edoCacheCanvas.height !== H;
+        if (needsRebuild) {
+          if (!_edoCacheCanvas) _edoCacheCanvas = document.createElement('canvas');
+          _edoCacheCanvas.width = W;
+          _edoCacheCanvas.height = H;
+          const cctx = _edoCacheCanvas.getContext('2d');
+          cctx.clearRect(0, 0, W, H);
+          const startSemitone = Math.floor(displayMin / 100);
+          const endSemitone = Math.ceil(displayMax / 100);
 
-        let edoLineStart, edoLabelX, edoLabelAlign;
-        if (recordMode) {
-          // Confine EDO to the backdrop area so it doesn't bleed across the camera.
-          // Start lines past the label width so the dash phases don't align at the backdrop edge.
-          const edgeX = W * backdropEdge;
-          edoLabelX = edgeX + 8 * S;
-          edoLabelAlign = 'left';
-          ctx.font = `${11 * S}px system-ui`;
-          const labelW = ctx.measureText('A♯2').width;
-          edoLineStart = edoLabelX + labelW + 8 * S;
-        } else {
-          edoLineStart = 0;
-          edoLabelX = rulerX - (95 + config.edoOffset * 100) * S;
-          edoLabelAlign = 'right';
-        }
-
-        ctx.setLineDash([4, 6]);
-
-        for (let semi = startSemitone; semi <= endSemitone; semi++) {
-          const cents = semi * 100;
-          if (cents < displayMin || cents > displayMax) continue;
-
-          const y = centsToY(cents);
-          ctx.strokeStyle = 'rgba(70, 70, 70, 0.7)';
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(edoLineStart, y);
-          ctx.lineTo(W, y);
-          ctx.stroke();
-
-          ctx.fillStyle = 'rgba(100, 100, 100, 1)';
-          ctx.font = `${11 * S}px system-ui`;
-          ctx.textAlign = edoLabelAlign;
-          ctx.textBaseline = 'middle';
-
-          let label;
-          if (isCustomMode) {
-            const degree = ((semi % 12) + 12) % 12;
-            const degreeNames = ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'];
-            label = degreeNames[degree];
+          let edoLineStart, edoLabelX, edoLabelAlign;
+          if (recordMode) {
+            // Confine EDO to the backdrop area so it doesn't bleed across the camera.
+            // Start lines past the label width so the dash phases don't align at the backdrop edge.
+            const edgeX = W * backdropEdge;
+            edoLabelX = edgeX + 8 * S;
+            edoLabelAlign = 'left';
+            cctx.font = `${11 * S}px system-ui`;
+            const labelW = cctx.measureText('A♯2').width;
+            edoLineStart = edoLabelX + labelW + 8 * S;
           } else {
-            const noteInfo = getNoteAtCents(cents, config.refNote);
-            label = `${noteInfo.name}${noteInfo.octave}`;
+            edoLineStart = 0;
+            edoLabelX = rulerX - (95 + config.edoOffset * 100) * S;
+            edoLabelAlign = 'right';
           }
 
-          ctx.fillText(label, edoLabelX, y);
+          cctx.setLineDash([4, 6]);
+
+          for (let semi = startSemitone; semi <= endSemitone; semi++) {
+            const cents = semi * 100;
+            if (cents < displayMin || cents > displayMax) continue;
+
+            const y = centsToY(cents);
+            cctx.strokeStyle = 'rgba(70, 70, 70, 0.7)';
+            cctx.lineWidth = 1;
+            cctx.beginPath();
+            cctx.moveTo(edoLineStart, y);
+            cctx.lineTo(W, y);
+            cctx.stroke();
+
+            cctx.fillStyle = 'rgba(100, 100, 100, 1)';
+            cctx.font = `${11 * S}px system-ui`;
+            cctx.textAlign = edoLabelAlign;
+            cctx.textBaseline = 'middle';
+
+            let label;
+            if (isCustomMode) {
+              const degree = ((semi % 12) + 12) % 12;
+              const degreeNames = ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'];
+              label = degreeNames[degree];
+            } else {
+              const noteInfo = getNoteAtCents(cents, config.refNote);
+              label = `${noteInfo.name}${noteInfo.octave}`;
+            }
+
+            cctx.fillText(label, edoLabelX, y);
+          }
+          _edoCacheSig = sig;
         }
 
-        ctx.setLineDash([]);
+        ctx.save();
+        ctx.globalAlpha *= edoAlpha;
+        ctx.drawImage(_edoCacheCanvas, 0, 0);
         ctx.restore();
       }
       
