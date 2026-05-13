@@ -2577,21 +2577,49 @@
       return `hsla(${hsl.h}, ${hsl.s}%, ${hsl.l}%, ${alpha})`;
     }
     
+    // Pitch search bounds, in Hz. Drive the YIN tau range so the
+    // algorithm never wastes cycles or considers candidates outside
+    // the band the pitch-bandpass actually passes. Slightly wider than
+    // the bandpass (80–1200 Hz) so the roll-off shoulders are still
+    // searched, but anything beyond is pure noise.
+    const YIN_MIN_FREQ_HZ = 60;
+    const YIN_MAX_FREQ_HZ = 1600;
+    // Reusable CMNDF scratch buffer (sized to halfBuffer = fftSize/2).
+    // A fresh 8–16 KB Float32Array on every rAF frame produces ~1 MB/sec
+    // of garbage on Pixel 7, which forces GC pauses long enough to
+    // underrun the audio thread and click the recording. One persistent
+    // cache, resized only when fftSize changes.
+    let yinScratch = null;
+
     function yinDetect(buffer, sampleRate) {
       const threshold = 0.15;
       const bufferSize = buffer.length;
       const halfBuffer = Math.floor(bufferSize / 2);
-      
+
       let rms = 0;
       for (let i = 0; i < bufferSize; i++) rms += buffer[i] * buffer[i];
       rms = Math.sqrt(rms / bufferSize);
       if (rms < 0.005) return { freq: -1, probability: 0 };
-      
-      const yinBuffer = new Float32Array(halfBuffer);
+
+      if (!yinScratch || yinScratch.length !== halfBuffer) {
+        yinScratch = new Float32Array(halfBuffer);
+      }
+      const yinBuffer = yinScratch;
+
+      // Bound the outer YIN loop at the lowest expected fundamental.
+      // Skipping tau > tauMaxSearch saves CPU proportional to how much
+      // we trim — at fftSize=8192/sr=48k the unbounded loop runs 4096
+      // outer iters; bounded at 60 Hz it runs ~800, a 5× CPU saving
+      // in idle mode that pays for the doubled signal window without
+      // any precision loss (the truncated taus correspond to sub-bass
+      // that the bandpass already kills).
+      const tauMinSearch = Math.max(2, Math.floor(sampleRate / YIN_MAX_FREQ_HZ));
+      const tauMaxSearch = Math.min(halfBuffer - 1, Math.ceil(sampleRate / YIN_MIN_FREQ_HZ));
+
       let runningSum = 0;
       yinBuffer[0] = 1;
-      
-      for (let tau = 1; tau < halfBuffer; tau++) {
+
+      for (let tau = 1; tau <= tauMaxSearch; tau++) {
         let diff = 0;
         for (let i = 0; i < halfBuffer; i++) {
           const delta = buffer[i] - buffer[i + tau];
@@ -2601,11 +2629,11 @@
         runningSum += diff;
         yinBuffer[tau] = yinBuffer[tau] * tau / runningSum;
       }
-      
+
       let tauEstimate = -1, minVal = 1, foundBelow = false;
       let candidates = [];
-      
-      for (let tau = 2; tau < halfBuffer; tau++) {
+
+      for (let tau = tauMinSearch; tau <= tauMaxSearch; tau++) {
         if (yinBuffer[tau] < threshold) {
           foundBelow = true;
           candidates.push({ tau, val: yinBuffer[tau] });
@@ -2615,7 +2643,7 @@
           }
         } else if (foundBelow && yinBuffer[tau] > threshold * 2) break;
       }
-      
+
       if (candidates.length > 1 && tauEstimate > 0) {
         for (const cand of candidates) {
           const ratio = cand.tau / tauEstimate;
@@ -2626,11 +2654,11 @@
           }
         }
       }
-      
+
       if (tauEstimate === -1) {
-        minVal = yinBuffer[2];
-        tauEstimate = 2;
-        for (let tau = 3; tau < halfBuffer; tau++) {
+        minVal = yinBuffer[tauMinSearch];
+        tauEstimate = tauMinSearch;
+        for (let tau = tauMinSearch + 1; tau <= tauMaxSearch; tau++) {
           if (yinBuffer[tau] < minVal) {
             minVal = yinBuffer[tau];
             tauEstimate = tau;
@@ -2638,7 +2666,12 @@
         }
         if (minVal > 0.5) return { freq: -1, probability: 0 };
       }
-      
+
+      // Parabolic sub-tau refinement. Three-point fit on the CMNDF
+      // gives ~0.05-tau resolution on clean signals — which translates
+      // to <0.3¢ even at G5 in synthetic testing. Five-point LSQ was
+      // tried and rejected: YIN's CMNDF has an asymmetric, narrow
+      // minimum that a wider quadratic biases away from the true dip.
       let betterTau = tauEstimate;
       if (tauEstimate > 0 && tauEstimate < halfBuffer - 1) {
         const s0 = yinBuffer[tauEstimate - 1];
@@ -2650,7 +2683,7 @@
           if (Math.abs(adjustment) < 1) betterTau = tauEstimate + adjustment;
         }
       }
-      
+
       return { freq: sampleRate / betterTau, probability: 1 - minVal };
     }
     
