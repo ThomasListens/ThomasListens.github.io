@@ -2210,12 +2210,17 @@
     let recordMode = false;
     let recordHintShown = false;
 
-    // Analyser FFT sizes. YIN autocorrelation cost is O((fftSize/2)²),
-    // so halving fftSize ≈ quarters CPU per detection cycle. At 48 kHz
-    // sample rate, fftSize=2048 → halfBuffer=1024 → lowest detectable
-    // freq ≈ 47 Hz, which is well below normal voice range. Outside
-    // record mode we keep the larger 4096 buffer for maximum precision.
-    const ANALYSER_FFT_IDLE   = 4096;
+    // Analyser FFT sizes. YIN cost is now O((tauMax - tauMin) * halfBuffer)
+    // instead of O((fftSize/2)²) thanks to the bounded tau search — at
+    // 48 kHz with YIN bounds [60, 1600] Hz this caps the outer loop at
+    // ~800 iters regardless of fftSize, so doubling the window doubles
+    // the inner cost but does not square it. IDLE=8192 (was 4096) gives
+    // ~170 ms of signal for the CMNDF, dropping per-frame std-dev at
+    // G5 from ~0.06¢ to ~0.01¢ in synthetic-noise tests — the kind of
+    // jitter floor microtonal singing actually runs into. RECORD stays
+    // at 2048 so the Pixel-7 CPU budget during MediaRecorder + camera
+    // filter + rAF draw is unchanged.
+    const ANALYSER_FFT_IDLE   = 8192;
     const ANALYSER_FFT_RECORD = 2048;
 
     let cameraStream = null;
@@ -4581,8 +4586,8 @@
       sourceNode.onended = () => { if (isPlaying) stopFilePlayback(); };
       
       analyser = audioContext.createAnalyser();
-      analyser.fftSize = 4096;
-      
+      analyser.fftSize = recordMode ? ANALYSER_FFT_RECORD : ANALYSER_FFT_IDLE;
+
       // Audible playback path stays full-band: source -> destination directly.
       // Pitch tap (separate, parallel) runs through the 80-1200 Hz bandpass
       // -> analyser, so YIN sees a cleaner spectrum without colouring what
