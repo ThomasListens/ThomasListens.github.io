@@ -1695,7 +1695,7 @@
              Persists under tuner.btLatencyMs. -->
         <label style="font-size: 12px; color: #888; margin-top: 6px; margin-bottom: 2px;">Headphone delay <span id="btLatencyVal" style="color: #aaa;">200 ms</span></label>
         <div class="slider-row">
-          <input type="range" id="btLatencySlider" min="0" max="400" value="200" step="5">
+          <input type="range" id="btLatencySlider" min="0" max="1200" value="200" step="5">
         </div>
         <!-- Reel length mode. "Shortest" (default) ends the composed
              reel when the shortest layer ends — the historical
@@ -6984,7 +6984,7 @@
         return;
       }
       const startTime = audioContext.currentTime + 0.05;
-      const delaySec = Math.max(0, Math.min(1.0, btLatencyMs / 1000));
+      const delaySec = Math.max(0, Math.min(1.5, btLatencyMs / 1000));
       for (const layer of harmonyStack) {
         const source = audioContext.createBufferSource();
         source.buffer = layer.audioBuffer;
@@ -7001,7 +7001,7 @@
         // Branch A — monitor (user hears the layer through BT/speakers)
         gainNode.connect(audioContext.destination);
         // Branch B — recording bus (delayed by BT compensation)
-        const delay = audioContext.createDelay(1.0);
+        const delay = audioContext.createDelay(1.5);
         delay.delayTime.value = delaySec;
         gainNode.connect(delay).connect(mp.masterOutputGain);
         source.start(startTime);
@@ -8558,7 +8558,7 @@
       try {
         const saved = localStorage.getItem('tuner.btLatencyMs');
         if (saved !== null && !isNaN(parseInt(saved, 10))) {
-          btLatencyMs = Math.max(0, Math.min(400, parseInt(saved, 10)));
+          btLatencyMs = Math.max(0, Math.min(1200, parseInt(saved, 10)));
         }
       } catch (_) {}
       const btSlider = document.getElementById('btLatencySlider');
@@ -8568,7 +8568,7 @@
         if (btLabel) btLabel.textContent = btLatencyMs + ' ms';
         btSlider.addEventListener('input', (e) => {
           const v = parseInt(e.target.value, 10);
-          btLatencyMs = isNaN(v) ? 200 : Math.max(0, Math.min(400, v));
+          btLatencyMs = isNaN(v) ? 200 : Math.max(0, Math.min(1200, v));
           if (btLabel) btLabel.textContent = btLatencyMs + ' ms';
           try { localStorage.setItem('tuner.btLatencyMs', String(btLatencyMs)); } catch (_) {}
         });
