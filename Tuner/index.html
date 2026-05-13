@@ -8029,6 +8029,11 @@
       };
 
       const start = (e) => {
+        // The long-press entry point is reserved for studio mode.
+        // Casual visitors get no visual hint that the gesture does
+        // anything — short-circuit before the progress animation or
+        // vibration runs, so the title gives nothing away.
+        if (!studioMode) return;
         triggered = false;
         clearTimeout(pressTimer);
         pressStart = performance.now();
@@ -8038,10 +8043,6 @@
           if (navigator.vibrate) navigator.vibrate(30);
           title.style.color = '#ff3b30';
           setTimeout(resetColor, 200);
-          // The long-press entry point is reserved for studio mode.
-          // Casual visitors land on the tuner-only view and never enter
-          // record mode through this gesture.
-          if (!studioMode) return;
           if (recordMode) exitRecordMode();
           else enterRecordMode();
         }, HOLD_MS);
