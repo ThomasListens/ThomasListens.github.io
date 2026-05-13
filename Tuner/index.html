@@ -1611,9 +1611,32 @@
     }
     #stackIndicator #downloadReelBtn.visible { display: inline-flex; }
     #stackIndicator #downloadReelBtn:active { background: rgba(50, 140, 230, 1); transform: scale(0.97); }
+
+    /* Studio mode gate. The recording / layer / export surface is
+       hidden until studioMode is unlocked. Anything tagged with
+       .studio-only stays out of the DOM flow for casual visitors;
+       individual recording elements get explicit selectors below as
+       they're added. The code stays — only its UI is hidden. */
+    body:not(.studio) .studio-only { display: none !important; }
   </style>
 </head>
 <body>
+  <script>
+    // Studio mode gate — run before first paint so the recording UI
+    // never flashes for casual visitors. The full applyStudioMode()
+    // (with hashchange listener) is wired up later from the main script
+    // block; this pre-paint pass is the minimum needed to set body.studio.
+    (function () {
+      try {
+        var unlocked = localStorage.getItem('tuner.studio') === '1';
+        if (window.location.hash === '#studio') {
+          unlocked = true;
+          localStorage.setItem('tuner.studio', '1');
+        }
+        if (unlocked) document.body.classList.add('studio');
+      } catch (_) {}
+    })();
+  </script>
   <button id="mobileToggle">☰</button>
   <button id="settingsToggle" title="Hide settings panel" aria-label="Hide settings panel">✕</button>
   <div id="app">
@@ -2209,6 +2232,24 @@
 
     let recordMode = false;
     let recordHintShown = false;
+
+    // Studio mode gate. The recording / layer / export UI is hidden
+    // from casual visitors. Unlock via the URL hash (`#studio`) or
+    // the localStorage flag set on first unlock. Once unlocked,
+    // the flag persists (sticky) so subsequent loads without the
+    // hash stay unlocked. Toggled by applyStudioMode().
+    let studioMode = false;
+
+    function applyStudioMode() {
+      let unlocked = false;
+      try { unlocked = localStorage.getItem('tuner.studio') === '1'; } catch (_) {}
+      if (window.location.hash === '#studio') {
+        unlocked = true;
+        try { localStorage.setItem('tuner.studio', '1'); } catch (_) {}
+      }
+      studioMode = unlocked;
+      document.body.classList.toggle('studio', unlocked);
+    }
 
     // Analyser FFT sizes. YIN autocorrelation cost is O((fftSize/2)²),
     // so halving fftSize ≈ quarters CPU per detection cycle. At 48 kHz
@@ -8289,10 +8330,15 @@
     
     function init() {
       const params = new URLSearchParams(window.location.search);
-      
+
       if (params.get('obs') === '1') {
         document.body.classList.add('obs');
       }
+
+      // Apply once at boot (mirrors the pre-paint inline script) and
+      // again on hashchange so the user can unlock without reloading.
+      applyStudioMode();
+      window.addEventListener('hashchange', applyStudioMode);
       
       const mobileToggle = document.getElementById('mobileToggle');
       const controls = document.getElementById('controls');
