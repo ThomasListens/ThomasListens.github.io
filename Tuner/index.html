@@ -3620,7 +3620,10 @@
           return Math.pow(2, minLf + yNorm * lfSpan);
         };
         const stripWidth = 6 * S;
-        const numSlices = 80;
+        // Slice count: 32 in lo-fi (the default), 80 when fancy is on.
+        // 32 is still finer than the rail's pixel-perceptible resolution
+        // on phones and ~60% cheaper per frame.
+        const numSlices = fancyMode ? 80 : 32;
         const sliceHeight = rulerHeight / numSlices;
         const stripBaseAlpha = alphaMul * spectrumOpacity * 0.55;
         if (stripBaseAlpha > 0.001) {
