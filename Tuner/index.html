@@ -3377,6 +3377,19 @@
       ctx.stroke();
 
       const tickLen = 14 * S;
+      // Shadow setup hoisted out of the per-tick loop. The params don't
+      // vary per tick; setting them once cuts 9 ctx state churns/frame
+      // and lets us skip shadow entirely in lo-fi mode (canvas shadows
+      // are a known mobile-GPU hotspot — blur+offset force a rasterize
+      // pass per call).
+      const drawShadow = fancyMode;
+      if (drawShadow) {
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur = 3 * S;
+        ctx.shadowOffsetX = 0.5 * S;
+        ctx.shadowOffsetY = 0.5 * S;
+      }
       for (let i = 0; i < TICKS.length; i++) {
         const hz = TICKS[i];
         if (hz < minHz || hz > maxHz) continue;
@@ -3407,17 +3420,10 @@
         ctx.stroke();
 
         const label = hz >= 1000 ? `${Math.round(hz / 1000)}k` : `${hz}`;
-        // Shadow scoped to the numeric text only - keep the tick line
-        // crisp. Negligible cost for 8 fillText calls/frame.
-        ctx.save();
-        ctx.shadowColor = 'rgba(0,0,0,0.6)';
-        ctx.shadowBlur = 3 * S;
-        ctx.shadowOffsetX = 0.5 * S;
-        ctx.shadowOffsetY = 0.5 * S;
         ctx.fillStyle = `rgba(${PARCHMENT}, ${labelAlpha})`;
         ctx.fillText(label, rulerX - 8 * S, y);
-        ctx.restore();
       }
+      if (drawShadow) ctx.restore();
 
       ctx.restore();
     }
@@ -3992,29 +3998,32 @@
         }
 
         ctx.setLineDash([4, 6]);
+        // Hoist constant text state out of the per-line loop. fillStyle,
+        // font, textAlign, textBaseline don't change per EDO row; setting
+        // them once is the same correctness for ~half the CanvasRenderingContext
+        // state churn on a typical 12-row frame.
+        ctx.strokeStyle = 'rgba(70, 70, 70, 0.7)';
+        ctx.lineWidth = 1;
+        ctx.fillStyle = 'rgba(100, 100, 100, 1)';
+        ctx.font = `${11 * S}px system-ui`;
+        ctx.textAlign = edoLabelAlign;
+        ctx.textBaseline = 'middle';
+        const DEGREE_NAMES = ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'];
 
         for (let semi = startSemitone; semi <= endSemitone; semi++) {
           const cents = semi * 100;
           if (cents < displayMin || cents > displayMax) continue;
 
           const y = centsToY(cents);
-          ctx.strokeStyle = 'rgba(70, 70, 70, 0.7)';
-          ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(edoLineStart, y);
           ctx.lineTo(W, y);
           ctx.stroke();
 
-          ctx.fillStyle = 'rgba(100, 100, 100, 1)';
-          ctx.font = `${11 * S}px system-ui`;
-          ctx.textAlign = edoLabelAlign;
-          ctx.textBaseline = 'middle';
-
           let label;
           if (isCustomMode) {
             const degree = ((semi % 12) + 12) % 12;
-            const degreeNames = ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'];
-            label = degreeNames[degree];
+            label = DEGREE_NAMES[degree];
           } else {
             const noteInfo = getNoteAtCents(cents, config.refNote);
             label = `${noteInfo.name}${noteInfo.octave}`;
