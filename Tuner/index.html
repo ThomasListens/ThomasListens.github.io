@@ -1633,6 +1633,17 @@
     body:not(.studio) #flipCamBtn {
       display: none !important;
     }
+
+    /* Harmony-stack surface — the "+ layer" chip, the stack indicator
+       pill (Layers: N), and the per-layer volume panel. All three live
+       top-level so they can paint over the canvas; locking them down
+       at the studio gate keeps the stack invisible even if some future
+       code accidentally adds the .visible class. */
+    body:not(.studio) #layerAddBtn,
+    body:not(.studio) #stackIndicator,
+    body:not(.studio) #layerVolumePanel {
+      display: none !important;
+    }
   </style>
 </head>
 <body>
