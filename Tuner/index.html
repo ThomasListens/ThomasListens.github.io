@@ -3591,8 +3591,10 @@
       // on top. Uses raw per-frame FFT (no EMA) - let it be alive.
       // Hue mapping is the same one the particles use so the strip
       // and the spawning column read as a single object. Cost is
-      // ~80 fillRects/frame, gated to spectrum mode only. Trivial.
-      if (an && spectrumBuf && rulerHeight > 0) {
+      // ~80 fillRects + HSL string parses per frame; cheap on desktop,
+      // measurable on the spectrum view on mid-range phones. Lo-fi
+      // path skips it — the particle column carries the spawn moment.
+      if (fancyMode && an && spectrumBuf && rulerHeight > 0) {
         const sr = (audioContext && audioContext.sampleRate) || 48000;
         const binCount = an.frequencyBinCount;
         const binHz = sr / (binCount * 2);
