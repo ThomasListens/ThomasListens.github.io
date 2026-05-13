@@ -1649,17 +1649,14 @@
 <body>
   <script>
     // Studio mode gate — run before first paint so the recording UI
-    // never flashes for casual visitors. The full applyStudioMode()
-    // (with hashchange listener) is wired up later from the main script
-    // block; this pre-paint pass is the minimum needed to set body.studio.
+    // never flashes for casual visitors. The unlock gesture lives on
+    // the title long-press (see setupTitleLongPress); this pre-paint
+    // pass just rehydrates the persisted flag.
     (function () {
       try {
-        var unlocked = localStorage.getItem('tuner.studio') === '1';
-        if (window.location.hash === '#studio') {
-          unlocked = true;
-          localStorage.setItem('tuner.studio', '1');
+        if (localStorage.getItem('tuner.studio') === '1') {
+          document.body.classList.add('studio');
         }
-        if (unlocked) document.body.classList.add('studio');
       } catch (_) {}
     })();
   </script>
@@ -2260,21 +2257,34 @@
     let recordHintShown = false;
 
     // Studio mode gate. The recording / layer / export UI is hidden
-    // from casual visitors. Unlock via the URL hash (`#studio`) or
-    // the localStorage flag set on first unlock. Once unlocked,
-    // the flag persists (sticky) so subsequent loads without the
-    // hash stay unlocked. Toggled by applyStudioMode().
+    // from casual visitors. Unlock and lock are both performed by a
+    // 1.5s long-press on the title (see setupTitleLongPress). Once
+    // unlocked, the flag persists in localStorage so subsequent loads
+    // stay unlocked; the same gesture locks again. The flag here is
+    // re-hydrated at boot by applyStudioMode().
     let studioMode = false;
 
     function applyStudioMode() {
       let unlocked = false;
       try { unlocked = localStorage.getItem('tuner.studio') === '1'; } catch (_) {}
-      if (window.location.hash === '#studio') {
-        unlocked = true;
-        try { localStorage.setItem('tuner.studio', '1'); } catch (_) {}
-      }
       studioMode = unlocked;
       document.body.classList.toggle('studio', unlocked);
+    }
+
+    // Toggle invoked by the title long-press handler. Locking also
+    // exits record-mode so the camera/recorder isn't left running
+    // behind a hidden UI.
+    function toggleStudioMode() {
+      if (studioMode) {
+        try { localStorage.removeItem('tuner.studio'); } catch (_) {}
+        if (recordMode) exitRecordMode();
+        studioMode = false;
+        document.body.classList.remove('studio');
+      } else {
+        try { localStorage.setItem('tuner.studio', '1'); } catch (_) {}
+        studioMode = true;
+        document.body.classList.add('studio');
+      }
     }
 
     // Analyser FFT sizes. YIN autocorrelation cost is O((fftSize/2)²),
@@ -8005,60 +8015,87 @@
 
     function setupTitleLongPress() {
       const title = document.getElementById('title');
-      const HOLD_MS = 600;
-      let pressTimer = null;
-      let triggered = false;
+      // Two release thresholds share the same gesture on the title:
+      //   - >= 1500ms holds toggle studio mode (lock / unlock). This is
+      //     the only path for a casual visitor to reveal the recording
+      //     UI, replacing the older URL-hash unlock.
+      //   - >= 600ms but < 1500ms holds, in studio mode only, enter or
+      //     exit record mode (the existing behaviour). Non-studio
+      //     visitors get no effect from a short long-press.
+      // The visual feedback is a subtle white text-shadow that ramps up
+      // over the full 1500ms, neutral enough to give nothing away — no
+      // colour shift, no vibration, no record-adjacent labels.
+      const RECORD_MS = 600;
+      const STUDIO_MS = 1500;
+      const MOVE_CANCEL_PX = 10;
       let pressStart = 0;
+      let pressActive = false;
+      let triggered = false;
+      let startX = 0;
+      let startY = 0;
       let progressRaf = null;
 
-      const animateProgress = () => {
+      const animateGlow = () => {
+        if (!pressActive) return;
         const elapsed = performance.now() - pressStart;
-        const t = Math.min(1, elapsed / HOLD_MS);
-        // Fade title from white to red as the press is held
-        const r = 255;
-        const g = Math.round(255 - 187 * t);
-        const b = Math.round(255 - 187 * t);
-        title.style.color = `rgb(${r}, ${g}, ${b})`;
-        if (t < 1) progressRaf = requestAnimationFrame(animateProgress);
+        const t = Math.min(1, elapsed / STUDIO_MS);
+        title.style.textShadow = `0 0 14px rgba(255, 255, 255, ${t * 0.45})`;
+        progressRaf = requestAnimationFrame(animateGlow);
       };
 
-      const resetColor = () => {
+      const cleanup = () => {
+        pressActive = false;
         if (progressRaf) cancelAnimationFrame(progressRaf);
         progressRaf = null;
-        title.style.color = '';
+        title.style.textShadow = '';
       };
 
       const start = (e) => {
-        // The long-press entry point is reserved for studio mode.
-        // Casual visitors get no visual hint that the gesture does
-        // anything — short-circuit before the progress animation or
-        // vibration runs, so the title gives nothing away.
-        if (!studioMode) return;
+        // Mouse: primary button only. Touch / pen: no button filter.
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        pressActive = true;
         triggered = false;
-        clearTimeout(pressTimer);
         pressStart = performance.now();
-        progressRaf = requestAnimationFrame(animateProgress);
-        pressTimer = setTimeout(() => {
+        startX = e.clientX;
+        startY = e.clientY;
+        progressRaf = requestAnimationFrame(animateGlow);
+      };
+
+      const move = (e) => {
+        if (!pressActive) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        if (dx * dx + dy * dy > MOVE_CANCEL_PX * MOVE_CANCEL_PX) {
+          cleanup();
+        }
+      };
+
+      const release = (e) => {
+        if (!pressActive) return;
+        const duration = performance.now() - pressStart;
+        cleanup();
+        if (duration >= STUDIO_MS) {
           triggered = true;
-          if (navigator.vibrate) navigator.vibrate(30);
-          title.style.color = '#ff3b30';
-          setTimeout(resetColor, 200);
+          toggleStudioMode();
+        } else if (duration >= RECORD_MS && studioMode) {
+          triggered = true;
           if (recordMode) exitRecordMode();
           else enterRecordMode();
-        }, HOLD_MS);
+        }
       };
-      const cancel = () => {
-        clearTimeout(pressTimer);
-        pressTimer = null;
-        resetColor();
+
+      const abort = () => {
+        if (!pressActive) return;
+        cleanup();
       };
 
       title.addEventListener('pointerdown', start);
-      title.addEventListener('pointerup', cancel);
-      title.addEventListener('pointerleave', cancel);
-      title.addEventListener('pointercancel', cancel);
+      title.addEventListener('pointermove', move);
+      title.addEventListener('pointerup', release);
+      title.addEventListener('pointerleave', abort);
+      title.addEventListener('pointercancel', abort);
 
-      // Suppress the regular click handler when long-press triggered
+      // Suppress the regular click handler when a long-press triggered.
       title.addEventListener('click', (e) => {
         if (triggered) {
           e.stopImmediatePropagation();
@@ -8366,10 +8403,9 @@
         document.body.classList.add('obs');
       }
 
-      // Apply once at boot (mirrors the pre-paint inline script) and
-      // again on hashchange so the user can unlock without reloading.
+      // Apply once at boot (mirrors the pre-paint inline script) so
+      // the in-memory studioMode flag matches the persisted state.
       applyStudioMode();
-      window.addEventListener('hashchange', applyStudioMode);
       
       const mobileToggle = document.getElementById('mobileToggle');
       const controls = document.getElementById('controls');
