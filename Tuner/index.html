@@ -2253,6 +2253,12 @@
     let pendingExportFilename = null;
     let activeLayerSources = [];
     let btLatencyMs = 200;
+    // Performance escape hatch. Default OFF (lo-fi path) so the tuner
+    // renders cheaply on mid-range phones. Set to true via
+    //   localStorage.setItem('tuner.fancyMode','1')
+    // to opt into the original radial-gradient aurora, larger particle
+    // ceilings, and other GPU-expensive flourishes. Read once at boot.
+    let fancyMode = false;
     // reelLengthMode: 'shortest' (current behavior — reel ends when the
     // shortest layer ends, audio always sync'd) or 'longest' (reel runs
     // until the longest layer ends; layers that have ended are painted
@@ -3508,11 +3514,13 @@
       }
 
       // Spawn rate scales with total energy. Cap at ~6/sec total - even
-      // when very loud, sparse > frantic. Hard particle ceiling at 60.
-      const spawnRate = Math.min(6, 0.4 + totalEnergy * 1.6);
+      // when very loud, sparse > frantic. Hard particle ceiling at 60
+      // (fancy) / 22 (lo-fi default; fewer overdraws on mid-range phones).
+      const spawnRate = Math.min(fancyMode ? 6 : 4, 0.4 + totalEnergy * 1.6);
+      const particleCap = fancyMode ? 60 : 22;
       let spawnBudget = spawnRate * dt;
       let attempts = 0;
-      while (spawnBudget > 0 && cloudParticles.length < 60 && attempts < 4) {
+      while (spawnBudget > 0 && cloudParticles.length < particleCap && attempts < 4) {
         attempts++;
         const p = Math.min(1, spawnBudget);
         if (Math.random() > p) break;
@@ -3647,22 +3655,33 @@
         const alphaEnv = Math.min(1, t * 5) * Math.pow(1 - t, 1.5);
         if (alphaEnv <= 0.001) continue;
         const aCenter = alphaEnv * p.energy * 0.85 * spectrumOpacity;
-        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-        // Tatooine palette: pull S/L from per-hue anchors and damp the
-        // saturation toward the rim so each particle reads as sun-bleached
-        // ink rather than a saturated neon dot.
         const sl = cloudHueToSL(p.hue);
-        const sCore = Math.min(65, sl.s + 8);
-        const lCore = Math.min(70, sl.l + 8);
-        const sMid  = Math.max(20, sl.s - 5);
-        const lMid  = sl.l;
-        const sEdge = Math.max(15, sl.s - 15);
-        const lEdge = Math.max(35, sl.l - 8);
-        grad.addColorStop(0,    `hsla(${p.hue}, ${sCore}%, ${lCore}%, ${aCenter})`);
-        grad.addColorStop(0.45, `hsla(${p.hue}, ${sMid}%, ${lMid}%, ${aCenter * 0.45})`);
-        grad.addColorStop(1,    `hsla(${p.hue}, ${sEdge}%, ${lEdge}%, 0)`);
-        ctx.fillStyle = grad;
-        ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+        if (fancyMode) {
+          // Tatooine palette: pull S/L from per-hue anchors and damp the
+          // saturation toward the rim so each particle reads as sun-bleached
+          // ink rather than a saturated neon dot.
+          const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+          const sCore = Math.min(65, sl.s + 8);
+          const lCore = Math.min(70, sl.l + 8);
+          const sMid  = Math.max(20, sl.s - 5);
+          const lMid  = sl.l;
+          const sEdge = Math.max(15, sl.s - 15);
+          const lEdge = Math.max(35, sl.l - 8);
+          grad.addColorStop(0,    `hsla(${p.hue}, ${sCore}%, ${lCore}%, ${aCenter})`);
+          grad.addColorStop(0.45, `hsla(${p.hue}, ${sMid}%, ${lMid}%, ${aCenter * 0.45})`);
+          grad.addColorStop(1,    `hsla(${p.hue}, ${sEdge}%, ${lEdge}%, 0)`);
+          ctx.fillStyle = grad;
+          ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+        } else {
+          // Lo-fi path: flat HSLA disc, no per-particle gradient build.
+          // 'lighter' composite still color-mixes overlaps so the field
+          // reads as additive ink, just without the rim falloff. ~10x
+          // cheaper per particle on mid-range mobile GPUs.
+          ctx.fillStyle = `hsla(${p.hue}, ${sl.s}%, ${sl.l}%, ${aCenter * 0.55})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, r * 0.75, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
 
       ctx.globalCompositeOperation = oldComp;
@@ -8561,6 +8580,7 @@
           btLatencyMs = Math.max(0, Math.min(1200, parseInt(saved, 10)));
         }
       } catch (_) {}
+      try { fancyMode = localStorage.getItem('tuner.fancyMode') === '1'; } catch (_) {}
       const btSlider = document.getElementById('btLatencySlider');
       const btLabel  = document.getElementById('btLatencyVal');
       if (btSlider) {
