@@ -3110,6 +3110,12 @@
     }
     
     function buildCameraFilter() {
+      // Multi-stage canvas filters (brightness/contrast/grayscale/sepia/
+      // hue-rotate/saturate) are GPU shader passes per camera draw. On
+      // a Pixel-class phone the chain alone can knock 5-10 fps off a
+      // 1080p capture. In lo-fi mode we skip it entirely; the B&W /
+      // brightness sliders no-op until fancy effects are turned on.
+      if (!fancyMode) return 'none';
       const parts = [];
       if (videoBrightness !== 1) parts.push(`brightness(${videoBrightness})`);
       if (videoContrast !== 1) parts.push(`contrast(${videoContrast})`);
