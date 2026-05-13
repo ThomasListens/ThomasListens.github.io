@@ -1618,6 +1618,21 @@
        individual recording elements get explicit selectors below as
        they're added. The code stays — only its UI is hidden. */
     body:not(.studio) .studio-only { display: none !important; }
+
+    /* Record-mode entry surface. #recordOverlay defaults to display:none
+       and only shows under body.record-mode, but the long-press entry
+       is now studio-gated too — these rules are belt-and-braces so that
+       nothing from the record dock can ever paint outside studio mode. */
+    body:not(.studio) #recordOverlay,
+    body:not(.studio) #droneRecordStrip,
+    body:not(.studio) #droneRecordToggle,
+    body:not(.studio) #audioFXVrbBtn,
+    body:not(.studio) #audioFXLevelStrip,
+    body:not(.studio) #audioFXMeter,
+    body:not(.studio) #rulerHideBtn,
+    body:not(.studio) #flipCamBtn {
+      display: none !important;
+    }
   </style>
 </head>
 <body>
@@ -8012,6 +8027,10 @@
           if (navigator.vibrate) navigator.vibrate(30);
           title.style.color = '#ff3b30';
           setTimeout(resetColor, 200);
+          // The long-press entry point is reserved for studio mode.
+          // Casual visitors land on the tuner-only view and never enter
+          // record mode through this gesture.
+          if (!studioMode) return;
           if (recordMode) exitRecordMode();
           else enterRecordMode();
         }, HOLD_MS);
