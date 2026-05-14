@@ -580,6 +580,57 @@
       display: block;
     }
 
+    /* Hidden studio-mode unlock: invisible 44×44 button parked in the
+       top-right corner. Triple-tap toggles studio mode (see
+       setupStudioCornerTap). Nothing visible — a stranger can't see it,
+       Thomas knows the corner. In record-mode the corner is occupied by
+       #exitRecBtn and #settingsToggle (z-index 200+); pointer-events are
+       turned off there so taps fall through to those buttons. Outside
+       record mode the corner is empty, so a tap reliably hits this. */
+    #studioCornerTap {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      margin: 0;
+      border: 0;
+      background: transparent;
+      cursor: default;
+      z-index: 300;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    body.record-mode #studioCornerTap {
+      pointer-events: none;
+    }
+
+    /* Toast confirming studio-mode toggle. Same pill style as
+       #recIndicator. Shown for ~1.5 s after the corner-tap gesture
+       fires so the user gets unambiguous feedback. */
+    #studioToast {
+      position: fixed;
+      top: calc(14px + env(safe-area-inset-top));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1001;
+      padding: 8px 16px;
+      background: rgba(0, 0, 0, 0.78);
+      border-radius: 999px;
+      color: #fff;
+      font-size: 13px;
+      letter-spacing: 0.3px;
+      display: none;
+      pointer-events: none;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      white-space: nowrap;
+    }
+    #studioToast.visible {
+      display: block;
+    }
+
     /* "Optimizing video..." pill — shown while FFmpeg.wasm remuxes the
        MediaRecorder fragmented MP4 (ftyp/moov-init/moof+mdat...) into a
        non-fragmented MP4 with the moov atom at the front (faststart) —
@@ -1719,8 +1770,8 @@
   <script>
     // Studio mode gate — run before first paint so the recording UI
     // never flashes for casual visitors. The unlock gesture lives on
-    // the title long-press (see setupTitleLongPress); this pre-paint
-    // pass just rehydrates the persisted flag.
+    // the top-right corner triple-tap (see setupStudioCornerTap); this
+    // pre-paint pass just rehydrates the persisted flag.
     (function () {
       try {
         if (localStorage.getItem('tuner.studio') === '1') {
@@ -1731,6 +1782,11 @@
   </script>
   <button id="mobileToggle">☰</button>
   <button id="settingsToggle" title="Hide settings panel" aria-label="Hide settings panel">✕</button>
+  <!-- Invisible 44×44 hit target. Triple-tap toggles studio mode. No
+       label, no border, no aria description — this is intentionally
+       undiscoverable to casual visitors. See setupStudioCornerTap. -->
+  <button id="studioCornerTap" type="button" tabindex="-1" aria-hidden="true"></button>
+  <div id="studioToast" role="status" aria-live="polite"></div>
   <div id="app">
     <div id="controls">
       <h1 id="title">JI Pitch Ruler</h1>
@@ -2330,10 +2386,11 @@
 
     // Studio mode gate. The recording / layer / export UI is hidden
     // from casual visitors. Unlock and lock are both performed by a
-    // 1.5s long-press on the title (see setupTitleLongPress). Once
-    // unlocked, the flag persists in localStorage so subsequent loads
-    // stay unlocked; the same gesture locks again. The flag here is
-    // re-hydrated at boot by applyStudioMode().
+    // triple-tap on the invisible top-right corner target (see
+    // setupStudioCornerTap). Once unlocked, the flag persists in
+    // localStorage so subsequent loads stay unlocked; the same gesture
+    // locks again. The flag here is re-hydrated at boot by
+    // applyStudioMode().
     let studioMode = false;
 
     function applyStudioMode() {
@@ -2343,7 +2400,7 @@
       document.body.classList.toggle('studio', unlocked);
     }
 
-    // Toggle invoked by the title long-press handler. Locking also
+    // Toggle invoked by the corner triple-tap handler. Locking also
     // exits record-mode so the camera/recorder isn't left running
     // behind a hidden UI.
     function toggleStudioMode() {
@@ -8174,18 +8231,15 @@
 
     function setupTitleLongPress() {
       const title = document.getElementById('title');
-      // Two release thresholds share the same gesture on the title:
-      //   - >= 1500ms holds toggle studio mode (lock / unlock). This is
-      //     the only path for a casual visitor to reveal the recording
-      //     UI, replacing the older URL-hash unlock.
-      //   - >= 600ms but < 1500ms holds, in studio mode only, enter or
-      //     exit record mode (the existing behaviour). Non-studio
-      //     visitors get no effect from a short long-press.
-      // The visual feedback is a subtle white text-shadow that ramps up
-      // over the full 1500ms, neutral enough to give nothing away — no
-      // colour shift, no vibration, no record-adjacent labels.
+      // Single threshold: >= 600 ms hold on the title, in studio mode
+      // only, enters or exits record mode. The older studio-unlock
+      // branch (>= 1500 ms) that lived here moved to a triple-tap on the
+      // invisible top-right corner — Thomas couldn't tell whether a
+      // long press was "working" (see setupStudioCornerTap).
+      // Visual feedback is a subtle white text-shadow that ramps to
+      // full strength right as the 600 ms threshold is reached, so the
+      // user can feel the gesture land before releasing.
       const RECORD_MS = 600;
-      const STUDIO_MS = 1500;
       const MOVE_CANCEL_PX = 10;
       let pressStart = 0;
       let pressActive = false;
@@ -8197,7 +8251,7 @@
       const animateGlow = () => {
         if (!pressActive) return;
         const elapsed = performance.now() - pressStart;
-        const t = Math.min(1, elapsed / STUDIO_MS);
+        const t = Math.min(1, elapsed / RECORD_MS);
         title.style.textShadow = `0 0 14px rgba(255, 255, 255, ${t * 0.45})`;
         progressRaf = requestAnimationFrame(animateGlow);
       };
@@ -8233,10 +8287,7 @@
         if (!pressActive) return;
         const duration = performance.now() - pressStart;
         cleanup();
-        if (duration >= STUDIO_MS) {
-          triggered = true;
-          toggleStudioMode();
-        } else if (duration >= RECORD_MS && studioMode) {
+        if (duration >= RECORD_MS && studioMode) {
           triggered = true;
           if (recordMode) exitRecordMode();
           else enterRecordMode();
@@ -8262,6 +8313,51 @@
           triggered = false;
         }
       }, true);
+    }
+
+    // Studio-mode unlock gesture: triple-tap on the invisible top-right
+    // corner target. Replaces the previous 1.5 s title long-press,
+    // which gave Thomas no feedback about whether it was "working".
+    // Three taps within TAP_WINDOW_MS of each other (i.e. taps[2] -
+    // taps[0] <= TAP_WINDOW_MS) toggles studio mode and surfaces a
+    // brief "Studio mode on/off" toast. A single stray tap does
+    // nothing; two taps within the window also do nothing.
+    let studioToastTimer = null;
+    function showStudioToast(text) {
+      const el = document.getElementById('studioToast');
+      if (!el) return;
+      el.textContent = text;
+      el.classList.add('visible');
+      if (studioToastTimer) clearTimeout(studioToastTimer);
+      studioToastTimer = setTimeout(() => {
+        el.classList.remove('visible');
+        studioToastTimer = null;
+      }, 1500);
+    }
+    function setupStudioCornerTap() {
+      const target = document.getElementById('studioCornerTap');
+      if (!target) return;
+      const TAP_WINDOW_MS = 600;
+      let taps = [];
+      const onTap = (e) => {
+        // Mouse: primary button only. Touch / pen: no button filter.
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        e.preventDefault();
+        const now = performance.now();
+        // Drop any tap older than the window so a slow first/second tap
+        // doesn't bank credit indefinitely.
+        taps.push(now);
+        taps = taps.filter(t => now - t <= TAP_WINDOW_MS);
+        if (taps.length >= 3) {
+          taps = [];
+          toggleStudioMode();
+          showStudioToast(studioMode ? 'Studio mode on' : 'Studio mode off');
+        }
+      };
+      target.addEventListener('pointerup', onTap);
+      // Block context-menu on long-press so iOS / Android don't pop up
+      // the "save image" / text-selection sheet over the corner.
+      target.addEventListener('contextmenu', (e) => e.preventDefault());
     }
     
     function fadeOutIndicator() {
@@ -8608,6 +8704,7 @@
       document.getElementById('stopDronesBtn').addEventListener('click', stopAllDrones);
 
       setupTitleLongPress();
+      setupStudioCornerTap();
       document.getElementById('recBtn').addEventListener('click', toggleRecording);
       document.getElementById('flipCamBtn').addEventListener('click', flipCamera);
       document.getElementById('exitRecBtn').addEventListener('click', exitRecordMode);
