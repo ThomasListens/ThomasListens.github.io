@@ -1732,14 +1732,46 @@
         <div class="slider-row">
           <input type="range" id="spectrumOpacity" min="20" max="100" value="85">
         </div>
-        <!-- Fancy mode: gates the heavy visuals (aurora particle cloud,
-             camera CSS filter chain) so Pixel-class phones can sustain
-             30 fps during reel recording. Default OFF — lo-fi by default,
-             flip on for a high-effects desktop preview.
-             Persists under tuner.fancyMode. -->
-        <div class="checkbox-row" style="margin-top: 6px;">
-          <input type="checkbox" id="fancyModeToggle">
-          <label for="fancyModeToggle">Fancy effects (heavier)</label>
+      </div>
+
+      <!-- Studio settings: recording-only knobs. Whole section is gated
+           behind body.studio via .studio-only so casual visitors never
+           see it. Everything here exists to serve the reel-recording
+           pipeline; the tuner-as-tuner experience does not need it. -->
+      <div class="control-section studio-only">
+        <div class="section-header">Studio settings</div>
+        <!-- Recording resolution. Picks the base 9:16 portrait W×H plus
+             a matching MediaRecorder bitrate. All values are H.264
+             macroblock-aligned. Persists under tuner.recRes. -->
+        <label style="font-size: 12px; color: #888; margin-bottom: 2px;">Recording resolution</label>
+        <div style="display: flex; gap: 8px; margin-bottom: 6px;">
+          <select id="recResSelect" style="flex: 1;">
+            <option value="544x960">544×960 · 3 Mbps</option>
+            <option value="416x720">416×720 · 2.2 Mbps</option>
+            <option value="320x576">320×576 · 1.5 Mbps</option>
+          </select>
+        </div>
+        <!-- Per-effect visual toggles. Replaces the old single
+             "Fancy effects" master switch with individual control per
+             effect — Thomas wants to flip the camera filter on its own
+             (for B&W reels) without dragging in the aurora cloud cost.
+             All default OFF — lo-fi first, "art direction over pixel
+             count". Each flag persists under its own tuner.fx.* key. -->
+        <div class="checkbox-row" style="margin-top: 4px;">
+          <input type="checkbox" id="fxAuroraToggle">
+          <label for="fxAuroraToggle">Aurora backdrop</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="fxCameraFilterToggle">
+          <label for="fxCameraFilterToggle">Camera filter</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="fxRulerShadowToggle">
+          <label for="fxRulerShadowToggle">Ruler glow</label>
+        </div>
+        <div class="checkbox-row" style="margin-bottom: 6px;">
+          <input type="checkbox" id="fxFftFancyToggle">
+          <label for="fxFftFancyToggle">Spectrum detail</label>
         </div>
         <!-- Bluetooth headphone output-latency compensation. Layer
              playback during stacked recording is shifted forward by this
@@ -1748,7 +1780,7 @@
              baked in because they sing to what they hear). 200ms is a
              reasonable AirPods default; wired headphones might want 20.
              Persists under tuner.btLatencyMs. -->
-        <label style="font-size: 12px; color: #888; margin-top: 6px; margin-bottom: 2px;">Headphone delay <span id="btLatencyVal" style="color: #aaa;">200 ms</span></label>
+        <label style="font-size: 12px; color: #888; margin-bottom: 2px;">Headphone delay <span id="btLatencyVal" style="color: #aaa;">200 ms</span></label>
         <div class="slider-row">
           <input type="range" id="btLatencySlider" min="0" max="1200" value="200" step="5">
         </div>
@@ -1761,8 +1793,8 @@
              trailing visuals will be silent if later layers are longer
              than the most-recent take. Persists under
              tuner.reelLengthMode. -->
-        <label class="studio-only" style="font-size: 12px; color: #888; margin-top: 6px; margin-bottom: 2px;">Reel length</label>
-        <div class="studio-only" style="display: flex; gap: 8px;">
+        <label style="font-size: 12px; color: #888; margin-top: 6px; margin-bottom: 2px;">Reel length</label>
+        <div style="display: flex; gap: 8px;">
           <select id="reelLengthMode" style="flex: 1;">
             <option value="shortest" selected>Shortest layer (default)</option>
             <option value="longest">Longest layer (later cells go black)</option>
@@ -2391,11 +2423,22 @@
     // whether the spectrum competes with the camera footage or recedes
     // into the background. Persisted under tuner.spectrumOpacity.
     let spectrumOpacity = 0.85;
-    // Fancy mode: gates the expensive eye-candy (aurora particle cloud,
-    // camera CSS filter chain) so Pixel-class phones don't drop frames
-    // during reel recording. Default OFF; togglable from the side panel
-    // and persisted under tuner.fancyMode.
-    let fancyMode = false;
+    // Per-effect visual toggles. Each flag gates one piece of eye-candy
+    // that was previously bundled under a single "fancy mode" master
+    // switch. Splitting them lets Thomas pick (e.g.) just the camera
+    // filter chain for B&W reels without paying for the aurora cloud.
+    // All default OFF — lo-fi first; the studio panel surfaces them
+    // individually. Each flag persists under its own tuner.fx.* key.
+    //   aurora       → particle cloud + ambient idle stars
+    //   cameraFilter → brightness/contrast/grayscale/sepia/saturate chain
+    //   rulerShadow  → Hz ruler tick + label text shadow
+    //   fftFancy     → spectrum energy strip slice count (80 vs 32)
+    let fx = {
+      aurora: false,
+      cameraFilter: false,
+      rulerShadow: false,
+      fftFancy: false,
+    };
     // Master output trim. Range -20..+6 dB on the slider (0..100).
     // Persisted under tuner.outputLevelDb. Applied via the
     // masterOutputGain node inserted in buildMicProcessing.
@@ -2519,31 +2562,49 @@
       return 100 * Math.log(hz / DRONE_CUTOFF_MIN) / Math.log(DRONE_CUTOFF_MAX / DRONE_CUTOFF_MIN);
     }
 
-    // Lo-fi capture: 544x960 (9:16) is the new default. Originally halved
-    // from 1080x1920 to 540x960, but H.264 encoders work in 16x16
-    // macroblocks and many hardware encoders (Pixel-class Android in
-    // particular) silently produce undecodable output when given
-    // dimensions not divisible by 16. 540 fails this; 544 = 16 * 34
-    // does not. Symptom of the misalignment was 25-31 KB files that
-    // open in a player as "video" but stay stuck at 0:00 with a black
-    // frame -- exactly what you see when the encoder emits data without
-    // valid keyframes. All values below are also kept on a 16-pixel
-    // grid for max compatibility (960=16*60, 680=16*42.5 -> 680 ok,
-    // 544=16*34). The 4:5 height moved from 675 to 680 (5/4 of 544).
-    // Visually 4 extra pixels of width is a 0.7% change -- invisible.
-    const ASPECT_DIMS = {
-      '9:16': [544, 960],
-      '4:5':  [544, 680],
-      '1:1':  [544, 544]
+    // Lo-fi capture: H.264 encoders work in 16x16 macroblocks and many
+    // hardware encoders (Pixel-class Android in particular) silently
+    // produce undecodable output when given dimensions not divisible by
+    // 16. Symptom of the misalignment was 25-31 KB files that open in a
+    // player as "video" but stay stuck at 0:00 with a black frame --
+    // exactly what you see when the encoder emits data without valid
+    // keyframes. All base widths and 9:16 heights below are kept on a
+    // 16-pixel grid. The derived 4:5 heights are kept on an 8-pixel
+    // grid (680/520/400) — historical, the encoder tolerates 8-align
+    // for those values.
+    //
+    // Three profiles, selected from the studio settings panel via
+    // tuner.recRes. Bitrate scales with pixel count. Each picks the
+    // base 9:16 W×H; 4:5 and 1:1 are derived from W. The current
+    // selection drives ASPECT_DIMS, CAPTURE_PIXEL_SCALE, and the
+    // MediaRecorder videoBitsPerSecond used in every record path.
+    const REC_RES_PROFILES = {
+      '544x960': { w: 544, h: 960, bitrate: 3_000_000 },
+      '416x720': { w: 416, h: 720, bitrate: 2_200_000 },
+      '320x576': { w: 320, h: 576, bitrate: 1_500_000 },
     };
+    let recRes = '544x960';
+    // Recomputed by applyRecRes() — mutable mirrors of the active profile.
+    let ASPECT_DIMS = { '9:16': [544, 960], '4:5': [544, 680], '1:1': [544, 544] };
     // Multiplier applied to all literal-pixel constants in the record-mode
-    // draw path (font sizes, stroke widths, bracket arms, etc.). Hardwired
-    // to 0.5 so the lo-fi 544-wide canvas renders the ruler / EDO /
-    // crosshair / labels at the same on-screen proportion they had on
-    // the old 1080-wide canvas. 544/1088 ≈ 0.5 (0.7% drift; nobody
-    // will notice). If we ever pick a different capture resolution,
-    // recompute this as (newCanvasWidth / 1080).
-    const CAPTURE_PIXEL_SCALE = 0.5;
+    // draw path (font sizes, stroke widths, bracket arms, etc.). The old
+    // 1080-wide canvas is the calibration target; W/1088 keeps every "* S"
+    // literal at the same on-screen proportion regardless of recRes.
+    let CAPTURE_PIXEL_SCALE = 544 / 1088;
+    let RECORD_BITRATE = 3_000_000;
+    function applyRecRes(key) {
+      const profile = REC_RES_PROFILES[key] || REC_RES_PROFILES['544x960'];
+      recRes = REC_RES_PROFILES[key] ? key : '544x960';
+      const W = profile.w, H = profile.h;
+      // 4:5 height: round W*5/4 to the nearest 8 so 416 -> 520 stays
+      // 8-aligned and 320 -> 400 hits the 16-grid. 544 -> 680 reproduces
+      // the existing value.
+      const h45 = Math.round(W * 5 / 4 / 8) * 8;
+      ASPECT_DIMS = { '9:16': [W, H], '4:5': [W, h45], '1:1': [W, W] };
+      CAPTURE_PIXEL_SCALE = W / 1088;
+      RECORD_BITRATE = profile.bitrate;
+    }
+    applyRecRes(recRes);
     
     const noteNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
     const noteNamesFlat = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
@@ -3229,8 +3290,8 @@
       // hue-rotate/saturate) are GPU shader passes per camera draw. On
       // a Pixel-class phone the chain alone can knock 5-10 fps off a
       // 1080p capture. In lo-fi mode we skip it entirely; the B&W /
-      // brightness sliders no-op until fancy effects are turned on.
-      if (!fancyMode) return 'none';
+      // brightness sliders no-op until the camera-filter toggle is on.
+      if (!fx.cameraFilter) return 'none';
       const parts = [];
       if (videoBrightness !== 1) parts.push(`brightness(${videoBrightness})`);
       if (videoContrast !== 1) parts.push(`contrast(${videoContrast})`);
@@ -3497,7 +3558,7 @@
       // and lets us skip shadow entirely in lo-fi mode (canvas shadows
       // are a known mobile-GPU hotspot — blur+offset force a rasterize
       // pass per call).
-      const drawShadow = fancyMode;
+      const drawShadow = fx.rulerShadow;
       if (drawShadow) {
         ctx.save();
         ctx.shadowColor = 'rgba(0,0,0,0.6)';
@@ -3650,9 +3711,10 @@
 
       // Spawn rate scales with total energy. Cap at ~6/sec total - even
       // when very loud, sparse > frantic. Hard particle ceiling at 60.
-      // Skipped entirely when fancyMode is off; ~60 radial-gradient fills
-      // per frame is the heaviest single cost in this view on a Pixel 7.
-      const spawnRate = fancyMode ? Math.min(6, 0.4 + totalEnergy * 1.6) : 0;
+      // Skipped entirely when the aurora flag is off; ~60 radial-gradient
+      // fills per frame is the heaviest single cost in this view on a
+      // Pixel 7.
+      const spawnRate = fx.aurora ? Math.min(6, 0.4 + totalEnergy * 1.6) : 0;
       let spawnBudget = spawnRate * dt;
       let attempts = 0;
       while (spawnBudget > 0 && cloudParticles.length < 60 && attempts < 4) {
@@ -3681,9 +3743,9 @@
       // Ambient stars: when nothing's coming through, drop one low-energy
       // particle every ~5-9 sec near canvas center. Cool wandering hue,
       // longer lifetime - reads as distant atmosphere, not measurement.
-      // Gated with the main spawn loop above so the cloud field stays dark
-      // entirely in lo-fi mode.
-      if (fancyMode && totalEnergy < 0.04) {
+      // Gated with the main spawn loop above (same aurora flag) so the
+      // cloud field stays dark entirely in lo-fi mode.
+      if (fx.aurora && totalEnergy < 0.04) {
         if (cloudLastIdleSpawnTime === 0) {
           cloudLastIdleSpawnTime = tNow;
           cloudNextIdleInterval = 5 + Math.random() * 4;
@@ -3741,10 +3803,10 @@
           return Math.pow(2, minLf + yNorm * lfSpan);
         };
         const stripWidth = 6 * S;
-        // Slice count: 32 in lo-fi (the default), 80 when fancy is on.
-        // 32 is still finer than the rail's pixel-perceptible resolution
-        // on phones and ~60% cheaper per frame.
-        const numSlices = fancyMode ? 80 : 32;
+        // Slice count: 32 in lo-fi (the default), 80 when the fft-detail
+        // flag is on. 32 is still finer than the rail's pixel-perceptible
+        // resolution on phones and ~60% cheaper per frame.
+        const numSlices = fx.fftFancy ? 80 : 32;
         const sliceHeight = rulerHeight / numSlices;
         const stripBaseAlpha = alphaMul * spectrumOpacity * 0.55;
         if (stripBaseAlpha > 0.001) {
@@ -6065,10 +6127,19 @@
 
     // Returns canvas cell positions for an N-layer stack. Cell index 0
     // is always the most recent take (top/prominent slot). Coords are
-    // in 544x960 canvas pixels. Layouts mirror the prior FFmpeg layouts
-    // (same prominence ordering and grid shapes).
+    // in the current 9:16 portrait dims (read live from ASPECT_DIMS so
+    // the layout follows the recRes selector). All cell sizes are
+    // fractions of W/H — the historic 544×960 numbers were 480=H/2,
+    // 320=H/3, 240=H/4, 272=W/2; expressed as fractions they reproduce
+    // exactly at any resRes profile whose W and H divide evenly by
+    // 4 and 12 respectively (all three current profiles qualify).
     function getStackCells(n) {
-      const W = 544, H = 960;
+      const dims = ASPECT_DIMS['9:16'];
+      const W = dims[0], H = dims[1];
+      const h2 = Math.floor(H / 2);
+      const h3 = Math.floor(H / 3);
+      const h4 = Math.floor(H / 4);
+      const w2 = Math.floor(W / 2);
       if (n <= 1) {
         return { cells: [{ x: 0, y: 0, w: W, h: H }], outputW: W, outputH: H };
       }
@@ -6076,8 +6147,8 @@
         // 2 rows, full width — most recent on top.
         return {
           cells: [
-            { x: 0, y: 0,   w: W, h: 480 },
-            { x: 0, y: 480, w: W, h: 480 },
+            { x: 0, y: 0,  w: W, h: h2 },
+            { x: 0, y: h2, w: W, h: H - h2 },
           ],
           outputW: W, outputH: H,
         };
@@ -6086,9 +6157,9 @@
         // 3 rows, full width.
         return {
           cells: [
-            { x: 0, y: 0,   w: W, h: 320 },
-            { x: 0, y: 320, w: W, h: 320 },
-            { x: 0, y: 640, w: W, h: 320 },
+            { x: 0, y: 0,      w: W, h: h3 },
+            { x: 0, y: h3,     w: W, h: h3 },
+            { x: 0, y: h3 * 2, w: W, h: H - h3 * 2 },
           ],
           outputW: W, outputH: H,
         };
@@ -6097,70 +6168,68 @@
         // 2x2 grid — most recent top-left, fills row-major.
         return {
           cells: [
-            { x: 0,   y: 0,   w: 272, h: 480 },
-            { x: 272, y: 0,   w: 272, h: 480 },
-            { x: 0,   y: 480, w: 272, h: 480 },
-            { x: 272, y: 480, w: 272, h: 480 },
+            { x: 0,  y: 0,  w: w2,     h: h2 },
+            { x: w2, y: 0,  w: W - w2, h: h2 },
+            { x: 0,  y: h2, w: w2,     h: H - h2 },
+            { x: w2, y: h2, w: W - w2, h: H - h2 },
           ],
           outputW: W, outputH: H,
         };
       }
       if (n === 5) {
         // Top row full-width (most recent), then 2x2 grid below.
-        // 320 + 320 + 320 = 960; 272 + 272 = 544.
         return {
           cells: [
-            { x: 0,   y: 0,   w: W,   h: 320 },
-            { x: 0,   y: 320, w: 272, h: 320 },
-            { x: 272, y: 320, w: 272, h: 320 },
-            { x: 0,   y: 640, w: 272, h: 320 },
-            { x: 272, y: 640, w: 272, h: 320 },
+            { x: 0,  y: 0,      w: W,      h: h3 },
+            { x: 0,  y: h3,     w: w2,     h: h3 },
+            { x: w2, y: h3,     w: W - w2, h: h3 },
+            { x: 0,  y: h3 * 2, w: w2,     h: H - h3 * 2 },
+            { x: w2, y: h3 * 2, w: W - w2, h: H - h3 * 2 },
           ],
           outputW: W, outputH: H,
         };
       }
       if (n === 6) {
-        // 3 rows x 2 cols. 320 * 3 = 960; 272 * 2 = 544.
+        // 3 rows x 2 cols.
         return {
           cells: [
-            { x: 0,   y: 0,   w: 272, h: 320 },
-            { x: 272, y: 0,   w: 272, h: 320 },
-            { x: 0,   y: 320, w: 272, h: 320 },
-            { x: 272, y: 320, w: 272, h: 320 },
-            { x: 0,   y: 640, w: 272, h: 320 },
-            { x: 272, y: 640, w: 272, h: 320 },
+            { x: 0,  y: 0,      w: w2,     h: h3 },
+            { x: w2, y: 0,      w: W - w2, h: h3 },
+            { x: 0,  y: h3,     w: w2,     h: h3 },
+            { x: w2, y: h3,     w: W - w2, h: h3 },
+            { x: 0,  y: h3 * 2, w: w2,     h: H - h3 * 2 },
+            { x: w2, y: h3 * 2, w: W - w2, h: H - h3 * 2 },
           ],
           outputW: W, outputH: H,
         };
       }
       if (n === 7) {
         // Top spans full (most recent), then 3 rows x 2 cols below.
-        // 240 + 240 * 3 = 960; 272 * 2 = 544.
         return {
           cells: [
-            { x: 0,   y: 0,   w: W,   h: 240 },
-            { x: 0,   y: 240, w: 272, h: 240 },
-            { x: 272, y: 240, w: 272, h: 240 },
-            { x: 0,   y: 480, w: 272, h: 240 },
-            { x: 272, y: 480, w: 272, h: 240 },
-            { x: 0,   y: 720, w: 272, h: 240 },
-            { x: 272, y: 720, w: 272, h: 240 },
+            { x: 0,  y: 0,      w: W,      h: h4 },
+            { x: 0,  y: h4,     w: w2,     h: h4 },
+            { x: w2, y: h4,     w: W - w2, h: h4 },
+            { x: 0,  y: h4 * 2, w: w2,     h: h4 },
+            { x: w2, y: h4 * 2, w: W - w2, h: h4 },
+            { x: 0,  y: h4 * 3, w: w2,     h: H - h4 * 3 },
+            { x: w2, y: h4 * 3, w: W - w2, h: H - h4 * 3 },
           ],
           outputW: W, outputH: H,
         };
       }
       if (n === 8) {
-        // 4 rows x 2 cols. 240 * 4 = 960; 272 * 2 = 544.
+        // 4 rows x 2 cols.
         return {
           cells: [
-            { x: 0,   y: 0,   w: 272, h: 240 },
-            { x: 272, y: 0,   w: 272, h: 240 },
-            { x: 0,   y: 240, w: 272, h: 240 },
-            { x: 272, y: 240, w: 272, h: 240 },
-            { x: 0,   y: 480, w: 272, h: 240 },
-            { x: 272, y: 480, w: 272, h: 240 },
-            { x: 0,   y: 720, w: 272, h: 240 },
-            { x: 272, y: 720, w: 272, h: 240 },
+            { x: 0,  y: 0,      w: w2,     h: h4 },
+            { x: w2, y: 0,      w: W - w2, h: h4 },
+            { x: 0,  y: h4,     w: w2,     h: h4 },
+            { x: w2, y: h4,     w: W - w2, h: h4 },
+            { x: 0,  y: h4 * 2, w: w2,     h: h4 },
+            { x: w2, y: h4 * 2, w: W - w2, h: h4 },
+            { x: 0,  y: h4 * 3, w: w2,     h: H - h4 * 3 },
+            { x: w2, y: h4 * 3, w: W - w2, h: H - h4 * 3 },
           ],
           outputW: W, outputH: H,
         };
@@ -6364,7 +6433,7 @@
         // 5. MediaRecorder. Reuse pickRecorderMime so the per-take and
         //    composite recorders agree on codec preference.
         const mime = pickRecorderMime();
-        const recOpts = { videoBitsPerSecond: 3_000_000 };
+        const recOpts = { videoBitsPerSecond: RECORD_BITRATE };
         if (mime) recOpts.mimeType = mime;
         mediaRecorder = new MediaRecorder(combined, recOpts);
 
@@ -6700,12 +6769,13 @@
       let dataEvents = 0;
       let emptyEvents = 0;
       try {
-        // Lo-fi capture: 3 Mbps video. Plenty for 544x960 @ 30fps and a
-        // big drop from the prior 8 Mbps - keeps mobile encoders happy
-        // and shrinks output files for upload.
+        // Lo-fi capture: RECORD_BITRATE scales with the recRes profile
+        // (3 Mbps at 544×960, 2.2 Mbps at 416×720, 1.5 Mbps at 320×576).
+        // Big drop from the prior 8 Mbps default - keeps mobile encoders
+        // happy and shrinks output files for upload.
         mediaRecorder = mime
-          ? new MediaRecorder(canvasStream, { mimeType: mime, videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 128_000 })
-          : new MediaRecorder(canvasStream, { videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 128_000 });
+          ? new MediaRecorder(canvasStream, { mimeType: mime, videoBitsPerSecond: RECORD_BITRATE, audioBitsPerSecond: 128_000 })
+          : new MediaRecorder(canvasStream, { videoBitsPerSecond: RECORD_BITRATE, audioBitsPerSecond: 128_000 });
       } catch (err) {
         console.error('MediaRecorder init failed:', err);
         alert('Recording is not supported on this browser.');
@@ -8676,8 +8746,37 @@
         if (sopa !== null && !isNaN(parseFloat(sopa))) {
           spectrumOpacity = Math.max(0.2, Math.min(1, parseFloat(sopa)));
         }
-        const fancy = localStorage.getItem('tuner.fancyMode');
-        if (fancy !== null) fancyMode = fancy === '1';
+        // One-time migration from the old single tuner.fancyMode key
+        // to the per-effect tuner.fx.* keys. If the legacy key is still
+        // present, mirror its value onto every per-effect flag (so a
+        // user who had 'fancy mode' on keeps every individual effect
+        // on) and then clear the old key so this branch is a no-op on
+        // subsequent loads. Per-effect keys take precedence if they
+        // already exist — the per-key reads below run after this, so
+        // they overwrite the migrated value cleanly.
+        const legacyFancy = localStorage.getItem('tuner.fancyMode');
+        if (legacyFancy !== null) {
+          const on = legacyFancy === '1' ? '1' : '0';
+          if (localStorage.getItem('tuner.fx.aurora') === null)
+            localStorage.setItem('tuner.fx.aurora', on);
+          if (localStorage.getItem('tuner.fx.cameraFilter') === null)
+            localStorage.setItem('tuner.fx.cameraFilter', on);
+          if (localStorage.getItem('tuner.fx.rulerShadow') === null)
+            localStorage.setItem('tuner.fx.rulerShadow', on);
+          if (localStorage.getItem('tuner.fx.fftFancy') === null)
+            localStorage.setItem('tuner.fx.fftFancy', on);
+          localStorage.removeItem('tuner.fancyMode');
+        }
+        // Per-effect visual toggle flags. Each is independent; defaults
+        // all false (set above) so an empty localStorage yields lo-fi.
+        const fxAurora = localStorage.getItem('tuner.fx.aurora');
+        if (fxAurora !== null) fx.aurora = fxAurora === '1';
+        const fxCam = localStorage.getItem('tuner.fx.cameraFilter');
+        if (fxCam !== null) fx.cameraFilter = fxCam === '1';
+        const fxShadow = localStorage.getItem('tuner.fx.rulerShadow');
+        if (fxShadow !== null) fx.rulerShadow = fxShadow === '1';
+        const fxFft = localStorage.getItem('tuner.fx.fftFancy');
+        if (fxFft !== null) fx.fftFancy = fxFft === '1';
       } catch (_) {}
       const lowcutCb = document.getElementById('voiceLowcut');
       const compressCb = document.getElementById('voiceCompression');
@@ -8742,18 +8841,73 @@
         });
       }
 
-      // Fancy-mode toggle. When flipped off, any in-flight cloud
-      // particles are cleared so leftovers don't keep rendering for the
-      // ~2-3 s tail of their life.
-      const fancyModeCb = document.getElementById('fancyModeToggle');
-      if (fancyModeCb) {
-        fancyModeCb.checked = !!fancyMode;
-        fancyModeCb.addEventListener('change', (e) => {
-          fancyMode = !!e.target.checked;
-          if (!fancyMode && typeof cloudParticles !== 'undefined') {
+      // Per-effect visual toggles. Each checkbox owns one fx.* flag and
+      // one tuner.fx.* localStorage key. The aurora handler also clears
+      // any in-flight cloud particles when turned off so leftovers don't
+      // keep rendering for the ~2-3 s tail of their life.
+      const fxAuroraCb = document.getElementById('fxAuroraToggle');
+      if (fxAuroraCb) {
+        fxAuroraCb.checked = !!fx.aurora;
+        fxAuroraCb.addEventListener('change', (e) => {
+          fx.aurora = !!e.target.checked;
+          if (!fx.aurora && typeof cloudParticles !== 'undefined') {
             cloudParticles.length = 0;
           }
-          try { localStorage.setItem('tuner.fancyMode', fancyMode ? '1' : '0'); } catch (_) {}
+          try { localStorage.setItem('tuner.fx.aurora', fx.aurora ? '1' : '0'); } catch (_) {}
+        });
+      }
+      const fxCamFilterCb = document.getElementById('fxCameraFilterToggle');
+      if (fxCamFilterCb) {
+        fxCamFilterCb.checked = !!fx.cameraFilter;
+        fxCamFilterCb.addEventListener('change', (e) => {
+          fx.cameraFilter = !!e.target.checked;
+          try { localStorage.setItem('tuner.fx.cameraFilter', fx.cameraFilter ? '1' : '0'); } catch (_) {}
+        });
+      }
+      const fxRulerShadowCb = document.getElementById('fxRulerShadowToggle');
+      if (fxRulerShadowCb) {
+        fxRulerShadowCb.checked = !!fx.rulerShadow;
+        fxRulerShadowCb.addEventListener('change', (e) => {
+          fx.rulerShadow = !!e.target.checked;
+          try { localStorage.setItem('tuner.fx.rulerShadow', fx.rulerShadow ? '1' : '0'); } catch (_) {}
+        });
+      }
+      const fxFftFancyCb = document.getElementById('fxFftFancyToggle');
+      if (fxFftFancyCb) {
+        fxFftFancyCb.checked = !!fx.fftFancy;
+        fxFftFancyCb.addEventListener('change', (e) => {
+          fx.fftFancy = !!e.target.checked;
+          try { localStorage.setItem('tuner.fx.fftFancy', fx.fftFancy ? '1' : '0'); } catch (_) {}
+        });
+      }
+
+      // Recording resolution selector — restore from localStorage and
+      // wire the <select>. applyRecRes rebuilds ASPECT_DIMS,
+      // CAPTURE_PIXEL_SCALE, and RECORD_BITRATE; the next draw() call
+      // resizes the canvas to match. The settings panel is force-hidden
+      // during active recording (enterRecordMode), so the user can't
+      // physically reach this selector mid-recording.
+      try {
+        const savedRes = localStorage.getItem('tuner.recRes');
+        if (savedRes && REC_RES_PROFILES[savedRes]) {
+          applyRecRes(savedRes);
+        } else if (savedRes === null) {
+          // First load on this branch — opt into 416×720 so Thomas
+          // gets the lower-res default and can A/B against 544×960
+          // from the selector. Persisted immediately so a second
+          // visit doesn't surprise-revert to the literal initializer.
+          applyRecRes('416x720');
+          try { localStorage.setItem('tuner.recRes', '416x720'); } catch (_) {}
+        }
+      } catch (_) {}
+      const recResSel = document.getElementById('recResSelect');
+      if (recResSel) {
+        recResSel.value = recRes;
+        recResSel.addEventListener('change', (e) => {
+          const v = e.target.value;
+          if (!REC_RES_PROFILES[v]) return;
+          applyRecRes(v);
+          try { localStorage.setItem('tuner.recRes', recRes); } catch (_) {}
         });
       }
 
