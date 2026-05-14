@@ -1741,6 +1741,14 @@
           <input type="checkbox" id="fancyModeToggle">
           <label for="fancyModeToggle">Fancy effects (heavier)</label>
         </div>
+      </div>
+
+      <!-- Studio settings: recording-only knobs. Whole section is gated
+           behind body.studio via .studio-only so casual visitors never
+           see it. Everything here exists to serve the reel-recording
+           pipeline; the tuner-as-tuner experience does not need it. -->
+      <div class="control-section studio-only">
+        <div class="section-header">Studio settings</div>
         <!-- Bluetooth headphone output-latency compensation. Layer
              playback during stacked recording is shifted forward by this
              amount on the recording-bus branch so it lines up with the
@@ -1748,7 +1756,7 @@
              baked in because they sing to what they hear). 200ms is a
              reasonable AirPods default; wired headphones might want 20.
              Persists under tuner.btLatencyMs. -->
-        <label style="font-size: 12px; color: #888; margin-top: 6px; margin-bottom: 2px;">Headphone delay <span id="btLatencyVal" style="color: #aaa;">200 ms</span></label>
+        <label style="font-size: 12px; color: #888; margin-bottom: 2px;">Headphone delay <span id="btLatencyVal" style="color: #aaa;">200 ms</span></label>
         <div class="slider-row">
           <input type="range" id="btLatencySlider" min="0" max="1200" value="200" step="5">
         </div>
@@ -1761,8 +1769,8 @@
              trailing visuals will be silent if later layers are longer
              than the most-recent take. Persists under
              tuner.reelLengthMode. -->
-        <label class="studio-only" style="font-size: 12px; color: #888; margin-top: 6px; margin-bottom: 2px;">Reel length</label>
-        <div class="studio-only" style="display: flex; gap: 8px;">
+        <label style="font-size: 12px; color: #888; margin-top: 6px; margin-bottom: 2px;">Reel length</label>
+        <div style="display: flex; gap: 8px;">
           <select id="reelLengthMode" style="flex: 1;">
             <option value="shortest" selected>Shortest layer (default)</option>
             <option value="longest">Longest layer (later cells go black)</option>
