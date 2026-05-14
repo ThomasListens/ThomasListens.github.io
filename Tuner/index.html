@@ -1732,15 +1732,6 @@
         <div class="slider-row">
           <input type="range" id="spectrumOpacity" min="20" max="100" value="85">
         </div>
-        <!-- Fancy mode: gates the heavy visuals (aurora particle cloud,
-             camera CSS filter chain) so Pixel-class phones can sustain
-             30 fps during reel recording. Default OFF — lo-fi by default,
-             flip on for a high-effects desktop preview.
-             Persists under tuner.fancyMode. -->
-        <div class="checkbox-row" style="margin-top: 6px;">
-          <input type="checkbox" id="fancyModeToggle">
-          <label for="fancyModeToggle">Fancy effects (heavier)</label>
-        </div>
       </div>
 
       <!-- Studio settings: recording-only knobs. Whole section is gated
@@ -1749,6 +1740,28 @@
            pipeline; the tuner-as-tuner experience does not need it. -->
       <div class="control-section studio-only">
         <div class="section-header">Studio settings</div>
+        <!-- Per-effect visual toggles. Replaces the old single
+             "Fancy effects" master switch with individual control per
+             effect — Thomas wants to flip the camera filter on its own
+             (for B&W reels) without dragging in the aurora cloud cost.
+             All default OFF — lo-fi first, "art direction over pixel
+             count". Each flag persists under its own tuner.fx.* key. -->
+        <div class="checkbox-row" style="margin-top: 4px;">
+          <input type="checkbox" id="fxAuroraToggle">
+          <label for="fxAuroraToggle">Aurora backdrop</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="fxCameraFilterToggle">
+          <label for="fxCameraFilterToggle">Camera filter</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="fxRulerShadowToggle">
+          <label for="fxRulerShadowToggle">Ruler glow</label>
+        </div>
+        <div class="checkbox-row" style="margin-bottom: 6px;">
+          <input type="checkbox" id="fxFftFancyToggle">
+          <label for="fxFftFancyToggle">Spectrum detail</label>
+        </div>
         <!-- Bluetooth headphone output-latency compensation. Layer
              playback during stacked recording is shifted forward by this
              amount on the recording-bus branch so it lines up with the
@@ -2394,11 +2407,22 @@
     // whether the spectrum competes with the camera footage or recedes
     // into the background. Persisted under tuner.spectrumOpacity.
     let spectrumOpacity = 0.85;
-    // Fancy mode: gates the expensive eye-candy (aurora particle cloud,
-    // camera CSS filter chain) so Pixel-class phones don't drop frames
-    // during reel recording. Default OFF; togglable from the side panel
-    // and persisted under tuner.fancyMode.
-    let fancyMode = false;
+    // Per-effect visual toggles. Each flag gates one piece of eye-candy
+    // that was previously bundled under a single "fancy mode" master
+    // switch. Splitting them lets Thomas pick (e.g.) just the camera
+    // filter chain for B&W reels without paying for the aurora cloud.
+    // All default OFF — lo-fi first; the studio panel surfaces them
+    // individually. Each flag persists under its own tuner.fx.* key.
+    //   aurora       → particle cloud + ambient idle stars
+    //   cameraFilter → brightness/contrast/grayscale/sepia/saturate chain
+    //   rulerShadow  → Hz ruler tick + label text shadow
+    //   fftFancy     → spectrum energy strip slice count (80 vs 32)
+    let fx = {
+      aurora: false,
+      cameraFilter: false,
+      rulerShadow: false,
+      fftFancy: false,
+    };
     // Master output trim. Range -20..+6 dB on the slider (0..100).
     // Persisted under tuner.outputLevelDb. Applied via the
     // masterOutputGain node inserted in buildMicProcessing.
@@ -3199,8 +3223,8 @@
       // hue-rotate/saturate) are GPU shader passes per camera draw. On
       // a Pixel-class phone the chain alone can knock 5-10 fps off a
       // 1080p capture. In lo-fi mode we skip it entirely; the B&W /
-      // brightness sliders no-op until fancy effects are turned on.
-      if (!fancyMode) return 'none';
+      // brightness sliders no-op until the camera-filter toggle is on.
+      if (!fx.cameraFilter) return 'none';
       const parts = [];
       if (videoBrightness !== 1) parts.push(`brightness(${videoBrightness})`);
       if (videoContrast !== 1) parts.push(`contrast(${videoContrast})`);
@@ -3467,7 +3491,7 @@
       // and lets us skip shadow entirely in lo-fi mode (canvas shadows
       // are a known mobile-GPU hotspot — blur+offset force a rasterize
       // pass per call).
-      const drawShadow = fancyMode;
+      const drawShadow = fx.rulerShadow;
       if (drawShadow) {
         ctx.save();
         ctx.shadowColor = 'rgba(0,0,0,0.6)';
@@ -3620,9 +3644,10 @@
 
       // Spawn rate scales with total energy. Cap at ~6/sec total - even
       // when very loud, sparse > frantic. Hard particle ceiling at 60.
-      // Skipped entirely when fancyMode is off; ~60 radial-gradient fills
-      // per frame is the heaviest single cost in this view on a Pixel 7.
-      const spawnRate = fancyMode ? Math.min(6, 0.4 + totalEnergy * 1.6) : 0;
+      // Skipped entirely when the aurora flag is off; ~60 radial-gradient
+      // fills per frame is the heaviest single cost in this view on a
+      // Pixel 7.
+      const spawnRate = fx.aurora ? Math.min(6, 0.4 + totalEnergy * 1.6) : 0;
       let spawnBudget = spawnRate * dt;
       let attempts = 0;
       while (spawnBudget > 0 && cloudParticles.length < 60 && attempts < 4) {
@@ -3651,9 +3676,9 @@
       // Ambient stars: when nothing's coming through, drop one low-energy
       // particle every ~5-9 sec near canvas center. Cool wandering hue,
       // longer lifetime - reads as distant atmosphere, not measurement.
-      // Gated with the main spawn loop above so the cloud field stays dark
-      // entirely in lo-fi mode.
-      if (fancyMode && totalEnergy < 0.04) {
+      // Gated with the main spawn loop above (same aurora flag) so the
+      // cloud field stays dark entirely in lo-fi mode.
+      if (fx.aurora && totalEnergy < 0.04) {
         if (cloudLastIdleSpawnTime === 0) {
           cloudLastIdleSpawnTime = tNow;
           cloudNextIdleInterval = 5 + Math.random() * 4;
@@ -3711,10 +3736,10 @@
           return Math.pow(2, minLf + yNorm * lfSpan);
         };
         const stripWidth = 6 * S;
-        // Slice count: 32 in lo-fi (the default), 80 when fancy is on.
-        // 32 is still finer than the rail's pixel-perceptible resolution
-        // on phones and ~60% cheaper per frame.
-        const numSlices = fancyMode ? 80 : 32;
+        // Slice count: 32 in lo-fi (the default), 80 when the fft-detail
+        // flag is on. 32 is still finer than the rail's pixel-perceptible
+        // resolution on phones and ~60% cheaper per frame.
+        const numSlices = fx.fftFancy ? 80 : 32;
         const sliceHeight = rulerHeight / numSlices;
         const stripBaseAlpha = alphaMul * spectrumOpacity * 0.55;
         if (stripBaseAlpha > 0.001) {
@@ -8646,8 +8671,16 @@
         if (sopa !== null && !isNaN(parseFloat(sopa))) {
           spectrumOpacity = Math.max(0.2, Math.min(1, parseFloat(sopa)));
         }
-        const fancy = localStorage.getItem('tuner.fancyMode');
-        if (fancy !== null) fancyMode = fancy === '1';
+        // Per-effect visual toggle flags. Each is independent; defaults
+        // all false (set above) so an empty localStorage yields lo-fi.
+        const fxAurora = localStorage.getItem('tuner.fx.aurora');
+        if (fxAurora !== null) fx.aurora = fxAurora === '1';
+        const fxCam = localStorage.getItem('tuner.fx.cameraFilter');
+        if (fxCam !== null) fx.cameraFilter = fxCam === '1';
+        const fxShadow = localStorage.getItem('tuner.fx.rulerShadow');
+        if (fxShadow !== null) fx.rulerShadow = fxShadow === '1';
+        const fxFft = localStorage.getItem('tuner.fx.fftFancy');
+        if (fxFft !== null) fx.fftFancy = fxFft === '1';
       } catch (_) {}
       const lowcutCb = document.getElementById('voiceLowcut');
       const compressCb = document.getElementById('voiceCompression');
@@ -8712,18 +8745,43 @@
         });
       }
 
-      // Fancy-mode toggle. When flipped off, any in-flight cloud
-      // particles are cleared so leftovers don't keep rendering for the
-      // ~2-3 s tail of their life.
-      const fancyModeCb = document.getElementById('fancyModeToggle');
-      if (fancyModeCb) {
-        fancyModeCb.checked = !!fancyMode;
-        fancyModeCb.addEventListener('change', (e) => {
-          fancyMode = !!e.target.checked;
-          if (!fancyMode && typeof cloudParticles !== 'undefined') {
+      // Per-effect visual toggles. Each checkbox owns one fx.* flag and
+      // one tuner.fx.* localStorage key. The aurora handler also clears
+      // any in-flight cloud particles when turned off so leftovers don't
+      // keep rendering for the ~2-3 s tail of their life.
+      const fxAuroraCb = document.getElementById('fxAuroraToggle');
+      if (fxAuroraCb) {
+        fxAuroraCb.checked = !!fx.aurora;
+        fxAuroraCb.addEventListener('change', (e) => {
+          fx.aurora = !!e.target.checked;
+          if (!fx.aurora && typeof cloudParticles !== 'undefined') {
             cloudParticles.length = 0;
           }
-          try { localStorage.setItem('tuner.fancyMode', fancyMode ? '1' : '0'); } catch (_) {}
+          try { localStorage.setItem('tuner.fx.aurora', fx.aurora ? '1' : '0'); } catch (_) {}
+        });
+      }
+      const fxCamFilterCb = document.getElementById('fxCameraFilterToggle');
+      if (fxCamFilterCb) {
+        fxCamFilterCb.checked = !!fx.cameraFilter;
+        fxCamFilterCb.addEventListener('change', (e) => {
+          fx.cameraFilter = !!e.target.checked;
+          try { localStorage.setItem('tuner.fx.cameraFilter', fx.cameraFilter ? '1' : '0'); } catch (_) {}
+        });
+      }
+      const fxRulerShadowCb = document.getElementById('fxRulerShadowToggle');
+      if (fxRulerShadowCb) {
+        fxRulerShadowCb.checked = !!fx.rulerShadow;
+        fxRulerShadowCb.addEventListener('change', (e) => {
+          fx.rulerShadow = !!e.target.checked;
+          try { localStorage.setItem('tuner.fx.rulerShadow', fx.rulerShadow ? '1' : '0'); } catch (_) {}
+        });
+      }
+      const fxFftFancyCb = document.getElementById('fxFftFancyToggle');
+      if (fxFftFancyCb) {
+        fxFftFancyCb.checked = !!fx.fftFancy;
+        fxFftFancyCb.addEventListener('change', (e) => {
+          fx.fftFancy = !!e.target.checked;
+          try { localStorage.setItem('tuner.fx.fftFancy', fx.fftFancy ? '1' : '0'); } catch (_) {}
         });
       }
 
