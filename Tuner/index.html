@@ -719,6 +719,75 @@
       background: rgba(40, 40, 40, 0.9);
     }
 
+    /* Studio / recording settings live inside the dock alongside the
+       per-take video tweaks. <select> dropdowns and a compact row of fx
+       checkboxes; styled to match the dark, semi-transparent dock look.
+       Hidden by the existing settings-hidden > :not(.record-essential)
+       rule when the user collapses the dock with #settingsToggle. */
+    #recordOverlay select {
+      flex: 1;
+      min-width: 0;
+      background: rgba(20, 20, 20, 0.8);
+      color: #ddd;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 12px;
+      font-family: inherit;
+      letter-spacing: 0.3px;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    #recordOverlay select:focus {
+      outline: none;
+      border-color: #666;
+    }
+    #recordOverlay .check-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px 14px;
+      padding: 0 8px;
+      max-width: 480px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    #recordOverlay .check-row label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #aaa;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      user-select: none;
+    }
+    #recordOverlay .check-row input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      accent-color: #ccc;
+      cursor: pointer;
+      flex: none;
+    }
+    #recordOverlay .value-badge {
+      font-size: 10px;
+      color: #888;
+      letter-spacing: 0.4px;
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+      min-width: 44px;
+      text-align: right;
+    }
+    #recordOverlay .studio-divider {
+      border-top: 1px solid rgba(255,255,255,0.08);
+      margin: 4px auto 0;
+      max-width: 460px;
+      width: 100%;
+    }
+
     /* Landscape / wide screens: dock controls to the right of the canvas */
     @media (orientation: landscape) and (min-width: 768px) {
       body.record-mode #rulerContainer {
@@ -1734,72 +1803,14 @@
         </div>
       </div>
 
-      <!-- Studio settings: recording-only knobs. Whole section is gated
-           behind body.studio via .studio-only so casual visitors never
-           see it. Everything here exists to serve the reel-recording
-           pipeline; the tuner-as-tuner experience does not need it. -->
+      <!-- Studio settings: recording-only knobs. The contents (resolution,
+           per-effect fx toggles, headphone delay, reel length) were
+           relocated into #recordOverlay so all video-related controls
+           live together in the record-mode dock. The wrapper is left
+           empty here for one commit to keep the relocation diff tight;
+           the next commit removes it. -->
       <div class="control-section studio-only">
         <div class="section-header">Studio settings</div>
-        <!-- Recording resolution. Picks the base 9:16 portrait W×H plus
-             a matching MediaRecorder bitrate. All values are H.264
-             macroblock-aligned. Persists under tuner.recRes. -->
-        <label style="font-size: 12px; color: #888; margin-bottom: 2px;">Recording resolution</label>
-        <div style="display: flex; gap: 8px; margin-bottom: 6px;">
-          <select id="recResSelect" style="flex: 1;">
-            <option value="544x960">544×960 · 3 Mbps</option>
-            <option value="416x720">416×720 · 2.2 Mbps</option>
-            <option value="320x576">320×576 · 1.5 Mbps</option>
-          </select>
-        </div>
-        <!-- Per-effect visual toggles. Replaces the old single
-             "Fancy effects" master switch with individual control per
-             effect — Thomas wants to flip the camera filter on its own
-             (for B&W reels) without dragging in the aurora cloud cost.
-             All default OFF — lo-fi first, "art direction over pixel
-             count". Each flag persists under its own tuner.fx.* key. -->
-        <div class="checkbox-row" style="margin-top: 4px;">
-          <input type="checkbox" id="fxAuroraToggle">
-          <label for="fxAuroraToggle">Aurora backdrop</label>
-        </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="fxCameraFilterToggle">
-          <label for="fxCameraFilterToggle">Camera filter</label>
-        </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="fxRulerShadowToggle">
-          <label for="fxRulerShadowToggle">Ruler glow</label>
-        </div>
-        <div class="checkbox-row" style="margin-bottom: 6px;">
-          <input type="checkbox" id="fxFftFancyToggle">
-          <label for="fxFftFancyToggle">Spectrum detail</label>
-        </div>
-        <!-- Bluetooth headphone output-latency compensation. Layer
-             playback during stacked recording is shifted forward by this
-             amount on the recording-bus branch so it lines up with the
-             mic input (the user's voice arrives at MSAD with the BT lag
-             baked in because they sing to what they hear). 200ms is a
-             reasonable AirPods default; wired headphones might want 20.
-             Persists under tuner.btLatencyMs. -->
-        <label style="font-size: 12px; color: #888; margin-bottom: 2px;">Headphone delay <span id="btLatencyVal" style="color: #aaa;">200 ms</span></label>
-        <div class="slider-row">
-          <input type="range" id="btLatencySlider" min="0" max="1200" value="200" step="5">
-        </div>
-        <!-- Reel length mode. "Shortest" (default) ends the composed
-             reel when the shortest layer ends — the historical
-             behaviour, preserves audio sync. "Longest" runs until the
-             longest layer ends; cells whose video has finished are
-             painted black for the remainder of the reel. Audio still
-             follows the most-recent take, so in longest mode the
-             trailing visuals will be silent if later layers are longer
-             than the most-recent take. Persists under
-             tuner.reelLengthMode. -->
-        <label style="font-size: 12px; color: #888; margin-top: 6px; margin-bottom: 2px;">Reel length</label>
-        <div style="display: flex; gap: 8px;">
-          <select id="reelLengthMode" style="flex: 1;">
-            <option value="shortest" selected>Shortest layer (default)</option>
-            <option value="longest">Longest layer (later cells go black)</option>
-          </select>
-        </div>
       </div>
 
       <div class="control-section">
@@ -2170,6 +2181,43 @@
       <label>Label Sz</label>
       <input type="range" id="ratioSizeSlider" min="40" max="300" value="105">
     </div>
+
+    <!-- Studio / recording settings. Relocated from the side panel so
+         all video-related knobs live together inside the record-mode
+         dock. Reaches every <select>/<input> through the same IDs the
+         init code already wires (recResSelect, fxAuroraToggle,
+         fxCameraFilterToggle, fxRulerShadowToggle, fxFftFancyToggle,
+         btLatencySlider, btLatencyVal, reelLengthMode), so the JS
+         wiring is unchanged.  Order: capture-format knobs first, then
+         visual fx switches, then sync/timing, then output framing. -->
+    <div class="studio-divider"></div>
+    <div class="feather-row">
+      <label>Res</label>
+      <select id="recResSelect">
+        <option value="544x960">544×960 · 3 Mbps</option>
+        <option value="416x720">416×720 · 2.2 Mbps</option>
+        <option value="320x576">320×576 · 1.5 Mbps</option>
+      </select>
+    </div>
+    <div class="check-row">
+      <label><input type="checkbox" id="fxAuroraToggle"> Aurora</label>
+      <label><input type="checkbox" id="fxCameraFilterToggle"> Filter</label>
+      <label><input type="checkbox" id="fxRulerShadowToggle"> Glow</label>
+      <label><input type="checkbox" id="fxFftFancyToggle"> Detail</label>
+    </div>
+    <div class="feather-row">
+      <label>BT Lag</label>
+      <input type="range" id="btLatencySlider" min="0" max="1200" value="200" step="5">
+      <span id="btLatencyVal" class="value-badge">200 ms</span>
+    </div>
+    <div class="feather-row">
+      <label>Reel</label>
+      <select id="reelLengthMode">
+        <option value="shortest" selected>Shortest (default)</option>
+        <option value="longest">Longest (later cells black)</option>
+      </select>
+    </div>
+
     <div class="record-row record-essential">
       <button type="button" id="layerAddBtn" title="Add this take as a harmony layer" aria-label="Add layer">⊕</button>
       <button id="discardRecBtn" title="Discard recording" aria-label="Discard recording">🗑</button>
