@@ -8853,6 +8853,13 @@
         const savedRes = localStorage.getItem('tuner.recRes');
         if (savedRes && REC_RES_PROFILES[savedRes]) {
           applyRecRes(savedRes);
+        } else if (savedRes === null) {
+          // First load on this branch — opt into 416×720 so Thomas
+          // gets the lower-res default and can A/B against 544×960
+          // from the selector. Persisted immediately so a second
+          // visit doesn't surprise-revert to the literal initializer.
+          applyRecRes('416x720');
+          try { localStorage.setItem('tuner.recRes', '416x720'); } catch (_) {}
         }
       } catch (_) {}
       const recResSel = document.getElementById('recResSelect');
