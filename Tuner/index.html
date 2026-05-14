@@ -8671,6 +8671,27 @@
         if (sopa !== null && !isNaN(parseFloat(sopa))) {
           spectrumOpacity = Math.max(0.2, Math.min(1, parseFloat(sopa)));
         }
+        // One-time migration from the old single tuner.fancyMode key
+        // to the per-effect tuner.fx.* keys. If the legacy key is still
+        // present, mirror its value onto every per-effect flag (so a
+        // user who had 'fancy mode' on keeps every individual effect
+        // on) and then clear the old key so this branch is a no-op on
+        // subsequent loads. Per-effect keys take precedence if they
+        // already exist — the per-key reads below run after this, so
+        // they overwrite the migrated value cleanly.
+        const legacyFancy = localStorage.getItem('tuner.fancyMode');
+        if (legacyFancy !== null) {
+          const on = legacyFancy === '1' ? '1' : '0';
+          if (localStorage.getItem('tuner.fx.aurora') === null)
+            localStorage.setItem('tuner.fx.aurora', on);
+          if (localStorage.getItem('tuner.fx.cameraFilter') === null)
+            localStorage.setItem('tuner.fx.cameraFilter', on);
+          if (localStorage.getItem('tuner.fx.rulerShadow') === null)
+            localStorage.setItem('tuner.fx.rulerShadow', on);
+          if (localStorage.getItem('tuner.fx.fftFancy') === null)
+            localStorage.setItem('tuner.fx.fftFancy', on);
+          localStorage.removeItem('tuner.fancyMode');
+        }
         // Per-effect visual toggle flags. Each is independent; defaults
         // all false (set above) so an empty localStorage yields lo-fi.
         const fxAurora = localStorage.getItem('tuner.fx.aurora');
