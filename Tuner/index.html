@@ -2185,7 +2185,9 @@
       <label>Res</label>
       <select id="recResSelect">
         <option value="544x960">544×960 · 3 Mbps</option>
+        <option value="480x848">480×848 · 2.5 Mbps</option>
         <option value="416x720">416×720 · 2.2 Mbps</option>
+        <option value="368x640">368×640 · 1.8 Mbps</option>
         <option value="320x576">320×576 · 1.5 Mbps</option>
       </select>
     </div>
@@ -2611,14 +2613,21 @@
     // grid (680/520/400) — historical, the encoder tolerates 8-align
     // for those values.
     //
-    // Three profiles, selected from the studio settings panel via
-    // tuner.recRes. Bitrate scales with pixel count. Each picks the
-    // base 9:16 W×H; 4:5 and 1:1 are derived from W. The current
-    // selection drives ASPECT_DIMS, CAPTURE_PIXEL_SCALE, and the
-    // MediaRecorder videoBitsPerSecond used in every record path.
+    // Five profiles, selected from the record-mode dock via tuner.recRes.
+    // Bitrate scales with pixel count. Each picks the base 9:16 W×H; 4:5
+    // and 1:1 are derived from W. The current selection drives
+    // ASPECT_DIMS, CAPTURE_PIXEL_SCALE, and the MediaRecorder
+    // videoBitsPerSecond used in every record path.
+    //
+    // Heavy stacks (6-8 layers) want a smaller canvas — per-frame
+    // compositing of 8 cells is the actual cost on Pixel 7. The
+    // intermediate rungs (480×848, 368×640) give Thomas headroom to
+    // dial capture size to layer count.
     const REC_RES_PROFILES = {
       '544x960': { w: 544, h: 960, bitrate: 3_000_000 },
+      '480x848': { w: 480, h: 848, bitrate: 2_500_000 },
       '416x720': { w: 416, h: 720, bitrate: 2_200_000 },
+      '368x640': { w: 368, h: 640, bitrate: 1_800_000 },
       '320x576': { w: 320, h: 576, bitrate: 1_500_000 },
     };
     let recRes = '544x960';
@@ -6169,8 +6178,12 @@
     // the layout follows the recRes selector). All cell sizes are
     // fractions of W/H — the historic 544×960 numbers were 480=H/2,
     // 320=H/3, 240=H/4, 272=W/2; expressed as fractions they reproduce
-    // exactly at any resRes profile whose W and H divide evenly by
-    // 4 and 12 respectively (all three current profiles qualify).
+    // exactly at any recRes profile whose W and H divide evenly by 4
+    // and 12 (544/960, 416/720, 320/576). Profiles where H isn't a
+    // multiple of 12 (480/848, 368/640) get a 1-2 px height offset on
+    // n=3/5/6 stacks — Math.floor + the "H - h3*2" trailing-cell
+    // expression absorb the remainder into the last row, so cells stay
+    // gap-free and the encoder still sees a clean 8/16-aligned frame.
     function getStackCells(n) {
       const dims = ASPECT_DIMS['9:16'];
       const W = dims[0], H = dims[1];
