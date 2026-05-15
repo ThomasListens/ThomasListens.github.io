@@ -580,20 +580,22 @@
       display: block;
     }
 
-    /* Hidden record-mode entry: invisible 44×44 button parked in the
-       top-right corner. Triple-tap enters record mode (see
-       setupRecordCornerTap). Nothing visible — a stranger can't see it,
-       Thomas knows the corner. In record-mode the corner is occupied by
-       #exitRecBtn and #settingsToggle (z-index 200+); pointer-events are
-       turned off there so taps fall through to those buttons (exit uses
-       the visible X). Outside record mode the corner is empty, so a tap
-       reliably hits this. */
+    /* Hidden record-mode entry: invisible 64×64 button parked in the
+       top-right corner. Triple-tap OR ~1.2 s press-and-hold enters
+       record mode (see setupRecordCornerTap). Nothing visible — a
+       stranger can't see it, Thomas knows the corner. In record-mode
+       the corner is occupied by #exitRecBtn and #settingsToggle
+       (z-index 200+); pointer-events are turned off there so taps fall
+       through to those buttons (exit uses the visible X). Outside
+       record mode the corner is empty, so a tap reliably hits this.
+       Hit area is 64 (not 44) so a one-handed thumb on a phone lands
+       it without aiming. */
     #recordCornerTap {
       position: fixed;
       top: 0;
       right: 0;
-      width: 44px;
-      height: 44px;
+      width: 64px;
+      height: 64px;
       padding: 0;
       margin: 0;
       border: 0;
@@ -8361,13 +8363,20 @@
       applySettingsHidden();
     }
 
-    // Record-mode entry gesture: triple-tap on the invisible top-right
-    // corner target. Three taps within TAP_WINDOW_MS of each other
-    // (i.e. taps[2] - taps[0] <= TAP_WINDOW_MS) enters record mode and
-    // surfaces a brief toast. A single stray tap does nothing; two
-    // taps within the window also do nothing. The corner tap is
-    // covered by #exitRecBtn while in record mode (pointer-events:none
-    // there), so exit is via the visible X — not the triple-tap.
+    // Record-mode entry gesture: triple-tap OR press-and-hold on the
+    // invisible top-right corner target.
+    //
+    // History: the previous version counted on pointerup with a 600 ms
+    // window. On a phone that was unreliable for two reasons —
+    // (a) pointerup fires only after the finger lifts, and any micro-
+    // swipe between down and up gets the event reclassified, dropping
+    // the count; (b) three deliberate taps inside 600 ms is genuinely
+    // tight one-handed. Now we count on pointerdown (the moment skin
+    // touches glass) inside a 1000 ms window, and add a 1200 ms press-
+    // and-hold as a second, more forgiving way in. Either gesture
+    // surfaces the same toast. The corner tap is covered by #exitRecBtn
+    // while in record mode (pointer-events:none there), so exit is via
+    // the visible X — not these gestures.
     let recordToastTimer = null;
     function showRecordToast(text) {
       const el = document.getElementById('recordToast');
@@ -8383,29 +8392,42 @@
     function setupRecordCornerTap() {
       const target = document.getElementById('recordCornerTap');
       if (!target) return;
-      const TAP_WINDOW_MS = 600;
+      const TAP_WINDOW_MS = 1000;
+      const HOLD_MS = 1200;
       let taps = [];
-      const onTap = (e) => {
-        // Mouse: primary button only. Touch / pen: no button filter.
-        if (e.pointerType === 'mouse' && e.button !== 0) return;
-        e.preventDefault();
-        const now = performance.now();
-        // Drop any tap older than the window so a slow first/second tap
-        // doesn't bank credit indefinitely.
-        taps.push(now);
-        taps = taps.filter(t => now - t <= TAP_WINDOW_MS);
-        if (taps.length >= 3) {
-          taps = [];
-          if (recordMode) {
-            exitRecordMode();
-            showRecordToast('Recording off');
-          } else {
-            showRecordToast('Recording on');
-            enterRecordMode();
-          }
+      let holdTimer = null;
+
+      const triggerEntry = () => {
+        taps = [];
+        if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+        if (recordMode) {
+          exitRecordMode();
+          showRecordToast('Recording off');
+        } else {
+          showRecordToast('Recording on');
+          enterRecordMode();
         }
       };
-      target.addEventListener('pointerup', onTap);
+
+      const onDown = (e) => {
+        // Mouse: primary button only. Touch / pen: no button filter.
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (holdTimer) clearTimeout(holdTimer);
+        holdTimer = setTimeout(triggerEntry, HOLD_MS);
+
+        const now = performance.now();
+        taps.push(now);
+        taps = taps.filter(t => now - t <= TAP_WINDOW_MS);
+        if (taps.length >= 3) triggerEntry();
+      };
+      const cancelHold = () => {
+        if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+      };
+
+      target.addEventListener('pointerdown', onDown);
+      target.addEventListener('pointerup', cancelHold);
+      target.addEventListener('pointercancel', cancelHold);
+      target.addEventListener('pointerleave', cancelHold);
       // Block context-menu on long-press so iOS / Android don't pop up
       // the "save image" / text-selection sheet over the corner.
       target.addEventListener('contextmenu', (e) => e.preventDefault());
