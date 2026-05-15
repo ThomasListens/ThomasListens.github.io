@@ -906,6 +906,52 @@
     #recordOverlay .feather-row > .bt-nudge {
       margin: 0 -3px;
     }
+    /* Auto / Calibrate pill buttons in the new Sync row. Two visual
+       states: idle and .active (Auto button when auto mode is engaged).
+       .busy disables interaction while a calibration is running. */
+    #recordOverlay .bt-pill {
+      height: 26px;
+      padding: 0 10px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 6px;
+      color: #ddd;
+      font-size: 10px;
+      line-height: 1;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      font-variant-numeric: tabular-nums;
+      flex: 0 0 auto;
+    }
+    #recordOverlay .bt-pill.active {
+      background: rgba(120,200,120,0.18);
+      border-color: rgba(120,200,120,0.5);
+      color: #cfeacc;
+    }
+    #recordOverlay .bt-pill:active {
+      background: rgba(255,255,255,0.16);
+    }
+    #recordOverlay .bt-pill.busy {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+    /* The Sync status readout — "Auto: 247ms (BT)" / "Manual: 350ms (Speaker)" /
+       "Calibrating…" / "Calibrated: 280ms (BT)". Center-aligned between the
+       Auto and Calibrate pills, takes the remaining row space. */
+    #recordOverlay .lat-status {
+      font-size: 10px;
+      color: #aaa;
+      letter-spacing: 0.4px;
+      flex: 1 1 auto;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     #recordOverlay .studio-divider {
       border-top: 1px solid rgba(255,255,255,0.08);
       margin: 4px auto 0;
@@ -2394,7 +2440,13 @@
       <label><input type="checkbox" id="btHeadphonesOn" checked> Using Bluetooth headphones</label>
     </div>
     <div class="feather-row">
-      <label>BT Lag</label>
+      <label>Sync</label>
+      <button type="button" id="btLatencyAuto" class="bt-pill active" aria-label="Use automatic latency from browser">Auto</button>
+      <span id="btLatencyStatus" class="lat-status">Auto: …</span>
+      <button type="button" id="btLatencyCalibrate" class="bt-pill" aria-label="Run latency calibration">Calibrate</button>
+    </div>
+    <div class="feather-row">
+      <label>Manual</label>
       <button type="button" id="btLatencyDown" class="bt-nudge" aria-label="Decrease BT lag by 5 ms">−</button>
       <input type="range" id="btLatencySlider" min="0" max="1200" value="200" step="5">
       <button type="button" id="btLatencyUp" class="bt-nudge" aria-label="Increase BT lag by 5 ms">+</button>
@@ -2568,8 +2620,9 @@
     //                      record-stop or discard without leaking nodes)
     // btLatencyMs:         the EFFECTIVE current output-delay compensation
     //                      (ms) read by scheduleLayerPlayback. Always
-    //                      mirrors the slider; the underlying stored value
-    //                      depends on btHeadphonesOn.
+    //                      mirrors the slider. In Auto mode the source
+    //                      is audioContext.outputLatency (refreshed live);
+    //                      in Manual mode it's the per-toggle slot.
     // btHeadphonesOn:      true when the singer is monitoring through
     //                      Bluetooth headphones (large output latency,
     //                      default 200ms). False for speaker / wired
@@ -2616,6 +2669,24 @@
     let btLatencyMsBt = 200;
     let btLatencyMsNoBt = 80;
     let btHeadphonesOn = true;
+    // Auto-latency state. When btAutoMode is true the effective btLatencyMs
+    // is driven by audioContext.outputLatency (read live + on output-device
+    // change), so a fresh user gets sensible alignment without ever
+    // touching the slider. Manual mode (slider drag / nudge buttons /
+    // calibration result) overrides auto and remembers the value in the
+    // active BT/non-BT slot.
+    //
+    // btLatencySource is purely a status-text hint: 'auto' | 'manual' |
+    // 'calibrated'. Doesn't affect the effective value — that's always
+    // btLatencyMs at the read site (scheduleLayerPlayback).
+    //
+    // Persisted: tuner.btAutoMode (the flag itself).
+    let btAutoMode = true;
+    let btAutoLatencyMs = 0;
+    let btLatencySource = 'auto';
+    let _autoLatencyPollId = null;
+    let _autoLatencyInit = false;
+    let _calibrationBusy = false;
     // reelLengthMode: 'shortest' (current behavior — reel ends when the
     // shortest layer ends, audio always sync'd) or 'longest' (reel runs
     // until the longest layer ends; layers that have ended are painted
@@ -3220,7 +3291,114 @@
       if (audioContext.state === 'suspended') {
         audioContext.resume().catch(() => {});
       }
+      initAutoLatencyOnce();
       return audioContext;
+    }
+
+    // ---- Auto-latency (outputLatency-driven compensation) -----------
+    // Modern browsers expose AudioContext.outputLatency: the wall-clock
+    // delay between an audio sample entering destination and it
+    // physically being heard. On Android Chrome this includes the
+    // Bluetooth profile latency when BT output is active. We read it
+    // here, treat it as the default "Auto" compensation, and re-read
+    // on output-device change so plugging/unplugging headphones
+    // re-aligns the recording automatically. Rounded to nearest 5 ms
+    // for tidy display + to match the slider step.
+    //
+    // Returns null when outputLatency is unsupported / zero / nonsense,
+    // signalling the caller to fall back to the last manual slot and
+    // hint at Calibrate.
+    function readOutputLatencyMs() {
+      if (!audioContext) return null;
+      const v = audioContext.outputLatency;
+      if (typeof v !== 'number' || !isFinite(v) || v <= 0) return null;
+      return Math.round((v * 1000) / 5) * 5;
+    }
+    // Repaints the Sync status row to match current state. Keeps the
+    // "what is happening right now" obvious: Auto/Manual/Calibrated +
+    // value + (BT|Speaker) tag. _calibrationBusy short-circuits to
+    // "Calibrating…" so the user knows the next ~3 s is the routine.
+    function updateBtStatus() {
+      const statusEl = document.getElementById('btLatencyStatus');
+      const autoBtn  = document.getElementById('btLatencyAuto');
+      if (autoBtn) autoBtn.classList.toggle('active', btAutoMode);
+      if (!statusEl) return;
+      const tag = btHeadphonesOn ? 'BT' : 'Speaker';
+      if (_calibrationBusy) {
+        statusEl.textContent = 'Calibrating…';
+        return;
+      }
+      if (btAutoMode) {
+        if (btAutoLatencyMs > 0) {
+          statusEl.textContent = `Auto: ${btAutoLatencyMs}ms (${tag})`;
+        } else {
+          statusEl.textContent = `Auto: unavailable — try Calibrate`;
+        }
+      } else if (btLatencySource === 'calibrated') {
+        statusEl.textContent = `Calibrated: ${btLatencyMs}ms (${tag})`;
+      } else {
+        statusEl.textContent = `Manual: ${btLatencyMs}ms (${tag})`;
+      }
+    }
+    // Internal write — sets the EFFECTIVE compensation and mirrors it
+    // to slider + badge. Does NOT touch the manual slot or auto flag.
+    // Called by every code path that updates the effective value.
+    function _writeEffectiveBtLatency(ms) {
+      const n = Math.max(0, Math.min(1200, Math.round(ms || 0)));
+      btLatencyMs = n;
+      const sl = document.getElementById('btLatencySlider');
+      const lb = document.getElementById('btLatencyVal');
+      if (sl) sl.value = String(btLatencyMs);
+      if (lb) lb.textContent = btLatencyMs + ' ms';
+    }
+    // Refresh the cached outputLatency reading and, if auto mode is
+    // active, push it to the effective value + UI. Called on initial
+    // context create, on the periodic poll, on visibilitychange, and
+    // on the (rare, browser-dependent) sinkchange event.
+    function refreshAutoLatency() {
+      const ms = readOutputLatencyMs();
+      if (ms != null) btAutoLatencyMs = ms;
+      if (btAutoMode) {
+        if (btAutoLatencyMs > 0) {
+          _writeEffectiveBtLatency(btAutoLatencyMs);
+        } else {
+          // outputLatency unavailable — fall back to last manual slot so
+          // recordings still align approximately while we hint at Calibrate.
+          _writeEffectiveBtLatency(btHeadphonesOn ? btLatencyMsBt : btLatencyMsNoBt);
+        }
+      }
+      updateBtStatus();
+    }
+    // One-shot wiring per audio context — reads outputLatency once, kicks
+    // off the slow poll, and registers any change events the browser
+    // happens to support. Idempotent across getAudioContext() calls.
+    function initAutoLatencyOnce() {
+      if (_autoLatencyInit || !audioContext) return;
+      _autoLatencyInit = true;
+      refreshAutoLatency();
+      if (!_autoLatencyPollId) {
+        _autoLatencyPollId = setInterval(() => {
+          if (!audioContext || audioContext.state !== 'running') return;
+          const ms = readOutputLatencyMs();
+          if (ms != null && Math.abs(ms - btAutoLatencyMs) >= 5) {
+            btAutoLatencyMs = ms;
+            if (btAutoMode) _writeEffectiveBtLatency(btAutoLatencyMs);
+            updateBtStatus();
+          }
+        }, 2000);
+      }
+      // sinkchange (Chrome / Edge in some versions) fires when the OS
+      // moves audio output to a different device — exactly when
+      // outputLatency jumps. Best-effort; harmless if unsupported.
+      try {
+        audioContext.addEventListener('sinkchange', refreshAutoLatency);
+      } catch (_) {}
+    }
+    // Stub — replaced in PART 2 with a tone-burst + mic capture +
+    // onset-detect routine. Declared here so the boot-time click handler
+    // wiring resolves even before PART 2 lands.
+    async function runLatencyCalibration() {
+      console.warn('[calibration] not yet implemented');
     }
 
     // Lazily build the pitch-detection bandpass for the current AudioContext.
@@ -3404,6 +3582,13 @@
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && audioContext && audioContext.state === 'suspended') {
         audioContext.resume().catch(() => {});
+      }
+      // Coming back from background — the OS may have rerouted audio to
+      // a different output (BT headset connect/disconnect happens silently
+      // while the tab is hidden). Re-read outputLatency so Auto mode
+      // stays accurate without the user touching anything.
+      if (!document.hidden && audioContext) {
+        refreshAutoLatency();
       }
     });
 
@@ -9450,24 +9635,33 @@
           // value > 50ms almost certainly were monitoring through BT.
           btHeadphonesOn = (btLatencyMsBt > 50);
         }
+        // Auto mode defaults ON so a fresh user gets sensible alignment
+        // out of the box — outputLatency is the source of truth.
+        const savedAuto = localStorage.getItem('tuner.btAutoMode');
+        if (savedAuto === 'true' || savedAuto === 'false') {
+          btAutoMode = (savedAuto === 'true');
+        }
       } catch (_) {}
       btLatencyMs = btHeadphonesOn ? btLatencyMsBt : btLatencyMsNoBt;
+      btLatencySource = btAutoMode ? 'auto' : 'manual';
       const btSlider = document.getElementById('btLatencySlider');
       const btLabel  = document.getElementById('btLatencyVal');
       const btDown   = document.getElementById('btLatencyDown');
       const btUp     = document.getElementById('btLatencyUp');
       const btToggle = document.getElementById('btHeadphonesOn');
-      // Single write path for btLatencyMs — keeps slider, badge,
-      // module state, and the CURRENT mode's localStorage slot in
-      // lockstep whether the change came from dragging the slider or
-      // tapping the ± nudge buttons. Clamp matches the slider min/max so
-      // the buttons can't drive the value out of range. Read by
+      const btAutoBtn = document.getElementById('btLatencyAuto');
+      const btCalBtn  = document.getElementById('btLatencyCalibrate');
+      // Manual write path — the slider, ± nudges, and the calibration
+      // result all funnel through here. Persists to the active BT/non-BT
+      // slot in localStorage and (unless keepAuto is set) flips
+      // btAutoMode off because the user just specified a manual value.
+      // btLatencySource is the status-text hint: 'manual' for slider/
+      // nudge, 'calibrated' for calibration result. Read by
       // scheduleLayerPlayback at the next record-start.
-      const applyBtLatencyMs = (next) => {
+      const applyBtLatencyMs = (next, opts) => {
+        opts = opts || {};
         const n = (typeof next === 'number' && isFinite(next)) ? Math.round(next) : 200;
-        btLatencyMs = Math.max(0, Math.min(1200, n));
-        if (btSlider) btSlider.value = String(btLatencyMs);
-        if (btLabel) btLabel.textContent = btLatencyMs + ' ms';
+        _writeEffectiveBtLatency(n);
         if (btHeadphonesOn) {
           btLatencyMsBt = btLatencyMs;
           try { localStorage.setItem('tuner.btLatencyMs', String(btLatencyMs)); } catch (_) {}
@@ -9475,19 +9669,51 @@
           btLatencyMsNoBt = btLatencyMs;
           try { localStorage.setItem('tuner.btLatencyMsNoBt', String(btLatencyMs)); } catch (_) {}
         }
+        if (!opts.keepAuto && btAutoMode) {
+          btAutoMode = false;
+          try { localStorage.setItem('tuner.btAutoMode', 'false'); } catch (_) {}
+        }
+        btLatencySource = opts.source || 'manual';
+        updateBtStatus();
       };
-      // Flip the active slot. The current slider value is already in
-      // the OLD mode's slot (kept in lockstep by applyBtLatencyMs), so
-      // we just swap btLatencyMs to the new mode's remembered value
-      // and reflect it on the slider + badge.
+      // Engage auto mode. Forces a fresh outputLatency read and pushes
+      // it to the effective value. Falls back to the active manual slot
+      // if outputLatency is unavailable, so the recording still aligns
+      // while we hint at Calibrate.
+      const applyBtAutoMode = (on) => {
+        btAutoMode = !!on;
+        try { localStorage.setItem('tuner.btAutoMode', btAutoMode ? 'true' : 'false'); } catch (_) {}
+        if (btAutoMode) {
+          btLatencySource = 'auto';
+          const ms = readOutputLatencyMs();
+          if (ms != null) btAutoLatencyMs = ms;
+          _writeEffectiveBtLatency(btAutoLatencyMs > 0
+            ? btAutoLatencyMs
+            : (btHeadphonesOn ? btLatencyMsBt : btLatencyMsNoBt));
+        } else {
+          btLatencySource = 'manual';
+          _writeEffectiveBtLatency(btHeadphonesOn ? btLatencyMsBt : btLatencyMsNoBt);
+        }
+        updateBtStatus();
+      };
+      // Flip the active slot. In manual mode, the slider+effective value
+      // swap to the new mode's remembered slot. In auto mode, the effective
+      // value stays driven by outputLatency (the OS will report a different
+      // figure for the new output device); only the status tag updates.
       const applyBtHeadphonesOn = (on) => {
         btHeadphonesOn = !!on;
         try { localStorage.setItem('tuner.btHeadphonesOn', btHeadphonesOn ? 'true' : 'false'); } catch (_) {}
-        const next = btHeadphonesOn ? btLatencyMsBt : btLatencyMsNoBt;
-        btLatencyMs = Math.max(0, Math.min(1200, next));
-        if (btSlider) btSlider.value = String(btLatencyMs);
-        if (btLabel) btLabel.textContent = btLatencyMs + ' ms';
+        if (btAutoMode) {
+          const ms = readOutputLatencyMs();
+          if (ms != null) btAutoLatencyMs = ms;
+          _writeEffectiveBtLatency(btAutoLatencyMs > 0
+            ? btAutoLatencyMs
+            : (btHeadphonesOn ? btLatencyMsBt : btLatencyMsNoBt));
+        } else {
+          _writeEffectiveBtLatency(btHeadphonesOn ? btLatencyMsBt : btLatencyMsNoBt);
+        }
         if (btToggle) btToggle.checked = btHeadphonesOn;
+        updateBtStatus();
       };
       if (btSlider) {
         btSlider.value = String(btLatencyMs);
@@ -9503,6 +9729,21 @@
         btToggle.checked = btHeadphonesOn;
         btToggle.addEventListener('change', (e) => applyBtHeadphonesOn(!!e.target.checked));
       }
+      if (btAutoBtn) {
+        btAutoBtn.addEventListener('click', () => applyBtAutoMode(true));
+      }
+      if (btCalBtn) {
+        btCalBtn.addEventListener('click', () => {
+          runLatencyCalibration().catch((err) => {
+            console.warn('[calibration] aborted:', err && err.message || err);
+          });
+        });
+      }
+      // Initial paint — outputLatency may not be readable yet (no
+      // AudioContext until the user grants mic), so this just primes
+      // the status text. initAutoLatencyOnce repaints when the context
+      // arrives.
+      updateBtStatus();
       // Reel length mode — restore from localStorage, wire the
       // <select>. Persists under tuner.reelLengthMode.
       try {
