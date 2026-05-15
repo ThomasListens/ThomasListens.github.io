@@ -879,6 +879,33 @@
       min-width: 44px;
       text-align: right;
     }
+    /* ± nudge buttons flanking the BT Lag slider. Each tap adjusts
+       btLatencyMs by ±5 ms (same step as the slider) for fine landing
+       on a phone where the 0–1200 slider is too coarse to hit a
+       specific value. Negative side margin pulls the buttons close to
+       the slider so the slider keeps usable drag width inside the
+       narrow landscape dock. */
+    #recordOverlay .bt-nudge {
+      width: 26px;
+      height: 26px;
+      flex: 0 0 26px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 6px;
+      color: #ddd;
+      font-size: 14px;
+      line-height: 1;
+      padding: 0;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      font-variant-numeric: tabular-nums;
+    }
+    #recordOverlay .bt-nudge:active {
+      background: rgba(255,255,255,0.16);
+    }
+    #recordOverlay .feather-row > .bt-nudge {
+      margin: 0 -3px;
+    }
     #recordOverlay .studio-divider {
       border-top: 1px solid rgba(255,255,255,0.08);
       margin: 4px auto 0;
@@ -2365,7 +2392,9 @@
     </div>
     <div class="feather-row">
       <label>BT Lag</label>
+      <button type="button" id="btLatencyDown" class="bt-nudge" aria-label="Decrease BT lag by 5 ms">−</button>
       <input type="range" id="btLatencySlider" min="0" max="1200" value="200" step="5">
+      <button type="button" id="btLatencyUp" class="bt-nudge" aria-label="Increase BT lag by 5 ms">+</button>
       <span id="btLatencyVal" class="value-badge">200 ms</span>
     </div>
     <div class="feather-row">
@@ -9303,16 +9332,31 @@
       } catch (_) {}
       const btSlider = document.getElementById('btLatencySlider');
       const btLabel  = document.getElementById('btLatencyVal');
+      const btDown   = document.getElementById('btLatencyDown');
+      const btUp     = document.getElementById('btLatencyUp');
+      // Single write path for btLatencyMs — keeps slider, badge,
+      // module state, and localStorage in lockstep whether the change
+      // came from dragging the slider or tapping the ± nudge buttons.
+      // Clamp matches the slider min/max so the buttons can't drive
+      // the value out of range. Read by scheduleLayerPlayback at the
+      // next record-start.
+      const applyBtLatencyMs = (next) => {
+        const n = (typeof next === 'number' && isFinite(next)) ? Math.round(next) : 200;
+        btLatencyMs = Math.max(0, Math.min(1200, n));
+        if (btSlider) btSlider.value = String(btLatencyMs);
+        if (btLabel) btLabel.textContent = btLatencyMs + ' ms';
+        try { localStorage.setItem('tuner.btLatencyMs', String(btLatencyMs)); } catch (_) {}
+      };
       if (btSlider) {
         btSlider.value = String(btLatencyMs);
         if (btLabel) btLabel.textContent = btLatencyMs + ' ms';
         btSlider.addEventListener('input', (e) => {
           const v = parseInt(e.target.value, 10);
-          btLatencyMs = isNaN(v) ? 200 : Math.max(0, Math.min(1200, v));
-          if (btLabel) btLabel.textContent = btLatencyMs + ' ms';
-          try { localStorage.setItem('tuner.btLatencyMs', String(btLatencyMs)); } catch (_) {}
+          applyBtLatencyMs(isNaN(v) ? 200 : v);
         });
       }
+      if (btDown) btDown.addEventListener('click', () => applyBtLatencyMs(btLatencyMs - 5));
+      if (btUp)   btUp.addEventListener('click',   () => applyBtLatencyMs(btLatencyMs + 5));
       // Reel length mode — restore from localStorage, wire the
       // <select>. Persists under tuner.reelLengthMode.
       try {
