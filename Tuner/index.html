@@ -2832,7 +2832,27 @@
       RECORD_BITRATE = profile.bitrate;
     }
     applyRecRes(recRes);
-    
+
+    // Final delivery dimensions for exported reels — always Instagram-
+    // ready regardless of the lo-fi capture rung. Capture stays at
+    // ASPECT_DIMS[recordAspect]; the export canvas paints into one of
+    // these IG sizes with imageSmoothingEnabled=false so the low-res
+    // cells upscale as crisp pixel blocks instead of bilinear mush
+    // (intentional lo-fi look preserved). Bitrate is matched to the
+    // 1080-class output so the upscaled frame doesn't compress to
+    // garbage; the tiny per-rung RECORD_BITRATE is fine for capture
+    // but starves a 1080×1920 encoder.
+    const IG_OUTPUT_DIMS = {
+      '9:16': [1080, 1920],
+      '4:5':  [1080, 1350],
+      '1:1':  [1080, 1080],
+    };
+    const IG_EXPORT_BITRATE = {
+      '9:16': 8_000_000,
+      '4:5':  7_000_000,
+      '1:1':  6_500_000,
+    };
+
     const noteNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
     const noteNamesFlat = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
     
@@ -6421,11 +6441,16 @@
 
     // -------- Stacked-reel export (canvas + MediaRecorder composite) --------
     //
-    // Each take in harmonyStack is a complete MP4 (videoBlob). When the
-    // user taps "Export reel", we composite N takes into a portrait
-    // 544x960 grid using a hidden HTMLVideoElement per layer drawn into
-    // an offscreen canvas, capture the canvas into a MediaStream, mux
-    // in the most-recent take's audio, and record with MediaRecorder.
+    // Each take in harmonyStack is a complete MP4 (videoBlob), captured
+    // at whatever lo-fi rung Thomas picked (as low as 128×224). When
+    // the user taps "Export reel", we composite N takes into an IG-
+    // ready 1080-class grid (1080×1920 / 1080×1350 / 1080×1080 by
+    // aspect — see IG_OUTPUT_DIMS) using a hidden HTMLVideoElement per
+    // layer drawn into an offscreen canvas, capture the canvas into a
+    // MediaStream, mux in the most-recent take's audio, and record
+    // with MediaRecorder. ctx.imageSmoothingEnabled is false so the
+    // low-res cells upscale crisply (nearest-neighbor) — the lo-fi
+    // pixels stay as deliberate blocks, not bilinear smudge.
     //
     // Why canvas + MediaRecorder instead of FFmpeg.wasm? FFmpeg.wasm
     // re-encodes with libx264 in single-threaded WASM and takes minutes
@@ -6439,27 +6464,29 @@
     // running mix because each take was recorded with the prior layers
     // playing back into the recording bus (see scheduleLayerPlayback).
     //
-    // Output: 544x960 MP4 (or WebM where MP4 isn't supported) at 3 Mbps.
-    // FFmpeg.wasm is still used at the tail end for the faststart remux
-    // — that's a fast `-c copy` job, not a re-encode.
+    // Output: 1080-class MP4 (or WebM where MP4 isn't supported) at
+    // IG_EXPORT_BITRATE (6.5-8 Mbps by aspect). n=1 is NOT a fast path
+    // — the single take must still be upscaled to IG dims, so it runs
+    // the same composite pipeline as a multi-layer stack. FFmpeg.wasm
+    // is still used at the tail end for the faststart remux — that's
+    // a fast `-c copy` job, not a re-encode.
 
     // Returns canvas cell positions for an N-layer stack. Cell index 0
     // is always the most recent take (top/prominent slot). Coords are
-    // in the current ASPECT_DIMS[recordAspect] dims so the export
-    // canvas matches the shape the user picked for the takes. All cell
-    // sizes are fractions of W/H — the historic 544×960 numbers were
-    // 480=H/2, 320=H/3, 240=H/4, 272=W/2; expressed as fractions they
-    // reproduce exactly at any recRes profile whose W and H divide
-    // evenly by 4 and 12 (544/960, 416/720, 320/576). Profiles where H
-    // isn't a multiple of 12 (480/848, 368/640) get a 1-2 px height
-    // offset on n=3/5/6 stacks — Math.floor + the "H - h3*2" trailing
-    // cell expression absorb the remainder into the last row, so cells
-    // stay gap-free and the encoder still sees a clean 8/16-aligned
-    // frame. The same fractional layouts apply unchanged at 4:5 and
-    // 1:1 — 2-row stripes / 2x2 grids land on integer pixel boundaries
-    // for every square or 4:5 dim produced by applyRecRes.
-    function getStackCells(n) {
-      const dims = ASPECT_DIMS[recordAspect] || ASPECT_DIMS['9:16'];
+    // in `dimsOverride` when supplied (export pipeline passes
+    // IG_OUTPUT_DIMS so the layout is computed directly at delivery
+    // size), otherwise in ASPECT_DIMS[recordAspect]. All cell sizes are
+    // fractions of W/H — the historic 544×960 numbers were 480=H/2,
+    // 320=H/3, 240=H/4, 272=W/2; expressed as fractions they reproduce
+    // exactly at the 1080-class IG dims (1080×1920 / 1080×1350 /
+    // 1080×1080) and at every recRes profile whose W and H divide
+    // evenly by 4 and 12. Profiles where H isn't a multiple of 12 get
+    // a 1-2 px height offset on n=3/5/6 stacks — Math.floor + the
+    // "H - h3*2" trailing cell expression absorb the remainder into
+    // the last row, so cells stay gap-free and the encoder still sees
+    // a clean 8/16-aligned frame.
+    function getStackCells(n, dimsOverride) {
+      const dims = dimsOverride || ASPECT_DIMS[recordAspect] || ASPECT_DIMS['9:16'];
       const W = dims[0], H = dims[1];
       const h2 = Math.floor(H / 2);
       const h3 = Math.floor(H / 3);
@@ -6621,31 +6648,18 @@
       // Reverse so cells[0] = most recent (harmonyStack is oldest-first).
       const ordered = harmonyStack.slice().reverse();
 
-      // n=1 fast path: nothing to composite.
-      if (n === 1) {
-        try {
-          // Park the single-take blob for the gated Download button
-          // instead of auto-triggering the download. Same UX as the
-          // multi-layer path below.
-          pendingExportBlob = ordered[0].videoBlob;
-          pendingExportFilename = outName;
-          updateDownloadReelBtn();
-          showRemuxIndicator(
-            'Reel exported (1 layer, ' +
-            Math.round(pendingExportBlob.size / 1024) + 'KB)'
-          );
-          setTimeout(hideRemuxIndicator, 4000);
-        } finally {
-          _exportInFlight = false;
-          resumeLiveLoops();
-        }
-        return;
-      }
-
-      const layout = getStackCells(n);
+      // No n=1 fast path: even a single take must be upscaled to IG
+      // delivery dims, so it runs the same canvas+MediaRecorder
+      // composite pipeline as a multi-layer stack. getStackCells(1)
+      // returns a single full-frame cell at the IG output size, and
+      // imageSmoothingEnabled=false keeps the upscale crisp.
+      const igDims = IG_OUTPUT_DIMS[recordAspect] || IG_OUTPUT_DIMS['9:16'];
+      const igBitrate = IG_EXPORT_BITRATE[recordAspect] || IG_EXPORT_BITRATE['9:16'];
+      const layout = getStackCells(n, igDims);
       const W = layout.outputW, H = layout.outputH;
 
-      showRemuxIndicator('Compositing ' + n + ' layers…');
+      const layerWord = (n === 1) ? 'layer' : 'layers';
+      showRemuxIndicator('Compositing ' + n + ' ' + layerWord + '…');
 
       // Resource bookkeeping. Populated as we acquire things so the
       // finally block can release whatever we got, even if a later
@@ -6738,6 +6752,11 @@
         canvas.width = W;
         canvas.height = H;
         const ctx = canvas.getContext('2d');
+        // Nearest-neighbor upscale: the lo-fi capture pixels must land
+        // as crisp blocks at 1080-class output, not bilinear blur. Set
+        // once on the ctx — save/restore inside drawFrame preserves
+        // it, and nothing in this pipeline re-enables smoothing.
+        ctx.imageSmoothingEnabled = false;
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, W, H);
 
@@ -6764,9 +6783,13 @@
         for (const t of audioDest.stream.getAudioTracks()) combined.addTrack(t);
 
         // 5. MediaRecorder. Reuse pickRecorderMime so the per-take and
-        //    composite recorders agree on codec preference.
+        //    composite recorders agree on codec preference. Bitrate is
+        //    sized for the 1080-class IG output, NOT the lo-fi capture
+        //    rung — at 1080×1920 the per-rung RECORD_BITRATE (down to
+        //    230 kbps at 128×224) would compress the upscaled frame to
+        //    garbage, defeating the point of the upscale.
         const mime = pickRecorderMime();
-        const recOpts = { videoBitsPerSecond: RECORD_BITRATE };
+        const recOpts = { videoBitsPerSecond: igBitrate };
         if (mime) recOpts.mimeType = mime;
         mediaRecorder = new MediaRecorder(combined, recOpts);
 
@@ -6853,7 +6876,7 @@
             lastUI = performance.now();
             const pct = Math.max(0, Math.min(99,
               Math.round(elapsed / targetSec * 100)));
-            showRemuxIndicator('Compositing ' + n + ' layers… ' + pct + '%');
+            showRemuxIndicator('Compositing ' + n + ' ' + layerWord + '… ' + pct + '%');
           }
 
           // Two termination paths:
@@ -6912,7 +6935,7 @@
         pendingExportFilename = outName;
         updateDownloadReelBtn();
         showRemuxIndicator(
-          'Reel exported (' + n + ' layers, ' +
+          'Reel exported (' + n + ' ' + layerWord + ', ' +
           Math.round(outputBlob.size / 1024) + 'KB)'
         );
         setTimeout(hideRemuxIndicator, 4000);
