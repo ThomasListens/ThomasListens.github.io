@@ -4923,8 +4923,18 @@
       if (config.show12EDO && edoAlpha > 0.01) {
         ctx.save();
         ctx.globalAlpha *= edoAlpha;
-        const startSemitone = Math.floor(displayMin / 100);
-        const endSemitone = Math.ceil(displayMax / 100);
+        // Iterate semitones across the visible Y band, not just the
+        // ratio-derived cents window. centsToY is a linear map from
+        // [displayMin, displayMax] onto [rulerBottom, rulerTop], so
+        // we widen the iteration with a 2-semitone buffer on each
+        // end and clip by Y against the ruler band. This guarantees
+        // the EDO grid fills the full ruler height -- the same band
+        // the ratio ladder paints into -- regardless of how the
+        // padding, rulerZoom, or rulerPan move displayMin/displayMax
+        // around. The earlier cents-based filter was equivalent at
+        // zoom 1 but truncated visibly under non-default zoom/pan.
+        const startSemitone = Math.floor(displayMin / 100) - 2;
+        const endSemitone = Math.ceil(displayMax / 100) + 2;
         const isCustomMode = !document.getElementById('refPreset').value;
 
         // EDO label decimation. centsToY maps [displayMin, displayMax]
@@ -4997,9 +5007,13 @@
 
         for (let semi = startSemitone; semi <= endSemitone; semi++) {
           const cents = semi * 100;
-          if (cents < displayMin || cents > displayMax) continue;
-
           const y = centsToY(cents);
+          // Clip by Y, not by cents. This is the source of truth for
+          // what's on screen -- the ruler band -- and lets the EDO
+          // grid extend the same way the ratio ladder does whenever
+          // the visible Y window doesn't match the strict ratio
+          // cents range (rulerZoom / rulerPan, asymmetric padding).
+          if (y < rulerTop || y > rulerBottom) continue;
           ctx.beginPath();
           ctx.moveTo(edoLineStart, y);
           ctx.lineTo(W, y);
