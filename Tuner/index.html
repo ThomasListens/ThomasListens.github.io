@@ -2390,6 +2390,9 @@
       <input type="range" id="dockVoiceReverbTail" min="0" max="100" value="60">
       <span id="dockVoiceReverbTailVal" class="value-badge">60%</span>
     </div>
+    <div class="check-row">
+      <label><input type="checkbox" id="btHeadphonesOn" checked> Using Bluetooth headphones</label>
+    </div>
     <div class="feather-row">
       <label>BT Lag</label>
       <button type="button" id="btLatencyDown" class="bt-nudge" aria-label="Decrease BT lag by 5 ms">−</button>
@@ -2563,8 +2566,20 @@
     // activeLayerSources:  AudioBufferSourceNode + DelayNode handles for the
     //                      currently-playing layers (so we can stop them on
     //                      record-stop or discard without leaking nodes)
-    // btLatencyMs:         Bluetooth output delay compensation, persisted
-    //                      under tuner.btLatencyMs (default 200ms)
+    // btLatencyMs:         the EFFECTIVE current output-delay compensation
+    //                      (ms) read by scheduleLayerPlayback. Always
+    //                      mirrors the slider; the underlying stored value
+    //                      depends on btHeadphonesOn.
+    // btHeadphonesOn:      true when the singer is monitoring through
+    //                      Bluetooth headphones (large output latency,
+    //                      default 200ms). False for speaker / wired
+    //                      sessions where there's only the small inherent
+    //                      mic+output round-trip (default 80ms). Each mode
+    //                      remembers its own preferred latency so flipping
+    //                      the toggle restores that mode's last setting.
+    //                      Persisted under tuner.btLatencyMs (BT slot),
+    //                      tuner.btLatencyMsNoBt (non-BT slot), and
+    //                      tuner.btHeadphonesOn (which slot is active).
     // HARMONY_STACK_MAX:   cap on stacked layers — ~8 × 30s × stereo × 48kHz
     //                      × 4 bytes ≈ 92 MB, comfortable on Pixel-class
     //                      devices. Each layer also costs one
@@ -2591,6 +2606,16 @@
     // loop and the YIN pitch analysis pause.
     let _heavyWorkDepth = 0;
     let btLatencyMs = 200;
+    // Per-mode remembered slots — applyBtHeadphonesOn swaps the active
+    // slot into btLatencyMs and the slider. Defaults: BT mode 200ms
+    // (the round-trip a typical BT headset adds on top of the bare
+    // mic+output path), non-BT mode 80ms (the inherent mic-input +
+    // speaker-output latency that exists even without wireless audio —
+    // testing confirmed at-0 takes still drift when monitoring through
+    // device speakers).
+    let btLatencyMsBt = 200;
+    let btLatencyMsNoBt = 80;
+    let btHeadphonesOn = true;
     // reelLengthMode: 'shortest' (current behavior — reel ends when the
     // shortest layer ends, audio always sync'd) or 'longest' (reel runs
     // until the longest layer ends; layers that have ended are painted
@@ -9405,30 +9430,64 @@
         });
       }
 
-      // Harmony-stack init — restore btLatencyMs from localStorage,
-      // wire the slider, the "+ layer" chip, and the clear-X button.
+      // Harmony-stack init — restore the two per-mode latency slots and
+      // the headphones-on toggle from localStorage, then wire the slider,
+      // the ± nudge buttons, the toggle, and the "+ layer" chip.
       try {
-        const saved = localStorage.getItem('tuner.btLatencyMs');
-        if (saved !== null && !isNaN(parseInt(saved, 10))) {
-          btLatencyMs = Math.max(0, Math.min(1200, parseInt(saved, 10)));
+        const savedBt = localStorage.getItem('tuner.btLatencyMs');
+        if (savedBt !== null && !isNaN(parseInt(savedBt, 10))) {
+          btLatencyMsBt = Math.max(0, Math.min(1200, parseInt(savedBt, 10)));
+        }
+        const savedNoBt = localStorage.getItem('tuner.btLatencyMsNoBt');
+        if (savedNoBt !== null && !isNaN(parseInt(savedNoBt, 10))) {
+          btLatencyMsNoBt = Math.max(0, Math.min(1200, parseInt(savedNoBt, 10)));
+        }
+        const savedOn = localStorage.getItem('tuner.btHeadphonesOn');
+        if (savedOn === 'true' || savedOn === 'false') {
+          btHeadphonesOn = (savedOn === 'true');
+        } else {
+          // First-run inference — existing users with a remembered BT
+          // value > 50ms almost certainly were monitoring through BT.
+          btHeadphonesOn = (btLatencyMsBt > 50);
         }
       } catch (_) {}
+      btLatencyMs = btHeadphonesOn ? btLatencyMsBt : btLatencyMsNoBt;
       const btSlider = document.getElementById('btLatencySlider');
       const btLabel  = document.getElementById('btLatencyVal');
       const btDown   = document.getElementById('btLatencyDown');
       const btUp     = document.getElementById('btLatencyUp');
+      const btToggle = document.getElementById('btHeadphonesOn');
       // Single write path for btLatencyMs — keeps slider, badge,
-      // module state, and localStorage in lockstep whether the change
-      // came from dragging the slider or tapping the ± nudge buttons.
-      // Clamp matches the slider min/max so the buttons can't drive
-      // the value out of range. Read by scheduleLayerPlayback at the
-      // next record-start.
+      // module state, and the CURRENT mode's localStorage slot in
+      // lockstep whether the change came from dragging the slider or
+      // tapping the ± nudge buttons. Clamp matches the slider min/max so
+      // the buttons can't drive the value out of range. Read by
+      // scheduleLayerPlayback at the next record-start.
       const applyBtLatencyMs = (next) => {
         const n = (typeof next === 'number' && isFinite(next)) ? Math.round(next) : 200;
         btLatencyMs = Math.max(0, Math.min(1200, n));
         if (btSlider) btSlider.value = String(btLatencyMs);
         if (btLabel) btLabel.textContent = btLatencyMs + ' ms';
-        try { localStorage.setItem('tuner.btLatencyMs', String(btLatencyMs)); } catch (_) {}
+        if (btHeadphonesOn) {
+          btLatencyMsBt = btLatencyMs;
+          try { localStorage.setItem('tuner.btLatencyMs', String(btLatencyMs)); } catch (_) {}
+        } else {
+          btLatencyMsNoBt = btLatencyMs;
+          try { localStorage.setItem('tuner.btLatencyMsNoBt', String(btLatencyMs)); } catch (_) {}
+        }
+      };
+      // Flip the active slot. The current slider value is already in
+      // the OLD mode's slot (kept in lockstep by applyBtLatencyMs), so
+      // we just swap btLatencyMs to the new mode's remembered value
+      // and reflect it on the slider + badge.
+      const applyBtHeadphonesOn = (on) => {
+        btHeadphonesOn = !!on;
+        try { localStorage.setItem('tuner.btHeadphonesOn', btHeadphonesOn ? 'true' : 'false'); } catch (_) {}
+        const next = btHeadphonesOn ? btLatencyMsBt : btLatencyMsNoBt;
+        btLatencyMs = Math.max(0, Math.min(1200, next));
+        if (btSlider) btSlider.value = String(btLatencyMs);
+        if (btLabel) btLabel.textContent = btLatencyMs + ' ms';
+        if (btToggle) btToggle.checked = btHeadphonesOn;
       };
       if (btSlider) {
         btSlider.value = String(btLatencyMs);
@@ -9440,6 +9499,10 @@
       }
       if (btDown) btDown.addEventListener('click', () => applyBtLatencyMs(btLatencyMs - 5));
       if (btUp)   btUp.addEventListener('click',   () => applyBtLatencyMs(btLatencyMs + 5));
+      if (btToggle) {
+        btToggle.checked = btHeadphonesOn;
+        btToggle.addEventListener('change', (e) => applyBtHeadphonesOn(!!e.target.checked));
+      }
       // Reel length mode — restore from localStorage, wire the
       // <select>. Persists under tuner.reelLengthMode.
       try {
