@@ -4536,27 +4536,80 @@
       // whole ladder when the cloud field is in front
       // (ladderAlpha = 1 in pitch view, ~0.05 in spectrum view -
       // barely-perceptible ghost so the structure isn't visible).
+      //
+      // Label decimation. At the smallest record rungs (128x224,
+      // 160x288, 192x336) the ruler is only 58-86 canvas px tall and
+      // 15*S falls to 3-5 px -- below legibility. The padding fix
+      // (commit 663f808) gave the labels room to spread out, but the
+      // labels themselves were still rendered at sub-legible sizes
+      // *and* still tried to fit 10 of them into the band, so the
+      // ratio column read as mush.
+      //
+      // Decimation is GATED on the font floor actually engaging
+      // (15*S < MIN_LABEL_FONT_PX, i.e. W < 290px capture). Above
+      // that, the ladder draws at its calibrated density -- which
+      // the user accepts even where adjacent JI ratios cluster
+      // (e.g. 4/3 -> 11/8 -> 16/11 -> 3/2 within 200 cents). Below
+      // the floor we'd otherwise render mush, so we trade label
+      // count for legibility: floor the font at 8 canvas px so the
+      // labels we DO draw stay crisp, then greedily drop labels
+      // whose Y is within one line-height of an already-kept label
+      // or of the bottom anchor. First and last ratios are always
+      // kept so the ladder's vertical extent is legible at a glance.
+      // Tick lines and animation state run for every ratio
+      // regardless -- only text thins out, so the ladder still shows
+      // every rung position and tap-to-drone still works on
+      // hidden-label rungs. At 320x576 and up, decimation does
+      // nothing -- render is bit-identical to pre-fix.
+      const MIN_LABEL_FONT_PX = 8;
+      const decimateLabels = (15 * S < MIN_LABEL_FONT_PX);
+      const labelKeep = new Set();
+      if (config.ratios.length > 0) {
+        const lastIdx = config.ratios.length - 1;
+        if (!decimateLabels) {
+          for (let i = 0; i <= lastIdx; i++) labelKeep.add(i);
+        } else {
+          const labelLineHeight = MIN_LABEL_FONT_PX * 1.5;
+          labelKeep.add(0);
+          if (lastIdx > 0) labelKeep.add(lastIdx);
+          if (lastIdx > 1) {
+            const finalY = centsToY(config.ratios[lastIdx].cents);
+            let lastKeptY = centsToY(config.ratios[0].cents);
+            for (let i = 1; i < lastIdx; i++) {
+              const y = centsToY(config.ratios[i].cents);
+              if (Math.abs(y - lastKeptY) >= labelLineHeight &&
+                  Math.abs(y - finalY) >= labelLineHeight) {
+                labelKeep.add(i);
+                lastKeptY = y;
+              }
+            }
+          }
+        }
+      }
+
       ctx.save();
       ctx.globalAlpha *= ladderAlpha;
-      for (const ratio of config.ratios) {
+      for (let i = 0; i < config.ratios.length; i++) {
+        const ratio = config.ratios[i];
+        const drawLabel = labelKeep.has(i);
         const y = centsToY(ratio.cents);
         const isNearest = (nearestRatio === ratio && nearestDiff < 25);
         const isDroneActive = droneOscillators[ratio.label] !== undefined;
-        
+
         droneRatioYPositions[ratio.label] = y;
-        
+
         if (ratioExtensions[ratio.label] === undefined) ratioExtensions[ratio.label] = 0;
-        
+
         const targetExtension = isNearest ? 1 : 0;
         const extensionSpeed = 0.15;
         ratioExtensions[ratio.label] += (targetExtension - ratioExtensions[ratio.label]) * extensionSpeed;
         const ext = ratioExtensions[ratio.label];
-        
+
         const color = ratio.color;
         const droneBoost = isDroneActive ? 0.12 : 0;
         const alpha = 0.85 + ext * 0.15 + droneBoost;
         const colorStr = hslToString(color, alpha);
-        
+
         const lineLeft = rulerX - (50 + ext * 30) * S;
         const lineRight = rulerX + 25 * S;
         const lineWidth = (1.5 + ext * 1.5) * S;
@@ -4568,7 +4621,9 @@
         ctx.lineTo(lineRight, y);
         ctx.stroke();
 
-        const fontSize = (15 + ext * 3) * S;
+        if (!drawLabel) continue;
+
+        const fontSize = Math.max((15 + ext * 3) * S, MIN_LABEL_FONT_PX);
         const fontWeight = ext > 0.5 ? 'bold' : 'normal';
 
         ctx.fillStyle = colorStr;
@@ -4582,7 +4637,7 @@
 
         if (config.showHz) {
           const hz = config.refFreq * ratio.ratio;
-          ctx.font = `${11 * S}px system-ui`;
+          ctx.font = `${Math.max(11 * S, 7)}px system-ui`;
           ctx.textAlign = 'left';
           const hzAlpha = 0.35 + ext * 0.55 + droneBoost;
           ctx.fillStyle = hslToString(color, hzAlpha);
@@ -4590,7 +4645,7 @@
         }
 
         if (config.showCents) {
-          ctx.font = `${10 * S}px system-ui`;
+          ctx.font = `${Math.max(10 * S, 7)}px system-ui`;
           ctx.fillStyle = 'rgba(255,255,255,0.25)';
           ctx.textAlign = 'left';
           ctx.fillText(`${ratio.cents.toFixed(0)}¢`, centsX, y);
