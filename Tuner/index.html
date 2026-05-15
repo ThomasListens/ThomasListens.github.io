@@ -438,7 +438,18 @@
       left: 0;
       right: 0;
       z-index: 200;
-      padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+      /* Cap dock height to the visible viewport (less the top safe area)
+         so a tall settings list can scroll instead of running off the top
+         of the screen — previously the first row (.aspect-row with the
+         9:16/4:5/1:1 buttons) was pushed above the status bar/notch and
+         could not be tapped on phones. overscroll-behavior: contain
+         prevents a scroll inside the dock from bubbling up to the
+         document and bouncing the camera view. */
+      max-height: 100vh;
+      max-height: 100dvh;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: calc(14px + env(safe-area-inset-top)) 16px calc(14px + env(safe-area-inset-bottom));
       background: linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0));
       flex-direction: column;
       gap: 10px;
@@ -447,6 +458,19 @@
 
     body.record-mode #recordOverlay {
       display: flex;
+    }
+
+    /* When the settings dock is expanded (not collapsed via #settingsToggle)
+       enable pointer events on the container itself so touch-scroll works
+       inside the dock. The floating bottom controls (#audioFXLevelStrip,
+       #droneRecordToggle, #audioFXVrbBtn, #rulerHideBtn, #flipCamBtn) all
+       sit at z-index ≥ 250 and own their pointer-events, so they still win
+       hit-testing over the dock at z-index 200. When settings are hidden
+       only the .record-essential row remains, so the original
+       pointer-events:none stays in force and the empty dock area lets
+       camera-pan drags through. */
+    body.record-mode:not(.settings-hidden) #recordOverlay {
+      pointer-events: auto;
     }
 
     /* Only re-enable pointer events on the actual interactive controls.
