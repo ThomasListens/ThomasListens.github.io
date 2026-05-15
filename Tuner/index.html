@@ -2236,6 +2236,24 @@
       <label><input type="checkbox" id="fxRulerShadowToggle"> Glow</label>
       <label><input type="checkbox" id="fxFftFancyToggle"> Detail</label>
     </div>
+    <!-- Shimmer reverb. Mirrors the same three controls under
+         "Voice processing" in the side panel; syncVoiceFXUI() keeps
+         the two copies in lockstep so flipping one updates the other.
+         Mix and Tail sliders stay enabled regardless of the toggle —
+         the live setters silently no-op when reverb is off. -->
+    <div class="check-row">
+      <label><input type="checkbox" id="dockVoiceReverb"> Reverb</label>
+    </div>
+    <div class="feather-row">
+      <label>Mix</label>
+      <input type="range" id="dockVoiceReverbMix" min="0" max="100" value="50">
+      <span id="dockVoiceReverbMixVal" class="value-badge">50%</span>
+    </div>
+    <div class="feather-row">
+      <label>Tail</label>
+      <input type="range" id="dockVoiceReverbTail" min="0" max="100" value="60">
+      <span id="dockVoiceReverbTailVal" class="value-badge">60%</span>
+    </div>
     <div class="feather-row">
       <label>BT Lag</label>
       <input type="range" id="btLatencySlider" min="0" max="1200" value="200" step="5">
@@ -5548,12 +5566,16 @@
       updateVoiceReverbControlsVisibility();
     }
 
-    // Live update of mix/tail without rebuilding the graph.
+    // Live update of mix/tail without rebuilding the graph. Both side-
+    // panel and dock value badges are updated so the two UIs never drift.
     function setVoiceReverbMix(v) {
       voiceFXMix = Math.max(0, Math.min(1, v));
       try { localStorage.setItem('tuner.voice.reverbMix', String(voiceFXMix)); } catch (_) {}
+      const pct = Math.round(voiceFXMix * 100) + '%';
       const lbl = document.getElementById('voiceReverbMixVal');
-      if (lbl) lbl.textContent = Math.round(voiceFXMix * 100) + '%';
+      if (lbl) lbl.textContent = pct;
+      const dockLbl = document.getElementById('dockVoiceReverbMixVal');
+      if (dockLbl) dockLbl.textContent = pct;
       if (micProcessing && micProcessing.wetGain && micProcessing.dryGain && micProcessing.ctx) {
         const t = micProcessing.ctx.currentTime;
         const g = voiceFXMixGains(voiceFXMix);
@@ -5567,8 +5589,11 @@
     function setVoiceReverbTail(v) {
       voiceFXTail = Math.max(0, Math.min(1, v));
       try { localStorage.setItem('tuner.voice.reverbTail', String(voiceFXTail)); } catch (_) {}
+      const pct = Math.round(voiceFXTail * 100) + '%';
       const lbl = document.getElementById('voiceReverbTailVal');
-      if (lbl) lbl.textContent = Math.round(voiceFXTail * 100) + '%';
+      if (lbl) lbl.textContent = pct;
+      const dockLbl = document.getElementById('dockVoiceReverbTailVal');
+      if (dockLbl) dockLbl.textContent = pct;
       if (micProcessing && micProcessing.reverb) {
         try { micProcessing.reverb.setFeedback(voiceFXTailToFeedback(voiceFXTail)); } catch (_) {}
       }
@@ -8122,14 +8147,24 @@
       const vrbMain  = document.getElementById('voiceReverb');
       const mixMain  = document.getElementById('voiceReverbMix');
       const mixLbl   = document.getElementById('voiceReverbMixVal');
+      const tailMain = document.getElementById('voiceReverbTail');
+      const tailLbl  = document.getElementById('voiceReverbTailVal');
       // Record-mode floating strip: only the verb ⏻ button + Mix slider
       // remain. LC/CMP/DE have no UI here — they live in the side
       // (Settings) panel. The Mix slider greys out via [disabled] when
       // reverb is off so the user can still see the control exists.
       const vrbChip   = document.getElementById('audioFXVrbBtn');
       const mixStrip  = document.getElementById('audioFXMixSlider');
+      // Record-mode dock (gear panel): mirror of the side-panel reverb
+      // controls so Thomas can dial verb without leaving record mode.
+      const vrbDock     = document.getElementById('dockVoiceReverb');
+      const mixDock     = document.getElementById('dockVoiceReverbMix');
+      const mixDockLbl  = document.getElementById('dockVoiceReverbMixVal');
+      const tailDock    = document.getElementById('dockVoiceReverbTail');
+      const tailDockLbl = document.getElementById('dockVoiceReverbTailVal');
 
       const mixPct  = Math.round(voiceFXMix * 100);
+      const tailPct = Math.round(voiceFXTail * 100);
 
       if (lcMain)   lcMain.checked  = voiceFX.lowcut;
       if (cmpMain)  cmpMain.checked = voiceFX.compression;
@@ -8137,12 +8172,20 @@
       if (vrbMain)  vrbMain.checked = voiceFX.reverb;
       if (mixMain)  mixMain.value   = mixPct;
       if (mixLbl)   mixLbl.textContent = mixPct + '%';
+      if (tailMain) tailMain.value  = tailPct;
+      if (tailLbl)  tailLbl.textContent = tailPct + '%';
 
       if (vrbChip)   vrbChip.classList.toggle('on', voiceFX.reverb);
       if (mixStrip) {
         mixStrip.value = mixPct;
         mixStrip.disabled = !voiceFX.reverb;
       }
+
+      if (vrbDock)     vrbDock.checked = voiceFX.reverb;
+      if (mixDock)     mixDock.value   = mixPct;
+      if (mixDockLbl)  mixDockLbl.textContent = mixPct + '%';
+      if (tailDock)    tailDock.value  = tailPct;
+      if (tailDockLbl) tailDockLbl.textContent = tailPct + '%';
     }
 
     // -------- Feature 1: Settings hide toggle --------
@@ -8834,6 +8877,35 @@
       }
       if (reverbTailSlider) {
         reverbTailSlider.addEventListener('input', (e) => {
+          setVoiceReverbTail(parseInt(e.target.value, 10) / 100);
+        });
+      }
+
+      // Dock copies. Each writes directly to the shared voiceFX state /
+      // setters that the side panel uses, then syncVoiceFXUI() pushes
+      // the new value back into every UI copy so both stay in lockstep.
+      const dockReverbCb       = document.getElementById('dockVoiceReverb');
+      const dockReverbMixSld   = document.getElementById('dockVoiceReverbMix');
+      const dockReverbTailSld  = document.getElementById('dockVoiceReverbTail');
+      if (dockReverbCb) {
+        dockReverbCb.checked = !!voiceFX.reverb;
+        dockReverbCb.addEventListener('change', (e) => {
+          voiceFX.reverb = !!e.target.checked;
+          persistVoiceFXFlags();
+          applyVoiceFX();
+          syncVoiceFXUI();
+        });
+      }
+      if (dockReverbMixSld) {
+        dockReverbMixSld.value = Math.round(voiceFXMix * 100);
+        dockReverbMixSld.addEventListener('input', (e) => {
+          setVoiceReverbMix(parseInt(e.target.value, 10) / 100);
+          syncVoiceFXUI();
+        });
+      }
+      if (dockReverbTailSld) {
+        dockReverbTailSld.value = Math.round(voiceFXTail * 100);
+        dockReverbTailSld.addEventListener('input', (e) => {
           setVoiceReverbTail(parseInt(e.target.value, 10) / 100);
         });
       }
