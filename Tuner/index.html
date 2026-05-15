@@ -2721,10 +2721,24 @@
     // for those values.
     //
     // Five profiles, selected from the record-mode dock via tuner.recRes.
-    // Bitrate scales with pixel count. Each picks the base 9:16 W×H; 4:5
-    // and 1:1 are derived from W. The current selection drives
-    // ASPECT_DIMS, CAPTURE_PIXEL_SCALE, and the MediaRecorder
-    // videoBitsPerSecond used in every record path.
+    // Bitrate scales with pixel count. Each profile lists a 9:16 base
+    // W×H; 4:5 and 1:1 dims are derived per-aspect so each shape carries
+    // a comparable pixel count to the 9:16 reference (kept on the
+    // 16-pixel grid for H.264 macroblock alignment). The current
+    // selection drives ASPECT_DIMS, CAPTURE_PIXEL_SCALE, and the
+    // MediaRecorder videoBitsPerSecond used in every record path.
+    //
+    // The two selectors live in distinct dimensions:
+    //   recRes        → picks the size tier (pixel budget)
+    //   recordAspect  → picks the shape (9:16 / 4:5 / 1:1)
+    // ASPECT_DIMS is rebuilt by applyRecRes whenever the tier changes;
+    // a tap on an aspect button just looks up the matching entry.
+    //
+    // Square dimensions per tier (from round(sqrt(W*H)/16)*16):
+    //   544×960 → 720×720,  480×848 → 640×640,  416×720 → 544×544,
+    //   368×640 → 480×480,  320×576 → 432×432.
+    // Each square is roughly the same pixel count as its 9:16 sibling
+    // (within ~1%), so the same RECORD_BITRATE serves both.
     //
     // Heavy stacks (6-8 layers) want a smaller canvas — per-frame
     // compositing of 8 cells is the actual cost on Pixel 7. The
@@ -2739,7 +2753,7 @@
     };
     let recRes = '544x960';
     // Recomputed by applyRecRes() — mutable mirrors of the active profile.
-    let ASPECT_DIMS = { '9:16': [544, 960], '4:5': [544, 680], '1:1': [544, 544] };
+    let ASPECT_DIMS = { '9:16': [544, 960], '4:5': [544, 680], '1:1': [720, 720] };
     // Multiplier applied to all literal-pixel constants in the record-mode
     // draw path (font sizes, stroke widths, bracket arms, etc.). The old
     // 1080-wide canvas is the calibration target; W/1088 keeps every "* S"
@@ -2754,7 +2768,14 @@
       // 8-aligned and 320 -> 400 hits the 16-grid. 544 -> 680 reproduces
       // the existing value.
       const h45 = Math.round(W * 5 / 4 / 8) * 8;
-      ASPECT_DIMS = { '9:16': [W, H], '4:5': [W, h45], '1:1': [W, W] };
+      // 1:1 side: keep the same total pixel count as the 9:16 reference,
+      // snapped to the 16-pixel grid. side = round(sqrt(W*H)/16)*16.
+      // Previous formula was [W, W] which made the square strictly
+      // smaller than the portrait reference (e.g. 544×544 = 296k px vs
+      // 544×960 = 522k px); the comparable-area square keeps detail and
+      // bitrate matched across shapes.
+      const side11 = Math.round(Math.sqrt(W * H) / 16) * 16;
+      ASPECT_DIMS = { '9:16': [W, H], '4:5': [W, h45], '1:1': [side11, side11] };
       CAPTURE_PIXEL_SCALE = W / 1088;
       RECORD_BITRATE = profile.bitrate;
     }
@@ -6349,18 +6370,21 @@
 
     // Returns canvas cell positions for an N-layer stack. Cell index 0
     // is always the most recent take (top/prominent slot). Coords are
-    // in the current 9:16 portrait dims (read live from ASPECT_DIMS so
-    // the layout follows the recRes selector). All cell sizes are
-    // fractions of W/H — the historic 544×960 numbers were 480=H/2,
-    // 320=H/3, 240=H/4, 272=W/2; expressed as fractions they reproduce
-    // exactly at any recRes profile whose W and H divide evenly by 4
-    // and 12 (544/960, 416/720, 320/576). Profiles where H isn't a
-    // multiple of 12 (480/848, 368/640) get a 1-2 px height offset on
-    // n=3/5/6 stacks — Math.floor + the "H - h3*2" trailing-cell
-    // expression absorb the remainder into the last row, so cells stay
-    // gap-free and the encoder still sees a clean 8/16-aligned frame.
+    // in the current ASPECT_DIMS[recordAspect] dims so the export
+    // canvas matches the shape the user picked for the takes. All cell
+    // sizes are fractions of W/H — the historic 544×960 numbers were
+    // 480=H/2, 320=H/3, 240=H/4, 272=W/2; expressed as fractions they
+    // reproduce exactly at any recRes profile whose W and H divide
+    // evenly by 4 and 12 (544/960, 416/720, 320/576). Profiles where H
+    // isn't a multiple of 12 (480/848, 368/640) get a 1-2 px height
+    // offset on n=3/5/6 stacks — Math.floor + the "H - h3*2" trailing
+    // cell expression absorb the remainder into the last row, so cells
+    // stay gap-free and the encoder still sees a clean 8/16-aligned
+    // frame. The same fractional layouts apply unchanged at 4:5 and
+    // 1:1 — 2-row stripes / 2x2 grids land on integer pixel boundaries
+    // for every square or 4:5 dim produced by applyRecRes.
     function getStackCells(n) {
-      const dims = ASPECT_DIMS['9:16'];
+      const dims = ASPECT_DIMS[recordAspect] || ASPECT_DIMS['9:16'];
       const W = dims[0], H = dims[1];
       const h2 = Math.floor(H / 2);
       const h3 = Math.floor(H / 3);
