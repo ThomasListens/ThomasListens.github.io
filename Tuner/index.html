@@ -2329,6 +2329,8 @@
         <option value="416x720">416×720 · 2.2 Mbps</option>
         <option value="368x640">368×640 · 1.8 Mbps</option>
         <option value="320x576">320×576 · 1.5 Mbps</option>
+        <option value="288x512">288×512 · 1.2 Mbps</option>
+        <option value="256x448">256×448 · 0.95 Mbps</option>
       </select>
     </div>
     <div class="feather-row">
@@ -2773,20 +2775,24 @@
     //
     // Square dimensions per tier (from round(sqrt(W*H)/16)*16):
     //   544×960 → 720×720,  480×848 → 640×640,  416×720 → 544×544,
-    //   368×640 → 480×480,  320×576 → 432×432.
+    //   368×640 → 480×480,  320×576 → 432×432,  288×512 → 384×384,
+    //   256×448 → 336×336.
     // Each square is roughly the same pixel count as its 9:16 sibling
     // (within ~1%), so the same RECORD_BITRATE serves both.
     //
     // Heavy stacks (6-8 layers) want a smaller canvas — per-frame
     // compositing of 8 cells is the actual cost on Pixel 7. The
     // intermediate rungs (480×848, 368×640) give Thomas headroom to
-    // dial capture size to layer count.
+    // dial capture size to layer count. The two lowest rungs (288×512,
+    // 256×448) extend that headroom for the largest stacks.
     const REC_RES_PROFILES = {
       '544x960': { w: 544, h: 960, bitrate: 3_000_000 },
       '480x848': { w: 480, h: 848, bitrate: 2_500_000 },
       '416x720': { w: 416, h: 720, bitrate: 2_200_000 },
       '368x640': { w: 368, h: 640, bitrate: 1_800_000 },
       '320x576': { w: 320, h: 576, bitrate: 1_500_000 },
+      '288x512': { w: 288, h: 512, bitrate: 1_200_000 },
+      '256x448': { w: 256, h: 448, bitrate:   950_000 },
     };
     let recRes = '544x960';
     // Recomputed by applyRecRes() — mutable mirrors of the active profile.
