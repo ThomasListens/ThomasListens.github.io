@@ -2201,7 +2201,7 @@
     </div>
     <div class="feather-row">
       <label>Zoom</label>
-      <input type="range" id="zoomSlider" min="50" max="250" value="100">
+      <input type="range" id="zoomSlider" min="100" max="250" value="100">
       <button class="reset-btn" id="resetFramingBtn" title="Reset framing">⟲</button>
     </div>
     <div class="feather-row">
@@ -3460,7 +3460,7 @@
       return parts.length ? parts.join(' ') : 'none';
     }
 
-    function drawCameraOnto(targetCtx, video, W, H, dx, dy, drawW, drawH, alpha) {
+    function drawCameraOnto(targetCtx, video, W, H, sx, sy, sw, sh, dx, dy, drawW, drawH, alpha) {
       targetCtx.save();
       const filter = buildCameraFilter();
       if (filter !== 'none') targetCtx.filter = filter;
@@ -3468,9 +3468,9 @@
       if (cameraFacing === 'user') {
         targetCtx.translate(W, 0);
         targetCtx.scale(-1, 1);
-        targetCtx.drawImage(video, W - dx - drawW, dy, drawW, drawH);
+        targetCtx.drawImage(video, sx, sy, sw, sh, W - dx - drawW, dy, drawW, drawH);
       } else {
-        targetCtx.drawImage(video, dx, dy, drawW, drawH);
+        targetCtx.drawImage(video, sx, sy, sw, sh, dx, dy, drawW, drawH);
       }
       targetCtx.restore();
     }
@@ -3494,18 +3494,27 @@
       // sensors are 4:3 native and Chrome was side-cropping the
       // rejected 9:16 request, narrowing the effective FOV.
       const baseScale = Math.min(W / vw, H / vh);
-      const scale = baseScale * cameraZoom;
-      const drawW = vw * scale, drawH = vh * scale;
-      const overflowX = Math.max(0, drawW - W);
-      const overflowY = Math.max(0, drawH - H);
-      const dx = (W - drawW) / 2 + cameraPanX * (overflowX / 2);
-      const dy = (H - drawH) / 2 + cameraPanY * (overflowY / 2);
+      const drawW = vw * baseScale, drawH = vh * baseScale;
+      const dx = (W - drawW) / 2;
+      const dy = (H - drawH) / 2;
 
-      // Snapshot the visible (clamped) Y range of the camera image
-      // for the ruler overlay. When zoom > 1 the image overflows the
-      // canvas (no letterbox bars); when zoom <= 1 with a 4:3 source
-      // there are bars top + bottom and the overlay confines itself
-      // to [y0, y1] so it doesn't paint over them.
+      // Zoom is applied to the SOURCE crop rect, not the destination, so
+      // the on-canvas image area (and therefore the recorded frame layout
+      // — image area + letterbox bars) stays identical at every zoom
+      // value. zoom > 1 narrows the source view (digital crop), zoom <= 1
+      // shows the full source. cameraPanX/Y slides the source crop inside
+      // the available overflow when zoomed in.
+      const zoom = Math.max(1.0, cameraZoom);
+      const sw = vw / zoom;
+      const sh = vh / zoom;
+      const overflowSX = vw - sw;
+      const overflowSY = vh - sh;
+      const sx = overflowSX / 2 + cameraPanX * (overflowSX / 2);
+      const sy = overflowSY / 2 + cameraPanY * (overflowSY / 2);
+
+      // Snapshot the visible Y range of the camera image for the ruler
+      // overlay. The destination rect no longer changes with zoom, so the
+      // visible band is the fixed letterbox-fit rect.
       cameraVisibleRect = {
         y0: Math.max(0, dy),
         y1: Math.min(H, dy + drawH)
@@ -3523,17 +3532,17 @@
 
         // First frame: draw fully opaque to seed the buffer (avoid initial black fade-in)
         if (!trailSeeded) {
-          drawCameraOnto(trailCtx, video, W, H, dx, dy, drawW, drawH, 1);
+          drawCameraOnto(trailCtx, video, W, H, sx, sy, sw, sh, dx, dy, drawW, drawH, 1);
           trailSeeded = true;
         } else {
           // IIR blend: out = newFrame * (1 - trail) + buffer * trail
-          drawCameraOnto(trailCtx, video, W, H, dx, dy, drawW, drawH, 1 - trailAmount);
+          drawCameraOnto(trailCtx, video, W, H, sx, sy, sw, sh, dx, dy, drawW, drawH, 1 - trailAmount);
         }
 
         ctx.drawImage(trailCanvas, 0, 0);
       } else {
         trailSeeded = false; // reset so re-enabling trail seeds fresh
-        drawCameraOnto(ctx, video, W, H, dx, dy, drawW, drawH, 1);
+        drawCameraOnto(ctx, video, W, H, sx, sy, sw, sh, dx, dy, drawW, drawH, 1);
       }
     }
 
