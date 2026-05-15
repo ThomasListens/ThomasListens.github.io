@@ -3394,11 +3394,242 @@
         audioContext.addEventListener('sinkchange', refreshAutoLatency);
       } catch (_) {}
     }
-    // Stub — replaced in PART 2 with a tone-burst + mic capture +
-    // onset-detect routine. Declared here so the boot-time click handler
-    // wiring resolves even before PART 2 lands.
+    // One-tap latency calibration. Plays a series of short tone bursts
+    // through audioContext.destination while capturing the mic via a
+    // ScriptProcessorNode. For each scheduled burst we find the onset
+    // peak in the captured envelope and take the offset from the
+    // schedule time — that's the round-trip latency for THIS output
+    // path (speaker, BT, headphone, whatever). Median across N bursts
+    // throws out outliers (room reflections, transient noise). The
+    // result is written to the active BT/non-BT slot via
+    // applyBtLatencyMs(source: 'calibrated'), which also switches off
+    // auto mode so the calibrated value sticks until the user taps
+    // Auto again or recalibrates.
+    //
+    // Echo cancellation is forced OFF by buildAudioConstraints, so the
+    // mic faithfully picks up speaker/BT output. The user just holds
+    // the phone with mic+output near each other for ~3 s.
+    //
+    // Calibration is disabled while a recording is in progress —
+    // mediaRecorder.state === 'recording' check guards the entry point.
     async function runLatencyCalibration() {
-      console.warn('[calibration] not yet implemented');
+      if (_calibrationBusy) return;
+      const statusEl = document.getElementById('btLatencyStatus');
+      const calBtn   = document.getElementById('btLatencyCalibrate');
+      const failWith = (msg) => {
+        _calibrationBusy = false;
+        if (calBtn) calBtn.classList.remove('busy');
+        if (statusEl) statusEl.textContent = msg;
+        // Restore the normal status text after 2.5 s so the error
+        // doesn't linger past the user's next action.
+        setTimeout(() => { updateBtStatus(); }, 2500);
+      };
+      // Refuse while recording — the calibration tones would end up in
+      // the user's take. Bursts are also loud enough to be annoying.
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        failWith('Stop recording to calibrate');
+        return;
+      }
+      getAudioContext();
+      if (!audioContext) { failWith('No audio context'); return; }
+      if (!currentMicSource) { failWith('Mic not active'); return; }
+      try {
+        if (audioContext.state === 'suspended') await audioContext.resume();
+      } catch (_) {}
+      _calibrationBusy = true;
+      if (calBtn) calBtn.classList.add('busy');
+      updateBtStatus();
+
+      const ctx = audioContext;
+      const sampleRate = ctx.sampleRate;
+      const TONE_FREQ = 1000;          // mid-band, well within phone-mic response
+      const TONE_DUR_SEC = 0.05;       // 50 ms burst
+      const TONE_GAIN = 0.7;           // loud enough to dominate room noise
+      const N_TONES = 5;
+      const TONE_SPACING_SEC = 0.55;   // > max plausible latency so windows don't overlap
+      const PRE_ROLL_SEC = 0.35;       // capture mic for this long before first tone
+      const POST_ROLL_SEC = 0.4;       // and this long after last tone's expected echo
+
+      // Set up an off-graph capture: mic source → ScriptProcessor → muted gain → dest.
+      // Connecting to destination is required for onaudioprocess to fire on most
+      // browsers, even when we don't want the audio to be heard (gain.value = 0).
+      const BUF = 4096;
+      const proc = ctx.createScriptProcessor(BUF, 1, 1);
+      const muteSink = ctx.createGain();
+      muteSink.gain.value = 0;
+      proc.connect(muteSink);
+      muteSink.connect(ctx.destination);
+      try { currentMicSource.connect(proc); } catch (e) {
+        try { proc.disconnect(); } catch (_) {}
+        try { muteSink.disconnect(); } catch (_) {}
+        failWith('Mic disconnected — try again');
+        return;
+      }
+
+      // Sample bookkeeping — we record an absolute audioContext time
+      // for the FIRST processed sample, then derive sample-index → time
+      // from there. Total captured samples grows in chunks; we just
+      // concatenate at the end.
+      const captured = [];
+      let captureStartT = null;
+      let captureFirstChunk = true;
+      proc.onaudioprocess = (e) => {
+        if (captureFirstChunk) {
+          // This buffer was captured at roughly currentTime - BUF/sr.
+          captureStartT = ctx.currentTime - (BUF / sampleRate);
+          captureFirstChunk = false;
+        }
+        // Copy — Web Audio reuses the underlying buffer between events.
+        const ch = e.inputBuffer.getChannelData(0);
+        captured.push(new Float32Array(ch));
+      };
+
+      // Let a few capture buffers flow in before we play tones, so
+      // captureStartT is established and the warm-up is clean.
+      await new Promise(r => setTimeout(r, 250));
+
+      // Schedule the bursts. firstToneT is measured against the SAME
+      // ctx.currentTime clock that captureStartT uses, so the math
+      // lines up cleanly. Each tone is an oscillator routed through a
+      // short attack/release envelope so it has a sharp onset (good
+      // for detection) without a click on the trailing edge.
+      const firstToneT = ctx.currentTime + PRE_ROLL_SEC;
+      const toneSchedTimes = [];
+      for (let i = 0; i < N_TONES; i++) {
+        const t = firstToneT + i * TONE_SPACING_SEC;
+        toneSchedTimes.push(t);
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = TONE_FREQ;
+        const env = ctx.createGain();
+        env.gain.setValueAtTime(0, t);
+        env.gain.linearRampToValueAtTime(TONE_GAIN, t + 0.003);
+        env.gain.setValueAtTime(TONE_GAIN, t + TONE_DUR_SEC - 0.003);
+        env.gain.linearRampToValueAtTime(0, t + TONE_DUR_SEC);
+        osc.connect(env).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + TONE_DUR_SEC + 0.02);
+      }
+
+      // Wait until capture window closes. Last tone time + post-roll.
+      const lastToneT = toneSchedTimes[toneSchedTimes.length - 1];
+      const waitMs = ((lastToneT - ctx.currentTime) + POST_ROLL_SEC) * 1000;
+      await new Promise(r => setTimeout(r, Math.max(200, waitMs)));
+
+      // Tear down capture graph.
+      try { currentMicSource.disconnect(proc); } catch (_) {}
+      try { proc.disconnect(); } catch (_) {}
+      try { muteSink.disconnect(); } catch (_) {}
+      proc.onaudioprocess = null;
+
+      if (captureStartT === null || captured.length === 0) {
+        failWith('No mic data — try again');
+        return;
+      }
+
+      // Concatenate captured buffers into a single Float32Array.
+      let total = 0;
+      for (const c of captured) total += c.length;
+      const pcm = new Float32Array(total);
+      {
+        let off = 0;
+        for (const c of captured) { pcm.set(c, off); off += c.length; }
+      }
+
+      // Goertzel-style narrowband energy at TONE_FREQ. Reject voice,
+      // hum, room noise that don't share the burst's spectrum, so the
+      // envelope peaks are tightly aligned with each tone arrival.
+      // Block size = 256 samples (~5.3 ms at 48 kHz) — fine enough to
+      // localise an onset, coarse enough to not see individual cycles
+      // of 1 kHz (which would oscillate the envelope).
+      const BLOCK = 256;
+      const nBlocks = Math.floor(total / BLOCK);
+      const coeff = 2 * Math.cos(2 * Math.PI * TONE_FREQ / sampleRate);
+      const energy = new Float32Array(nBlocks);
+      for (let b = 0; b < nBlocks; b++) {
+        const start = b * BLOCK;
+        let s_prev = 0, s_prev2 = 0;
+        for (let i = 0; i < BLOCK; i++) {
+          const s = pcm[start + i] + coeff * s_prev - s_prev2;
+          s_prev2 = s_prev;
+          s_prev = s;
+        }
+        // Magnitude proxy — full computation is sqrt(s_prev^2 + s_prev2^2
+        // - coeff*s_prev*s_prev2). We just need a monotonic measure for
+        // peak picking, so the squared form is fine.
+        energy[b] = s_prev * s_prev + s_prev2 * s_prev2 - coeff * s_prev * s_prev2;
+      }
+
+      // For each scheduled tone, find the peak energy block within a
+      // generous window starting AT the scheduled time and extending
+      // far enough to cover any realistic latency. Then walk back to
+      // the onset (the first block above peak/4) and convert block
+      // index → seconds → offset against schedule time.
+      const blockSec = BLOCK / sampleRate;
+      const offsets = [];
+      const SEARCH_AHEAD_SEC = 1.2;
+      const SEARCH_BEHIND_SEC = 0.02; // small slack for clock alignment
+      for (const schedT of toneSchedTimes) {
+        const schedBlock = Math.round((schedT - captureStartT) / blockSec);
+        const winStart = Math.max(0, schedBlock - Math.round(SEARCH_BEHIND_SEC / blockSec));
+        const winEnd   = Math.min(nBlocks, schedBlock + Math.round(SEARCH_AHEAD_SEC / blockSec));
+        if (winEnd <= winStart) continue;
+        let peakIdx = winStart, peakVal = -1;
+        for (let i = winStart; i < winEnd; i++) {
+          if (energy[i] > peakVal) { peakVal = energy[i]; peakIdx = i; }
+        }
+        // Onset = walk back from peak until energy drops below peak/4.
+        const thresh = peakVal / 4;
+        let onsetIdx = peakIdx;
+        for (let i = peakIdx - 1; i >= winStart; i--) {
+          if (energy[i] < thresh) { onsetIdx = i + 1; break; }
+          onsetIdx = i;
+        }
+        const onsetT = captureStartT + onsetIdx * blockSec;
+        const offsetSec = onsetT - schedT;
+        // Sanity gate — reject offsets that are negative (impossible)
+        // or absurdly large (room reflection of a previous tone, or
+        // missed detection that latched onto the next burst).
+        if (offsetSec > 0.005 && offsetSec < 1.0) {
+          offsets.push(offsetSec);
+        }
+      }
+
+      if (offsets.length < 2) {
+        failWith('Could not detect tones — louder / closer, try again');
+        return;
+      }
+
+      // Median is robust to the one or two outliers that survive the
+      // sanity gate (e.g. a late-firing peak picked up a strong room
+      // reflection of the previous burst).
+      offsets.sort((a, b) => a - b);
+      const median = offsets[Math.floor(offsets.length / 2)];
+      const measuredMs = Math.max(0, Math.min(1200,
+        Math.round((median * 1000) / 5) * 5));
+
+      _calibrationBusy = false;
+      if (calBtn) calBtn.classList.remove('busy');
+      // applyBtLatencyMs is the boot-scope closure that owns slot
+      // persistence + auto-mode flip + status repaint. It's declared
+      // inside the boot wiring block but exposed via the click handler
+      // graph. Here we duplicate just enough behaviour to avoid
+      // reaching across that closure: write to slot, persist, flip off
+      // auto, label as 'calibrated', repaint.
+      _writeEffectiveBtLatency(measuredMs);
+      if (btHeadphonesOn) {
+        btLatencyMsBt = btLatencyMs;
+        try { localStorage.setItem('tuner.btLatencyMs', String(btLatencyMs)); } catch (_) {}
+      } else {
+        btLatencyMsNoBt = btLatencyMs;
+        try { localStorage.setItem('tuner.btLatencyMsNoBt', String(btLatencyMs)); } catch (_) {}
+      }
+      if (btAutoMode) {
+        btAutoMode = false;
+        try { localStorage.setItem('tuner.btAutoMode', 'false'); } catch (_) {}
+      }
+      btLatencySource = 'calibrated';
+      updateBtStatus();
     }
 
     // Lazily build the pitch-detection bandpass for the current AudioContext.
