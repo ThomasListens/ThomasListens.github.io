@@ -2417,16 +2417,19 @@
     }
 
     // Analyser FFT sizes. YIN cost is now O((tauMax - tauMin) * halfBuffer)
-    // instead of O((fftSize/2)²) thanks to the bounded tau search — at
-    // 48 kHz with YIN bounds [60, 1600] Hz this caps the outer loop at
-    // ~800 iters regardless of fftSize, so doubling the window doubles
-    // the inner cost but does not square it. IDLE=8192 (was 4096) gives
-    // ~170 ms of signal for the CMNDF, dropping per-frame std-dev at
-    // G5 from ~0.06¢ to ~0.01¢ in synthetic-noise tests — the kind of
-    // jitter floor microtonal singing actually runs into. RECORD stays
-    // at 2048 so the Pixel-7 CPU budget during MediaRecorder + camera
-    // filter + rAF draw is unchanged.
-    const ANALYSER_FFT_IDLE   = 8192;
+    // thanks to the bounded tau search — at 48 kHz with YIN bounds
+    // [60, 1600] Hz the outer loop caps at ~800 iters regardless of
+    // fftSize. Inner halfBuffer scales linearly with fftSize, so a
+    // larger window still costs proportionally more on the main thread.
+    //
+    // IDLE=4096 (reverted from 8192). The bumped 8192 idle window added
+    // ~1.7M extra inner ops per detect at idle — small on desktop but
+    // enough headroom-eat on Pixel-class hardware that the rAF loop
+    // jittered into the audio thread as occasional crackle during live
+    // listening. The bounded-tau 4096 path still resolves better than
+    // 0.05¢ at vocal frequencies, comfortably inside microtonal
+    // precision needs.
+    const ANALYSER_FFT_IDLE   = 4096;
     const ANALYSER_FFT_RECORD = 2048;
 
     let cameraStream = null;
