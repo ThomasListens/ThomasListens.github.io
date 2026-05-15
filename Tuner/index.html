@@ -2650,6 +2650,15 @@
     let pendingExportBlob = null;
     let pendingExportFilename = null;
     let activeLayerSources = [];
+    // Bake-down delay (ms) actually applied to prior-layer audio in the
+    // most recently recorded take. Captured inside scheduleLayerPlayback
+    // at recording start so it reflects the btLatencyMs in force then —
+    // not the value that might be live at export time. pushLastTakeAsLayer
+    // snapshots it onto the new layer's bakeDownDelayMs field so the
+    // composite knows how far to shift older layer videos to align them
+    // with their voices in the latest take's audio. Zero before any
+    // stacked take has been recorded.
+    let _lastTakeBakeDownDelayMs = 0;
     // Counter (not bool) so nested or overlapping export/remux calls
     // gate the live audio loop correctly — depth>0 means "something
     // CPU-heavy is in flight, skip non-essential rAF work." Drives the
@@ -7192,6 +7201,7 @@
       const videoEls = [];
       const objectUrls = [];
       const audioNodes = [];   // MediaElementAudioSourceNode + MediaStreamAudioDestinationNode
+      const playTimeouts = []; // setTimeout IDs for delayed older-layer play()
       let canvas = null;
       let mediaRecorder = null;
       let rafId = null;
@@ -7358,14 +7368,60 @@
         // 6. Start the recorder, then start playback. Playing AFTER
         //    MediaRecorder.start() guarantees the recorder doesn't miss
         //    the first frames.
+        //
+        //    BAKE-DOWN ALIGNMENT. Each take's MP4 audio holds prior-layer
+        //    voices offset by ~btLatencyMs (scheduleLayerPlayback feeds
+        //    them through DelayNode(btLatencyMs/1000) so the user's
+        //    BT-delayed mic capture lines up with the layers in the
+        //    recording bus). The latest take's audio is the only audio
+        //    source in the composite, so older layer videos must be
+        //    delayed by that same offset or their visuals will lead their
+        //    voices by btLatencyMs in the captured composite. On BT this
+        //    is a 200–400 ms lip-sync slip on the base/older cells; on
+        //    speakers it's near-zero so the same bug was invisible until
+        //    Auto latency picked up real BT outputLatency.
+        //
+        //    We read the offset from ordered[0] (the audio source) — that
+        //    layer was recorded with the btLatencyMs that was actually
+        //    applied to ITS bake-down, which may not equal the live
+        //    btLatencyMs at export time (Auto mode can shift between
+        //    takes). videoEls[0] still starts immediately (its own video
+        //    aligns with its own audio internally); only i > 0 get the
+        //    shift.
+        const bakeDownDelayMs = (ordered[0] && typeof ordered[0].bakeDownDelayMs === 'number')
+          ? Math.max(0, ordered[0].bakeDownDelayMs) : 0;
+        const layerPlayOffsetMs = new Array(videoEls.length).fill(0);
+        for (let i = 1; i < videoEls.length; i++) layerPlayOffsetMs[i] = bakeDownDelayMs;
+
         mediaRecorder.start();
 
         for (const v of videoEls) {
           try { v.currentTime = 0; } catch (_) {}
         }
-        // play() returns a Promise — await all so we know playback
-        // actually started before the rAF loop checks elapsed time.
-        await Promise.all(videoEls.map(v => v.play().catch(() => {})));
+        // Start videoEls[0] immediately — it provides audio for the whole
+        // composite, so the recorder needs samples flowing from t=0.
+        // play() returns a Promise — await so we know playback actually
+        // started before the rAF loop checks elapsed time.
+        await videoEls[0].play().catch(() => {});
+        // Older-layer videos: if a bake-down shift is in effect, defer
+        // play() by that amount so their currentTime stays at 0 (the
+        // frame-0 still) until the audio reaches their voice. drawFrame
+        // gates drawImage on layerPlayOffsetMs so the cell stays black
+        // during the wait — without that gate drawImage(v) would paint
+        // the seeked-to-0 frame and the cell would freeze on its first
+        // frame instead of going black, defeating the alignment cue.
+        for (let i = 1; i < videoEls.length; i++) {
+          const v = videoEls[i];
+          if (layerPlayOffsetMs[i] > 0) {
+            const tid = setTimeout(() => {
+              if (stopRequested) return;
+              v.play().catch(() => {});
+            }, layerPlayOffsetMs[i]);
+            playTimeouts.push(tid);
+          } else {
+            v.play().catch(() => {});
+          }
+        }
 
         // 7. Compose loop. clear -> for each cell, draw the matching
         //    video element with letterboxing. Browser uses its hardware
@@ -7377,11 +7433,21 @@
           if (stopRequested) return;
           ctx.fillStyle = '#000';
           ctx.fillRect(0, 0, W, H);
+          const elapsedMsNow = performance.now() - startMs;
           let allEnded = true;
           for (let i = 0; i < videoEls.length && i < layout.cells.length; i++) {
             const cell = layout.cells[i];
             const v = videoEls[i];
             const dur = layerDurations[i] || 0;
+            // Bake-down alignment gate. Older-layer cells stay black until
+            // their voice begins inside the latest take's audio. Without
+            // this, drawImage(v) at composite t=0 paints v's seeked frame
+            // 0 (the cell would freeze on its still until play() fires)
+            // even though v hasn't started playing yet.
+            if (elapsedMsNow < layerPlayOffsetMs[i]) {
+              allEnded = false;
+              continue;
+            }
             // In longest mode, treat layers as "done" once they have
             // played past their declared duration (videoEl.ended is
             // unreliable on iOS Safari) and leave their cell black
@@ -7501,6 +7567,9 @@
         stopRequested = true;
         if (rafId) {
           try { cancelAnimationFrame(rafId); } catch (_) {}
+        }
+        for (const tid of playTimeouts) {
+          try { clearTimeout(tid); } catch (_) {}
         }
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
           try { mediaRecorder.stop(); } catch (_) {}
@@ -8030,6 +8099,14 @@
         // (used by exportStackedReel for the canvas+MediaRecorder
         // composite). We hold a reference, not a clone — the blob
         // backing data is GC'd when the stack drops it.
+        // bakeDownDelayMs: the audio offset at which prior-layer voices
+        // begin inside this take's MP4. Comes from scheduleLayerPlayback's
+        // DelayNode (btLatencyMs at recording start). The composite reads
+        // this from the most-recent take to shift older-layer videos so
+        // their visuals align with their voices in the bake-down. Take 1
+        // had no prior layers and no scheduleLayerPlayback call, so its
+        // bake-down delay is 0.
+        const bakeDownDelayMs = harmonyStack.length > 0 ? _lastTakeBakeDownDelayMs : 0;
         harmonyStack.push({
           audioBuffer,
           videoBlob: lastRecordedBlob,
@@ -8041,6 +8118,7 @@
           // not honour this field — it bakes the most-recent take's
           // audio as-is. See the panel footer note.
           gain: 1.0,
+          bakeDownDelayMs,
         });
         updateStackIndicator();
         showRemuxIndicator('Layer ' + harmonyStack.length + ' added');
@@ -8056,6 +8134,7 @@
     function clearHarmonyStack() {
       stopActiveLayerSources();
       harmonyStack.length = 0;
+      _lastTakeBakeDownDelayMs = 0;
       updateStackIndicator();
     }
 
@@ -8142,6 +8221,11 @@
       }
       const startTime = audioContext.currentTime + 0.05;
       const delaySec = Math.max(0, Math.min(1.5, btLatencyMs / 1000));
+      // Snapshot the delay actually applied to this take's bake-down so
+      // the composite export can shift older-layer videos to match. Read
+      // at scheduleLayerPlayback time (not at export time) because Auto
+      // mode can shift btLatencyMs between takes.
+      _lastTakeBakeDownDelayMs = Math.round(delaySec * 1000);
       for (const layer of harmonyStack) {
         const source = audioContext.createBufferSource();
         source.buffer = layer.audioBuffer;
