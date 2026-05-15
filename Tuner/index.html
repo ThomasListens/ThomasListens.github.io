@@ -4347,7 +4347,17 @@
         }
       }
 
-      const padding = 60;
+      // Margin from the camera-visible-rect edge. The literal 60 was
+      // calibrated for the 544x960 default capture (visible camera band
+      // ~408 px tall after 4:3-into-9:16 letterboxing). At the lowest
+      // record rungs (192x336, 160x288, 128x224) the visible band is only
+      // ~96-144 px, so a raw 60+60 padding collapses or inverts the ruler
+      // height and every ratio Y position bunches into a few pixels —
+      // the labels overlap regardless of font scaling. Cap the padding
+      // by a fraction of the visible band so it backs off at tiny
+      // captures while staying at the calibrated 60 for default-and-up.
+      const visibleH = botY - topY;
+      const padding = Math.min(60, visibleH * 0.2);
       const rulerTop = topY + padding;
       const rulerBottom = botY - padding;
       const rulerHeight = rulerBottom - rulerTop;
