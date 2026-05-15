@@ -2333,11 +2333,8 @@
     </div>
     <div class="feather-row">
       <label>FPS</label>
-      <select id="recFpsSelect">
-        <option value="30">30 fps</option>
-        <option value="24">24 fps</option>
-        <option value="18">18 fps</option>
-      </select>
+      <input type="range" id="recFpsSlider" min="6" max="60" value="30" step="1">
+      <span id="recFpsVal" class="value-badge">30 fps</span>
     </div>
     <div class="check-row">
       <label><input type="checkbox" id="fxAuroraToggle"> Aurora</label>
@@ -4160,16 +4157,21 @@
     // audioLoop() always schedules the next frame regardless — this
     // only skips the actual rendering work on intervening ticks.
     //
-    // recFps is the user-selectable frame rate (30 / 24 / 18) wired in
+    // recFps is the user-selectable frame rate (6–60, integer) wired in
     // the record dock; RECORD_DRAW_INTERVAL_MS is derived from it so a
     // lower fps actually saves draw-loop work, not just encode work.
-    // applyRecFps() updates both when the selector changes.
+    // applyRecFps() updates both when the slider changes; out-of-range or
+    // non-numeric input falls back to 30 so recording can't be broken.
     let lastDrawTime = 0;
     let recFps = 30;
     let RECORD_DRAW_INTERVAL_MS = Math.floor(1000 / recFps);
     function applyRecFps(fps) {
-      const allowed = [30, 24, 18];
-      recFps = allowed.indexOf(fps) >= 0 ? fps : 30;
+      const n = parseInt(fps, 10);
+      if (!isFinite(n) || isNaN(n)) {
+        recFps = 30;
+      } else {
+        recFps = Math.max(6, Math.min(60, n));
+      }
       RECORD_DRAW_INTERVAL_MS = Math.floor(1000 / recFps);
     }
 
@@ -9248,17 +9250,20 @@
       // during active recording, so the user can't change fps mid-take.
       try {
         const savedFps = parseInt(localStorage.getItem('tuner.recFps'), 10);
-        if (savedFps === 30 || savedFps === 24 || savedFps === 18) {
+        if (!isNaN(savedFps) && savedFps >= 6 && savedFps <= 60) {
           applyRecFps(savedFps);
         }
       } catch (_) {}
-      const recFpsSel = document.getElementById('recFpsSelect');
-      if (recFpsSel) {
-        recFpsSel.value = String(recFps);
-        recFpsSel.addEventListener('change', (e) => {
+      const recFpsSlider = document.getElementById('recFpsSlider');
+      const recFpsVal = document.getElementById('recFpsVal');
+      if (recFpsSlider) {
+        recFpsSlider.value = String(recFps);
+        if (recFpsVal) recFpsVal.textContent = recFps + ' fps';
+        recFpsSlider.addEventListener('input', (e) => {
           const v = parseInt(e.target.value, 10);
-          if (v !== 30 && v !== 24 && v !== 18) return;
+          if (isNaN(v)) return;
           applyRecFps(v);
+          if (recFpsVal) recFpsVal.textContent = recFps + ' fps';
           try { localStorage.setItem('tuner.recFps', String(recFps)); } catch (_) {}
         });
       }
