@@ -665,6 +665,26 @@
       background: rgba(180, 110, 0, 0.95);
       color: #fff;
     }
+    /* Export-pause affordance. While body.exporting is set, the audioLoop
+       holds the rAF chain but skips draw() + YIN (see pauseLiveLoops).
+       The canvas is therefore frozen at the last painted frame; dim it
+       and add a subtle 1s pulse to the remux indicator so the freeze
+       reads as "I'm busy, not stuck." Pointer events on the canvas are
+       blocked too, so a stray tap doesn't get queued behind the heavy
+       work. The mic / drone / recorder UI remain interactive. */
+    body.exporting #rulerCanvas {
+      opacity: 0.55;
+      filter: saturate(0.6);
+      pointer-events: none;
+      transition: opacity 180ms ease, filter 180ms ease;
+    }
+    body.exporting #remuxIndicator.visible {
+      animation: exportPulse 1.2s ease-in-out infinite;
+    }
+    @keyframes exportPulse {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.72; }
+    }
 
     body.record-mode #controls,
     body.record-mode #mobileToggle {
@@ -2475,6 +2495,14 @@
     let pendingExportBlob = null;
     let pendingExportFilename = null;
     let activeLayerSources = [];
+    // Counter (not bool) so nested or overlapping export/remux calls
+    // gate the live audio loop correctly — depth>0 means "something
+    // CPU-heavy is in flight, skip non-essential rAF work." Drives the
+    // pause in audioLoop and the .exporting body class for the
+    // "Processing…" affordance. Live mic, MediaRecorder, AudioContext,
+    // and the recording graph all keep running; only the visual draw
+    // loop and the YIN pitch analysis pause.
+    let _heavyWorkDepth = 0;
     let btLatencyMs = 200;
     // reelLengthMode: 'shortest' (current behavior — reel ends when the
     // shortest layer ends, audio always sync'd) or 'longest' (reel runs
@@ -4660,6 +4688,35 @@
       return true;
     }
     
+    // Gate the live audio loop while a composite/remux/download is in
+    // flight. Pause: stop running YIN on the main thread and stop the
+    // per-frame draw() — both compete with the FFmpeg.wasm core and the
+    // composite canvas's captureStream for CPU/GPU headroom. Resume:
+    // unwind the depth and tag-drive the "exporting" body class for the
+    // CSS-driven "Processing…" affordance. AudioContext, mic source,
+    // recording graph, and the tanpura drone are NOT touched — only the
+    // visual + analysis work that's purely non-essential during export.
+    // Counter (not bool) so a per-take remux nested inside a stacked
+    // export, or two remuxes back-to-back, still hold the gate cleanly.
+    function pauseLiveLoops() {
+      _heavyWorkDepth++;
+      if (_heavyWorkDepth === 1) {
+        document.body.classList.add('exporting');
+      }
+    }
+    function resumeLiveLoops() {
+      if (_heavyWorkDepth > 0) _heavyWorkDepth--;
+      if (_heavyWorkDepth === 0) {
+        document.body.classList.remove('exporting');
+        // Kick the loop back to life. Live mic / record mode would have
+        // re-queued the rAF on their own, but the explicit nudge here
+        // makes resume crisp regardless of what was running before.
+        if (!animationId && (isListening || isPlaying || recordMode)) {
+          audioLoop();
+        }
+      }
+    }
+
     function audioLoop() {
       // Render loop is alive whenever the canvas needs painting: mic on,
       // file playing, OR record mode (camera background must keep
@@ -4669,6 +4726,18 @@
       // from this loop and the loop returned early on no analyser.
       if (!isListening && !isPlaying && !recordMode) {
         animationId = null;
+        return;
+      }
+
+      // Export/remux gate. While a composite or FFmpeg.wasm remux is in
+      // flight, skip YIN + draw() but keep the rAF chain alive so we
+      // resume cleanly the moment the heavy work finishes (no need for
+      // the resume path to call audioLoop() explicitly in the common
+      // case). The "Processing…" / "Optimizing video…" indicator above
+      // the canvas is what the user sees during this window, so a
+      // frozen canvas underneath doesn't look broken.
+      if (_heavyWorkDepth > 0) {
+        animationId = requestAnimationFrame(audioLoop);
         return;
       }
 
@@ -6395,6 +6464,12 @@
       }
 
       _exportInFlight = true;
+      // Pause the live draw loop + YIN until the composite is fully done
+      // (including the final remux). The export canvas is independent
+      // from the live tuner canvas, so freezing the live one for the
+      // duration is safe and frees CPU/GPU headroom for the composite's
+      // captureStream + MediaRecorder + FFmpeg.wasm. Resumed in finally.
+      pauseLiveLoops();
       const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const outName = 'reel-stacked-' + ts + '.mp4';
 
@@ -6417,6 +6492,7 @@
           setTimeout(hideRemuxIndicator, 4000);
         } finally {
           _exportInFlight = false;
+          resumeLiveLoops();
         }
         return;
       }
@@ -6722,6 +6798,7 @@
           try { node.disconnect(); } catch (_) {}
         }
         _exportInFlight = false;
+        resumeLiveLoops();
       }
     }
 
@@ -6999,6 +7076,13 @@
         // users have no console, so silent failures are unacceptable.
         let outputBlob = recordedBlob;
         if (type.includes('mp4')) {
+          // Pause the live draw loop + YIN around the FFmpeg.wasm remux.
+          // The recorder has already stopped by this point, so freezing
+          // the live canvas costs nothing visible — the on-screen
+          // "Optimizing video…" indicator is what the user is watching.
+          // try/finally guarantees the loop resumes even if remux throws
+          // before its own catch fires (e.g. wasm OOM).
+          pauseLiveLoops();
           try {
             outputBlob = await remuxToFastStartMP4(recordedBlob);
             console.log('[record] FFmpeg remux complete, size:', outputBlob.size);
@@ -7013,6 +7097,8 @@
             // below will repaint the indicator with the named trigger.
             setTimeout(hideRemuxIndicator, 6000);
             saveTrigger = 'DL: ffmpeg fail fallback';
+          } finally {
+            resumeLiveLoops();
           }
         }
 
