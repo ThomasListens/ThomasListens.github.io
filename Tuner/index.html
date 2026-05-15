@@ -7299,10 +7299,35 @@
         audioNodes.push(audioSrc, audioDest);
 
         // 4. Combined MediaStream: canvas video track + audio dest's
-        //    audio track. captureStream uses the user-selected recFps
-        //    so a stack export inherits the same frame rate as live
-        //    recording; mobile may not honour it exactly — acceptable.
-        const videoStream = canvas.captureStream(recFps);
+        //    audio track.
+        //
+        //    Composite captureStream pacing is DECOUPLED from the per-
+        //    take recFps slider. The slider drives the lo-fi capture
+        //    aesthetic (1–60 fps recording, including extreme values
+        //    Thomas uses for slideshow-style takes), but the export
+        //    output has to be a stable, IG-friendly framerate or the
+        //    encoder produces MP4s with video_dur < audio_dur — at
+        //    captureStream(1..5) Chromium's frame pacing emits too
+        //    few unique frames per second for the muxer to keep the
+        //    two tracks aligned, and players reconcile the mismatch
+        //    by stretching the last frames or freezing on them. That
+        //    was the cause of the "footage stretched/frozen/not
+        //    aligned" symptom — audio aligned cleanly, but video
+        //    drifted because captureStream(recFps=2) on a 1080×1920
+        //    canvas is brittle.
+        //
+        //    The lo-fi aesthetic still lands in the output because
+        //    each source <video> plays its MP4 at its own recorded
+        //    rate, and drawImage paints whatever current frame the
+        //    source is on. A 5-fps source frame simply repeats six
+        //    times across a 30-fps composite output interval —
+        //    visually identical to 5-fps content, but the OUTPUT
+        //    container is the steady IG-class 30 fps that mobile
+        //    decoders and Instagram's ingest expect. Stays inside
+        //    the canvas.captureStream(N) mechanism (no
+        //    captureStream(0) + requestFrame, per the standing rule).
+        const COMPOSITE_OUTPUT_FPS = 30;
+        const videoStream = canvas.captureStream(COMPOSITE_OUTPUT_FPS);
         const combined = new MediaStream();
         for (const t of videoStream.getVideoTracks()) combined.addTrack(t);
         for (const t of audioDest.stream.getAudioTracks()) combined.addTrack(t);
