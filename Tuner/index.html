@@ -4927,6 +4927,45 @@
         const endSemitone = Math.ceil(displayMax / 100);
         const isCustomMode = !document.getElementById('refPreset').value;
 
+        // EDO label decimation. centsToY maps [displayMin, displayMax]
+        // onto rulerHeight, so each semitone occupies pxPerSemi
+        // canvas-px of vertical space. When Thomas pulls the ratio
+        // range wide (three octaves = 36 semitones squeezed into the
+        // same ruler band) pxPerSemi falls below the font height and
+        // the chromatic labels overlap into illegible vertical mush.
+        // Same class of bug as the ratio-label decimation below, but
+        // range-driven (cents-range vs. canvas-band) rather than
+        // S-driven (small capture).
+        //
+        // Pick the smallest stride from {1,2,3,4,6,12} that gives
+        // each label its (nearly) full font height. Strides are
+        // divisors of 12 so the kept pattern stays regular and the
+        // octave anchor (C in note-name mode, '1' in custom mode) is
+        // always in the keep set -- at the most aggressive stride only
+        // the Cs (or 1s) remain. The 0.85 fudge lets labels touch
+        // vertically before we decimate, so at one or two octaves on
+        // any reasonable canvas stride resolves to 1 and the render is
+        // bit-identical to pre-fix. Tick lines still draw for every
+        // semitone -- only the text thins out -- so tap-to-drone on
+        // unlabeled rungs still works.
+        const EDO_MIN_FONT_PX = 8;
+        const edoFontPx = Math.max(11 * S, EDO_MIN_FONT_PX);
+        const visibleCents = displayMax - displayMin;
+        const pxPerSemi = visibleCents > 0
+          ? rulerHeight * 100 / visibleCents
+          : Infinity;
+        const requiredPxPerLabel = edoFontPx * 0.85;
+        const EDO_STRIDES = [1, 2, 3, 4, 6, 12];
+        let labelStride = 12;
+        for (const s of EDO_STRIDES) {
+          if (s * pxPerSemi >= requiredPxPerLabel) { labelStride = s; break; }
+        }
+        let anchorOffset = 0;
+        if (!isCustomMode) {
+          const ref = parseNoteName(config.refNote);
+          anchorOffset = ((-ref.index) % 12 + 12) % 12;
+        }
+
         let edoLineStart, edoLabelX, edoLabelAlign;
         if (recordMode) {
           // Confine EDO to the backdrop area so it doesn't bleed across the camera.
@@ -4934,7 +4973,7 @@
           const edgeX = W * backdropEdge;
           edoLabelX = edgeX + 8 * S;
           edoLabelAlign = 'left';
-          ctx.font = `${11 * S}px system-ui`;
+          ctx.font = `${edoFontPx}px system-ui`;
           const labelW = ctx.measureText('A♯2').width;
           edoLineStart = edoLabelX + labelW + 8 * S;
         } else {
@@ -4951,7 +4990,7 @@
         ctx.strokeStyle = 'rgba(70, 70, 70, 0.7)';
         ctx.lineWidth = 1;
         ctx.fillStyle = 'rgba(100, 100, 100, 1)';
-        ctx.font = `${11 * S}px system-ui`;
+        ctx.font = `${edoFontPx}px system-ui`;
         ctx.textAlign = edoLabelAlign;
         ctx.textBaseline = 'middle';
         const DEGREE_NAMES = ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'];
@@ -4965,6 +5004,8 @@
           ctx.moveTo(edoLineStart, y);
           ctx.lineTo(W, y);
           ctx.stroke();
+
+          if ((((semi - anchorOffset) % labelStride) + labelStride) % labelStride !== 0) continue;
 
           let label;
           if (isCustomMode) {
