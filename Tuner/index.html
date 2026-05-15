@@ -2331,6 +2331,9 @@
         <option value="320x576">320×576 · 1.5 Mbps</option>
         <option value="288x512">288×512 · 1.2 Mbps</option>
         <option value="256x448">256×448 · 0.95 Mbps</option>
+        <option value="192x336">192×336 · 520 kbps</option>
+        <option value="160x288">160×288 · 370 kbps</option>
+        <option value="128x224">128×224 · 230 kbps</option>
       </select>
     </div>
     <div class="feather-row">
@@ -2776,15 +2779,18 @@
     // Square dimensions per tier (from round(sqrt(W*H)/16)*16):
     //   544×960 → 720×720,  480×848 → 640×640,  416×720 → 544×544,
     //   368×640 → 480×480,  320×576 → 432×432,  288×512 → 384×384,
-    //   256×448 → 336×336.
+    //   256×448 → 336×336,  192×336 → 256×256,  160×288 → 208×208,
+    //   128×224 → 176×176.
     // Each square is roughly the same pixel count as its 9:16 sibling
     // (within ~1%), so the same RECORD_BITRATE serves both.
     //
     // Heavy stacks (6-8 layers) want a smaller canvas — per-frame
     // compositing of 8 cells is the actual cost on Pixel 7. The
     // intermediate rungs (480×848, 368×640) give Thomas headroom to
-    // dial capture size to layer count. The two lowest rungs (288×512,
-    // 256×448) extend that headroom for the largest stacks.
+    // dial capture size to layer count. The lowest rungs (288×512,
+    // 256×448, then 192×336 / 160×288 / 128×224) extend that headroom
+    // for the largest stacks and let Thomas experiment at extreme low
+    // resolutions where each cell is only a few dozen pixels tall.
     const REC_RES_PROFILES = {
       '544x960': { w: 544, h: 960, bitrate: 3_000_000 },
       '480x848': { w: 480, h: 848, bitrate: 2_500_000 },
@@ -2793,6 +2799,9 @@
       '320x576': { w: 320, h: 576, bitrate: 1_500_000 },
       '288x512': { w: 288, h: 512, bitrate: 1_200_000 },
       '256x448': { w: 256, h: 448, bitrate:   950_000 },
+      '192x336': { w: 192, h: 336, bitrate:   520_000 },
+      '160x288': { w: 160, h: 288, bitrate:   370_000 },
+      '128x224': { w: 128, h: 224, bitrate:   230_000 },
     };
     let recRes = '544x960';
     // Recomputed by applyRecRes() — mutable mirrors of the active profile.
