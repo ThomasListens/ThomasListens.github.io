@@ -2254,6 +2254,28 @@
       </select>
     </div>
 
+    <!-- Shimmer reverb mirrors. Same voiceFX.reverb / voiceFXMix /
+         voiceFXTail state as the side-panel "Voice processing" controls
+         (#voiceReverb / #voiceReverbMix / #voiceReverbTail) and the
+         floating verb chip (#audioFXVrbBtn) / mix slider (#audioFXMixSlider).
+         syncVoiceFXUI() keeps every mirror in step; the input handlers
+         here call the same setters the side panel uses, so persistence
+         and the live audio graph respond identically regardless of which
+         control the user touched. -->
+    <div class="check-row">
+      <label><input type="checkbox" id="voiceReverbDock"> Reverb</label>
+    </div>
+    <div class="feather-row">
+      <label>Mix</label>
+      <input type="range" id="voiceReverbMixDock" min="0" max="100" value="50">
+      <span id="voiceReverbMixDockVal" class="value-badge">50%</span>
+    </div>
+    <div class="feather-row">
+      <label>Tail</label>
+      <input type="range" id="voiceReverbTailDock" min="0" max="100" value="60">
+      <span id="voiceReverbTailDockVal" class="value-badge">60%</span>
+    </div>
+
     <div class="record-row record-essential">
       <button type="button" id="layerAddBtn" title="Add this take as a harmony layer" aria-label="Add layer">⊕</button>
       <button id="discardRecBtn" title="Discard recording" aria-label="Discard recording">🗑</button>
@@ -8127,9 +8149,11 @@
       if (cutStrip) cutStrip.value = cutSlider;
     }
 
-    // Mirror the voice-FX UI state across the side panel and the floating
-    // record strip. Single source of truth: voiceFX.{lowcut,compression,reverb}
-    // and voiceFXMix. Call after any state change from either UI.
+    // Mirror the voice-FX UI state across every surface that exposes it:
+    // the side panel, the floating verb chip / mix slider, and the
+    // record-mode dock reverb mirrors. Single source of truth:
+    // voiceFX.{lowcut,compression,deess,reverb}, voiceFXMix, voiceFXTail.
+    // Call after any state change from any UI.
     function syncVoiceFXUI() {
       // Side panel
       const lcMain   = document.getElementById('voiceLowcut');
@@ -8138,14 +8162,25 @@
       const vrbMain  = document.getElementById('voiceReverb');
       const mixMain  = document.getElementById('voiceReverbMix');
       const mixLbl   = document.getElementById('voiceReverbMixVal');
+      const tailMain = document.getElementById('voiceReverbTail');
+      const tailLbl  = document.getElementById('voiceReverbTailVal');
       // Record-mode floating strip: only the verb ⏻ button + Mix slider
       // remain. LC/CMP/DE have no UI here — they live in the side
       // (Settings) panel. The Mix slider greys out via [disabled] when
       // reverb is off so the user can still see the control exists.
       const vrbChip   = document.getElementById('audioFXVrbBtn');
       const mixStrip  = document.getElementById('audioFXMixSlider');
+      // Record-mode dock mirrors. Same toggle/mix/tail controls as the
+      // side panel, surfaced in the dock so reverb is reachable from the
+      // record screen without backing out to the main settings panel.
+      const vrbDock     = document.getElementById('voiceReverbDock');
+      const mixDock     = document.getElementById('voiceReverbMixDock');
+      const mixDockLbl  = document.getElementById('voiceReverbMixDockVal');
+      const tailDock    = document.getElementById('voiceReverbTailDock');
+      const tailDockLbl = document.getElementById('voiceReverbTailDockVal');
 
       const mixPct  = Math.round(voiceFXMix * 100);
+      const tailPct = Math.round(voiceFXTail * 100);
 
       if (lcMain)   lcMain.checked  = voiceFX.lowcut;
       if (cmpMain)  cmpMain.checked = voiceFX.compression;
@@ -8153,12 +8188,23 @@
       if (vrbMain)  vrbMain.checked = voiceFX.reverb;
       if (mixMain)  mixMain.value   = mixPct;
       if (mixLbl)   mixLbl.textContent = mixPct + '%';
+      if (tailMain) tailMain.value   = tailPct;
+      if (tailLbl)  tailLbl.textContent = tailPct + '%';
 
       if (vrbChip)   vrbChip.classList.toggle('on', voiceFX.reverb);
       if (mixStrip) {
         mixStrip.value = mixPct;
         mixStrip.disabled = !voiceFX.reverb;
       }
+
+      if (vrbDock)     vrbDock.checked = voiceFX.reverb;
+      if (mixDock) {
+        mixDock.value = mixPct;
+        mixDock.disabled = !voiceFX.reverb;
+      }
+      if (mixDockLbl)  mixDockLbl.textContent = mixPct + '%';
+      if (tailDock)    tailDock.value = tailPct;
+      if (tailDockLbl) tailDockLbl.textContent = tailPct + '%';
     }
 
     // -------- Feature 1: Settings hide toggle --------
@@ -8988,6 +9034,42 @@
           try { localStorage.setItem('tuner.reelLengthMode', reelLengthMode); } catch (_) {}
         });
       }
+
+      // Reverb dock mirrors. Initial values come from voiceFX.reverb /
+      // voiceFXMix / voiceFXTail (which the side-panel boot block above
+      // already restored from localStorage). Each handler routes through
+      // the same setters the side panel uses, then calls syncVoiceFXUI()
+      // so every other surface (side panel, floating verb chip / mix
+      // slider) reflects the change immediately. No localStorage writes
+      // here — the existing setters and persistVoiceFXFlags own that.
+      const verbDockCb   = document.getElementById('voiceReverbDock');
+      const verbDockMix  = document.getElementById('voiceReverbMixDock');
+      const verbDockTail = document.getElementById('voiceReverbTailDock');
+      if (verbDockCb) {
+        verbDockCb.checked = !!voiceFX.reverb;
+        verbDockCb.addEventListener('change', (e) => {
+          voiceFX.reverb = !!e.target.checked;
+          persistVoiceFXFlags();
+          applyVoiceFX();
+          syncVoiceFXUI();
+        });
+      }
+      if (verbDockMix) {
+        verbDockMix.value = String(Math.round(voiceFXMix * 100));
+        verbDockMix.disabled = !voiceFX.reverb;
+        verbDockMix.addEventListener('input', (e) => {
+          setVoiceReverbMix(parseInt(e.target.value, 10) / 100);
+          syncVoiceFXUI();
+        });
+      }
+      if (verbDockTail) {
+        verbDockTail.value = String(Math.round(voiceFXTail * 100));
+        verbDockTail.addEventListener('input', (e) => {
+          setVoiceReverbTail(parseInt(e.target.value, 10) / 100);
+          syncVoiceFXUI();
+        });
+      }
+
       const layerAddBtn = document.getElementById('layerAddBtn');
       if (layerAddBtn) {
         layerAddBtn.addEventListener('click', () => {
