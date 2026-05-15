@@ -2295,6 +2295,14 @@
         <option value="320x576">320×576 · 1.5 Mbps</option>
       </select>
     </div>
+    <div class="feather-row">
+      <label>FPS</label>
+      <select id="recFpsSelect">
+        <option value="30">30 fps</option>
+        <option value="24">24 fps</option>
+        <option value="18">18 fps</option>
+      </select>
+    </div>
     <div class="check-row">
       <label><input type="checkbox" id="fxAuroraToggle"> Aurora</label>
       <label><input type="checkbox" id="fxCameraFilterToggle"> Filter</label>
@@ -4076,14 +4084,25 @@
       }
     }
 
-    // Throttle the draw() body to ~30 FPS while record-mode is on, to
-     // match canvas.captureStream(30) and the halved pitch-detection
-     // rate. Outside record mode, run every rAF tick (full ~60 Hz) for
-     // maximum visual responsiveness. The rAF loop in audioLoop() always
-     // schedules the next frame regardless — this only skips the actual
-     // rendering work on intervening ticks.
+    // Throttle the draw() body while record-mode is on, to match the
+    // selected canvas.captureStream(recFps) rate and the halved pitch-
+    // detection rate. Outside record mode, run every rAF tick (full
+    // ~60 Hz) for maximum visual responsiveness. The rAF loop in
+    // audioLoop() always schedules the next frame regardless — this
+    // only skips the actual rendering work on intervening ticks.
+    //
+    // recFps is the user-selectable frame rate (30 / 24 / 18) wired in
+    // the record dock; RECORD_DRAW_INTERVAL_MS is derived from it so a
+    // lower fps actually saves draw-loop work, not just encode work.
+    // applyRecFps() updates both when the selector changes.
     let lastDrawTime = 0;
-    const RECORD_DRAW_INTERVAL_MS = 33;
+    let recFps = 30;
+    let RECORD_DRAW_INTERVAL_MS = Math.floor(1000 / recFps);
+    function applyRecFps(fps) {
+      const allowed = [30, 24, 18];
+      recFps = allowed.indexOf(fps) >= 0 ? fps : 30;
+      RECORD_DRAW_INTERVAL_MS = Math.floor(1000 / recFps);
+    }
 
     // Returns whether the canvas pixels were updated this call. Used so
     // recordVideoTrack.requestFrame() only runs on real paints — the
@@ -4874,11 +4893,11 @@
 
       draw();
 
-      // No requestFrame() call here. captureStream(30) is browser-paced
-      // — it polls the canvas at 30 Hz on its own clock, independent of
-      // main-thread work. Driving frames manually from the main thread
-      // (captureStream(0) + requestFrame) tied video timing to rAF
-      // jitter, which clicked the audio under load.
+      // No requestFrame() call here. captureStream(recFps) is browser-
+      // paced — it polls the canvas at the chosen rate on its own clock,
+      // independent of main-thread work. Driving frames manually from
+      // the main thread (captureStream(0) + requestFrame) tied video
+      // timing to rAF jitter, which clicked the audio under load.
 
       animationId = requestAnimationFrame(audioLoop);
     }
@@ -6637,9 +6656,10 @@
         audioNodes.push(audioSrc, audioDest);
 
         // 4. Combined MediaStream: canvas video track + audio dest's
-        //    audio track. captureStream(30) requests 30fps but mobile
-        //    may not honour it exactly — acceptable.
-        const videoStream = canvas.captureStream(30);
+        //    audio track. captureStream uses the user-selected recFps
+        //    so a stack export inherits the same frame rate as live
+        //    recording; mobile may not honour it exactly — acceptable.
+        const videoStream = canvas.captureStream(recFps);
         const combined = new MediaStream();
         for (const t of videoStream.getVideoTracks()) combined.addTrack(t);
         for (const t of audioDest.stream.getAudioTracks()) combined.addTrack(t);
@@ -6897,17 +6917,19 @@
         setTimeout(hideRemuxIndicator, 6000);
         return;
       }
-      // Browser-paced capture at 30 fps. The browser polls the canvas
-      // on its own clock, independent of rAF / main-thread jitter, so
-      // the muxer sees a steady video clock even when YIN, canvas blur,
-      // or UI work momentarily blocks the main thread. Audio packets
-      // stream on the audio thread and align cleanly against this
-      // steady clock — no per-frame resync, no clicks.
+      // Browser-paced capture at the user-selected fps (30 / 24 / 18).
+      // The browser polls the canvas on its own clock, independent of
+      // rAF / main-thread jitter, so the muxer sees a steady video
+      // clock even when YIN, canvas blur, or UI work momentarily blocks
+      // the main thread. Audio packets stream on the audio thread and
+      // align cleanly against this steady clock — no per-frame resync,
+      // no clicks.
       //
       // captureStream(0) (manual requestFrame) was tried and made things
       // worse: every main-thread stall translated directly into video
-      // clock stalls, and the muxer popped on each realignment.
-      const canvasStream = canvas.captureStream(30);
+      // clock stalls, and the muxer popped on each realignment. Do not
+      // switch to that mechanism even at low fps.
+      const canvasStream = canvas.captureStream(recFps);
       recordVideoTrack = canvasStream.getVideoTracks()[0] || null;
       // Snapshot captureStream video-track health so the on-stop
       // diagnostic can include it even after the track has been ended.
@@ -9134,6 +9156,28 @@
           if (!REC_RES_PROFILES[v]) return;
           applyRecRes(v);
           try { localStorage.setItem('tuner.recRes', recRes); } catch (_) {}
+        });
+      }
+
+      // Recording frame rate selector. Drives both canvas.captureStream
+      // (the encoder's pacing) and RECORD_DRAW_INTERVAL_MS (the draw
+      // throttle), so picking a lower fps actually reduces main-thread
+      // work, not just bitrate. The settings panel is force-hidden
+      // during active recording, so the user can't change fps mid-take.
+      try {
+        const savedFps = parseInt(localStorage.getItem('tuner.recFps'), 10);
+        if (savedFps === 30 || savedFps === 24 || savedFps === 18) {
+          applyRecFps(savedFps);
+        }
+      } catch (_) {}
+      const recFpsSel = document.getElementById('recFpsSelect');
+      if (recFpsSel) {
+        recFpsSel.value = String(recFps);
+        recFpsSel.addEventListener('change', (e) => {
+          const v = parseInt(e.target.value, 10);
+          if (v !== 30 && v !== 24 && v !== 18) return;
+          applyRecFps(v);
+          try { localStorage.setItem('tuner.recFps', String(recFps)); } catch (_) {}
         });
       }
 
