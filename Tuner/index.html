@@ -7169,10 +7169,15 @@
       //
       // We only use the processed path when there's something to process:
       // a voice FX is enabled, OR the drone is enabled (drone is mixed
-      // in via micProcessing.dest). Otherwise we use the raw track.
+      // in via micProcessing.dest), OR a stack take is in progress —
+      // scheduleLayerPlayback routes Branch B through masterOutputGain
+      // → recordingLimiter → dest, so without the processed path the
+      // prior-layer audio never reaches the recorder and stack bake-down
+      // would drop everything but the live mic. Otherwise we use the raw
+      // track.
       const hasRatioDrones = Object.keys(droneOscillators).length > 0;
       const needsProcessedAudio =
-        voiceFX.lowcut || voiceFX.compression || voiceFX.reverb || tanpuraEnabled || hasRatioDrones;
+        voiceFX.lowcut || voiceFX.compression || voiceFX.reverb || tanpuraEnabled || hasRatioDrones || harmonyStack.length > 0;
 
       let audioTrack = null;
       let audioSource = 'none';
