@@ -580,14 +580,15 @@
       display: block;
     }
 
-    /* Hidden studio-mode unlock: invisible 44×44 button parked in the
-       top-right corner. Triple-tap toggles studio mode (see
-       setupStudioCornerTap). Nothing visible — a stranger can't see it,
+    /* Hidden record-mode entry: invisible 44×44 button parked in the
+       top-right corner. Triple-tap enters record mode (see
+       setupRecordCornerTap). Nothing visible — a stranger can't see it,
        Thomas knows the corner. In record-mode the corner is occupied by
        #exitRecBtn and #settingsToggle (z-index 200+); pointer-events are
-       turned off there so taps fall through to those buttons. Outside
-       record mode the corner is empty, so a tap reliably hits this. */
-    #studioCornerTap {
+       turned off there so taps fall through to those buttons (exit uses
+       the visible X). Outside record mode the corner is empty, so a tap
+       reliably hits this. */
+    #recordCornerTap {
       position: fixed;
       top: 0;
       right: 0;
@@ -602,14 +603,14 @@
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
-    body.record-mode #studioCornerTap {
+    body.record-mode #recordCornerTap {
       pointer-events: none;
     }
 
-    /* Toast confirming studio-mode toggle. Same pill style as
-       #recIndicator. Shown for ~1.5 s after the corner-tap gesture
-       fires so the user gets unambiguous feedback. */
-    #studioToast {
+    /* Toast confirming the entry gesture fired. Same pill style as
+       #recIndicator. Shown for ~1.5 s after the corner-tap so the user
+       gets unambiguous feedback. */
+    #recordToast {
       position: fixed;
       top: calc(14px + env(safe-area-inset-top));
       left: 50%;
@@ -627,7 +628,7 @@
       -webkit-backdrop-filter: blur(8px);
       white-space: nowrap;
     }
-    #studioToast.visible {
+    #recordToast.visible {
       display: block;
     }
 
@@ -1732,61 +1733,43 @@
     #stackIndicator #downloadReelBtn.visible { display: inline-flex; }
     #stackIndicator #downloadReelBtn:active { background: rgba(50, 140, 230, 1); transform: scale(0.97); }
 
-    /* Studio mode gate. The recording / layer / export surface is
-       hidden until studioMode is unlocked. Anything tagged with
-       .studio-only stays out of the DOM flow for casual visitors;
-       individual recording elements get explicit selectors below as
-       they're added. The code stays — only its UI is hidden. */
-    body:not(.studio) .studio-only { display: none !important; }
-
-    /* Record-mode entry surface. #recordOverlay defaults to display:none
-       and only shows under body.record-mode, but the long-press entry
-       is now studio-gated too — these rules are belt-and-braces so that
-       nothing from the record dock can ever paint outside studio mode. */
-    body:not(.studio) #recordOverlay,
-    body:not(.studio) #droneRecordStrip,
-    body:not(.studio) #droneRecordToggle,
-    body:not(.studio) #audioFXVrbBtn,
-    body:not(.studio) #audioFXLevelStrip,
-    body:not(.studio) #audioFXMeter,
-    body:not(.studio) #rulerHideBtn,
-    body:not(.studio) #flipCamBtn {
+    /* Record-mode gate. The recording / layer / export surface only
+       paints under body.record-mode. Each recording element already
+       defaults to display:none in its own block above, but these
+       belt-and-braces rules guarantee nothing from the record dock can
+       ever paint on the plain tuner — even if some future code
+       accidentally toggles a .visible class outside record mode. */
+    body:not(.record-mode) #recordOverlay,
+    body:not(.record-mode) #droneRecordStrip,
+    body:not(.record-mode) #droneRecordToggle,
+    body:not(.record-mode) #audioFXVrbBtn,
+    body:not(.record-mode) #audioFXLevelStrip,
+    body:not(.record-mode) #audioFXMeter,
+    body:not(.record-mode) #rulerHideBtn,
+    body:not(.record-mode) #flipCamBtn {
       display: none !important;
     }
 
     /* Harmony-stack surface — the "+ layer" chip, the stack indicator
        pill (Layers: N), and the per-layer volume panel. All three live
        top-level so they can paint over the canvas; locking them down
-       at the studio gate keeps the stack invisible even if some future
-       code accidentally adds the .visible class. */
-    body:not(.studio) #layerAddBtn,
-    body:not(.studio) #stackIndicator,
-    body:not(.studio) #layerVolumePanel {
+       at the record-mode gate keeps the stack invisible even if some
+       future code accidentally adds the .visible class. */
+    body:not(.record-mode) #layerAddBtn,
+    body:not(.record-mode) #stackIndicator,
+    body:not(.record-mode) #layerVolumePanel {
       display: none !important;
     }
   </style>
 </head>
 <body>
-  <script>
-    // Studio mode gate — run before first paint so the recording UI
-    // never flashes for casual visitors. The unlock gesture lives on
-    // the top-right corner triple-tap (see setupStudioCornerTap); this
-    // pre-paint pass just rehydrates the persisted flag.
-    (function () {
-      try {
-        if (localStorage.getItem('tuner.studio') === '1') {
-          document.body.classList.add('studio');
-        }
-      } catch (_) {}
-    })();
-  </script>
   <button id="mobileToggle">☰</button>
   <button id="settingsToggle" title="Hide settings panel" aria-label="Hide settings panel">✕</button>
-  <!-- Invisible 44×44 hit target. Triple-tap toggles studio mode. No
+  <!-- Invisible 44×44 hit target. Triple-tap enters record mode. No
        label, no border, no aria description — this is intentionally
-       undiscoverable to casual visitors. See setupStudioCornerTap. -->
-  <button id="studioCornerTap" type="button" tabindex="-1" aria-hidden="true"></button>
-  <div id="studioToast" role="status" aria-live="polite"></div>
+       undiscoverable to casual visitors. See setupRecordCornerTap. -->
+  <button id="recordCornerTap" type="button" tabindex="-1" aria-hidden="true"></button>
+  <div id="recordToast" role="status" aria-live="polite"></div>
   <div id="app">
     <div id="controls">
       <h1 id="title">JI Pitch Ruler</h1>
@@ -2383,38 +2366,6 @@
 
     let recordMode = false;
     let recordHintShown = false;
-
-    // Studio mode gate. The recording / layer / export UI is hidden
-    // from casual visitors. Unlock and lock are both performed by a
-    // triple-tap on the invisible top-right corner target (see
-    // setupStudioCornerTap). Once unlocked, the flag persists in
-    // localStorage so subsequent loads stay unlocked; the same gesture
-    // locks again. The flag here is re-hydrated at boot by
-    // applyStudioMode().
-    let studioMode = false;
-
-    function applyStudioMode() {
-      let unlocked = false;
-      try { unlocked = localStorage.getItem('tuner.studio') === '1'; } catch (_) {}
-      studioMode = unlocked;
-      document.body.classList.toggle('studio', unlocked);
-    }
-
-    // Toggle invoked by the corner triple-tap handler. Locking also
-    // exits record-mode so the camera/recorder isn't left running
-    // behind a hidden UI.
-    function toggleStudioMode() {
-      if (studioMode) {
-        try { localStorage.removeItem('tuner.studio'); } catch (_) {}
-        if (recordMode) exitRecordMode();
-        studioMode = false;
-        document.body.classList.remove('studio');
-      } else {
-        try { localStorage.setItem('tuner.studio', '1'); } catch (_) {}
-        studioMode = true;
-        document.body.classList.add('studio');
-      }
-    }
 
     // Analyser FFT sizes. YIN cost is now O((tauMax - tauMin) * halfBuffer)
     // instead of O((fftSize/2)²) thanks to the bounded tau search — at
@@ -8229,113 +8180,27 @@
       applySettingsHidden();
     }
 
-    function setupTitleLongPress() {
-      const title = document.getElementById('title');
-      // Single threshold: >= 600 ms hold on the title, in studio mode
-      // only, enters or exits record mode. The older studio-unlock
-      // branch (>= 1500 ms) that lived here moved to a triple-tap on the
-      // invisible top-right corner — Thomas couldn't tell whether a
-      // long press was "working" (see setupStudioCornerTap).
-      // Visual feedback is a subtle white text-shadow that ramps to
-      // full strength right as the 600 ms threshold is reached, so the
-      // user can feel the gesture land before releasing.
-      const RECORD_MS = 600;
-      const MOVE_CANCEL_PX = 10;
-      let pressStart = 0;
-      let pressActive = false;
-      let triggered = false;
-      let startX = 0;
-      let startY = 0;
-      let progressRaf = null;
-
-      const animateGlow = () => {
-        if (!pressActive) return;
-        const elapsed = performance.now() - pressStart;
-        const t = Math.min(1, elapsed / RECORD_MS);
-        title.style.textShadow = `0 0 14px rgba(255, 255, 255, ${t * 0.45})`;
-        progressRaf = requestAnimationFrame(animateGlow);
-      };
-
-      const cleanup = () => {
-        pressActive = false;
-        if (progressRaf) cancelAnimationFrame(progressRaf);
-        progressRaf = null;
-        title.style.textShadow = '';
-      };
-
-      const start = (e) => {
-        // Mouse: primary button only. Touch / pen: no button filter.
-        if (e.pointerType === 'mouse' && e.button !== 0) return;
-        pressActive = true;
-        triggered = false;
-        pressStart = performance.now();
-        startX = e.clientX;
-        startY = e.clientY;
-        progressRaf = requestAnimationFrame(animateGlow);
-      };
-
-      const move = (e) => {
-        if (!pressActive) return;
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-        if (dx * dx + dy * dy > MOVE_CANCEL_PX * MOVE_CANCEL_PX) {
-          cleanup();
-        }
-      };
-
-      const release = (e) => {
-        if (!pressActive) return;
-        const duration = performance.now() - pressStart;
-        cleanup();
-        if (duration >= RECORD_MS && studioMode) {
-          triggered = true;
-          if (recordMode) exitRecordMode();
-          else enterRecordMode();
-        }
-      };
-
-      const abort = () => {
-        if (!pressActive) return;
-        cleanup();
-      };
-
-      title.addEventListener('pointerdown', start);
-      title.addEventListener('pointermove', move);
-      title.addEventListener('pointerup', release);
-      title.addEventListener('pointerleave', abort);
-      title.addEventListener('pointercancel', abort);
-
-      // Suppress the regular click handler when a long-press triggered.
-      title.addEventListener('click', (e) => {
-        if (triggered) {
-          e.stopImmediatePropagation();
-          e.preventDefault();
-          triggered = false;
-        }
-      }, true);
-    }
-
-    // Studio-mode unlock gesture: triple-tap on the invisible top-right
-    // corner target. Replaces the previous 1.5 s title long-press,
-    // which gave Thomas no feedback about whether it was "working".
-    // Three taps within TAP_WINDOW_MS of each other (i.e. taps[2] -
-    // taps[0] <= TAP_WINDOW_MS) toggles studio mode and surfaces a
-    // brief "Studio mode on/off" toast. A single stray tap does
-    // nothing; two taps within the window also do nothing.
-    let studioToastTimer = null;
-    function showStudioToast(text) {
-      const el = document.getElementById('studioToast');
+    // Record-mode entry gesture: triple-tap on the invisible top-right
+    // corner target. Three taps within TAP_WINDOW_MS of each other
+    // (i.e. taps[2] - taps[0] <= TAP_WINDOW_MS) enters record mode and
+    // surfaces a brief toast. A single stray tap does nothing; two
+    // taps within the window also do nothing. The corner tap is
+    // covered by #exitRecBtn while in record mode (pointer-events:none
+    // there), so exit is via the visible X — not the triple-tap.
+    let recordToastTimer = null;
+    function showRecordToast(text) {
+      const el = document.getElementById('recordToast');
       if (!el) return;
       el.textContent = text;
       el.classList.add('visible');
-      if (studioToastTimer) clearTimeout(studioToastTimer);
-      studioToastTimer = setTimeout(() => {
+      if (recordToastTimer) clearTimeout(recordToastTimer);
+      recordToastTimer = setTimeout(() => {
         el.classList.remove('visible');
-        studioToastTimer = null;
+        recordToastTimer = null;
       }, 1500);
     }
-    function setupStudioCornerTap() {
-      const target = document.getElementById('studioCornerTap');
+    function setupRecordCornerTap() {
+      const target = document.getElementById('recordCornerTap');
       if (!target) return;
       const TAP_WINDOW_MS = 600;
       let taps = [];
@@ -8350,8 +8215,13 @@
         taps = taps.filter(t => now - t <= TAP_WINDOW_MS);
         if (taps.length >= 3) {
           taps = [];
-          toggleStudioMode();
-          showStudioToast(studioMode ? 'Studio mode on' : 'Studio mode off');
+          if (recordMode) {
+            exitRecordMode();
+            showRecordToast('Recording off');
+          } else {
+            showRecordToast('Recording on');
+            enterRecordMode();
+          }
         }
       };
       target.addEventListener('pointerup', onTap);
@@ -8658,10 +8528,6 @@
         document.body.classList.add('obs');
       }
 
-      // Apply once at boot (mirrors the pre-paint inline script) so
-      // the in-memory studioMode flag matches the persisted state.
-      applyStudioMode();
-      
       const mobileToggle = document.getElementById('mobileToggle');
       const controls = document.getElementById('controls');
       
@@ -8703,8 +8569,7 @@
       document.getElementById('rulerCanvas').addEventListener('click', handleCanvasClick);
       document.getElementById('stopDronesBtn').addEventListener('click', stopAllDrones);
 
-      setupTitleLongPress();
-      setupStudioCornerTap();
+      setupRecordCornerTap();
       document.getElementById('recBtn').addEventListener('click', toggleRecording);
       document.getElementById('flipCamBtn').addEventListener('click', flipCamera);
       document.getElementById('exitRecBtn').addEventListener('click', exitRecordMode);
