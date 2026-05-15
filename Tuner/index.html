@@ -1868,23 +1868,10 @@
           <input type="checkbox" id="voiceDeess" checked>
           <label for="voiceDeess">De-ess (5 kHz)</label>
         </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="voiceReverb">
-          <label for="voiceReverb">Shimmer reverb</label>
-        </div>
-        <div id="voiceReverbControls" style="display: none; padding-left: 4px;">
-          <label style="font-size: 12px; color: #888; margin-bottom: 2px;">Mix <span id="voiceReverbMixVal" style="color: #aaa;">50%</span></label>
-          <div class="slider-row" style="margin-bottom: 8px;">
-            <input type="range" id="voiceReverbMix" min="0" max="100" value="50">
-          </div>
-        </div>
-        <!-- Verb tails: always visible (set-and-forget). Slider value is
-             persisted and live-updates the running reverb when reverb
-             is on; safely ignored when reverb is off. -->
-        <label style="font-size: 12px; color: #888; margin-top: 6px; margin-bottom: 2px;">Verb tails <span id="voiceReverbTailVal" style="color: #aaa;">60%</span></label>
-        <div class="slider-row">
-          <input type="range" id="voiceReverbTail" min="0" max="100" value="60">
-        </div>
+        <!-- Shimmer reverb controls live in the record-mode dock only.
+             They were previously mirrored here in the side panel too,
+             but verb has no role on the default tuner screen — Thomas
+             only reaches for it when he's recording. -->
         <!-- Spectrum opacity: live multiplier on every listening-view
              visual. Drag down to push the spectrum into the background
              when the camera footage is busy; drag up for foreground.
@@ -8280,23 +8267,18 @@
     // record strip. Single source of truth: voiceFX.{lowcut,compression,reverb}
     // and voiceFXMix. Call after any state change from either UI.
     function syncVoiceFXUI() {
-      // Side panel
+      // Side panel: only LC/CMP/DE live here now. Reverb was removed
+      // from the default tuner UI and lives only in the record dock.
       const lcMain   = document.getElementById('voiceLowcut');
       const cmpMain  = document.getElementById('voiceCompression');
       const deMain   = document.getElementById('voiceDeess');
-      const vrbMain  = document.getElementById('voiceReverb');
-      const mixMain  = document.getElementById('voiceReverbMix');
-      const mixLbl   = document.getElementById('voiceReverbMixVal');
-      const tailMain = document.getElementById('voiceReverbTail');
-      const tailLbl  = document.getElementById('voiceReverbTailVal');
-      // Record-mode floating strip: only the verb ⏻ button + Mix slider
-      // remain. LC/CMP/DE have no UI here — they live in the side
-      // (Settings) panel. The Mix slider greys out via [disabled] when
-      // reverb is off so the user can still see the control exists.
+      // Record-mode floating strip: verb ⏻ button + mini Mix slider.
+      // The Mix slider greys out via [disabled] when reverb is off so
+      // the user can still see the control exists.
       const vrbChip   = document.getElementById('audioFXVrbBtn');
       const mixStrip  = document.getElementById('audioFXMixSlider');
-      // Record-mode dock (gear panel): mirror of the side-panel reverb
-      // controls so Thomas can dial verb without leaving record mode.
+      // Record-mode dock (gear panel): the only place reverb has a
+      // full set of controls (toggle + Mix + Tail).
       const vrbDock     = document.getElementById('dockVoiceReverb');
       const mixDock     = document.getElementById('dockVoiceReverbMix');
       const mixDockLbl  = document.getElementById('dockVoiceReverbMixVal');
@@ -8309,11 +8291,6 @@
       if (lcMain)   lcMain.checked  = voiceFX.lowcut;
       if (cmpMain)  cmpMain.checked = voiceFX.compression;
       if (deMain)   deMain.checked  = voiceFX.deess;
-      if (vrbMain)  vrbMain.checked = voiceFX.reverb;
-      if (mixMain)  mixMain.value   = mixPct;
-      if (mixLbl)   mixLbl.textContent = mixPct + '%';
-      if (tailMain) tailMain.value  = tailPct;
-      if (tailLbl)  tailLbl.textContent = tailPct + '%';
 
       if (vrbChip)   vrbChip.classList.toggle('on', voiceFX.reverb);
       if (mixStrip) {
@@ -8997,14 +8974,10 @@
       const lowcutCb = document.getElementById('voiceLowcut');
       const compressCb = document.getElementById('voiceCompression');
       const deessCb = document.getElementById('voiceDeess');
-      const reverbCb = document.getElementById('voiceReverb');
-      const reverbMixSlider = document.getElementById('voiceReverbMix');
-      const reverbTailSlider = document.getElementById('voiceReverbTail');
-      const reverbTailLbl = document.getElementById('voiceReverbTailVal');
-      if (reverbMixSlider) reverbMixSlider.value = Math.round(voiceFXMix * 100);
-      if (reverbTailSlider) reverbTailSlider.value = Math.round(voiceFXTail * 100);
-      if (reverbTailLbl) reverbTailLbl.textContent = Math.round(voiceFXTail * 100) + '%';
-      updateVoiceReverbControlsVisibility();
+      // Reverb controls were removed from the side panel; the dock owns
+      // them now. The block below still guards each assignment so the
+      // shared toggle handler doesn't clobber voiceFX.reverb when only
+      // lowcut/compression/deess are flipped.
       updateVoiceProcNote();
       syncVoiceFXUI();
 
@@ -9017,10 +8990,9 @@
         } catch (_) {}
       }
       function onVoiceFXToggle() {
-        voiceFX.lowcut      = !!(lowcutCb   && lowcutCb.checked);
-        voiceFX.compression = !!(compressCb && compressCb.checked);
-        voiceFX.deess       = !!(deessCb    && deessCb.checked);
-        voiceFX.reverb      = !!(reverbCb   && reverbCb.checked);
+        if (lowcutCb)   voiceFX.lowcut      = !!lowcutCb.checked;
+        if (compressCb) voiceFX.compression = !!compressCb.checked;
+        if (deessCb)    voiceFX.deess       = !!deessCb.checked;
         persistVoiceFXFlags();
         applyVoiceFX();
         syncVoiceFXUI();
@@ -9028,18 +9000,6 @@
       if (lowcutCb) lowcutCb.addEventListener('change', onVoiceFXToggle);
       if (compressCb) compressCb.addEventListener('change', onVoiceFXToggle);
       if (deessCb) deessCb.addEventListener('change', onVoiceFXToggle);
-      if (reverbCb) reverbCb.addEventListener('change', onVoiceFXToggle);
-      if (reverbMixSlider) {
-        reverbMixSlider.addEventListener('input', (e) => {
-          setVoiceReverbMix(parseInt(e.target.value, 10) / 100);
-          syncVoiceFXUI();
-        });
-      }
-      if (reverbTailSlider) {
-        reverbTailSlider.addEventListener('input', (e) => {
-          setVoiceReverbTail(parseInt(e.target.value, 10) / 100);
-        });
-      }
 
       // Dock copies. Each writes directly to the shared voiceFX state /
       // setters that the side panel uses, then syncVoiceFXUI() pushes
