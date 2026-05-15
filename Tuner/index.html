@@ -2108,6 +2108,42 @@
     </div>
   </div>
 
+  <!-- SVG filter defs used by canvas ctx.filter url() references. The
+       chromaticAberration filter splits the source into isolated R/G/B
+       channels, offsets R and B in opposite directions by a small
+       amount, and screen-blends them back together — produces a
+       subtle RGB fringe along contrast edges that reads as analog
+       lo-fi rather than as a digital glitch. The whole graph is five
+       SVG primitives (3 colormatrix, 2 offset, 2 blend) and lives on
+       the GPU on Chrome/Skia, so per-frame cost is much lower than
+       drawing the camera three times in JS. Filter region is widened
+       so the offset channels aren't clipped at the canvas edges. -->
+  <svg width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+    <defs>
+      <filter id="chromaticAberration" x="-2%" y="-2%" width="104%" height="104%" color-interpolation-filters="sRGB">
+        <feColorMatrix in="SourceGraphic" type="matrix"
+          values="1 0 0 0 0
+                  0 0 0 0 0
+                  0 0 0 0 0
+                  0 0 0 1 0" result="r"/>
+        <feOffset in="r" dx="2" dy="0" result="rShift"/>
+        <feColorMatrix in="SourceGraphic" type="matrix"
+          values="0 0 0 0 0
+                  0 1 0 0 0
+                  0 0 0 0 0
+                  0 0 0 1 0" result="g"/>
+        <feColorMatrix in="SourceGraphic" type="matrix"
+          values="0 0 0 0 0
+                  0 0 0 0 0
+                  0 0 1 0 0
+                  0 0 0 1 0" result="b"/>
+        <feOffset in="b" dx="-2" dy="0" result="bShift"/>
+        <feBlend in="rShift" in2="g" mode="screen" result="rg"/>
+        <feBlend in="rg" in2="bShift" mode="screen"/>
+      </filter>
+    </defs>
+  </svg>
+
   <video id="cameraFeed" autoplay playsinline muted></video>
 
   <div id="recIndicator"><span id="recTime">0:00</span></div>
@@ -2308,6 +2344,7 @@
       <label><input type="checkbox" id="fxCameraFilterToggle"> Filter</label>
       <label><input type="checkbox" id="fxRulerShadowToggle"> Glow</label>
       <label><input type="checkbox" id="fxFftFancyToggle"> Detail</label>
+      <label><input type="checkbox" id="fxChromaticAberrationToggle"> Chroma</label>
     </div>
     <!-- Shimmer reverb Mix + Tail. The on/off toggle lives on the
          floating #audioFXVrbBtn chip in the bottom-left corner — having
@@ -2576,15 +2613,18 @@
     // filter chain for B&W reels without paying for the aurora cloud.
     // All default OFF — lo-fi first; the studio panel surfaces them
     // individually. Each flag persists under its own tuner.fx.* key.
-    //   aurora       → particle cloud + ambient idle stars
-    //   cameraFilter → brightness/contrast/grayscale/sepia/saturate chain
-    //   rulerShadow  → Hz ruler tick + label text shadow
-    //   fftFancy     → spectrum energy strip slice count (80 vs 32)
+    //   aurora              → particle cloud + ambient idle stars
+    //   cameraFilter        → brightness/contrast/grayscale/sepia/saturate chain
+    //   rulerShadow         → Hz ruler tick + label text shadow
+    //   fftFancy            → spectrum energy strip slice count (80 vs 32)
+    //   chromaticAberration → subtle RGB channel split on the camera layer
+    //                         (SVG filter, GPU-composited via ctx.filter url())
     let fx = {
       aurora: false,
       cameraFilter: false,
       rulerShadow: false,
       fftFancy: false,
+      chromaticAberration: false,
     };
     // Master output trim. Range -20..+6 dB on the slider (0..100).
     // Persisted under tuner.outputLevelDb. Applied via the
@@ -3464,25 +3504,33 @@
       // Multi-stage canvas filters (brightness/contrast/grayscale/sepia/
       // hue-rotate/saturate) are GPU shader passes per camera draw. On
       // a Pixel-class phone the chain alone can knock 5-10 fps off a
-      // 1080p capture. In lo-fi mode we skip it entirely; the B&W /
-      // brightness sliders no-op until the camera-filter toggle is on.
-      if (!fx.cameraFilter) return 'none';
+      // 1080p capture. In lo-fi mode we skip the colour chain entirely;
+      // the B&W / brightness sliders no-op until the camera-filter
+      // toggle is on. Chromatic aberration is an independent SVG filter
+      // reached via url() — when its toggle is on it appends to the
+      // chain regardless of fx.cameraFilter, so the channel split
+      // applies to the bare camera too.
       const parts = [];
-      if (videoBrightness !== 1) parts.push(`brightness(${videoBrightness})`);
-      if (videoContrast !== 1) parts.push(`contrast(${videoContrast})`);
-
-      if (bwMode) {
-        parts.push('grayscale(1)');
-        if (bwTone > 0.01) {
-          parts.push(`sepia(${(bwTone * 0.6).toFixed(3)})`);
-        } else if (bwTone < -0.01) {
-          parts.push(`sepia(${(-bwTone * 0.6).toFixed(3)})`);
-          parts.push('hue-rotate(190deg)');
+      if (fx.cameraFilter) {
+        if (videoBrightness !== 1) parts.push(`brightness(${videoBrightness})`);
+        if (videoContrast !== 1) parts.push(`contrast(${videoContrast})`);
+        if (bwMode) {
+          parts.push('grayscale(1)');
+          if (bwTone > 0.01) {
+            parts.push(`sepia(${(bwTone * 0.6).toFixed(3)})`);
+          } else if (bwTone < -0.01) {
+            parts.push(`sepia(${(-bwTone * 0.6).toFixed(3)})`);
+            parts.push('hue-rotate(190deg)');
+          }
+        } else if (videoSaturation !== 1) {
+          parts.push(`saturate(${videoSaturation})`);
         }
-      } else if (videoSaturation !== 1) {
-        parts.push(`saturate(${videoSaturation})`);
       }
-
+      if (fx.chromaticAberration) {
+        // url() must come last in the chain so colour ops (brightness,
+        // grayscale, etc.) feed into the channel split as their result.
+        parts.push('url(#chromaticAberration)');
+      }
       return parts.length ? parts.join(' ') : 'none';
     }
 
@@ -9045,6 +9093,8 @@
         if (fxShadow !== null) fx.rulerShadow = fxShadow === '1';
         const fxFft = localStorage.getItem('tuner.fx.fftFancy');
         if (fxFft !== null) fx.fftFancy = fxFft === '1';
+        const fxChroma = localStorage.getItem('tuner.fx.chromaticAberration');
+        if (fxChroma !== null) fx.chromaticAberration = fxChroma === '1';
       } catch (_) {}
       const lowcutCb = document.getElementById('voiceLowcut');
       const compressCb = document.getElementById('voiceCompression');
@@ -9150,6 +9200,14 @@
         fxFftFancyCb.addEventListener('change', (e) => {
           fx.fftFancy = !!e.target.checked;
           try { localStorage.setItem('tuner.fx.fftFancy', fx.fftFancy ? '1' : '0'); } catch (_) {}
+        });
+      }
+      const fxChromaCb = document.getElementById('fxChromaticAberrationToggle');
+      if (fxChromaCb) {
+        fxChromaCb.checked = !!fx.chromaticAberration;
+        fxChromaCb.addEventListener('change', (e) => {
+          fx.chromaticAberration = !!e.target.checked;
+          try { localStorage.setItem('tuner.fx.chromaticAberration', fx.chromaticAberration ? '1' : '0'); } catch (_) {}
         });
       }
 
