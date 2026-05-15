@@ -1681,8 +1681,39 @@
       justify-content: center;
       padding: 0;
       line-height: 1;
+      transition: background 0.12s, box-shadow 0.12s;
     }
     #stackIndicator #stackClearBtn:active { background: rgba(140, 50, 50, 0.95); }
+    /* Armed state — first tap turns the chip bright red with a glow;
+       second tap within 2s actually clears. A stray single tap reverts
+       on the timeout so the stack is never wiped by accident. */
+    #stackIndicator #stackClearBtn.armed {
+      background: rgba(200, 60, 60, 0.98);
+      color: #fff;
+      box-shadow: 0 0 0 2px rgba(255, 120, 120, 0.55);
+    }
+    /* Undo last layer. Sibling to #stackClearBtn; tints amber so it
+       reads as "step back" rather than the destructive red clear. Pops
+       the most recent take off harmonyStack — middle layers can't be
+       removed cleanly because each take has the prior stack baked in
+       (see undoLastLayer). Hidden until at least one layer is on. */
+    #stackIndicator #stackUndoBtn {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(80, 60, 20, 0.9);
+      color: #ffd9a0;
+      font-size: 12px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      line-height: 1;
+    }
+    #stackIndicator #stackUndoBtn.visible { display: inline-flex; }
+    #stackIndicator #stackUndoBtn:active { background: rgba(140, 100, 40, 0.95); }
     /* Export-reel button — sibling to #stackClearBtn inside the
        indicator pill. Green tint reads as a positive action vs. the
        red clear chip. Hidden until at least one layer is on the stack. */
@@ -2105,7 +2136,8 @@
     <button type="button" class="stack-count" id="stackCountBtn" title="Adjust per-layer playback volume" aria-label="Adjust per-layer playback volume" aria-expanded="false">Layers: 0</button>
     <button type="button" id="stackExportBtn" title="Composite all layers into one MP4" aria-label="Export stacked reel">Export reel</button>
     <button type="button" id="downloadReelBtn" title="Save the composed reel to your device" aria-label="Download reel">Download reel</button>
-    <button type="button" id="stackClearBtn" title="Clear all harmony layers" aria-label="Clear harmony stack">✕</button>
+    <button type="button" id="stackUndoBtn" title="Remove the most recent layer (cannot remove middle layers — takes bake the prior stack in)" aria-label="Undo last layer">↶</button>
+    <button type="button" id="stackClearBtn" title="Clear all harmony layers (tap twice to confirm)" aria-label="Clear harmony stack">✕</button>
   </div>
 
   <!-- Per-layer volume panel. Toggled by tapping the "Layers: N" chip
@@ -7220,6 +7252,19 @@
       updateStackIndicator();
     }
 
+    // Pop the most recent take off the stack. The bake-down design
+    // means each layer N already contains layers 1..N-1 mixed in, so
+    // removing an arbitrary middle layer would leave a phantom audio
+    // residue in every later take — only the top of the stack can be
+    // cleanly removed. Stops any currently-scheduled layer sources so
+    // the speakers go quiet before the array shrinks.
+    function undoLastLayer() {
+      if (!harmonyStack.length) return;
+      stopActiveLayerSources();
+      harmonyStack.pop();
+      updateStackIndicator();
+    }
+
     // Disconnect every currently-playing layer source. Safe to call
     // multiple times. Triggered from both stopRecording (normal stop)
     // and discardRecording (so the speakers go quiet immediately).
@@ -7464,6 +7509,10 @@
       const expBtn = document.getElementById('stackExportBtn');
       if (expBtn) {
         expBtn.classList.toggle('visible', harmonyStack.length > 0);
+      }
+      const undoBtn = document.getElementById('stackUndoBtn');
+      if (undoBtn) {
+        undoBtn.classList.toggle('visible', harmonyStack.length > 0);
       }
       updateDownloadReelBtn();
     }
@@ -9039,10 +9088,32 @@
           pushLastTakeAsLayer();
         });
       }
+      // Clear-stack: two-tap confirm. First tap arms the chip (visible
+      // colour change via .armed). Second tap within CONFIRM_MS actually
+      // clears. After CONFIRM_MS with no second tap the armed state
+      // reverts — so a stray single tap never wipes a stack.
       const stackClearBtn = document.getElementById('stackClearBtn');
       if (stackClearBtn) {
+        const CONFIRM_MS = 2000;
+        let armTimer = null;
+        const disarm = () => {
+          stackClearBtn.classList.remove('armed');
+          if (armTimer) { clearTimeout(armTimer); armTimer = null; }
+        };
         stackClearBtn.addEventListener('click', () => {
-          clearHarmonyStack();
+          if (stackClearBtn.classList.contains('armed')) {
+            disarm();
+            clearHarmonyStack();
+          } else {
+            stackClearBtn.classList.add('armed');
+            armTimer = setTimeout(disarm, CONFIRM_MS);
+          }
+        });
+      }
+      const stackUndoBtn = document.getElementById('stackUndoBtn');
+      if (stackUndoBtn) {
+        stackUndoBtn.addEventListener('click', () => {
+          undoLastLayer();
         });
       }
       // Per-layer volume panel — tap the layer-count chip to open,
