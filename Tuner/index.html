@@ -7482,7 +7482,36 @@
         //    decoders and Instagram's ingest expect. Stays inside
         //    the canvas.captureStream(N) mechanism (no
         //    captureStream(0) + requestFrame, per the standing rule).
-        const COMPOSITE_OUTPUT_FPS = 30;
+        //
+        //    ADAPTIVE FPS BY STACK DEPTH. At 4+ layers the per-frame
+        //    cost (N drawImage calls + canvas captureStream sampling
+        //    + 1080×1920 H.264 encode) saturates Pixel-7-class mobile
+        //    SoCs at 30 fps. Symptom Thomas hit: audio mix stays
+        //    sample-accurate (Web Audio runs on its own thread with
+        //    its own sample clock), but the source <video> elements
+        //    fall behind real-time when the main thread + GPU + HW
+        //    encoder are all over-subscribed — drawImage paints stale
+        //    pixels, captured video drifts behind audio progressively
+        //    over the reel. The 1-3 layer case stayed clean because
+        //    the system had headroom; 4+ collapses it.
+        //
+        //    Halving/thirding the composite output rate cuts per-real-
+        //    time-second work proportionally on every stage of the
+        //    pipeline (drawImage, captureStream sampler, encoder) and
+        //    is the smallest-surface-area fix that preserves the rest
+        //    of the architecture (captureStream(N), Web Audio mix
+        //    graph, MediaRecorder, faststart remux). 15 fps is the
+        //    floor — below that the "video_dur < audio_dur" muxer
+        //    failure mode described above kicks back in. The visual
+        //    output is intentionally lo-fi already (source takes are
+        //    1–60 fps and the upscale uses nearest-neighbour), so the
+        //    drop from 30 → 20 → 15 reads as part of the aesthetic.
+        //
+        //    Tiers:
+        //      n ≤ 3 → 30 fps   (known-working, preserves current feel)
+        //      n = 4-5 → 20 fps (modest reduction, restores 4-stack sync)
+        //      n ≥ 6 → 15 fps   (aggressive reduction for 6/7/8-stack)
+        const COMPOSITE_OUTPUT_FPS = n <= 3 ? 30 : (n <= 5 ? 20 : 15);
         const videoStream = canvas.captureStream(COMPOSITE_OUTPUT_FPS);
         const combined = new MediaStream();
         for (const t of videoStream.getVideoTracks()) combined.addTrack(t);
@@ -7616,10 +7645,31 @@
         //    video element with letterboxing. Browser uses its hardware
         //    decoder for each video and its hardware encoder via
         //    captureStream/MediaRecorder.
+        //
+        //    Draw-loop throttle: rAF fires at the display rate (60-120
+        //    Hz on modern phones). captureStream samples the canvas at
+        //    COMPOSITE_OUTPUT_FPS, so any rAF paint that lands between
+        //    sample times is wasted work — its pixels are overwritten
+        //    by the next paint before the encoder ever sees them. At
+        //    8 layers that wasted work is the difference between the
+        //    main thread keeping up with real-time playback and falling
+        //    behind. We still drive rAF for monotonic timing, but skip
+        //    the expensive cell draws unless at least
+        //    (1000/COMPOSITE_OUTPUT_FPS) ms have passed since the last
+        //    real paint. The (- 1) tolerance absorbs rAF-tick jitter so
+        //    we don't accidentally drop every other intended frame.
+        const FRAME_INTERVAL_MS = 1000 / COMPOSITE_OUTPUT_FPS;
         const startMs = performance.now();
         let lastUI = 0;
+        let lastPaintMs = -Infinity;
         const drawFrame = () => {
           if (stopRequested) return;
+          const nowMs = performance.now();
+          if (nowMs - lastPaintMs < FRAME_INTERVAL_MS - 1) {
+            rafId = requestAnimationFrame(drawFrame);
+            return;
+          }
+          lastPaintMs = nowMs;
           ctx.fillStyle = '#000';
           ctx.fillRect(0, 0, W, H);
           let allEnded = true;
