@@ -7088,6 +7088,18 @@
     // "H - h3*2" trailing cell expression absorb the remainder into
     // the last row, so cells stay gap-free and the encoder still sees
     // a clean 8/16-aligned frame.
+    //
+    // Layout family — kept simple on purpose; cells letterbox the
+    // source (see drawFrame's contain-fit block) instead of cropping,
+    // so cell shape never costs Thomas any recorded content:
+    //   n=1 → full frame
+    //   n=2 → 2 stacked rows, full-width
+    //   n=3 → 3 stacked rows, full-width
+    //   n=4 → 2×2 grid
+    //   n=5 → 1 full-width row (most-recent) + 2×2 grid below
+    //   n=6 → 3×2 grid (3 rows × 2 cols)
+    //   n=7 → 4×2 grid with bottom-right cell empty (canvas black)
+    //   n=8 → 4×2 grid (4 rows × 2 cols)
     function getStackCells(n, dimsOverride) {
       const dims = dimsOverride || ASPECT_DIMS[recordAspect] || ASPECT_DIMS['9:16'];
       const W = dims[0], H = dims[1];
@@ -7159,16 +7171,22 @@
         };
       }
       if (n === 7) {
-        // Top spans full (most recent), then 3 rows x 2 cols below.
+        // 4 rows x 2 cols with the bottom-right cell left empty.
+        // Same grid pattern as n=6 (3x2) and n=8 (4x2) so the eye
+        // reads one consistent layout family across 6/7/8 stacks
+        // (each row is a cell-pair, most-recent top-left). The empty
+        // bottom-right tile is just the canvas's black background —
+        // no per-cell render, the for-loop stops at videoEls.length.
         return {
           cells: [
-            { x: 0,  y: 0,      w: W,      h: h4 },
+            { x: 0,  y: 0,      w: w2,     h: h4 },
+            { x: w2, y: 0,      w: W - w2, h: h4 },
             { x: 0,  y: h4,     w: w2,     h: h4 },
             { x: w2, y: h4,     w: W - w2, h: h4 },
             { x: 0,  y: h4 * 2, w: w2,     h: h4 },
             { x: w2, y: h4 * 2, w: W - w2, h: h4 },
             { x: 0,  y: h4 * 3, w: w2,     h: H - h4 * 3 },
-            { x: w2, y: h4 * 3, w: W - w2, h: H - h4 * 3 },
+            // [w2, h4*3] - [W, H] intentionally empty
           ],
           outputW: W, outputH: H,
         };
@@ -7690,32 +7708,44 @@
             if (!layerEnded) allEnded = false;
             if (layerEnded) continue;
             if (v.videoWidth > 0 && v.videoHeight > 0) {
-              // cover-fit: scale to fill the cell, crop the overhang.
-              // Source video is portrait 544x960 (the recorder paints
-              // at that AR), and most cells are also portrait, so crop
-              // is small in practice.
+              // CONTAIN fit (letterbox): preserve source aspect ratio
+              // entirely inside the cell. If the cell's AR doesn't
+              // match the source's AR, the difference is filled with
+              // black bars — top/bottom when the cell is wider than
+              // the source, left/right when the cell is taller. The
+              // bars draw themselves: the per-frame fillRect at the
+              // top of drawFrame already paints the whole canvas
+              // black, and the contained image is guaranteed to fit
+              // inside the cell rect, so no separate cell-fill, no
+              // clip rect, and no risk of bleeding into the next cell.
+              //
+              // Thomas's rule for the layouts: NEVER crop. If a cell
+              // shape doesn't match the recorded video shape, accept
+              // the bars. Cropping risks chopping content that matters
+              // (mouths, the EDO ruler, signage in frame); bars do
+              // not. cover-fit was the historic default but failed
+              // this contract whenever a cell ended up landscape
+              // (n=2/3 full-width rows, n=8's 540x480 tiles): the
+              // top/bottom of the singer's frame got cropped off.
               const srcAR = v.videoWidth / v.videoHeight;
               const cellAR = cell.w / cell.h;
               let dw, dh, dx, dy;
               if (srcAR > cellAR) {
-                dh = cell.h;
-                dw = dh * srcAR;
-                dx = cell.x + (cell.w - dw) / 2;
-                dy = cell.y;
-              } else {
+                // Source relatively wider — fit to cell width, bars top+bottom.
                 dw = cell.w;
                 dh = dw / srcAR;
                 dx = cell.x;
                 dy = cell.y + (cell.h - dh) / 2;
+              } else {
+                // Source relatively taller — fit to cell height, bars left+right.
+                dh = cell.h;
+                dw = dh * srcAR;
+                dx = cell.x + (cell.w - dw) / 2;
+                dy = cell.y;
               }
-              ctx.save();
-              ctx.beginPath();
-              ctx.rect(cell.x, cell.y, cell.w, cell.h);
-              ctx.clip();
               try {
                 ctx.drawImage(v, dx, dy, dw, dh);
               } catch (_) { /* video not ready for this frame */ }
-              ctx.restore();
             }
           }
 
