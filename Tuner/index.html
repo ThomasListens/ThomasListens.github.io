@@ -4925,18 +4925,26 @@
       if (config.show12EDO && edoAlpha > 0.01) {
         ctx.save();
         ctx.globalAlpha *= edoAlpha;
-        // Iterate semitones across the visible Y band, not just the
-        // ratio-derived cents window. centsToY is a linear map from
-        // [displayMin, displayMax] onto [rulerBottom, rulerTop], so
-        // we widen the iteration with a 2-semitone buffer on each
-        // end and clip by Y against the ruler band. This guarantees
-        // the EDO grid fills the full ruler height -- the same band
-        // the ratio ladder paints into -- regardless of how the
-        // padding, rulerZoom, or rulerPan move displayMin/displayMax
-        // around. The earlier cents-based filter was equivalent at
-        // zoom 1 but truncated visibly under non-default zoom/pan.
-        const startSemitone = Math.floor(displayMin / 100) - 2;
-        const endSemitone = Math.ceil(displayMax / 100) + 2;
+        // Extend the EDO grid to fill the entire visible canvas band
+        // [topY, botY], not just the centsToY-mapped [rulerTop,
+        // rulerBottom] inner band. The ratio ladder draws each ratio
+        // at centsToY(ratio.cents) with NO Y clip, so the highest and
+        // lowest ratios can land in the visible canvas area outside
+        // [rulerTop, rulerBottom] -- the camera-visible padding strip
+        // in record mode (rulerTop = topY + padding), or any time
+        // rulerZoom != 1 / rulerPan != 0 pushes ratios past the ruler
+        // band. The previous Y clip stopped the grid at the inner
+        // band, leaving the extreme ratios on bare canvas with no
+        // semitone reference (Thomas's "edo grid not extending to my
+        // highest and lowest ratio"). Iterate semitones across the
+        // full y → cents inverse of [topY, botY], then clip by Y
+        // against the SAME visible band so the grid covers everywhere
+        // a ratio rung could land.
+        const span = displayMax - displayMin;
+        const yBotCents = displayMin + (rulerBottom - botY) / rulerHeight * span;
+        const yTopCents = displayMin + (rulerBottom - topY) / rulerHeight * span;
+        const startSemitone = Math.floor(yBotCents / 100) - 1;
+        const endSemitone = Math.ceil(yTopCents / 100) + 1;
         const isCustomMode = !document.getElementById('refPreset').value;
 
         // EDO label decimation. centsToY maps [displayMin, displayMax]
@@ -5010,12 +5018,10 @@
         for (let semi = startSemitone; semi <= endSemitone; semi++) {
           const cents = semi * 100;
           const y = centsToY(cents);
-          // Clip by Y, not by cents. This is the source of truth for
-          // what's on screen -- the ruler band -- and lets the EDO
-          // grid extend the same way the ratio ladder does whenever
-          // the visible Y window doesn't match the strict ratio
-          // cents range (rulerZoom / rulerPan, asymmetric padding).
-          if (y < rulerTop || y > rulerBottom) continue;
+          // Clip by Y against the visible canvas band, not the inner
+          // ruler band -- see the iteration-bounds comment above for
+          // why. Tick lines extend wherever ratios can land.
+          if (y < topY || y > botY) continue;
           ctx.beginPath();
           ctx.moveTo(edoLineStart, y);
           ctx.lineTo(W, y);
