@@ -2615,9 +2615,11 @@
     //
     // harmonyStack:        decoded AudioBuffers, oldest first
     // lastRecordedBlob:    most recent saved MP4 blob, fed to "+ layer"
-    // activeLayerSources:  AudioBufferSourceNode + DelayNode handles for the
-    //                      currently-playing layers (so we can stop them on
-    //                      record-stop or discard without leaking nodes)
+    // activeLayerSources:  AudioBufferSourceNode + GainNode handles for the
+    //                      currently-playing monitor layers (so we can
+    //                      stop them on record-stop or discard without
+    //                      leaking nodes, and so the volume panel can
+    //                      live-rebind gain by handle.layer identity)
     // btLatencyMs:         the EFFECTIVE current output-delay compensation
     //                      (ms) read by scheduleLayerPlayback. Always
     //                      mirrors the slider. In Auto mode the source
@@ -2650,16 +2652,14 @@
     let pendingExportBlob = null;
     let pendingExportFilename = null;
     let activeLayerSources = [];
-    // Per-take DelayNode value (ms) actually applied to prior-layer
-    // audio in the most recently recorded take. Captured inside
+    // Per-take BT-latency snapshot (ms). Captured inside
     // scheduleLayerPlayback at recording start so it reflects the
     // btLatencyMs in force then — not the value that might be live at
-    // export time. pushLastTakeAsLayer ADDS this to the previous layer's
-    // (already cumulative) bakeDownDelayMs to derive the new layer's
-    // bakeDownDelayMs — see the recurrence comment there. The composite
-    // then seeks each cell's <video> past that head silence so every
-    // cell starts at composite t=0 with its singer about to sing. Zero
-    // before any stacked take has been recorded.
+    // export time. pushLastTakeAsLayer copies this into the new layer's
+    // bakeDownDelayMs (per-take only, NOT cumulative across the stack).
+    // Both scheduleLayerPlayback's monitor and exportStackedReel's mix
+    // seek each layer past bakeDownDelayMs so every singer's first voice
+    // lines up at t=0. Zero before any stacked take has been recorded.
     let _lastTakeBakeDownDelayMs = 0;
     // Counter (not bool) so nested or overlapping export/remux calls
     // gate the live audio loop correctly — depth>0 means "something
@@ -6107,16 +6107,18 @@
         const masterOutputGain = ctx.createGain();
         masterOutputGain.gain.value = 1.0;
         micOut.connect(masterOutputGain);
-        // Brick-wall limiter on the RECORDING branch only. Stacked
-        // playback (scheduleLayerPlayback) sums every harmony layer
-        // into masterOutputGain alongside the live mic, so with 8
-        // layers the bus can easily clip 0 dBFS in the recorded MP4
-        // even if each take was clean on its own. Threshold -3 dBFS,
-        // hard knee, ratio 20:1, 1ms attack / 50ms release acts as a
-        // ceiling without colouring normal-level material. The
+        // Brick-wall limiter on the RECORDING branch only. With drone
+        // / tanpura + voice FX running into masterOutputGain alongside
+        // the live mic the bus can occasionally tip 0 dBFS in the
+        // recorded MP4 even if the mic alone is clean. Threshold -3
+        // dBFS, hard knee, ratio 20:1, 1ms attack / 50ms release acts
+        // as a ceiling without colouring normal-level material. The
         // monitor path (audioContext.destination, attached per-source
-        // by scheduleLayerPlayback) is intentionally unlimited so the
-        // user's live ears stay transparent.
+        // by scheduleLayerPlayback for stack monitoring) is
+        // intentionally unlimited so the user's live ears stay
+        // transparent. (Non-bake-down recording keeps prior layers
+        // out of the recording bus entirely — the limiter only sees
+        // mic + FX + drone.)
         const recordingLimiter = ctx.createDynamicsCompressor();
         recordingLimiter.threshold.value = -3;     // dBFS
         recordingLimiter.knee.value = 0;            // hard knee
@@ -7050,10 +7052,12 @@
     // 10-30x faster on mobile.
     //
     // The most recent take is placed in the prominent slot (top of
-    // asymmetric grids, top-left of symmetric grids) and its audio track
-    // is mapped through unchanged — that audio already contains the
-    // running mix because each take was recorded with the prior layers
-    // playing back into the recording bus (see scheduleLayerPlayback).
+    // asymmetric grids, top-left of symmetric grids). With the non-
+    // bake-down recording model every take's MP4 contains only its
+    // own singer, so the composite mixes ALL layers' audio at export
+    // time via a Web Audio graph (createMediaElementSource per <video>
+    // → per-layer GainNode → MediaStreamAudioDestinationNode) — no
+    // single take carries the full mix anymore.
     //
     // Output: 1080-class MP4 (or WebM where MP4 isn't supported) at
     // IG_EXPORT_BITRATE (6.5-8 Mbps by aspect). n=1 is NOT a fast path
@@ -7268,13 +7272,21 @@
         // 1. Build a hidden video element per layer. Some browsers
         //    (Safari/iOS) won't decode video that isn't attached to the
         //    document, so we attach off-screen.
+        //
+        //    All videos are muted: with the non-bake-down recording
+        //    model each MP4 contains ONLY its own singer's mic, so we
+        //    can't get the composite audio out of any single <video>.
+        //    Composite audio is built via the Web Audio mix graph below
+        //    (createMediaElementSource on every layer → per-layer gain
+        //    → MediaStreamAudioDestinationNode). v.muted suppresses any
+        //    native-output leak from the <video> elements themselves.
         for (let i = 0; i < ordered.length; i++) {
           const url = URL.createObjectURL(ordered[i].videoBlob);
           objectUrls.push(url);
 
           const v = document.createElement('video');
           v.src = url;
-          v.muted = (i !== 0);     // only the most-recent take provides audio
+          v.muted = true;
           v.playsInline = true;
           v.preload = 'auto';
           v.crossOrigin = 'anonymous';
@@ -7366,18 +7378,38 @@
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, W, H);
 
-        // 3. Audio routing. Use the existing shared audioContext, NOT a
-        //    new one — see getAudioContext(). createMediaElementSource
-        //    is one-shot per element, but every videoEl in this run is
-        //    freshly created above, so it's safe across re-exports.
-        //    Deliberately not connecting audioSrc to audioCtx.destination
-        //    so the export stays silent (the user's mic shouldn't pick
-        //    up the playback if they happen to be on a speaker).
+        // 3. Audio routing — mix every layer's MP4 audio into a single
+        //    MediaStreamAudioDestination so the composite recorder
+        //    captures all takes layered together.
+        //
+        //    For each layer: createMediaElementSource(v) → GainNode
+        //    (using layer.gain from the volume panel) → audioDest.
+        //    createMediaElementSource is one-shot per element, but
+        //    every videoEl in this run is freshly created above, so
+        //    it's safe across re-exports. Nothing is connected to
+        //    audioCtx.destination, so the export stays silent in the
+        //    room (the user's mic shouldn't pick up playback if they
+        //    happen to be on a speaker).
+        //
+        //    Each <video>'s currentTime is seeked to its per-layer
+        //    bakeDownDelayMs/1000 (see section 6 below) BEFORE play()
+        //    begins, so the audio extracted by MediaElementSource also
+        //    starts past the front trim — audio and video stay locked
+        //    per layer because they share the <video>'s clock.
         const audioCtx = getAudioContext();
-        const audioSrc = audioCtx.createMediaElementSource(videoEls[0]);
         const audioDest = audioCtx.createMediaStreamDestination();
-        audioSrc.connect(audioDest);
-        audioNodes.push(audioSrc, audioDest);
+        audioNodes.push(audioDest);
+        for (let i = 0; i < videoEls.length; i++) {
+          const v = videoEls[i];
+          const layer = ordered[i];
+          const src = audioCtx.createMediaElementSource(v);
+          const gain = audioCtx.createGain();
+          const safeGain = (layer && typeof layer.gain === 'number' && isFinite(layer.gain))
+            ? Math.max(0, Math.min(2, layer.gain)) : 1.0;
+          gain.gain.value = safeGain;
+          src.connect(gain).connect(audioDest);
+          audioNodes.push(src, gain);
+        }
 
         // 4. Combined MediaStream: canvas video track + audio dest's
         //    audio track.
@@ -7436,49 +7468,29 @@
               ((e && e.error && e.error.message) || 'unknown')));
         });
 
-        // 6. BAKE-DOWN FRONT-TRIM. Each take's MP4 starts with
-        //    bakeDownDelayMs of dead air at the head: scheduleLayerPlayback
-        //    feeds prior layers through DelayNode(btLatencyMs/1000) into
-        //    the recording bus to align them with the user's BT-delayed
-        //    mic capture, so the MP4 head is silent until that delayed
-        //    playback reaches the bus. Take 1 had no scheduleLayerPlayback
-        //    call and stores 0.
+        // 6. FRONT-TRIM (non-bake-down model). Each take's MP4 starts
+        //    with bakeDownDelayMs of reaction-time silence at the head:
+        //    the singer hears the monitor (prior layers via Branch A,
+        //    see scheduleLayerPlayback) at speaker-time + btLatencyMs,
+        //    so their voice arrives at the recording bus that much
+        //    after the recorder started. Take 1 had no monitor and
+        //    stores 0.
         //
-        //    Earlier approach (commit 46581a3) kept the head intact and
-        //    deferred older cells' play() by the latest take's bake-down
-        //    delay — audio synced but the composite opened with ~700 ms
-        //    of black + silence on BT, "not presentable" as a reel.
-        //    This pass instead trims the silent head off EACH cell by
-        //    its own bakeDownDelayMs (Acapella/Smule pattern) so all
-        //    cells start at composite t=0 with their singer about to
-        //    sing. For the latest cell (videoEls[0], the audio source)
-        //    the same trim moves the audio past its dead air — composite
-        //    audio opens on the first baked-in voice instead of silence.
+        //    Per-layer bakeDownDelayMs is PER-TAKE, NOT cumulative.
+        //    Recording no longer mixes prior layers into the bus — each
+        //    MP4 contains only its own singer's mic — so the trim is
+        //    just this take's own delaySec_N. The compounding bug
+        //    (head silence growing by delaySec each pass, drifting 3+-
+        //    stack composites) is gone.
         //
-        //    Per-layer bakeDownDelayMs IS cumulative across takes. Each
-        //    new take re-runs every prior layer's already-baked-down
-        //    audio through DelayNode(delaySec_N), so the head silence
-        //    grows by delaySec_N each pass. Recurrence:
-        //      bakeDownDelayMs_1 = 0
-        //      bakeDownDelayMs_N = bakeDownDelayMs_{N-1} + delaySec_N
-        //    At delaySec≈700 ms (BT) the stack grows 0, 700, 1400, 2100
-        //    ms. A prior fix stored only the per-take delaySec, which
-        //    left takes 3+ trimmed too little — older layers' voices
-        //    bled into the composite audibly delayed/duplicated, the
-        //    exact symptom Thomas reported on 3- and 4-stack takes.
-        //
-        //    Lip-sync on cells K < N (older than latest):
-        //      - composite audio (from latest take, trimmed by
-        //        bakeDownDelayMs_N): every voice — including singer K's
-        //        — lands at composite t=0, because the latest take's
-        //        recording aligned every baked-in voice to its head
-        //        silence.
-        //      - cell K's video, trimmed by bakeDownDelayMs_K, shows
-        //        singer K's voice at composite t=0 (their mouth opens
-        //        a touch earlier and is cut, by reactionTime_K).
-        //      So mouth and voice are tight at composite t=0 on every
-        //      cell. Earlier docs claimed mouth led voice by delaySec_K;
-        //      that was an artifact of the broken non-cumulative trim.
+        //    Trim semantics:
+        //      - audio: each layer's <video> is seeked to trimSec[i] so
+        //        the MediaElementSource feeding the mix graph begins
+        //        playback past the silent head — every singer's first
+        //        voice sounds at composite t=0.
+        //      - video: same seek, same cell — mouth and voice stay
+        //        locked because audio and video both come from the
+        //        same <video> element's clock.
         //
         //    trimSec[] was computed earlier next to layerDurations (the
         //    end-of-reel sizing needs the trimmed effective duration).
@@ -7792,15 +7804,13 @@
       //
       // We only use the processed path when there's something to process:
       // a voice FX is enabled, OR the drone is enabled (drone is mixed
-      // in via micProcessing.dest), OR a stack take is in progress —
-      // scheduleLayerPlayback routes Branch B through masterOutputGain
-      // → recordingLimiter → dest, so without the processed path the
-      // prior-layer audio never reaches the recorder and stack bake-down
-      // would drop everything but the live mic. Otherwise we use the raw
-      // track.
+      // in via micProcessing.dest). Stack takes no longer force the
+      // processed path: non-bake-down recording keeps prior layers in
+      // the monitor only (audioContext.destination), never in the
+      // recording bus, so the new take's MP4 captures just the mic.
       const hasRatioDrones = Object.keys(droneOscillators).length > 0;
       const needsProcessedAudio =
-        voiceFX.lowcut || voiceFX.compression || voiceFX.reverb || tanpuraEnabled || hasRatioDrones || harmonyStack.length > 0;
+        voiceFX.lowcut || voiceFX.compression || voiceFX.reverb || tanpuraEnabled || hasRatioDrones;
 
       let audioTrack = null;
       let audioSource = 'none';
@@ -8182,50 +8192,44 @@
         const arrayBuffer = await lastRecordedBlob.arrayBuffer();
         // decodeAudioData consumes the buffer, so feed it a fresh copy.
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
-        // Each layer carries both an audioBuffer (used for next-take
-        // playback into the recording bus) and the original videoBlob
-        // (used by exportStackedReel for the canvas+MediaRecorder
-        // composite). We hold a reference, not a clone — the blob
-        // backing data is GC'd when the stack drops it.
-        // bakeDownDelayMs: the audio offset at which prior-layer voices
-        // begin inside this take's MP4 — also the silent-intro length
-        // before any baked-in voice. exportStackedReel uses each layer's
-        // value to seek that cell's <video> past its silent head so all
-        // cells start at composite t=0 with their singer about to sing
-        // (and the latest cell's seek also strips the audio source's
-        // intro silence).
+        // Each layer carries both an audioBuffer (used for monitor
+        // playback during the next take and for the export-time mix)
+        // and the original videoBlob (used by exportStackedReel for
+        // the canvas+MediaRecorder composite). We hold a reference,
+        // not a clone — the blob backing data is GC'd when the stack
+        // drops it.
         //
-        // CUMULATIVE across takes. Each new take plays every prior
-        // layer's audioBuffer through DelayNode(delaySec_N) into the
-        // recording bus, but those buffers already carry their own
-        // bake-down silence from earlier passes. So singer K's voice
-        // (and all baked-in voices) land in take N's MP4 at offset
-        // bakeDownDelayMs_{N-1} + delaySec_N. Singer N hears the
-        // delayed-arriving bake-down through speakers and sings to it,
-        // so their own voice also lands at the same offset (BT lag and
-        // delaySec_N cancel out in the round-trip). Recurrence:
-        //   bakeDownDelayMs_1 = 0
-        //   bakeDownDelayMs_N = bakeDownDelayMs_{N-1} + delaySec_N
-        // At delaySec≈700 ms (BT): 0, 700, 1400, 2100, ... A flat
-        // (per-take only) value left takes 3+ trimmed too little, and
-        // prior layers showed up duplicated/delayed in the composite —
-        // the symptom Thomas hit with 3+ stacks.
-        const prevLayer = harmonyStack.length > 0
-          ? harmonyStack[harmonyStack.length - 1] : null;
-        const prevCumulativeMs = (prevLayer && typeof prevLayer.bakeDownDelayMs === 'number')
-          ? Math.max(0, prevLayer.bakeDownDelayMs) : 0;
+        // bakeDownDelayMs: per-take front trim (ms). The singer's voice
+        // sits ~btLatencyMs into the MP4 because they react to the
+        // monitor through BT (BT speaker out → ear → vocal cords → mic
+        // → recorder). Seeking each layer past this offset at export
+        // time and monitor time aligns every singer's first voice to
+        // composite/monitor t=0.
+        //
+        // PER-TAKE, NOT CUMULATIVE. Non-bake-down recording (commit
+        // align-and-edo): scheduleLayerPlayback routes prior layers
+        // only to audioContext.destination (monitor), NOT into the
+        // recording bus, so this take's MP4 contains only the new
+        // singer's mic. No baked-in prior voices means the trim is
+        // just this take's own delaySec — it never compounds, so the
+        // 3+-stack drift Thomas saw in the bake-down model is gone.
+        //   bakeDownDelayMs_1 = 0          (no monitor was played)
+        //   bakeDownDelayMs_N = delaySec_N (for N > 1)
         const bakeDownDelayMs = harmonyStack.length > 0
-          ? (prevCumulativeMs + _lastTakeBakeDownDelayMs) : 0;
+          ? _lastTakeBakeDownDelayMs : 0;
         harmonyStack.push({
           audioBuffer,
           videoBlob: lastRecordedBlob,
           durationSec: audioBuffer.duration,
-          // gain: per-layer playback volume during the next recording
-          // pass. Wired through scheduleLayerPlayback as a per-source
-          // GainNode so the user can rebalance loud/quiet harmonies
-          // before re-recording the lead. The export pipeline does
-          // not honour this field — it bakes the most-recent take's
-          // audio as-is. See the panel footer note.
+          // gain: per-layer playback volume. Honoured in two places:
+          //   - scheduleLayerPlayback wires layer.gain into a per-source
+          //     GainNode so the user can rebalance any prior layer
+          //     during the next take's rehearsal/recording.
+          //   - exportStackedReel mixes every layer through its own
+          //     GainNode at export time, so the value the user lands on
+          //     is the value that ships in the reel. (Bake-down model
+          //     previously baked only the latest take's audio as-is,
+          //     ignoring this field — non-bake-down fixes that too.)
           gain: 1.0,
           bakeDownDelayMs,
         });
@@ -8247,12 +8251,12 @@
       updateStackIndicator();
     }
 
-    // Pop the most recent take off the stack. The bake-down design
-    // means each layer N already contains layers 1..N-1 mixed in, so
-    // removing an arbitrary middle layer would leave a phantom audio
-    // residue in every later take — only the top of the stack can be
-    // cleanly removed. Stops any currently-scheduled layer sources so
-    // the speakers go quiet before the array shrinks.
+    // Pop the most recent take off the stack. With the non-bake-down
+    // recording model arbitrary middle-layer removal would actually be
+    // safe (each take's MP4 is just its own singer), but the chip on
+    // the UI is "Undo" — single-step pop matches that affordance.
+    // Stops any currently-scheduled monitor sources so the speakers go
+    // quiet before the array shrinks.
     function undoLastLayer() {
       if (!harmonyStack.length) return;
       stopActiveLayerSources();
@@ -8268,7 +8272,6 @@
         try { handle.source.stop(); } catch (_) {}
         try { handle.source.disconnect(); } catch (_) {}
         if (handle.gainNode) { try { handle.gainNode.disconnect(); } catch (_) {} }
-        try { handle.delay.disconnect(); } catch (_) {}
       }
       activeLayerSources.length = 0;
     }
@@ -8307,65 +8310,58 @@
       });
     }
 
-    // Schedule every stacked layer to play simultaneously with the start
-    // of recording. Two branches per layer:
-    //   Branch A → audioContext.destination
-    //              user hears it through speakers/BT (with whatever output
-    //              latency the device has)
-    //   Branch B → DelayNode(btLatencyMs/1000) → masterOutputGain
-    //              the same audio is shifted forward by the BT compensation
-    //              and routed into the recording bus, so the user's mic
-    //              voice (which arrives at the recording bus with the BT
-    //              lag baked in, because the user sings to what they hear)
-    //              and the layer line up tightly in the final MP4.
-    // Returns nothing; populates module-scope activeLayerSources for cleanup.
+    // Schedule every stacked layer to play as MONITOR ONLY while the new
+    // take records. Non-bake-down model: prior-layer audio is NOT routed
+    // into the recording bus — each take's MP4 contains ONLY the new
+    // singer's mic. The composite mixes every take's audio together at
+    // export time (see exportStackedReel) so each layer's voice is heard
+    // exactly once, no compounding.
+    //
+    // Per layer: source → gainNode → audioContext.destination
+    //   - user hears every prior layer through speakers/BT
+    //   - no DelayNode, no masterOutputGain (no recording bus path)
+    //
+    // Each layer plays starting from offset = layer.bakeDownDelayMs/1000
+    // so each prior singer's first voice sounds at monitor t=0 — i.e.,
+    // the singer hears all prior voices begin together when recording
+    // starts. (bakeDownDelayMs is the singer's reaction-to-monitor delay
+    // captured in their take, see pushLastTakeAsLayer.)
+    //
+    // Returns nothing; populates module-scope activeLayerSources for cleanup
+    // and for the volume-panel live rebind (handle.layer === layer match).
     function scheduleLayerPlayback() {
       if (!harmonyStack.length) return;
       getAudioContext();
       if (!audioContext) return;
-      const mp = micProcessing;
-      if (!mp || !mp.masterOutputGain) {
-        console.warn('[stack] masterOutputGain unavailable; skipping layer schedule');
-        return;
-      }
       const startTime = audioContext.currentTime + 0.05;
       const delaySec = Math.max(0, Math.min(1.5, btLatencyMs / 1000));
-      // Snapshot the per-take DelayNode value. pushLastTakeAsLayer adds
-      // this to the previous layer's (already cumulative) bakeDownDelayMs
-      // to derive the new layer's cumulative head-silence — bakeDown
-      // compounds because each pass re-delays already-baked buffers.
-      // Read at scheduleLayerPlayback time (not at export time) because
+      // Snapshot the per-take BT compensation in force at record-start.
+      // pushLastTakeAsLayer reads this to populate the new layer's
+      // bakeDownDelayMs (per-take only, NOT cumulative across the stack).
+      // Read at scheduleLayerPlayback time (not export time) because
       // Auto mode can shift btLatencyMs between takes.
       _lastTakeBakeDownDelayMs = Math.round(delaySec * 1000);
-      // Bake-down model: each take's MP4 already contains every earlier
-      // layer mixed in, so playing the whole harmonyStack here would
-      // double-count (take 2's MP4 carries take 1; scheduling both makes
-      // singer hear take 1 twice at different offsets). Schedule ONLY
-      // the latest layer — it carries the running mix.
-      {
-        const layer = harmonyStack[harmonyStack.length - 1];
+      // Play ALL prior layers as monitor so the singer hears the full
+      // mix while recording. Each gets its own gainNode (driven by
+      // layer.gain) so the volume-panel slider can rebalance any layer
+      // live during rehearsal — the panel finds the right handle by
+      // identity (handle.layer === layer).
+      for (let i = 0; i < harmonyStack.length; i++) {
+        const layer = harmonyStack[i];
         const source = audioContext.createBufferSource();
         source.buffer = layer.audioBuffer;
-        // Per-layer gain node. Sits at the head of both monitor and
-        // recording branches so a single slider rebalances both. The
-        // panel slider writes to layer.gain AND, when a node exists,
-        // drives gainNode.gain.value live; the live write keeps the
-        // user's tweak audible during the take they're rehearsing.
         const gainNode = audioContext.createGain();
         const safeGain = (typeof layer.gain === 'number' && isFinite(layer.gain))
           ? Math.max(0, Math.min(2, layer.gain)) : 1.0;
         gainNode.gain.value = safeGain;
         source.connect(gainNode);
-        // Branch A — monitor (user hears the layer through BT/speakers)
         gainNode.connect(audioContext.destination);
-        // Branch B — recording bus (delayed by BT compensation)
-        const delay = audioContext.createDelay(1.5);
-        delay.delayTime.value = delaySec;
-        gainNode.connect(delay).connect(mp.masterOutputGain);
-        source.start(startTime);
-        // Stash the layer reference on the handle so the panel slider
-        // can find the live gain node by identity (handle.layer === layer).
-        activeLayerSources.push({ source, gainNode, delay, layer });
+        // Skip each buffer's silent head so every singer's first voice
+        // sounds at the same monitor t=0. Layer 1 (the base) has trim 0.
+        const trimMs = (typeof layer.bakeDownDelayMs === 'number')
+          ? Math.max(0, layer.bakeDownDelayMs) : 0;
+        source.start(startTime, trimMs / 1000);
+        activeLayerSources.push({ source, gainNode, layer });
       }
     }
 
@@ -8481,7 +8477,7 @@
       });
       const foot = document.createElement('div');
       foot.className = 'lv-foot';
-      foot.textContent = 'Volumes apply when recording your next layer. Re-record latest take to rebalance the export.';
+      foot.textContent = 'Volume applies live to the monitor during recording and to each layer in the exported reel.';
       panel.appendChild(foot);
     }
 
