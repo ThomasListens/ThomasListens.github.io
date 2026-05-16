@@ -7384,37 +7384,72 @@
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, W, H);
 
-        // 3. Audio routing — mix every layer's MP4 audio into a single
-        //    MediaStreamAudioDestination so the composite recorder
-        //    captures all takes layered together.
+        // 3. Audio routing — mix every layer's audio sample-accurate
+        //    via Web Audio, NOT through the <video> elements. Each
+        //    layer's audioBuffer was decoded at push time (see
+        //    pushLastTakeAsLayer) so we already have the PCM in hand;
+        //    play it through an AudioBufferSourceNode with the front
+        //    trim applied as the source's `offset` argument, route
+        //    through a per-layer GainNode (layer.gain from the volume
+        //    panel), and sum into a single MediaStreamDestinationNode
+        //    for the recorder.
         //
-        //    For each layer: createMediaElementSource(v) → GainNode
-        //    (using layer.gain from the volume panel) → audioDest.
-        //    createMediaElementSource is one-shot per element, but
-        //    every videoEl in this run is freshly created above, so
-        //    it's safe across re-exports. Nothing is connected to
-        //    audioCtx.destination, so the export stays silent in the
-        //    room (the user's mic shouldn't pick up playback if they
-        //    happen to be on a speaker).
+        //    Why not createMediaElementSource? Two failure modes that
+        //    Thomas hit on 3+-layer composites:
         //
-        //    Each <video>'s currentTime is seeked to its per-layer
-        //    bakeDownDelayMs/1000 (see section 6 below) BEFORE play()
-        //    begins, so the audio extracted by MediaElementSource also
-        //    starts past the front trim — audio and video stay locked
-        //    per layer because they share the <video>'s clock.
+        //    A. VFR seek slop. Per-take MP4s are encoded at the user's
+        //       recFps (1-60), and at low fps the muxer places
+        //       keyframes sparsely. Setting v.currentTime = trimSec[i]
+        //       lands the AUDIO sub-frame at the exact requested time
+        //       (AAC frames are tightly spaced) but the VIDEO snaps
+        //       backward to the nearest keyframe — sometimes hundreds
+        //       of ms earlier. The MediaElementSource emits audio from
+        //       the new exact position while the canvas drawImage paints
+        //       a stale keyframe until the decoder catches up, so audio
+        //       leads picture per cell. AudioBufferSource sources from
+        //       decoded PCM and doesn't share the video element's
+        //       VFR seek behaviour — every layer's audio starts at
+        //       its trim sample-exactly.
+        //
+        //    B. Inter-cell scheduling drift. Each <video>.play()
+        //       returns its own Promise, and at deeper stack depths
+        //       the wall-clock gap between when cell 0's audio first
+        //       leaves its MediaElementSource and when cell N's does
+        //       widens — every layer's mix offset is independent.
+        //       AudioBufferSource lets us schedule every source at one
+        //       shared AudioContext time, so all layers' audio enters
+        //       the mix on the same sample clock.
+        //
+        //    Per-cell lip-sync (mouth vs. that cell's own voice) still
+        //    rides on the video element's seek precision, but the
+        //    INTER-cell audio mix is now sample-accurate — voices
+        //    layer cleanly even at 4 takes with mixed BT latencies.
+        //
+        //    Nothing is connected to audioCtx.destination so the
+        //    export stays silent in the room.
         const audioCtx = getAudioContext();
         const audioDest = audioCtx.createMediaStreamDestination();
         audioNodes.push(audioDest);
+        const audioSources = [];
         for (let i = 0; i < videoEls.length; i++) {
-          const v = videoEls[i];
           const layer = ordered[i];
-          const src = audioCtx.createMediaElementSource(v);
+          if (!layer || !layer.audioBuffer) {
+            // Defensive: a layer pushed before audioBuffer was a
+            // required field would land here. Skip the audio path
+            // for it (video still plays); the composite just won't
+            // include that cell's voice.
+            console.warn('[export] layer', i, 'missing audioBuffer; audio mix will skip it');
+            continue;
+          }
+          const src = audioCtx.createBufferSource();
+          src.buffer = layer.audioBuffer;
           const gain = audioCtx.createGain();
-          const safeGain = (layer && typeof layer.gain === 'number' && isFinite(layer.gain))
+          const safeGain = (typeof layer.gain === 'number' && isFinite(layer.gain))
             ? Math.max(0, Math.min(2, layer.gain)) : 1.0;
           gain.gain.value = safeGain;
           src.connect(gain).connect(audioDest);
           audioNodes.push(src, gain);
+          audioSources.push({ src, trim: trimSec[i] });
         }
 
         // 4. Combined MediaStream: canvas video track + audio dest's
@@ -7490,13 +7525,18 @@
         //    stack composites) is gone.
         //
         //    Trim semantics:
-        //      - audio: each layer's <video> is seeked to trimSec[i] so
-        //        the MediaElementSource feeding the mix graph begins
-        //        playback past the silent head — every singer's first
-        //        voice sounds at composite t=0.
-        //      - video: same seek, same cell — mouth and voice stay
-        //        locked because audio and video both come from the
-        //        same <video> element's clock.
+        //      - audio: each layer's decoded audioBuffer is started at
+        //        the same audioCtx.currentTime with offset = trimSec[i].
+        //        Every singer's first voice lands at composite t=0
+        //        sample-accurately; inter-cell mix has zero drift
+        //        regardless of how independent the <video>.play()
+        //        Promises resolved.
+        //      - video: each cell's <video> is seeked to trimSec[i]
+        //        and played. Per-cell mouth-vs-voice alignment rides
+        //        on the video element's seek precision (VFR keyframe
+        //        snap can still pull the painted frame backward by up
+        //        to one keyframe interval until the decoder catches
+        //        up), but inter-cell audio is no longer affected.
         //
         //    trimSec[] was computed earlier next to layerDurations (the
         //    end-of-reel sizing needs the trimmed effective duration).
@@ -7538,6 +7578,22 @@
         // play() returns a Promise — await all so the rAF loop's
         // elapsed-time check sees real playback before any frame check.
         await Promise.all(videoEls.map(v => v.play().catch(() => {})));
+
+        // Kick the per-layer audio sources at one shared AudioContext
+        // time — every layer enters the mix on the same sample clock,
+        // so voices stack tight regardless of how independent each
+        // <video>.play() Promise resolved. The 10 ms cushion past
+        // currentTime keeps us inside the AudioContext's scheduling
+        // window; the recorder is already capturing, so a brief
+        // sample-level pre-roll of silence is harmless. Each source
+        // starts at its own per-layer trim offset (front silence
+        // skipped sample-accurately, bypassing the <video> element's
+        // VFR keyframe-snap behaviour that drifted audio vs. video
+        // per cell on 3+-stack composites).
+        const audioT0 = audioCtx.currentTime + 0.01;
+        for (const { src, trim } of audioSources) {
+          try { src.start(audioT0, Math.max(0, trim)); } catch (_) {}
+        }
 
         // 7. Compose loop. clear -> for each cell, draw the matching
         //    video element with letterboxing. Browser uses its hardware
