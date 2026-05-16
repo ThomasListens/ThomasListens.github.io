@@ -8337,7 +8337,13 @@
       // Read at scheduleLayerPlayback time (not at export time) because
       // Auto mode can shift btLatencyMs between takes.
       _lastTakeBakeDownDelayMs = Math.round(delaySec * 1000);
-      for (const layer of harmonyStack) {
+      // Bake-down model: each take's MP4 already contains every earlier
+      // layer mixed in, so playing the whole harmonyStack here would
+      // double-count (take 2's MP4 carries take 1; scheduling both makes
+      // singer hear take 1 twice at different offsets). Schedule ONLY
+      // the latest layer — it carries the running mix.
+      {
+        const layer = harmonyStack[harmonyStack.length - 1];
         const source = audioContext.createBufferSource();
         source.buffer = layer.audioBuffer;
         // Per-layer gain node. Sits at the head of both monitor and
