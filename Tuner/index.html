@@ -2655,10 +2655,12 @@
     // Per-take BT-latency snapshot (ms). Captured inside
     // scheduleLayerPlayback at recording start so it reflects the
     // btLatencyMs in force then — not the value that might be live at
-    // export time. pushLastTakeAsLayer ADDS this to the prior layer's
-    // bakeDownDelayMs to populate the new layer's bakeDownDelayMs —
-    // cumulative across the stack, because each singer's reaction
-    // delay compounds on top of every prior singer's offset.
+    // export time. pushLastTakeAsLayer stores this DIRECTLY as the new
+    // layer's bakeDownDelayMs — per-take, NOT cumulative. The prior
+    // layers are scheduled past their own bakeDownDelayMs during
+    // monitor playback, so each singer reacts to a mix that already
+    // starts at monitor t=0, and only their own BT round-trip
+    // contributes to their take's front-pad.
     // Both scheduleLayerPlayback's monitor and exportStackedReel's mix
     // seek each layer past bakeDownDelayMs so every singer's first voice
     // lines up at t=0. Zero before any stacked take has been recorded.
@@ -8365,22 +8367,23 @@
         // layer past this offset aligns every singer's first voice to
         // composite/monitor t=0.
         //
-        // CUMULATIVE across the stack. Even though scheduleLayerPlayback
-        // only routes monitor (not into the recording bus), the audible
-        // content of the latest prior layer reaches the new singer's ear
-        // — and their reaction delay compounds. Take N-1's voice sits at
-        // offset bakeDownDelayMs_{N-1} inside its own MP4; when
-        // audioContext.destination emits it, that offset is preserved in
-        // real time, and singer N's own BT round-trip adds delaySec_N on
-        // top. So the singer-N voice lands in take N's MP4 at
-        // bakeDownDelayMs_{N-1} + delaySec_N. Trimming take N by only
-        // delaySec_N leaves it shifted by every prior take's offset —
-        // exactly the "same drift, one layer later" pattern Thomas saw
-        // after the per-take-only change.
+        // PER-TAKE, NOT cumulative. Each take's bakeDownDelayMs is the
+        // delaySec snapshot in force during THAT take's recording —
+        // not the sum of prior takes. The theoretical recurrence
+        // "singer N reacts to singer N-1, whose voice already sits
+        // bakeDownDelayMs_{N-1} into its MP4, so the offsets compound"
+        // does NOT match what the recording playback path actually
+        // produces empirically — every take past Take 1 ends up with
+        // the same ~delaySec front-pad, and trimming by the cumulative
+        // sum over-trims later layers (Thomas: "layer 4's part came in
+        // way sooner than how I recorded it"). The recurrence is dead
+        // because scheduleLayerPlayback already starts each prior
+        // layer past its own bakeDownDelayMs, so the audible monitor
+        // signal singer N reacts to starts at monitor t=0, not at the
+        // prior layer's internal offset.
         //   bakeDownDelayMs_1 = 0
-        //   bakeDownDelayMs_N = bakeDownDelayMs_{N-1} + delaySec_N
-        const previousLayer = harmonyStack[harmonyStack.length - 1];
-        const bakeDownDelayMs = (previousLayer?.bakeDownDelayMs ?? 0) + _lastTakeBakeDownDelayMs;
+        //   bakeDownDelayMs_N = delaySec_N  (N > 1)
+        const bakeDownDelayMs = harmonyStack.length > 0 ? _lastTakeBakeDownDelayMs : 0;
         harmonyStack.push({
           audioBuffer,
           videoBlob: lastRecordedBlob,
@@ -8500,13 +8503,14 @@
       const startTime = audioContext.currentTime + 0.05;
       const delaySec = Math.max(0, Math.min(1.5, btLatencyMs / 1000));
       // Snapshot the per-take BT compensation in force at record-start.
-      // pushLastTakeAsLayer adds this to the prior layer's bakeDownDelayMs
-      // to populate the new layer's bakeDownDelayMs — cumulative across
-      // the stack, because each singer's reaction delay compounds on top
-      // of every prior singer's offset (the latest prior layer is audible
-      // through the monitor, so its own offset reaches singer N's ear).
-      // Read at scheduleLayerPlayback time (not export time) because
-      // Auto mode can shift btLatencyMs between takes.
+      // pushLastTakeAsLayer stores this directly as the new layer's
+      // bakeDownDelayMs — per-take, NOT cumulative. Each prior layer
+      // is played starting from its OWN bakeDownDelayMs offset (see
+      // the source.start(..., trimMs/1000) below), so the monitor mix
+      // singer N reacts to begins at audible t=0 — only singer N's
+      // own BT round-trip lands in their take. Read at
+      // scheduleLayerPlayback time (not export time) because Auto
+      // mode can shift btLatencyMs between takes.
       _lastTakeBakeDownDelayMs = Math.round(delaySec * 1000);
       // Play ALL prior layers as monitor so the singer hears the full
       // mix while recording. Each gets its own gainNode (driven by
