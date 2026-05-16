@@ -7573,27 +7573,42 @@
           try { v.currentTime = want; } catch (_) { finish(); }
         })));
 
+        // Kick the per-layer audio sources at one shared AudioContext
+        // time — every layer enters the mix on the same sample clock,
+        // so voices stack tight regardless of how independent each
+        // <video>.play() Promise resolved. Each source starts at its
+        // own per-layer trim offset (front silence skipped sample-
+        // accurately, bypassing the <video> element's VFR keyframe-
+        // snap behaviour that drifted audio vs. video per cell on
+        // 3+-stack composites).
+        //
+        // Schedule BEFORE mediaRecorder.start(). Chrome silently drops
+        // the audio track from the encoded MP4 if its
+        // MediaStreamAudioDestinationNode has never seen samples flow
+        // through it by the time the recorder is started — the
+        // composite then ships video-only. createMediaElementSource
+        // (the pre-f6f5553 path) sidestepped this because v.play()
+        // started the decoder pumping audio into the graph the
+        // instant the element resumed, and v.play() was awaited
+        // before recorder.start() in earlier revisions; with
+        // BufferSource the graph is inert until start() is called,
+        // so the window between recorder.start() and audio actually
+        // flowing was wide enough for Chrome to omit the track. The
+        // 80 ms cushion gives the recorder time to come online
+        // (start() is async-resolving internally) and still lands
+        // before v.play()'s first frame, keeping the trim offsets
+        // honest. The recorder captures a sliver of leading silence
+        // — well under one rAF tick — before audio fires.
+        const audioT0 = audioCtx.currentTime + 0.08;
+        for (const { src, trim } of audioSources) {
+          try { src.start(audioT0, Math.max(0, trim)); } catch (_) {}
+        }
+
         mediaRecorder.start();
 
         // play() returns a Promise — await all so the rAF loop's
         // elapsed-time check sees real playback before any frame check.
         await Promise.all(videoEls.map(v => v.play().catch(() => {})));
-
-        // Kick the per-layer audio sources at one shared AudioContext
-        // time — every layer enters the mix on the same sample clock,
-        // so voices stack tight regardless of how independent each
-        // <video>.play() Promise resolved. The 10 ms cushion past
-        // currentTime keeps us inside the AudioContext's scheduling
-        // window; the recorder is already capturing, so a brief
-        // sample-level pre-roll of silence is harmless. Each source
-        // starts at its own per-layer trim offset (front silence
-        // skipped sample-accurately, bypassing the <video> element's
-        // VFR keyframe-snap behaviour that drifted audio vs. video
-        // per cell on 3+-stack composites).
-        const audioT0 = audioCtx.currentTime + 0.01;
-        for (const { src, trim } of audioSources) {
-          try { src.start(audioT0, Math.max(0, trim)); } catch (_) {}
-        }
 
         // 7. Compose loop. clear -> for each cell, draw the matching
         //    video element with letterboxing. Browser uses its hardware
