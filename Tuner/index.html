@@ -2650,14 +2650,16 @@
     let pendingExportBlob = null;
     let pendingExportFilename = null;
     let activeLayerSources = [];
-    // Bake-down delay (ms) actually applied to prior-layer audio in the
-    // most recently recorded take. Captured inside scheduleLayerPlayback
-    // at recording start so it reflects the btLatencyMs in force then —
-    // not the value that might be live at export time. pushLastTakeAsLayer
-    // snapshots it onto the new layer's bakeDownDelayMs field; the
-    // composite then seeks each cell's <video> past that head silence so
-    // every cell starts at composite t=0 with its singer about to sing.
-    // Zero before any stacked take has been recorded.
+    // Per-take DelayNode value (ms) actually applied to prior-layer
+    // audio in the most recently recorded take. Captured inside
+    // scheduleLayerPlayback at recording start so it reflects the
+    // btLatencyMs in force then — not the value that might be live at
+    // export time. pushLastTakeAsLayer ADDS this to the previous layer's
+    // (already cumulative) bakeDownDelayMs to derive the new layer's
+    // bakeDownDelayMs — see the recurrence comment there. The composite
+    // then seeks each cell's <video> past that head silence so every
+    // cell starts at composite t=0 with its singer about to sing. Zero
+    // before any stacked take has been recorded.
     let _lastTakeBakeDownDelayMs = 0;
     // Counter (not bool) so nested or overlapping export/remux calls
     // gate the live audio loop correctly — depth>0 means "something
@@ -7453,20 +7455,30 @@
         //    the same trim moves the audio past its dead air — composite
         //    audio opens on the first baked-in voice instead of silence.
         //
-        //    Per-layer bakeDownDelayMs is the recording-time delaySec for
-        //    that take, NOT a cumulative across-takes value. The recording
-        //    bake-down only adds the current take's delaySec to prior
-        //    layers' positions; layers don't pile up across passes
-        //    (verified against scheduleLayerPlayback).
+        //    Per-layer bakeDownDelayMs IS cumulative across takes. Each
+        //    new take re-runs every prior layer's already-baked-down
+        //    audio through DelayNode(delaySec_N), so the head silence
+        //    grows by delaySec_N each pass. Recurrence:
+        //      bakeDownDelayMs_1 = 0
+        //      bakeDownDelayMs_N = bakeDownDelayMs_{N-1} + delaySec_N
+        //    At delaySec≈700 ms (BT) the stack grows 0, 700, 1400, 2100
+        //    ms. A prior fix stored only the per-take delaySec, which
+        //    left takes 3+ trimmed too little — older layers' voices
+        //    bled into the composite audibly delayed/duplicated, the
+        //    exact symptom Thomas reported on 3- and 4-stack takes.
         //
-        //    Lip-sync trade-off on cells K < N (older than latest): take
-        //    K's voice in the latest take's bake-down lands at composite
-        //    t = delaySecK + reactionTimeK after the audio trim, while
-        //    take K's video — trimmed by delaySecK — shows mouth-singing
-        //    at composite t ≈ reactionTimeK. So mouth leads voice by
-        //    delaySecK on older cells. Accepted as the cost of visual
-        //    coherence at composite t=0; flip the trim to delaySecN-only
-        //    (latest cell) if lip-sync drift becomes the louder issue.
+        //    Lip-sync on cells K < N (older than latest):
+        //      - composite audio (from latest take, trimmed by
+        //        bakeDownDelayMs_N): every voice — including singer K's
+        //        — lands at composite t=0, because the latest take's
+        //        recording aligned every baked-in voice to its head
+        //        silence.
+        //      - cell K's video, trimmed by bakeDownDelayMs_K, shows
+        //        singer K's voice at composite t=0 (their mouth opens
+        //        a touch earlier and is cut, by reactionTime_K).
+        //      So mouth and voice are tight at composite t=0 on every
+        //      cell. Earlier docs claimed mouth led voice by delaySec_K;
+        //      that was an artifact of the broken non-cumulative trim.
         //
         //    trimSec[] was computed earlier next to layerDurations (the
         //    end-of-reel sizing needs the trimmed effective duration).
@@ -8177,16 +8189,33 @@
         // backing data is GC'd when the stack drops it.
         // bakeDownDelayMs: the audio offset at which prior-layer voices
         // begin inside this take's MP4 — also the silent-intro length
-        // before any baked-in voice. Comes from scheduleLayerPlayback's
-        // DelayNode (btLatencyMs at recording start). exportStackedReel
-        // uses each layer's value to seek that cell's <video> past its
-        // silent head so all cells start at composite t=0 with their
-        // singer about to sing (and the latest cell's seek also strips
-        // the audio source's intro silence). Take 1 had no prior layers
-        // and no scheduleLayerPlayback call, so its bake-down delay is
-        // 0. NOT cumulative across takes — each take's stored value is
-        // just THAT take's recording-time delaySec.
-        const bakeDownDelayMs = harmonyStack.length > 0 ? _lastTakeBakeDownDelayMs : 0;
+        // before any baked-in voice. exportStackedReel uses each layer's
+        // value to seek that cell's <video> past its silent head so all
+        // cells start at composite t=0 with their singer about to sing
+        // (and the latest cell's seek also strips the audio source's
+        // intro silence).
+        //
+        // CUMULATIVE across takes. Each new take plays every prior
+        // layer's audioBuffer through DelayNode(delaySec_N) into the
+        // recording bus, but those buffers already carry their own
+        // bake-down silence from earlier passes. So singer K's voice
+        // (and all baked-in voices) land in take N's MP4 at offset
+        // bakeDownDelayMs_{N-1} + delaySec_N. Singer N hears the
+        // delayed-arriving bake-down through speakers and sings to it,
+        // so their own voice also lands at the same offset (BT lag and
+        // delaySec_N cancel out in the round-trip). Recurrence:
+        //   bakeDownDelayMs_1 = 0
+        //   bakeDownDelayMs_N = bakeDownDelayMs_{N-1} + delaySec_N
+        // At delaySec≈700 ms (BT): 0, 700, 1400, 2100, ... A flat
+        // (per-take only) value left takes 3+ trimmed too little, and
+        // prior layers showed up duplicated/delayed in the composite —
+        // the symptom Thomas hit with 3+ stacks.
+        const prevLayer = harmonyStack.length > 0
+          ? harmonyStack[harmonyStack.length - 1] : null;
+        const prevCumulativeMs = (prevLayer && typeof prevLayer.bakeDownDelayMs === 'number')
+          ? Math.max(0, prevLayer.bakeDownDelayMs) : 0;
+        const bakeDownDelayMs = harmonyStack.length > 0
+          ? (prevCumulativeMs + _lastTakeBakeDownDelayMs) : 0;
         harmonyStack.push({
           audioBuffer,
           videoBlob: lastRecordedBlob,
@@ -8301,10 +8330,12 @@
       }
       const startTime = audioContext.currentTime + 0.05;
       const delaySec = Math.max(0, Math.min(1.5, btLatencyMs / 1000));
-      // Snapshot the delay actually applied to this take's bake-down so
-      // the composite export can shift older-layer videos to match. Read
-      // at scheduleLayerPlayback time (not at export time) because Auto
-      // mode can shift btLatencyMs between takes.
+      // Snapshot the per-take DelayNode value. pushLastTakeAsLayer adds
+      // this to the previous layer's (already cumulative) bakeDownDelayMs
+      // to derive the new layer's cumulative head-silence — bakeDown
+      // compounds because each pass re-delays already-baked buffers.
+      // Read at scheduleLayerPlayback time (not at export time) because
+      // Auto mode can shift btLatencyMs between takes.
       _lastTakeBakeDownDelayMs = Math.round(delaySec * 1000);
       for (const layer of harmonyStack) {
         const source = audioContext.createBufferSource();
