@@ -2654,10 +2654,10 @@
     // most recently recorded take. Captured inside scheduleLayerPlayback
     // at recording start so it reflects the btLatencyMs in force then —
     // not the value that might be live at export time. pushLastTakeAsLayer
-    // snapshots it onto the new layer's bakeDownDelayMs field so the
-    // composite knows how far to shift older layer videos to align them
-    // with their voices in the latest take's audio. Zero before any
-    // stacked take has been recorded.
+    // snapshots it onto the new layer's bakeDownDelayMs field; the
+    // composite then seeks each cell's <video> past that head silence so
+    // every cell starts at composite t=0 with its singer about to sing.
+    // Zero before any stacked take has been recorded.
     let _lastTakeBakeDownDelayMs = 0;
     // Counter (not bool) so nested or overlapping export/remux calls
     // gate the live audio loop correctly — depth>0 means "something
@@ -7256,7 +7256,6 @@
       const videoEls = [];
       const objectUrls = [];
       const audioNodes = [];   // MediaElementAudioSourceNode + MediaStreamAudioDestinationNode
-      const playTimeouts = []; // setTimeout IDs for delayed older-layer play()
       let canvas = null;
       let mediaRecorder = null;
       let rafId = null;
@@ -7316,6 +7315,21 @@
             layerDurations.push((fb && fb > 0) ? fb : 0);
           }
         }
+        // Per-cell front trim (seconds). See the BAKE-DOWN FRONT-TRIM
+        // block in section 6 for the full rationale; here we just need
+        // it for sizing the compose loop's end-time. Each layer's
+        // bakeDownDelayMs is the silent intro the recorder captured
+        // before its first baked-in voice (0 for take 1 / pre-fix
+        // legacy layers); we'll seek each <video> past it before
+        // playback. effective duration = raw MP4 duration − trim.
+        const trimSec = new Array(videoEls.length).fill(0);
+        for (let i = 0; i < videoEls.length; i++) {
+          const ms = (ordered[i] && typeof ordered[i].bakeDownDelayMs === 'number')
+            ? Math.max(0, ordered[i].bakeDownDelayMs) : 0;
+          trimSec[i] = ms / 1000;
+        }
+        const effectiveDurations = layerDurations.map((d, i) =>
+          Math.max(0, d - trimSec[i]));
         // Reel length resolves the compose-loop end time.
         //   shortest mode → stop when the shortest layer ends (legacy)
         //   longest  mode → stop when the longest  layer ends (new)
@@ -7324,7 +7338,7 @@
         // grid, just with empty cells.
         let shortestSec = Infinity;
         let longestSec = 0;
-        for (const d of layerDurations) {
+        for (const d of effectiveDurations) {
           if (d > 0 && d < shortestSec) shortestSec = d;
           if (d > longestSec) longestSec = d;
         }
@@ -7420,63 +7434,80 @@
               ((e && e.error && e.error.message) || 'unknown')));
         });
 
-        // 6. Start the recorder, then start playback. Playing AFTER
-        //    MediaRecorder.start() guarantees the recorder doesn't miss
-        //    the first frames.
+        // 6. BAKE-DOWN FRONT-TRIM. Each take's MP4 starts with
+        //    bakeDownDelayMs of dead air at the head: scheduleLayerPlayback
+        //    feeds prior layers through DelayNode(btLatencyMs/1000) into
+        //    the recording bus to align them with the user's BT-delayed
+        //    mic capture, so the MP4 head is silent until that delayed
+        //    playback reaches the bus. Take 1 had no scheduleLayerPlayback
+        //    call and stores 0.
         //
-        //    BAKE-DOWN ALIGNMENT. Each take's MP4 audio holds prior-layer
-        //    voices offset by ~btLatencyMs (scheduleLayerPlayback feeds
-        //    them through DelayNode(btLatencyMs/1000) so the user's
-        //    BT-delayed mic capture lines up with the layers in the
-        //    recording bus). The latest take's audio is the only audio
-        //    source in the composite, so older layer videos must be
-        //    delayed by that same offset or their visuals will lead their
-        //    voices by btLatencyMs in the captured composite. On BT this
-        //    is a 200–400 ms lip-sync slip on the base/older cells; on
-        //    speakers it's near-zero so the same bug was invisible until
-        //    Auto latency picked up real BT outputLatency.
+        //    Earlier approach (commit 46581a3) kept the head intact and
+        //    deferred older cells' play() by the latest take's bake-down
+        //    delay — audio synced but the composite opened with ~700 ms
+        //    of black + silence on BT, "not presentable" as a reel.
+        //    This pass instead trims the silent head off EACH cell by
+        //    its own bakeDownDelayMs (Acapella/Smule pattern) so all
+        //    cells start at composite t=0 with their singer about to
+        //    sing. For the latest cell (videoEls[0], the audio source)
+        //    the same trim moves the audio past its dead air — composite
+        //    audio opens on the first baked-in voice instead of silence.
         //
-        //    We read the offset from ordered[0] (the audio source) — that
-        //    layer was recorded with the btLatencyMs that was actually
-        //    applied to ITS bake-down, which may not equal the live
-        //    btLatencyMs at export time (Auto mode can shift between
-        //    takes). videoEls[0] still starts immediately (its own video
-        //    aligns with its own audio internally); only i > 0 get the
-        //    shift.
-        const bakeDownDelayMs = (ordered[0] && typeof ordered[0].bakeDownDelayMs === 'number')
-          ? Math.max(0, ordered[0].bakeDownDelayMs) : 0;
-        const layerPlayOffsetMs = new Array(videoEls.length).fill(0);
-        for (let i = 1; i < videoEls.length; i++) layerPlayOffsetMs[i] = bakeDownDelayMs;
+        //    Per-layer bakeDownDelayMs is the recording-time delaySec for
+        //    that take, NOT a cumulative across-takes value. The recording
+        //    bake-down only adds the current take's delaySec to prior
+        //    layers' positions; layers don't pile up across passes
+        //    (verified against scheduleLayerPlayback).
+        //
+        //    Lip-sync trade-off on cells K < N (older than latest): take
+        //    K's voice in the latest take's bake-down lands at composite
+        //    t = delaySecK + reactionTimeK after the audio trim, while
+        //    take K's video — trimmed by delaySecK — shows mouth-singing
+        //    at composite t ≈ reactionTimeK. So mouth leads voice by
+        //    delaySecK on older cells. Accepted as the cost of visual
+        //    coherence at composite t=0; flip the trim to delaySecN-only
+        //    (latest cell) if lip-sync drift becomes the louder issue.
+        //
+        //    trimSec[] was computed earlier next to layerDurations (the
+        //    end-of-reel sizing needs the trimmed effective duration).
+
+        // Seek each <video> to its trim start and WAIT for the seek to
+        // commit before starting the recorder + play(). On iOS Safari
+        // a currentTime= write returns immediately but the decoder
+        // hasn't actually moved yet — kicking off play() in that window
+        // emits frame-0 audio/video for a few hundred ms before the
+        // seek lands, defeating the trim. The Promise.all gate ensures
+        // the recorder's first captured samples come from the trimmed
+        // position. 1500 ms safety timeout per video so a missed
+        // 'seeked' event (some mobile decoders silently drop it on
+        // small seeks) can't deadlock the export.
+        await Promise.all(videoEls.map((v, i) => new Promise((resolve) => {
+          const want = trimSec[i];
+          if (want <= 0) {
+            try { v.currentTime = 0; } catch (_) {}
+            return resolve();
+          }
+          let done = false;
+          let safetyTid = null;
+          const finish = () => {
+            if (done) return;
+            done = true;
+            v.removeEventListener('seeked', finish);
+            v.removeEventListener('error', finish);
+            if (safetyTid !== null) clearTimeout(safetyTid);
+            resolve();
+          };
+          v.addEventListener('seeked', finish);
+          v.addEventListener('error', finish);
+          safetyTid = setTimeout(finish, 1500);
+          try { v.currentTime = want; } catch (_) { finish(); }
+        })));
 
         mediaRecorder.start();
 
-        for (const v of videoEls) {
-          try { v.currentTime = 0; } catch (_) {}
-        }
-        // Start videoEls[0] immediately — it provides audio for the whole
-        // composite, so the recorder needs samples flowing from t=0.
-        // play() returns a Promise — await so we know playback actually
-        // started before the rAF loop checks elapsed time.
-        await videoEls[0].play().catch(() => {});
-        // Older-layer videos: if a bake-down shift is in effect, defer
-        // play() by that amount so their currentTime stays at 0 (the
-        // frame-0 still) until the audio reaches their voice. drawFrame
-        // gates drawImage on layerPlayOffsetMs so the cell stays black
-        // during the wait — without that gate drawImage(v) would paint
-        // the seeked-to-0 frame and the cell would freeze on its first
-        // frame instead of going black, defeating the alignment cue.
-        for (let i = 1; i < videoEls.length; i++) {
-          const v = videoEls[i];
-          if (layerPlayOffsetMs[i] > 0) {
-            const tid = setTimeout(() => {
-              if (stopRequested) return;
-              v.play().catch(() => {});
-            }, layerPlayOffsetMs[i]);
-            playTimeouts.push(tid);
-          } else {
-            v.play().catch(() => {});
-          }
-        }
+        // play() returns a Promise — await all so the rAF loop's
+        // elapsed-time check sees real playback before any frame check.
+        await Promise.all(videoEls.map(v => v.play().catch(() => {})));
 
         // 7. Compose loop. clear -> for each cell, draw the matching
         //    video element with letterboxing. Browser uses its hardware
@@ -7488,26 +7519,19 @@
           if (stopRequested) return;
           ctx.fillStyle = '#000';
           ctx.fillRect(0, 0, W, H);
-          const elapsedMsNow = performance.now() - startMs;
           let allEnded = true;
           for (let i = 0; i < videoEls.length && i < layout.cells.length; i++) {
             const cell = layout.cells[i];
             const v = videoEls[i];
             const dur = layerDurations[i] || 0;
-            // Bake-down alignment gate. Older-layer cells stay black until
-            // their voice begins inside the latest take's audio. Without
-            // this, drawImage(v) at composite t=0 paints v's seeked frame
-            // 0 (the cell would freeze on its still until play() fires)
-            // even though v hasn't started playing yet.
-            if (elapsedMsNow < layerPlayOffsetMs[i]) {
-              allEnded = false;
-              continue;
-            }
             // In longest mode, treat layers as "done" once they have
             // played past their declared duration (videoEl.ended is
             // unreliable on iOS Safari) and leave their cell black
             // for the remainder of the reel. The cell rect is already
             // black from the fillRect above, so the skip is enough.
+            // currentTime >= dur uses raw MP4 duration; the front trim
+            // moves the playhead's start, but the end is still the MP4
+            // tail — the playable run is (dur - trimSec[i]).
             const layerEnded = useLongest && dur > 0 &&
               (v.ended || v.currentTime >= dur);
             if (!layerEnded) allEnded = false;
@@ -7622,9 +7646,6 @@
         stopRequested = true;
         if (rafId) {
           try { cancelAnimationFrame(rafId); } catch (_) {}
-        }
-        for (const tid of playTimeouts) {
-          try { clearTimeout(tid); } catch (_) {}
         }
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
           try { mediaRecorder.stop(); } catch (_) {}
@@ -8155,12 +8176,16 @@
         // composite). We hold a reference, not a clone — the blob
         // backing data is GC'd when the stack drops it.
         // bakeDownDelayMs: the audio offset at which prior-layer voices
-        // begin inside this take's MP4. Comes from scheduleLayerPlayback's
-        // DelayNode (btLatencyMs at recording start). The composite reads
-        // this from the most-recent take to shift older-layer videos so
-        // their visuals align with their voices in the bake-down. Take 1
-        // had no prior layers and no scheduleLayerPlayback call, so its
-        // bake-down delay is 0.
+        // begin inside this take's MP4 — also the silent-intro length
+        // before any baked-in voice. Comes from scheduleLayerPlayback's
+        // DelayNode (btLatencyMs at recording start). exportStackedReel
+        // uses each layer's value to seek that cell's <video> past its
+        // silent head so all cells start at composite t=0 with their
+        // singer about to sing (and the latest cell's seek also strips
+        // the audio source's intro silence). Take 1 had no prior layers
+        // and no scheduleLayerPlayback call, so its bake-down delay is
+        // 0. NOT cumulative across takes — each take's stored value is
+        // just THAT take's recording-time delaySec.
         const bakeDownDelayMs = harmonyStack.length > 0 ? _lastTakeBakeDownDelayMs : 0;
         harmonyStack.push({
           audioBuffer,
