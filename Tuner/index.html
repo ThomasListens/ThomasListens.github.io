@@ -2150,6 +2150,28 @@
         </div>
       </div>
 
+      <!-- Auto-sine bank controls — side-panel mirror of the dock copies
+           in #recordOverlay. Publicly accessible like the Drone section
+           above; the feature is useful for tuner-only use, not just
+           recording. IDs end in "Main" to coexist with the dock's bare
+           IDs; both copies share state through the autoSineVolume /
+           autoSineSmoothness vars + syncAutoSineUI(). -->
+      <div class="control-section">
+        <div class="section-header">Auto sines</div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="fxAutoSinesToggleMain">
+          <label for="fxAutoSinesToggleMain">Sine bank fades in by proximity</label>
+        </div>
+        <label style="margin-top: 4px;">Volume <span id="autoSineVolumeMainVal" style="color: #aaa;">18%</span></label>
+        <div class="slider-row">
+          <input type="range" id="autoSineVolumeMain" min="0" max="100" value="18">
+        </div>
+        <label style="margin-top: 4px;">Smoothness <span id="autoSineSmoothnessMainVal" style="color: #aaa;">30%</span></label>
+        <div class="slider-row">
+          <input type="range" id="autoSineSmoothnessMain" min="0" max="100" value="30">
+        </div>
+      </div>
+
       <button id="stopDronesBtn">🔇 Stop All Drones</button>
       
       <!-- Remove this line to delete the "Show advanced features" toggle -->
@@ -2429,6 +2451,15 @@
       <label>AutoVol</label>
       <input type="range" id="autoSineVolume" min="0" max="100" value="18">
       <span id="autoSineVolumeVal" class="value-badge">18%</span>
+    </div>
+    <!-- Auto-sine smoothness. Single fader driving glide time-constant,
+         voice-gate attack/release, and per-ratio proximity smoothing.
+         Left = agile (snap to pitch), right = atmospheric (slow bloom).
+         Persists under tuner.autoSineSmoothness. -->
+    <div class="feather-row">
+      <label>AutoSm</label>
+      <input type="range" id="autoSineSmoothness" min="0" max="100" value="30">
+      <span id="autoSineSmoothnessVal" class="value-badge">30%</span>
     </div>
     <!-- Shimmer reverb Mix + Tail. The on/off toggle lives on the
          floating #audioFXVrbBtn chip in the bottom-left corner — having
@@ -2797,6 +2828,45 @@
     let autoSineVoiceGate = 0;
     let autoSineVolume = 0.18;
     const AUTO_SINE_WIDTH_CENTS = 22;
+    // Single "smoothness" knob — drives every responsiveness parameter
+    // in updateAutoSinesFrame. 0 = agile (sines snap to pitch, ~5-10 ms
+    // glide, tight gate, raw proximity), 1 = atmospheric (sines bloom
+    // over ~1-2 s with proximity smoothing, lingering release). Default
+    // 0.30 ≈ the original hardcoded feel (40 ms gain TC, 0.20/0.05
+    // gate alphas, no proximity smoothing). Persisted under
+    // tuner.autoSineSmoothness.
+    let autoSineSmoothness = 0.30;
+    // Derived parameters at the current smoothness setting. All four
+    // are read each frame by updateAutoSinesFrame; recomputed only
+    // when the smoothness state changes (via the slider handler).
+    // Exponential maps keep the slider feel musical — equal-distance
+    // moves at the agile end have similar perceptual weight to moves
+    // at the slow end.
+    //   gainTc          : setTargetAtTime time constant on per-ratio gain (s)
+    //   freqTc          : setTargetAtTime time constant on oscillator freq (s)
+    //   gateAttackAlpha : per-rAF one-pole alpha when voiceGate is rising
+    //   gateReleaseAlpha: per-rAF one-pole alpha when voiceGate is falling
+    //   proxAlpha       : per-rAF one-pole alpha on the per-ratio smoothed
+    //                     proximity (1.0 = pass-through, smaller = smoother)
+    let autoSineGainTc = 0.04;
+    let autoSineFreqTc = 0.05;
+    let autoSineGateAttackAlpha = 0.20;
+    let autoSineGateReleaseAlpha = 0.05;
+    let autoSineProxAlpha = 1.0;
+    function recomputeAutoSineParams() {
+      const s = Math.max(0, Math.min(1, autoSineSmoothness));
+      autoSineGainTc = 0.005 * Math.pow(400, s);                // 5 ms .. 2 s
+      autoSineFreqTc = autoSineGainTc;
+      autoSineGateAttackAlpha  = 0.50 * Math.pow(0.08, s);      // ~30 ms .. ~400 ms to half
+      autoSineGateReleaseAlpha = 0.20 * Math.pow(0.04, s);      // ~80 ms .. ~2 s to half
+      // Proximity smoother: alpha=1 at s=0 (pure pass-through, no
+      // smoother), quadratic taper down to alpha=0.05 at s=1 so the
+      // smoothing only really shows up in the upper half of the
+      // slider — matches the perceived "bloom" feel Thomas described.
+      const oneMinus = 1 - s;
+      autoSineProxAlpha = 0.05 + 0.95 * oneMinus * oneMinus;
+    }
+    recomputeAutoSineParams();
     // Master output trim. Range -20..+6 dB on the slider (0..100).
     // Persisted under tuner.outputLevelDb. Applied via the
     // masterOutputGain node inserted in buildMicProcessing.
@@ -4002,7 +4072,17 @@
           try { gain.connect(micProcessing.micOut); } catch (_) {}
         }
         try { osc.start(now); } catch (_) {}
-        autoSineNodes[ratio.label] = { osc, gain, baseFreq };
+        autoSineNodes[ratio.label] = {
+          osc, gain, baseFreq,
+          // Per-ratio smoothed proximity (one-pole). At low smoothness
+          // autoSineProxAlpha = 1.0 so this just shadows the raw value.
+          smoothedProximity: 0,
+          // Locked octave (integer k such that targetFreq = baseFreq · 2^k).
+          // Set once smoothedProximity rises above lockThreshold; cleared
+          // when smoothedProximity drops near zero. Keeps the oscillator
+          // freq from jumping octaves while the sine is audible.
+          lockedOctave: null,
+        };
       }
       autoSineBuilt = true;
     }
@@ -4031,17 +4111,27 @@
       // smoothedMicLevel is the same envelope that drives the CSS
       // bloom. AND them so room-rumble alone can't open the gate and
       // a quiet but pitched note still does. Asymmetric smoothing:
-      // fast attack so the sine reveals as soon as the note locks,
-      // slow release so the bank fades cleanly across short breaths
-      // instead of snapping silent between syllables.
+      // attack and release alphas come from the smoothness knob so
+      // the same fader controls "how quickly the sine reveals/clears"
+      // alongside "how quickly the sine glides to pitch".
       const sinceVoice = perfNow - lastPitchTime;
       const voiceActive = (sinceVoice < 180) && (smoothedMicLevel > 0.04) ? 1 : 0;
-      const gateAlpha = voiceActive > autoSineVoiceGate ? 0.20 : 0.05;
+      const gateAlpha = voiceActive > autoSineVoiceGate
+        ? autoSineGateAttackAlpha
+        : autoSineGateReleaseAlpha;
       autoSineVoiceGate += (voiceActive - autoSineVoiceGate) * gateAlpha;
       if (autoSineVoiceGate < 0.001) autoSineVoiceGate = 0;
 
       const userHz = (voiceActive && smoothedFreq) ? smoothedFreq : null;
       const widthC = AUTO_SINE_WIDTH_CENTS;
+      const proxAlpha = autoSineProxAlpha;
+      // Hysteresis on the octave lock. Lock once the smoothed
+      // proximity is solidly audible; release only when essentially
+      // silent. Prevents the oscillator from snapping to a different
+      // octave mid-bloom when proximity smoothing keeps the sine
+      // audible across short pitch glides.
+      const LOCK_ON  = 0.20;
+      const LOCK_OFF = 0.02;
 
       for (const ratio of config.ratios) {
         const node = autoSineNodes[ratio.label];
@@ -4050,24 +4140,43 @@
         // Keep base in sync if refFreq changed without a full rebuild.
         if (Math.abs(node.baseFreq - baseFreq) > 0.001) node.baseFreq = baseFreq;
 
-        let targetFreq = baseFreq;
-        let proximity = 0;
+        // Raw proximity at the nearest octave of this ratio to the
+        // current sung pitch.
+        let rawProximity = 0;
+        let nearestOct = node.lockedOctave;
         if (userHz && userHz > 0) {
-          // Nearest octave: snap log2(userHz/baseFreq) to an integer.
           const oct = Math.round(Math.log2(userHz / baseFreq));
-          targetFreq = baseFreq * Math.pow(2, oct);
-          const centsDist = Math.abs(1200 * Math.log2(targetFreq / userHz));
+          nearestOct = oct;
+          const candFreq = baseFreq * Math.pow(2, oct);
+          const centsDist = Math.abs(1200 * Math.log2(candFreq / userHz));
           const x = Math.min(1, centsDist / widthC);
           // Smooth cosine fade: 1.0 at the ratio, 0.0 at ±widthC,
           // continuous derivative at both ends so the crossfade
           // between adjacent ratios doesn't have audible knees.
-          proximity = 0.5 * (1 + Math.cos(Math.PI * x));
+          rawProximity = 0.5 * (1 + Math.cos(Math.PI * x));
         }
 
-        const targetGain = autoSineVoiceGate * proximity * autoSineVolume;
+        // One-pole smoother. At s=0 alpha=1 → smoothedProximity == raw.
+        node.smoothedProximity += (rawProximity - node.smoothedProximity) * proxAlpha;
+        if (node.smoothedProximity < 0.0005) node.smoothedProximity = 0;
+
+        // Octave lock with hysteresis. Hold the previously chosen
+        // octave while we're audible so the oscillator doesn't jump
+        // octave mid-bloom; only re-evaluate while essentially silent.
+        if (node.lockedOctave === null) {
+          if (node.smoothedProximity >= LOCK_ON) node.lockedOctave = nearestOct;
+        } else if (node.smoothedProximity <= LOCK_OFF) {
+          node.lockedOctave = null;
+        }
+        const chosenOct = (node.lockedOctave !== null) ? node.lockedOctave : nearestOct;
+        const targetFreq = (chosenOct !== null && chosenOct !== undefined)
+          ? baseFreq * Math.pow(2, chosenOct)
+          : baseFreq;
+
+        const targetGain = autoSineVoiceGate * node.smoothedProximity * autoSineVolume;
         try {
-          node.osc.frequency.setTargetAtTime(targetFreq, t, 0.05);
-          node.gain.gain.setTargetAtTime(targetGain, t, 0.04);
+          node.osc.frequency.setTargetAtTime(targetFreq, t, autoSineFreqTc);
+          node.gain.gain.setTargetAtTime(targetGain, t, autoSineGainTc);
         } catch (_) {}
       }
     }
@@ -10241,6 +10350,11 @@
         if (asv !== null && !isNaN(parseFloat(asv))) {
           autoSineVolume = Math.max(0, Math.min(1, parseFloat(asv)));
         }
+        const ass = localStorage.getItem('tuner.autoSineSmoothness');
+        if (ass !== null && !isNaN(parseFloat(ass))) {
+          autoSineSmoothness = Math.max(0, Math.min(1, parseFloat(ass)));
+          recomputeAutoSineParams();
+        }
       } catch (_) {}
       const lowcutCb = document.getElementById('voiceLowcut');
       const compressCb = document.getElementById('voiceCompression');
@@ -10361,34 +10475,73 @@
       // bootstrapAudio is a no-op when the AudioContext is already
       // live. Toggling off lets updateAutoSinesFrame clear the bank
       // next frame (fades to 0 over ~30 ms then disposes nodes).
-      const fxAutoSinesCb = document.getElementById('fxAutoSinesToggle');
-      if (fxAutoSinesCb) {
-        fxAutoSinesCb.checked = !!fx.autoSines;
-        fxAutoSinesCb.addEventListener('change', (e) => {
-          fx.autoSines = !!e.target.checked;
-          try { localStorage.setItem('tuner.fx.autoSines', fx.autoSines ? '1' : '0'); } catch (_) {}
-          if (fx.autoSines) {
-            try { bootstrapAudio(); } catch (_) {}
-          } else {
-            // Tear down immediately — audioLoop may not be running
-            // (no mic, not recording), so we can't rely on it to
-            // clean the bank up itself.
-            clearAutoSineBank();
-          }
-        });
+      // Both copies of each control (dock + side panel) write through to
+      // the same in-memory state vars (fx.autoSines, autoSineVolume,
+      // autoSineSmoothness) and call syncAutoSineUI() so the other copy
+      // stays in lockstep. Either control is a write source; both are
+      // read sinks.
+      const fxAutoSinesCb     = document.getElementById('fxAutoSinesToggle');
+      const fxAutoSinesCbMain = document.getElementById('fxAutoSinesToggleMain');
+      const autoSineVolSld    = document.getElementById('autoSineVolume');
+      const autoSineVolLbl    = document.getElementById('autoSineVolumeVal');
+      const autoSineVolSldM   = document.getElementById('autoSineVolumeMain');
+      const autoSineVolLblM   = document.getElementById('autoSineVolumeMainVal');
+      const autoSineSmthSld   = document.getElementById('autoSineSmoothness');
+      const autoSineSmthLbl   = document.getElementById('autoSineSmoothnessVal');
+      const autoSineSmthSldM  = document.getElementById('autoSineSmoothnessMain');
+      const autoSineSmthLblM  = document.getElementById('autoSineSmoothnessMainVal');
+
+      function syncAutoSineUI() {
+        if (fxAutoSinesCb)     fxAutoSinesCb.checked     = !!fx.autoSines;
+        if (fxAutoSinesCbMain) fxAutoSinesCbMain.checked = !!fx.autoSines;
+        const volPct = Math.round(autoSineVolume * 100);
+        if (autoSineVolSld)  autoSineVolSld.value  = volPct;
+        if (autoSineVolSldM) autoSineVolSldM.value = volPct;
+        if (autoSineVolLbl)  autoSineVolLbl.textContent  = volPct + '%';
+        if (autoSineVolLblM) autoSineVolLblM.textContent = volPct + '%';
+        const smPct = Math.round(autoSineSmoothness * 100);
+        if (autoSineSmthSld)  autoSineSmthSld.value  = smPct;
+        if (autoSineSmthSldM) autoSineSmthSldM.value = smPct;
+        if (autoSineSmthLbl)  autoSineSmthLbl.textContent  = smPct + '%';
+        if (autoSineSmthLblM) autoSineSmthLblM.textContent = smPct + '%';
       }
-      const autoSineVolumeSlider = document.getElementById('autoSineVolume');
-      const autoSineVolumeLbl = document.getElementById('autoSineVolumeVal');
-      if (autoSineVolumeSlider) {
-        autoSineVolumeSlider.value = Math.round(autoSineVolume * 100);
-        if (autoSineVolumeLbl) autoSineVolumeLbl.textContent = Math.round(autoSineVolume * 100) + '%';
-        autoSineVolumeSlider.addEventListener('input', (e) => {
-          const v = parseInt(e.target.value, 10) / 100;
-          autoSineVolume = Math.max(0, Math.min(1, v));
-          if (autoSineVolumeLbl) autoSineVolumeLbl.textContent = Math.round(autoSineVolume * 100) + '%';
-          try { localStorage.setItem('tuner.autoSineVolume', String(autoSineVolume)); } catch (_) {}
-        });
+
+      function onAutoSinesToggle(e) {
+        fx.autoSines = !!e.target.checked;
+        try { localStorage.setItem('tuner.fx.autoSines', fx.autoSines ? '1' : '0'); } catch (_) {}
+        if (fx.autoSines) {
+          try { bootstrapAudio(); } catch (_) {}
+        } else {
+          // Tear down immediately — audioLoop may not be running
+          // (no mic, not recording), so we can't rely on it to
+          // clean the bank up itself.
+          clearAutoSineBank();
+        }
+        syncAutoSineUI();
       }
+      function onAutoSineVolume(e) {
+        const v = parseInt(e.target.value, 10) / 100;
+        autoSineVolume = Math.max(0, Math.min(1, v));
+        try { localStorage.setItem('tuner.autoSineVolume', String(autoSineVolume)); } catch (_) {}
+        syncAutoSineUI();
+      }
+      function onAutoSineSmoothness(e) {
+        const v = parseInt(e.target.value, 10) / 100;
+        autoSineSmoothness = Math.max(0, Math.min(1, v));
+        recomputeAutoSineParams();
+        try { localStorage.setItem('tuner.autoSineSmoothness', String(autoSineSmoothness)); } catch (_) {}
+        syncAutoSineUI();
+      }
+
+      if (fxAutoSinesCb)     fxAutoSinesCb.addEventListener('change', onAutoSinesToggle);
+      if (fxAutoSinesCbMain) fxAutoSinesCbMain.addEventListener('change', onAutoSinesToggle);
+      if (autoSineVolSld)    autoSineVolSld.addEventListener('input', onAutoSineVolume);
+      if (autoSineVolSldM)   autoSineVolSldM.addEventListener('input', onAutoSineVolume);
+      if (autoSineSmthSld)   autoSineSmthSld.addEventListener('input', onAutoSineSmoothness);
+      if (autoSineSmthSldM)  autoSineSmthSldM.addEventListener('input', onAutoSineSmoothness);
+
+      // Initial paint from persisted state (loaded earlier in init).
+      syncAutoSineUI();
 
       // Recording resolution selector — restore from localStorage and
       // wire the <select>. applyRecRes rebuilds ASPECT_DIMS,
