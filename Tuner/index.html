@@ -2420,6 +2420,15 @@
       <label><input type="checkbox" id="fxRulerShadowToggle"> Glow</label>
       <label><input type="checkbox" id="fxFftFancyToggle"> Detail</label>
       <label><input type="checkbox" id="fxChromaticAberrationToggle"> Chroma</label>
+      <label><input type="checkbox" id="fxAutoSinesToggle"> Auto sines</label>
+    </div>
+    <!-- Auto-sine bank volume. Ceiling gain (0-100) applied at full
+         proximity-lock; the per-frame controller scales by voice-gate
+         × cosine-faded proximity. Persists under tuner.autoSineVolume. -->
+    <div class="feather-row">
+      <label>AutoVol</label>
+      <input type="range" id="autoSineVolume" min="0" max="100" value="18">
+      <span id="autoSineVolumeVal" class="value-badge">18%</span>
     </div>
     <!-- Shimmer reverb Mix + Tail. The on/off toggle lives on the
          floating #audioFXVrbBtn chip in the bottom-left corner — having
@@ -2761,13 +2770,33 @@
     //   fftFancy            → spectrum energy strip slice count (80 vs 32)
     //   chromaticAberration → subtle RGB channel split on the camera layer
     //                         (SVG filter, GPU-composited via ctx.filter url())
+    //   autoSines           → per-ratio sine bank that fades in by proximity
+    //                         (cents) to the sung pitch, gated by voice-active
     let fx = {
       aurora: false,
       cameraFilter: false,
       rulerShadow: false,
       fftFancy: false,
       chromaticAberration: false,
+      autoSines: false,
     };
+    // Auto-sine bank: one Oscillator+Gain per ratio in config.ratios,
+    // both feeding ctx.destination AND micProcessing.micOut (so the
+    // sines bake into recordings like manual drones do). Each frame
+    // updateAutoSinesFrame() retunes the oscillator to the nearest
+    // octave of its ratio relative to the sung pitch and ramps gain
+    // by proximity-in-cents (cosine fade across ±AUTO_SINE_WIDTH_CENTS),
+    // multiplied by the voice-active gate so the bank goes silent the
+    // moment Thomas stops singing.
+    //   autoSineNodes:      label → { osc, gain, freq }
+    //   autoSineBuilt:      bank exists for the current ratio set
+    //   autoSineVoiceGate:  0..1 smoothed envelope of "voice active"
+    //   autoSineVolume:     ceiling gain at full lock, 0..1 (slider/100)
+    let autoSineNodes = {};
+    let autoSineBuilt = false;
+    let autoSineVoiceGate = 0;
+    let autoSineVolume = 0.18;
+    const AUTO_SINE_WIDTH_CENTS = 22;
     // Master output trim. Range -20..+6 dB on the slider (0..100).
     // Persisted under tuner.outputLevelDb. Applied via the
     // masterOutputGain node inserted in buildMicProcessing.
@@ -3917,7 +3946,132 @@
       Object.keys(droneOscillators).forEach(stopDrone);
       updateStopButton();
     }
-    
+
+    // ----- Auto-sine bank ----------------------------------------------
+    // Parallel to the manual-drone machinery above, but every ratio in
+    // config.ratios gets a permanent osc+gain that idles at 0 and is
+    // modulated each frame by updateAutoSinesFrame(). The bank lives
+    // entirely inside the shared AudioContext and feeds both the
+    // monitor (ctx.destination) and the recorder bus
+    // (micProcessing.micOut) — same routing manual drones use.
+
+    function clearAutoSineBank() {
+      const ctx = audioContext;
+      const now = ctx ? ctx.currentTime : 0;
+      Object.keys(autoSineNodes).forEach((label) => {
+        const node = autoSineNodes[label];
+        if (!node) return;
+        try {
+          if (ctx) {
+            node.gain.gain.cancelScheduledValues(now);
+            node.gain.gain.setValueAtTime(node.gain.gain.value, now);
+            node.gain.gain.linearRampToValueAtTime(0, now + 0.03);
+          }
+        } catch (_) {}
+        setTimeout(() => {
+          try { node.osc.stop(); } catch (_) {}
+          try { node.osc.disconnect(); } catch (_) {}
+          try { node.gain.disconnect(); } catch (_) {}
+        }, 60);
+      });
+      autoSineNodes = {};
+      autoSineBuilt = false;
+      autoSineVoiceGate = 0;
+    }
+
+    function rebuildAutoSineBank() {
+      // Idempotent rebuild — tear down whatever exists, then build a
+      // fresh osc+gain per current ratio. Must run after bootstrapAudio
+      // so micProcessing exists (otherwise the recorder branch is a
+      // no-op and the sine wouldn't bake into the video).
+      clearAutoSineBank();
+      if (!fx.autoSines) return;
+      const ctx = audioContext;
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      for (const ratio of config.ratios) {
+        const baseFreq = config.refFreq * ratio.ratio;
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(baseFreq, now);
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0, now);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        if (micProcessing && micProcessing.micOut) {
+          try { gain.connect(micProcessing.micOut); } catch (_) {}
+        }
+        try { osc.start(now); } catch (_) {}
+        autoSineNodes[ratio.label] = { osc, gain, baseFreq };
+      }
+      autoSineBuilt = true;
+    }
+
+    function updateAutoSinesFrame(perfNow) {
+      // Per-rAF: re-tune oscillators to the nearest octave of their
+      // ratio relative to the sung pitch and ramp gains by proximity
+      // × voice-gate × user volume. Cheap — O(ratios) maths and a few
+      // setTargetAtTime calls per frame.
+      if (!fx.autoSines) {
+        if (autoSineBuilt) clearAutoSineBank();
+        return;
+      }
+      if (!audioContext || !micProcessing) return;
+      // Lazy build (first frame after toggle-on, or after ratios changed).
+      if (!autoSineBuilt || Object.keys(autoSineNodes).length !== config.ratios.length) {
+        rebuildAutoSineBank();
+        if (!autoSineBuilt) return;
+      }
+
+      const ctx = audioContext;
+      const t = ctx.currentTime;
+
+      // Voice-active gate. lastPitchTime is bumped each frame YIN
+      // returns a confident pitch (>= PITCH_PROB_FLOOR within range);
+      // smoothedMicLevel is the same envelope that drives the CSS
+      // bloom. AND them so room-rumble alone can't open the gate and
+      // a quiet but pitched note still does. Asymmetric smoothing:
+      // fast attack so the sine reveals as soon as the note locks,
+      // slow release so the bank fades cleanly across short breaths
+      // instead of snapping silent between syllables.
+      const sinceVoice = perfNow - lastPitchTime;
+      const voiceActive = (sinceVoice < 180) && (smoothedMicLevel > 0.04) ? 1 : 0;
+      const gateAlpha = voiceActive > autoSineVoiceGate ? 0.20 : 0.05;
+      autoSineVoiceGate += (voiceActive - autoSineVoiceGate) * gateAlpha;
+      if (autoSineVoiceGate < 0.001) autoSineVoiceGate = 0;
+
+      const userHz = (voiceActive && smoothedFreq) ? smoothedFreq : null;
+      const widthC = AUTO_SINE_WIDTH_CENTS;
+
+      for (const ratio of config.ratios) {
+        const node = autoSineNodes[ratio.label];
+        if (!node) continue;
+        const baseFreq = config.refFreq * ratio.ratio;
+        // Keep base in sync if refFreq changed without a full rebuild.
+        if (Math.abs(node.baseFreq - baseFreq) > 0.001) node.baseFreq = baseFreq;
+
+        let targetFreq = baseFreq;
+        let proximity = 0;
+        if (userHz && userHz > 0) {
+          // Nearest octave: snap log2(userHz/baseFreq) to an integer.
+          const oct = Math.round(Math.log2(userHz / baseFreq));
+          targetFreq = baseFreq * Math.pow(2, oct);
+          const centsDist = Math.abs(1200 * Math.log2(targetFreq / userHz));
+          const x = Math.min(1, centsDist / widthC);
+          // Smooth cosine fade: 1.0 at the ratio, 0.0 at ±widthC,
+          // continuous derivative at both ends so the crossfade
+          // between adjacent ratios doesn't have audible knees.
+          proximity = 0.5 * (1 + Math.cos(Math.PI * x));
+        }
+
+        const targetGain = autoSineVoiceGate * proximity * autoSineVolume;
+        try {
+          node.osc.frequency.setTargetAtTime(targetFreq, t, 0.05);
+          node.gain.gain.setTargetAtTime(targetGain, t, 0.04);
+        } catch (_) {}
+      }
+    }
+
     function handleCanvasClick(event) {
       if (suppressNextCanvasClick) {
         suppressNextCanvasClick = false;
@@ -5607,6 +5761,12 @@
         if (smoothedMicLevel < 0.001) smoothedMicLevel = 0;
         document.documentElement.style.setProperty('--mic-level', smoothedMicLevel.toFixed(3));
       }
+
+      // Auto-sine bank: O(ratios) gain/freq updates, gated by the
+      // same voice-active envelope the bloom uses. No-op when the
+      // fx.autoSines flag is off (and tears down the bank cleanly
+      // the first frame after toggle-off).
+      updateAutoSinesFrame(now);
 
       draw();
 
@@ -9745,6 +9905,13 @@
       // Retune tanpura when the reference pitch changes
       if (tanpuraNodes) setTanpuraTuning(config.refFreq);
 
+      // Rebuild the auto-sine bank when the ratio set or reference
+      // pitch changes. The next audioLoop tick would auto-rebuild on
+      // size mismatch anyway, but doing it here also catches refFreq
+      // changes (same ratio count, different base) and clears any
+      // stale oscillators immediately.
+      if (fx.autoSines && audioContext) rebuildAutoSineBank();
+
       draw();
     }
 
@@ -10068,6 +10235,12 @@
         if (fxFft !== null) fx.fftFancy = fxFft === '1';
         const fxChroma = localStorage.getItem('tuner.fx.chromaticAberration');
         if (fxChroma !== null) fx.chromaticAberration = fxChroma === '1';
+        const fxAuto = localStorage.getItem('tuner.fx.autoSines');
+        if (fxAuto !== null) fx.autoSines = fxAuto === '1';
+        const asv = localStorage.getItem('tuner.autoSineVolume');
+        if (asv !== null && !isNaN(parseFloat(asv))) {
+          autoSineVolume = Math.max(0, Math.min(1, parseFloat(asv)));
+        }
       } catch (_) {}
       const lowcutCb = document.getElementById('voiceLowcut');
       const compressCb = document.getElementById('voiceCompression');
@@ -10181,6 +10354,39 @@
         fxChromaCb.addEventListener('change', (e) => {
           fx.chromaticAberration = !!e.target.checked;
           try { localStorage.setItem('tuner.fx.chromaticAberration', fx.chromaticAberration ? '1' : '0'); } catch (_) {}
+        });
+      }
+      // Auto-sine toggle + volume. Toggling on tries to bootstrap audio
+      // immediately so the bank can build on the next audioLoop tick;
+      // bootstrapAudio is a no-op when the AudioContext is already
+      // live. Toggling off lets updateAutoSinesFrame clear the bank
+      // next frame (fades to 0 over ~30 ms then disposes nodes).
+      const fxAutoSinesCb = document.getElementById('fxAutoSinesToggle');
+      if (fxAutoSinesCb) {
+        fxAutoSinesCb.checked = !!fx.autoSines;
+        fxAutoSinesCb.addEventListener('change', (e) => {
+          fx.autoSines = !!e.target.checked;
+          try { localStorage.setItem('tuner.fx.autoSines', fx.autoSines ? '1' : '0'); } catch (_) {}
+          if (fx.autoSines) {
+            try { bootstrapAudio(); } catch (_) {}
+          } else {
+            // Tear down immediately — audioLoop may not be running
+            // (no mic, not recording), so we can't rely on it to
+            // clean the bank up itself.
+            clearAutoSineBank();
+          }
+        });
+      }
+      const autoSineVolumeSlider = document.getElementById('autoSineVolume');
+      const autoSineVolumeLbl = document.getElementById('autoSineVolumeVal');
+      if (autoSineVolumeSlider) {
+        autoSineVolumeSlider.value = Math.round(autoSineVolume * 100);
+        if (autoSineVolumeLbl) autoSineVolumeLbl.textContent = Math.round(autoSineVolume * 100) + '%';
+        autoSineVolumeSlider.addEventListener('input', (e) => {
+          const v = parseInt(e.target.value, 10) / 100;
+          autoSineVolume = Math.max(0, Math.min(1, v));
+          if (autoSineVolumeLbl) autoSineVolumeLbl.textContent = Math.round(autoSineVolume * 100) + '%';
+          try { localStorage.setItem('tuner.autoSineVolume', String(autoSineVolume)); } catch (_) {}
         });
       }
 
