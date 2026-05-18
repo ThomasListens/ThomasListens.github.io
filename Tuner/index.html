@@ -761,6 +761,86 @@
       }
     }
 
+    /* ─────────────────────────────────────────────────────────────
+       Desktop crop overlay (landscape >= 1024px + record-mode).
+
+       Wide landscape viewports flip body.desktop on via the matchMedia
+       listener near the recordAspect declaration. Combined with
+       body.record-mode, the otherwise-hidden live <video> element
+       fills the stage behind #rulerCanvas, and a 9999px box-shadow on
+       the canvas darkens everything outside the recorded frame — a
+       framing aid that shows what's around the user without changing
+       the encoded output.
+
+       Recording pipeline is untouched: MediaRecorder still captures
+       #rulerCanvas at ASPECT_DIMS exactly as today. This layer is
+       purely visual CSS. The hidden-recording surface is gated by
+       body.record-mode itself (the public tuner stays clean because
+       record-mode is entered only by the top-right corner triple-tap
+       / press-and-hold gesture). No separate studio class.
+       ───────────────────────────────────────────────────────────── */
+    body.desktop.record-mode #cameraFeed {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: calc(100% - 280px);
+      height: 100vh;
+      height: 100dvh;
+      opacity: 1;
+      pointer-events: none;
+      z-index: 0;
+      object-fit: contain;
+      background: #000;
+    }
+
+    /* Mirror the live preview when on the front camera so it matches
+       drawCameraOnto's user-facing scale(-1, 1). body.cam-user is
+       toggled in setupCamera. */
+    body.desktop.record-mode.cam-user #cameraFeed {
+      transform: scaleX(-1);
+    }
+
+    /* Canvas paints above the live preview; the 9999px box-shadow
+       spreads darkness across the rest of the rulerContainer so the
+       recorded region reads as the bright island. overflow:hidden on
+       the container clips the shadow at the container edge. */
+    body.desktop.record-mode #rulerContainer {
+      overflow: hidden;
+    }
+
+    body.desktop.record-mode #rulerCanvas {
+      position: relative;
+      z-index: 2;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+    }
+
+    /* When the dock is hidden via settings-hidden, the right-side
+       gutter collapses (existing rule on #rulerContainer) — give the
+       wide preview the full width too so the mask still tracks. */
+    body.desktop.record-mode.settings-hidden #cameraFeed {
+      width: 100%;
+    }
+
+    /* Desktop record-mode keeps the right-rail dock visible by
+       default — there's room for it alongside the canvas, and the
+       aspect-row needs to be reachable without an extra tap. This
+       overrides the global settings-hidden hider for the dock's
+       non-essential rows when body.desktop is on. The corresponding
+       enterRecordMode change skips the force-hide on entry; this CSS
+       rule also covers the case where the user later toggles
+       settings-hidden on while desktop is engaged.
+
+       Aspect-row pinned to the top of the scrolling dock so 9:16 /
+       4:5 / 1:1 always sit at eye level regardless of scroll. */
+    body.desktop.record-mode #recordOverlay .aspect-row:first-child {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: rgba(0, 0, 0, 0.85);
+      padding: 8px 0;
+      margin: -8px 0 4px;
+    }
+
     /* Ruler hide — toggle in the floating audio-FX strip (record-mode
        only). The canvas itself stays VISIBLE because the camera frame
        is drawn into it; only the ruler/backdrop overlay is suppressed,
@@ -2937,6 +3017,19 @@
     let isDraggingCamera = false;
     let suppressNextCanvasClick = false;
     let recordAspect = '9:16';
+
+    // Desktop layout switch. Wide landscape viewports (>=1024px) flip
+    // body.desktop on so the record-mode crop-overlay CSS can engage.
+    // matchMedia tracks resizes and orientation flips live; the
+    // overlay rules require body.record-mode too, so public visitors
+    // see no visible change. 1024px sits above the existing 768px
+    // landscape rule so tablets don't trip the desktop path.
+    const desktopMQL = window.matchMedia('(orientation: landscape) and (min-width: 1024px)');
+    function applyDesktopMode(e) {
+      document.body.classList.toggle('desktop', e.matches);
+    }
+    applyDesktopMode(desktopMQL);
+    desktopMQL.addEventListener('change', applyDesktopMode);
     let rulerOpacity = 1.0;
 
     // Visible camera rect after letterbox fit (set by
@@ -6980,6 +7073,9 @@
           audio: false
         });
         cameraFacing = facingMode;
+        // Body class for the desktop crop overlay so the live <video>
+        // mirrors the front camera the same way drawCameraOnto does.
+        document.body.classList.toggle('cam-user', cameraFacing === 'user');
         const video = document.getElementById('cameraFeed');
         video.srcObject = cameraStream;
         await video.play().catch(() => {});
@@ -7048,9 +7144,17 @@
       // deliberately do NOT touch localStorage here — tuner.settingsHidden
       // is the user's normal-mode preference and must not be clobbered by
       // record-mode entry/exit.
+      //
+      // Exception: on desktop (body.desktop, >=1024px landscape), keep
+      // the right-rail dock visible by default — the aspect-row and
+      // studio controls need to be reachable without an extra tap, and
+      // there's plenty of room alongside the canvas. The user can still
+      // toggle settings-hidden manually via the #settingsToggle button.
       prevSettingsHiddenForRecord = settingsHidden;
-      settingsHidden = true;
-      applySettingsHidden();
+      if (!document.body.classList.contains('desktop')) {
+        settingsHidden = true;
+        applySettingsHidden();
+      }
       // First-time hint: pulse the settings toggle once per page load so
       // users discover they can hide the panel while recording.
       if (!recordHintShown) {
