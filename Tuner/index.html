@@ -4440,7 +4440,19 @@
       // 'still zoomed in' symptom on Pixel-class front cameras: those
       // sensors are 4:3 native and Chrome was side-cropping the
       // rejected 9:16 request, narrowing the effective FOV.
-      const baseScale = Math.min(W / vw, H / vh);
+      //
+      // Desktop exception: when body.desktop is engaged (landscape
+      // >=1024px), switch to Math.max (cover) so a typical 16:9
+      // webcam fills the chosen portrait aspect by center-cropping
+      // the sides. Desktop webcams don't have the 4:3-native FOV-loss
+      // problem that drove the mobile contain choice — they're 16:9
+      // landscape sensors and Thomas wants the recorded portrait
+      // frame to feel filled, not letterboxed. Mobile stays on
+      // contain (Math.min) and reads body.desktop fresh each frame,
+      // so a window resize flips behavior immediately.
+      const baseScale = document.body.classList.contains('desktop')
+        ? Math.max(W / vw, H / vh)
+        : Math.min(W / vw, H / vh);
       const drawW = vw * baseScale, drawH = vh * baseScale;
       const dx = (W - drawW) / 2;
       const dy = (H - drawH) / 2;
