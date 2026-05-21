@@ -789,7 +789,15 @@
       opacity: 1;
       pointer-events: none;
       z-index: 0;
-      object-fit: contain;
+      /* MUST match drawCameraBackground's cover (Math.max) scale —
+         contain here paired with cover in the canvas put the same
+         face at two different scales on top of each other and
+         produced a hard vertical seam at the canvas edges. With
+         cover on both sides, the canvas's cropped recording region
+         and the wider live preview share the same source-to-CSS
+         scale; the dark-mask surround now correctly shows the
+         pixels that ARE being cropped off the recording. */
+      object-fit: cover;
       background: #000;
     }
 
