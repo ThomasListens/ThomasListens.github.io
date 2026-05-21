@@ -2516,6 +2516,31 @@
       <input type="range" id="autoSineSmoothness" min="0" max="100" value="30">
       <span id="autoSineSmoothnessVal" class="value-badge">30%</span>
     </div>
+    <!-- Frame-locked delay. Delay time = N × (1/recFps) so each repeat
+         lands on a video frame instead of drifting against it. HP 300 /
+         LP 3500 sit inside the feedback loop so each repeat is shaped
+         again on its way around. Record-mode-only — lives in the
+         togglable mic chain that applyVoiceFX rebuilds. Defaults: off,
+         mix 25%, feedback 30%, 1 frame. Persists under tuner.voice.delay*. -->
+    <div class="check-row">
+      <label><input type="checkbox" id="fxDelayToggle"> Frame delay</label>
+    </div>
+    <div class="feather-row">
+      <label>Frames</label>
+      <input type="range" id="dockDelayFrames" min="1" max="16" value="1" step="1">
+      <span id="dockDelayFramesVal" class="value-badge">1 fr</span>
+    </div>
+    <div class="feather-row">
+      <label>FB</label>
+      <input type="range" id="dockDelayFeedback" min="0" max="90" value="30">
+      <span id="dockDelayFeedbackVal" class="value-badge">30%</span>
+    </div>
+    <div class="feather-row">
+      <label>DlyMix</label>
+      <input type="range" id="dockDelayMix" min="0" max="100" value="25">
+      <span id="dockDelayMixVal" class="value-badge">25%</span>
+    </div>
+
     <!-- Shimmer reverb Mix + Tail. The on/off toggle lives on the
          floating #audioFXVrbBtn chip in the bottom-left corner — having
          a second checkbox here was redundant. The Mix and Tail sliders
@@ -2850,9 +2875,18 @@
     // (lowcut + compression + de-ess on, shimmer reverb off). All three
     // dry stages are individually togglable from the side-panel UI; when
     // off, the corresponding node(s) are not created in applyVoiceFX().
-    let voiceFX = { lowcut: true, compression: true, deess: true, reverb: false };
+    let voiceFX = { lowcut: true, compression: true, deess: true, reverb: false, delay: false };
     let voiceFXMix = 0.5;     // 0..1 wet/dry blend (50% default)
     let voiceFXTail = 0.6;    // 0..1 → mapped to feedback 0.5..0.78
+    // Frame-locked delay: delay time = delayFrames × (1/recFps), so each
+    // repeat lands on a visible video frame instead of drifting against
+    // the camera output. BP filtering (HP 300 / LP 3500) sits inside the
+    // feedback loop so each repeat is shaped on its way around. Lives in
+    // the togglable mic chain (applyVoiceFX rebuilds), record-mode-only —
+    // same lifecycle as voiceFX.reverb. Default off.
+    let voiceFXDelayMix = 0.25;       // 0..1 wet send level (dry stays full)
+    let voiceFXDelayFeedback = 0.30;  // 0..0.9 feedback gain (slider /100)
+    let voiceFXDelayFrames = 1;       // 1..16 integer; delay = N / recFps
     // Spectrum-mode opacity. Single user-controlled multiplier on every
     // listening-view visual (Hz ruler ticks/labels, rail energy strip,
     // cloud particles, and the dim ratio ladder ghost). Lets Thomas tune
@@ -2982,6 +3016,70 @@
       const x = Math.max(0, Math.min(1, m));
       return { wet: x * 0.45, dry: 1 - x * 0.5 };
     }
+
+    // Frame-locked delay block — sealed unit with one input and one output.
+    // Topology:
+    //   input ──┬─> dryGain ──────────────────────────────────────> output
+    //           │
+    //           └─> sum ──> delayNode ──> HP(300) ──> LP(3500) ──┬─> wetGain ──> output
+    //                ↑                                            │
+    //                └────────── feedbackGain <──────────────────┘
+    // Filters sit inside the feedback loop so each repeat is shaped again
+    // on its way around — repeats darken/clear progressively, classic
+    // tape-style colouring. Feedback tap is post-filter so a hot feedback
+    // value can't ring up sub-bass or sibilance unbounded.
+    function buildFrameLockedDelay(ctx, opts) {
+      opts = opts || {};
+      const delaySec = Math.max(0.001, opts.delaySec || (1 / 30));
+      const feedback = Math.max(0, Math.min(0.9, opts.feedback != null ? opts.feedback : 0.30));
+      const wet      = Math.max(0, Math.min(1,   opts.mixWet   != null ? opts.mixWet   : 0.25));
+      // 16 s max delay buffer covers fps=1 × 16 frames worst case; any
+      // higher frame count would be musically silly anyway.
+      const DELAY_MAX_SEC = 16;
+
+      const input  = ctx.createGain(); input.gain.value  = 1.0;
+      const output = ctx.createGain(); output.gain.value = 1.0;
+
+      const dryGain = ctx.createGain(); dryGain.gain.value = 1.0;
+      input.connect(dryGain);
+      dryGain.connect(output);
+
+      const sum = ctx.createGain(); sum.gain.value = 1.0;
+      const delayNode = ctx.createDelay(DELAY_MAX_SEC);
+      delayNode.delayTime.value = Math.min(DELAY_MAX_SEC, delaySec);
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 300; hp.Q.value = 0.707;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';  lp.frequency.value = 3500; lp.Q.value = 0.707;
+      const wetGain = ctx.createGain();      wetGain.gain.value      = wet;
+      const feedbackGain = ctx.createGain(); feedbackGain.gain.value = feedback;
+
+      input.connect(sum);
+      sum.connect(delayNode);
+      delayNode.connect(hp);
+      hp.connect(lp);
+      lp.connect(wetGain);
+      wetGain.connect(output);
+      lp.connect(feedbackGain);
+      feedbackGain.connect(sum);
+
+      return {
+        input, output, delayNode, hp, lp,
+        sum, dryGain, wetGain, feedbackGain,
+        // Tracked so disposeVoiceChain can disconnect them all in one
+        // pass alongside the rest of micProcessing.chain.
+        allNodes: [input, output, dryGain, sum, delayNode, hp, lp, wetGain, feedbackGain]
+      };
+    }
+
+    // Frames × (1/fps). Caller clamps recFps to ≥1 already; clamp again
+    // here as defence so a stray 0 can't produce Infinity.
+    function delayTimeSec() {
+      const f = Math.max(1, Math.min(16, voiceFXDelayFrames | 0));
+      const fps = Math.max(1, recFps | 0);
+      return f / fps;
+    }
+
     let featherAmount = 0.80;
     let featherWidth = 0.01; // -1..1 of canvas width: positive = feather outward (left), negative = feather inward (right)
     let backdropEdge = 0.80; // 0..1, x position where solid backdrop starts
@@ -5051,6 +5149,13 @@
         recFps = Math.max(1, Math.min(60, n));
       }
       RECORD_DRAW_INTERVAL_MS = Math.floor(1000 / recFps);
+      // Frame-locked delay (if active) computes delayTime = N / recFps —
+      // retune so the same N-frame setting tracks the new fps between
+      // takes. No-op when delay is off (pushDelayTimeToNode guards on
+      // micProcessing.delayNode existence). pushDelayTimeToNode is
+      // defined later in the file but at call-time it's hoisted, so this
+      // is safe to invoke from here.
+      if (typeof pushDelayTimeToNode === 'function') pushDelayTimeToNode();
     }
 
     // Master output fps for the stacked-reel composite (exportStackedReel).
@@ -6592,6 +6697,13 @@
       micProcessing.chain = [];
       micProcessing.wetGain = null;
       micProcessing.dryGain = null;
+      // Delay block refs (set in applyVoiceFX when voiceFX.delay is on).
+      // The nodes themselves were just disconnected via the chain loop —
+      // null the handles so the live setters know the graph is empty.
+      micProcessing.delayBlock = null;
+      micProcessing.delayNode = null;
+      micProcessing.delayWetGain = null;
+      micProcessing.delayFeedbackGain = null;
       micProcessing.head = micProcessing.micOut;
     }
 
@@ -6705,16 +6817,36 @@
           chainEnd = deEssOut;
         }
 
-        // Reverb-only edge case: if the user has lowcut + compression
-        // both off and only reverb on, `stages` is empty and `chainEnd`
-        // is null — the reverb branch below silently bails and the wet
-        // signal disappears. Inject a unity passthrough so the source
-        // has somewhere to land and the wet/dry split sees the input.
-        if (voiceFX.reverb && !chainEnd) {
+        // Wet-FX edge case: if every dry FX (lowcut, compression, deess)
+        // is off but delay or reverb is on, `stages` is empty and
+        // `chainEnd` is null — the wet branch below would silently bail
+        // and the effect signal would disappear. Inject a unity
+        // passthrough so the source has somewhere to land.
+        if ((voiceFX.delay || voiceFX.reverb) && !chainEnd) {
           const passthrough = ctx.createGain();
           passthrough.gain.value = 1;
           stages.push(passthrough);
           chainEnd = passthrough;
+        }
+
+        // Frame-locked delay slots between the dry chain and the reverb
+        // branch so the reverb blooms on the delayed repeats, not the
+        // other way around. The block presents one input/one output and
+        // sums its own dry + wet internally — downstream just treats
+        // `chainEnd` as the new tap point.
+        if (voiceFX.delay && chainEnd) {
+          const block = buildFrameLockedDelay(ctx, {
+            delaySec: delayTimeSec(),
+            feedback: voiceFXDelayFeedback,
+            mixWet:   voiceFXDelayMix,
+          });
+          chainEnd.connect(block.input);
+          stages.push.apply(stages, block.allNodes);
+          micProcessing.delayBlock = block;
+          micProcessing.delayNode = block.delayNode;
+          micProcessing.delayWetGain = block.wetGain;
+          micProcessing.delayFeedbackGain = block.feedbackGain;
+          chainEnd = block.output;
         }
 
         if (voiceFX.reverb && chainEnd) {
@@ -6842,6 +6974,53 @@
       }
     }
 
+    // Frame-locked delay live setters. Each tweaks one node parameter on
+    // the running graph (no chain rebuild) via setTargetAtTime, so the
+    // user can ride the knobs between takes without glitching the buffer.
+    // No-op when delay is off or chain hasn't been built yet — the next
+    // applyVoiceFX rebuild will pick up the new state from the vars.
+    function setVoiceDelayMix(v) {
+      voiceFXDelayMix = Math.max(0, Math.min(1, v));
+      try { localStorage.setItem('tuner.voice.delayMix', String(voiceFXDelayMix)); } catch (_) {}
+      const pct = Math.round(voiceFXDelayMix * 100) + '%';
+      const lbl = document.getElementById('dockDelayMixVal');
+      if (lbl) lbl.textContent = pct;
+      if (micProcessing && micProcessing.delayWetGain && micProcessing.ctx) {
+        const t = micProcessing.ctx.currentTime;
+        try { micProcessing.delayWetGain.gain.setTargetAtTime(voiceFXDelayMix, t, 0.03); } catch (_) {}
+      }
+    }
+    function setVoiceDelayFeedback(v) {
+      voiceFXDelayFeedback = Math.max(0, Math.min(0.9, v));
+      try { localStorage.setItem('tuner.voice.delayFeedback', String(voiceFXDelayFeedback)); } catch (_) {}
+      const pct = Math.round(voiceFXDelayFeedback * 100) + '%';
+      const lbl = document.getElementById('dockDelayFeedbackVal');
+      if (lbl) lbl.textContent = pct;
+      if (micProcessing && micProcessing.delayFeedbackGain && micProcessing.ctx) {
+        const t = micProcessing.ctx.currentTime;
+        try { micProcessing.delayFeedbackGain.gain.setTargetAtTime(voiceFXDelayFeedback, t, 0.03); } catch (_) {}
+      }
+    }
+    function setVoiceDelayFrames(n) {
+      voiceFXDelayFrames = Math.max(1, Math.min(16, n | 0));
+      try { localStorage.setItem('tuner.voice.delayFrames', String(voiceFXDelayFrames)); } catch (_) {}
+      const lbl = document.getElementById('dockDelayFramesVal');
+      if (lbl) lbl.textContent = voiceFXDelayFrames + ' fr';
+      pushDelayTimeToNode();
+    }
+    // Push delayTime to the live node. Used by setVoiceDelayFrames and by
+    // applyRecFps when the user changes fps between takes. setTargetAtTime
+    // with a short time constant glides the delay buffer instead of a hard
+    // setValueAtTime jump, avoiding a tape-style pitch click on the
+    // remainder of the in-flight buffer.
+    function pushDelayTimeToNode() {
+      if (!micProcessing || !micProcessing.delayNode || !micProcessing.ctx) return;
+      const t = micProcessing.ctx.currentTime;
+      try {
+        micProcessing.delayNode.delayTime.setTargetAtTime(delayTimeSec(), t, 0.05);
+      } catch (_) {}
+    }
+
     function updateVoiceReverbControlsVisibility() {
       const ctrl = document.getElementById('voiceReverbControls');
       if (ctrl) ctrl.style.display = voiceFX.reverb ? 'block' : 'none';
@@ -6858,6 +7037,7 @@
       // chainEnd-null guard in applyVoiceFX). Reflect both conditions
       // here so the indicator matches what's actually wired.
       if (voiceFX.deess && (voiceFX.lowcut || voiceFX.compression)) parts.push('de-ess');
+      if (voiceFX.delay) parts.push('frame delay');
       if (voiceFX.reverb) parts.push('shimmer reverb');
       note.textContent = parts.length
         ? 'Voice: ' + parts.join(' + ')
@@ -8365,7 +8545,7 @@
       // recording bus, so the new take's MP4 captures just the mic.
       const hasRatioDrones = Object.keys(droneOscillators).length > 0;
       const needsProcessedAudio =
-        voiceFX.lowcut || voiceFX.compression || voiceFX.reverb || tanpuraEnabled || hasRatioDrones;
+        voiceFX.lowcut || voiceFX.compression || voiceFX.reverb || voiceFX.delay || tanpuraEnabled || hasRatioDrones;
 
       let audioTrack = null;
       let audioSource = 'none';
@@ -10432,6 +10612,23 @@
         if (tail !== null && !isNaN(parseFloat(tail))) {
           voiceFXTail = Math.max(0, Math.min(1, parseFloat(tail)));
         }
+        // Frame-locked delay state restore. Same defaults-on-missing
+        // pattern as the reverb keys — an empty localStorage gives the
+        // curated defaults declared at the top of the file.
+        const dly = localStorage.getItem('tuner.voice.delay');
+        if (dly !== null) voiceFX.delay = dly === '1';
+        const dlyMix = localStorage.getItem('tuner.voice.delayMix');
+        if (dlyMix !== null && !isNaN(parseFloat(dlyMix))) {
+          voiceFXDelayMix = Math.max(0, Math.min(1, parseFloat(dlyMix)));
+        }
+        const dlyFb = localStorage.getItem('tuner.voice.delayFeedback');
+        if (dlyFb !== null && !isNaN(parseFloat(dlyFb))) {
+          voiceFXDelayFeedback = Math.max(0, Math.min(0.9, parseFloat(dlyFb)));
+        }
+        const dlyFr = localStorage.getItem('tuner.voice.delayFrames');
+        if (dlyFr !== null && !isNaN(parseInt(dlyFr, 10))) {
+          voiceFXDelayFrames = Math.max(1, Math.min(16, parseInt(dlyFr, 10)));
+        }
         const sopa = localStorage.getItem('tuner.spectrumOpacity');
         if (sopa !== null && !isNaN(parseFloat(sopa))) {
           spectrumOpacity = Math.max(0.2, Math.min(1, parseFloat(sopa)));
@@ -10497,6 +10694,7 @@
           localStorage.setItem('tuner.voice.compression', voiceFX.compression ? '1' : '0');
           localStorage.setItem('tuner.voice.deess', voiceFX.deess ? '1' : '0');
           localStorage.setItem('tuner.voice.reverb', voiceFX.reverb ? '1' : '0');
+          localStorage.setItem('tuner.voice.delay',  voiceFX.delay  ? '1' : '0');
         } catch (_) {}
       }
       function onVoiceFXToggle() {
@@ -10529,6 +10727,48 @@
         dockReverbTailSld.value = Math.round(voiceFXTail * 100);
         dockReverbTailSld.addEventListener('input', (e) => {
           setVoiceReverbTail(parseInt(e.target.value, 10) / 100);
+        });
+      }
+
+      // Frame-locked delay: toggle + 3 sliders, dock-only (matches the
+      // reverb-dock pattern). The toggle calls applyVoiceFX so the chain
+      // rebuilds with/without the delay block; the sliders use live
+      // setters so knob rides don't glitch the buffer.
+      const fxDelayCb = document.getElementById('fxDelayToggle');
+      const dockDelayFramesSld = document.getElementById('dockDelayFrames');
+      const dockDelayFramesLbl = document.getElementById('dockDelayFramesVal');
+      const dockDelayFbSld     = document.getElementById('dockDelayFeedback');
+      const dockDelayFbLbl     = document.getElementById('dockDelayFeedbackVal');
+      const dockDelayMixSld    = document.getElementById('dockDelayMix');
+      const dockDelayMixLbl    = document.getElementById('dockDelayMixVal');
+      if (fxDelayCb) {
+        fxDelayCb.checked = !!voiceFX.delay;
+        fxDelayCb.addEventListener('change', (e) => {
+          voiceFX.delay = !!e.target.checked;
+          persistVoiceFXFlags();
+          applyVoiceFX();
+          updateVoiceProcNote();
+        });
+      }
+      if (dockDelayFramesSld) {
+        dockDelayFramesSld.value = String(voiceFXDelayFrames);
+        if (dockDelayFramesLbl) dockDelayFramesLbl.textContent = voiceFXDelayFrames + ' fr';
+        dockDelayFramesSld.addEventListener('input', (e) => {
+          setVoiceDelayFrames(parseInt(e.target.value, 10));
+        });
+      }
+      if (dockDelayFbSld) {
+        dockDelayFbSld.value = String(Math.round(voiceFXDelayFeedback * 100));
+        if (dockDelayFbLbl) dockDelayFbLbl.textContent = Math.round(voiceFXDelayFeedback * 100) + '%';
+        dockDelayFbSld.addEventListener('input', (e) => {
+          setVoiceDelayFeedback(parseInt(e.target.value, 10) / 100);
+        });
+      }
+      if (dockDelayMixSld) {
+        dockDelayMixSld.value = String(Math.round(voiceFXDelayMix * 100));
+        if (dockDelayMixLbl) dockDelayMixLbl.textContent = Math.round(voiceFXDelayMix * 100) + '%';
+        dockDelayMixSld.addEventListener('input', (e) => {
+          setVoiceDelayMix(parseInt(e.target.value, 10) / 100);
         });
       }
 
