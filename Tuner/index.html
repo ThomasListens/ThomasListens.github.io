@@ -3001,33 +3001,58 @@
       return 0.5 + x * 0.28; // 0 → 0.50, 1 → 0.78  (default 0.6 → ~0.668)
     }
 
-    // Map UI mix (0..1) to actual wet/dry bus gains. The raw slider
-    // value used to drive wet.gain = m / dry.gain = 1-m linearly, which
-    // made the upper third of the slider explode (linear-amplitude
-    // crossfade is perceptually exponential at the top). Two tweaks:
-    //   1. Cap the maximum wet gain at 0.45 — full slider is now a
-    //      "loud but musical" wet level rather than wet-overwhelms-dry.
-    //   2. Dry stays mostly present: at 100% mix, dry attenuates to 0.5
-    //      instead of all the way to 0 — keeps articulation legible.
-    // Net effect: the bottom 80% of slider travel covers the bottom
-    // ~80% of subjective wet level, and the top of the slider is
-    // useful instead of unstable.
+    // Map UI mix (0..1) to actual wet/dry bus gains.
+    //
+    // Earlier shape was linear (wet = 0.45·m, dry = 1 - 0.5·m). Capped
+    // amplitudes kept the top from blowing up, but the SLIDER ITSELF
+    // still felt front-loaded — by the halfway point the reverb was
+    // already washed because linear amplitude is perceptually
+    // exponential (Stevens' loudness law: perceived ≈ amplitude^0.6).
+    //
+    // Current shape: amplitude curve x^1.7 on wet so equal slider
+    // increments produce roughly equal perceived increments. Wet
+    // ceiling preserved at 0.45 (same "loud but musical" top). Dry
+    // rolls off as 0.3·x^1.4 — keeps the dry vocal at 70% even at
+    // full wet, so the primary source never disappears (matches the
+    // aesthetic rule: wet textures sit around the voice, never bury it).
+    //
+    // Sample points (new vs old):
+    //   slider  wet new  wet old   dry new  dry old
+    //   0.00    0.000    0.000     1.000    1.000
+    //   0.25    0.039    0.113     0.954    0.875
+    //   0.50    0.138    0.225     0.886    0.750
+    //   0.75    0.278    0.338     0.797    0.625
+    //   1.00    0.450    0.450     0.700    0.500
     function voiceFXMixGains(m) {
       const x = Math.max(0, Math.min(1, m));
-      return { wet: x * 0.45, dry: 1 - x * 0.5 };
+      return { wet: 0.45 * Math.pow(x, 1.7), dry: 1 - 0.3 * Math.pow(x, 1.4) };
     }
 
-    // Frame-locked delay block — sealed unit with one input and one output.
-    // Topology:
-    //   input ──┬─> dryGain ──────────────────────────────────────> output
-    //           │
-    //           └─> sum ──> delayNode ──> HP(300) ──> LP(3500) ──┬─> wetGain ──> output
-    //                ↑                                            │
-    //                └────────── feedbackGain <──────────────────┘
+    // Frame-locked delay block — sealed unit with one input and one
+    // (stereo) output. Topology:
+    //
+    //   input ─┬─> dryGain ─────────────────────────────────────────────────> output (mono, downstream upmixes)
+    //          │
+    //          └─> sum ─> delayNode ─> HP(300) ─> LP(3500) ──┬─> widthDelayL(7 ms)  ─> merger.L ─┐
+    //                ↑                                       ├─> widthDelayR(11 ms) ─> merger.R ─┤
+    //                │                                       │                                   wetGain ─> output
+    //                └─── feedbackGain <─────  (mono tap)  ──┘
+    //
     // Filters sit inside the feedback loop so each repeat is shaped again
     // on its way around — repeats darken/clear progressively, classic
-    // tape-style colouring. Feedback tap is post-filter so a hot feedback
-    // value can't ring up sub-bass or sibilance unbounded.
+    // tape-style colouring. Feedback tap is post-filter (still mono) so
+    // a hot feedback can't ring up sub-bass or sibilance unbounded AND
+    // so the L/R width offsets below don't cross-couple through feedback.
+    //
+    // Width: the wet output is split into two short Haas-style branches
+    // (7 ms left, 11 ms right) merged to a stereo signal. These offsets
+    // are FIXED — NOT frame-quantized — because they encode spatial
+    // width, not rhythm. Combined with the mono dry path, the result is
+    // a centred primary voice and a widened repeat halo.
+    //
+    // Click-free build: wetGain and feedbackGain start at 0 and ramp to
+    // their targets over 50 ms, so a chain rebuild can't snap a hot wet
+    // signal into a fresh-but-empty delay buffer.
     function buildFrameLockedDelay(ctx, opts) {
       opts = opts || {};
       const delaySec = Math.max(0.001, opts.delaySec || (1 / 30));
@@ -3036,6 +3061,12 @@
       // 16 s max delay buffer covers fps=1 × 16 frames worst case; any
       // higher frame count would be musically silly anyway.
       const DELAY_MAX_SEC = 16;
+      // Haas-style L/R offsets on the wet path. Below ~30 ms the ear
+      // resolves these as image width rather than discrete echoes
+      // (precedence effect / Haas zone). 7 / 11 ms is asymmetric enough
+      // to spread the image cleanly without comb-filtering near unison.
+      const WIDTH_L_SEC = 0.007;
+      const WIDTH_R_SEC = 0.011;
 
       const input  = ctx.createGain(); input.gain.value  = 1.0;
       const output = ctx.createGain(); output.gain.value = 1.0;
@@ -3051,24 +3082,61 @@
       hp.type = 'highpass'; hp.frequency.value = 300; hp.Q.value = 0.707;
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';  lp.frequency.value = 3500; lp.Q.value = 0.707;
-      const wetGain = ctx.createGain();      wetGain.gain.value      = wet;
-      const feedbackGain = ctx.createGain(); feedbackGain.gain.value = feedback;
+
+      // Haas L/R width branches. Each is a static DelayNode with a
+      // small fixed time — no automation, no clicks. Merged via a
+      // 2-input ChannelMerger so widthDelayL writes to channel 0 (hard
+      // L) and widthDelayR to channel 1 (hard R). Downstream wetGain
+      // sees a stereo signal; the dry path stays mono.
+      const widthDelayL = ctx.createDelay(0.05);
+      widthDelayL.delayTime.value = WIDTH_L_SEC;
+      const widthDelayR = ctx.createDelay(0.05);
+      widthDelayR.delayTime.value = WIDTH_R_SEC;
+      const widthMerger = ctx.createChannelMerger(2);
+
+      // Wet and feedback start silent and ramp to target — eliminates
+      // the rebuild-moment click when the chain is constructed with the
+      // mic source already feeding it. setValueAtTime + linearRamp is
+      // sample-accurate; the ramp completes before any audio reaches
+      // the wet path in practice (chain build runs inside the smooth
+      // path's micOut-muted window).
+      const t0 = ctx.currentTime;
+      const wetGain = ctx.createGain();
+      wetGain.gain.setValueAtTime(0, t0);
+      wetGain.gain.linearRampToValueAtTime(wet, t0 + 0.05);
+      const feedbackGain = ctx.createGain();
+      feedbackGain.gain.setValueAtTime(0, t0);
+      feedbackGain.gain.linearRampToValueAtTime(feedback, t0 + 0.05);
 
       input.connect(sum);
       sum.connect(delayNode);
       delayNode.connect(hp);
       hp.connect(lp);
-      lp.connect(wetGain);
+      // Width split: LP (mono) feeds two short delays, merged to stereo.
+      lp.connect(widthDelayL);
+      lp.connect(widthDelayR);
+      widthDelayL.connect(widthMerger, 0, 0); // input 0 → channel L
+      widthDelayR.connect(widthMerger, 0, 1); // input 0 → channel R
+      widthMerger.connect(wetGain);
       wetGain.connect(output);
+      // Feedback tap is MONO from LP — single source feeding `sum`. If
+      // we tapped post-merger the feedback would be stereo and the
+      // sum/delayNode would mix L+R back into mono on every iteration,
+      // collapsing the width and producing comb artefacts.
       lp.connect(feedbackGain);
       feedbackGain.connect(sum);
 
       return {
         input, output, delayNode, hp, lp,
         sum, dryGain, wetGain, feedbackGain,
+        widthDelayL, widthDelayR, widthMerger,
         // Tracked so disposeVoiceChain can disconnect them all in one
         // pass alongside the rest of micProcessing.chain.
-        allNodes: [input, output, dryGain, sum, delayNode, hp, lp, wetGain, feedbackGain]
+        allNodes: [
+          input, output, dryGain, sum, delayNode, hp, lp,
+          widthDelayL, widthDelayR, widthMerger,
+          wetGain, feedbackGain
+        ]
       };
     }
 
@@ -6377,7 +6445,13 @@
       const o = opts || {};
       const feedback = o.feedback != null ? o.feedback : 0.668;
       const delays = [0.211, 0.307, 0.401, 0.503];
-      const pans = [-0.55, 0.30, -0.15, 0.55];
+      // Per-line stereo pans. Widened from [-0.55, 0.30, -0.15, 0.55] to
+      // [-0.85, 0.45, -0.45, 0.85] — symmetric L/R pairs at outer (±0.85)
+      // and inner (±0.45) positions. Wider image without changing FDN
+      // structure or tone (StereoPanner is amplitude-only, no filtering).
+      // Combined with the mono dry path through the chain, the primary
+      // voice stays centred and present; reverb halo blooms wide around it.
+      const pans = [-0.85, 0.45, -0.45, 0.85];
       // Per-line delay-time LFO rates (Hz). Slow, mutually prime-ish so
       // the four breaths slowly drift out of phase and never repeat.
       const lfoRates = [0.04, 0.06, 0.085, 0.11];
@@ -7009,16 +7083,39 @@
       pushDelayTimeToNode();
     }
     // Push delayTime to the live node. Used by setVoiceDelayFrames and by
-    // applyRecFps when the user changes fps between takes. setTargetAtTime
-    // with a short time constant glides the delay buffer instead of a hard
-    // setValueAtTime jump, avoiding a tape-style pitch click on the
-    // remainder of the in-flight buffer.
+    // applyRecFps when the user changes fps between takes.
+    //
+    // Two click-avoidance tricks:
+    //   1. rAF coalescing: rapid slider drags fire many input events in
+    //      one frame. Without coalescing, each one stomps the previous
+    //      setTargetAtTime — the AudioParam ends up chasing a moving
+    //      target through several superimposed exponential approaches,
+    //      and the buffer read pointer audibly chirps. We instead defer
+    //      to the next animation frame and read the final value once.
+    //   2. Longer time constant (0.20 s, was 0.05): DelayNode.delayTime
+    //      smoothing changes the buffer read position over time, which
+    //      is heard as a pitch glide. A 200 ms exponential is musical;
+    //      50 ms was perceptually a click. Stutter-delay feel is fine
+    //      with a gentle glide — the dominant rhythmic cue is the N×fps
+    //      target, not the transition between target values.
+    let _delayTimePushQueued = false;
     function pushDelayTimeToNode() {
       if (!micProcessing || !micProcessing.delayNode || !micProcessing.ctx) return;
-      const t = micProcessing.ctx.currentTime;
-      try {
-        micProcessing.delayNode.delayTime.setTargetAtTime(delayTimeSec(), t, 0.05);
-      } catch (_) {}
+      if (_delayTimePushQueued) return;
+      _delayTimePushQueued = true;
+      const apply = () => {
+        _delayTimePushQueued = false;
+        if (!micProcessing || !micProcessing.delayNode || !micProcessing.ctx) return;
+        const t = micProcessing.ctx.currentTime;
+        try {
+          micProcessing.delayNode.delayTime.setTargetAtTime(delayTimeSec(), t, 0.20);
+        } catch (_) {}
+      };
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(apply);
+      } else {
+        setTimeout(apply, 16);
+      }
     }
 
     function updateVoiceReverbControlsVisibility() {
