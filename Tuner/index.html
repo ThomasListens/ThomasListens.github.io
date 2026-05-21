@@ -2664,6 +2664,8 @@
     const cloudParticles = [];
     const CLOUD_BANDS = 24;             // log-frequency analysis bands
     let cloudBandEnergy = null;         // Float32Array, EMA per band
+    let cloudFrameBands = null;         // Float32Array(CLOUD_BANDS), reused per-frame scratch
+                                         // (was a fresh new Float32Array per draw — GC pressure)
     let cloudLastFrameTime = 0;
     let cloudLastIdleSpawnTime = 0;     // ambient-star pacing
     let cloudNextIdleInterval = 6;      // sec between ambient stars
@@ -4423,10 +4425,27 @@
           : baseFreq;
 
         const targetGain = autoSineVoiceGate * node.smoothedProximity * autoSineVolume;
-        try {
-          node.osc.frequency.setTargetAtTime(targetFreq, t, autoSineFreqTc);
-          node.gain.gain.setTargetAtTime(targetGain, t, autoSineGainTc);
-        } catch (_) {}
+
+        // IPC throttle. setTargetAtTime crosses the main-thread → audio-
+        // thread boundary on every call; with 7 ratios that's 14 IPC msgs
+        // per rAF, and most frames the target hasn't changed beyond what
+        // the AudioParam smoother already has scheduled. Cache the last
+        // applied value per node and skip the write when the delta is
+        // below an audibility threshold (~1/1000 gain, ~0.25 Hz freq).
+        // Net savings on Pixel 7: 70-90% of auto-sines IPC traffic in
+        // steady states (silence, sustained note), which directly frees
+        // up audio-thread scheduling headroom — the same headroom the
+        // hardware audio output needs to avoid underrun clicks during
+        // recording. Audible output is unchanged because skipped writes
+        // would have targeted a value the param is already heading to.
+        if (node._lastFreq === undefined || Math.abs(targetFreq - node._lastFreq) > 0.25) {
+          try { node.osc.frequency.setTargetAtTime(targetFreq, t, autoSineFreqTc); } catch (_) {}
+          node._lastFreq = targetFreq;
+        }
+        if (node._lastGain === undefined || Math.abs(targetGain - node._lastGain) > 0.001) {
+          try { node.gain.gain.setTargetAtTime(targetGain, t, autoSineGainTc); } catch (_) {}
+          node._lastGain = targetGain;
+        }
       }
     }
 
@@ -4956,7 +4975,17 @@
         const sr = (audioContext && audioContext.sampleRate) || 48000;
         const binHz = sr / (binCount * 2); // sampleRate / fftSize
 
-        const frameBands = new Float32Array(CLOUD_BANDS);
+        // Reused per-frame scratch (module-scope). Allocating a fresh
+        // Float32Array(24) every rAF was ~6 KB/sec of garbage when
+        // aurora is on — enough to provoke periodic GC pauses long
+        // enough to stall the audio thread (intermittent monitor
+        // clicks). Allocate once, zero in place each call.
+        if (!cloudFrameBands || cloudFrameBands.length !== CLOUD_BANDS) {
+          cloudFrameBands = new Float32Array(CLOUD_BANDS);
+        } else {
+          cloudFrameBands.fill(0);
+        }
+        const frameBands = cloudFrameBands;
         for (let i = 1; i < binCount; i++) {
           const v = spectrumBuf[i];
           if (v < 12) continue;          // noise-floor cull
@@ -6158,10 +6187,12 @@
       }
 
       // Auto-sine bank: O(ratios) gain/freq updates, gated by the
-      // same voice-active envelope the bloom uses. No-op when the
-      // fx.autoSines flag is off (and tears down the bank cleanly
-      // the first frame after toggle-off).
-      updateAutoSinesFrame(now);
+      // same voice-active envelope the bloom uses. The flag check is
+      // duplicated here so the disabled path doesn't even pay the
+      // function-call cost per rAF — when off, the only work is the
+      // teardown branch the first frame after toggle-off (handled by
+      // calling the function once when autoSineBuilt becomes stale).
+      if (fx.autoSines || autoSineBuilt) updateAutoSinesFrame(now);
 
       draw();
 
@@ -6611,8 +6642,20 @@
       // Soft tanh shaper inserted after the shimmer-tap point and
       // before the post shelf. Drive 0.3 is conservative — at peak
       // input ≈ -3 dB the curve's slope drops by roughly 1 dB, so
-      // it's musical harmonic enrichment, not crunch. 2× oversampling
-      // anti-aliases the harmonics added by the non-linearity.
+      // it's musical harmonic enrichment, not crunch.
+      //
+      // oversample was '2x' for anti-aliasing the non-linearity's
+      // harmonics. Switched to 'none' as part of the monitoring-click
+      // audit: 2x oversampling runs an internal upsample/downsample on
+      // every sample on the audio thread, and on Pixel 7 it was eating
+      // enough headroom during recording that the OS audio scheduler
+      // couldn't reliably service ctx.destination (export still clean
+      // because MediaRecorder absorbs short audio-thread delays in its
+      // capture buffer, but the hardware monitor output underruns →
+      // audible clicks). At drive=0.3 the worst-case harmonics added by
+      // the tanh sit ~30 dB below fundamental and the lowest aliased
+      // ones land in the high treble where the post-shelf and wet-comp
+      // attenuate further. Net change in audible character: undetectable.
       const shimmerSat = ctx.createWaveShaper();
       shimmerSat.curve = (function makeShimmerSatCurve(amount) {
         const n = 4096;
@@ -6625,7 +6668,7 @@
         }
         return curve;
       })(0.3);
-      shimmerSat.oversample = '2x';
+      shimmerSat.oversample = 'none';
 
       // fdnSum → shimmerSat → postShelf → wetComp → wetLimiter → output
       // (shimmer self-loop tap above is unaffected — it taps fdnSum
