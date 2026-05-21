@@ -762,56 +762,30 @@
     }
 
     /* ─────────────────────────────────────────────────────────────
-       Desktop crop overlay (landscape >= 1024px + record-mode).
+       Desktop record-mode layout (landscape >= 1024px + record-mode).
 
        Wide landscape viewports flip body.desktop on via the matchMedia
-       listener near the recordAspect declaration. Combined with
-       body.record-mode, the otherwise-hidden live <video> element
-       fills the stage behind #rulerCanvas, and a 9999px box-shadow on
-       the canvas darkens everything outside the recorded frame — a
-       framing aid that shows what's around the user without changing
-       the encoded output.
+       listener near the recordAspect declaration. On desktop the
+       canvas (the actual recording surface) shows on its own, centered
+       against the rulerContainer's #000 background — no live wider-
+       preview behind it. Earlier iterations layered the HTML <video>
+       element behind the canvas as a framing aid, but pairing two
+       independent renderings of the same camera (CSS object-fit on
+       the <video>, canvas-2d math on #rulerCanvas) produced a hard
+       vertical seam at the canvas edges whenever the two scales
+       didn't perfectly coincide — which is most webcam resolutions.
+       Hiding the <video> layer on desktop makes the seam geometrically
+       impossible: there's only one rendering, the one being recorded.
 
        Recording pipeline is untouched: MediaRecorder still captures
-       #rulerCanvas at ASPECT_DIMS exactly as today. This layer is
-       purely visual CSS. The hidden-recording surface is gated by
-       body.record-mode itself (the public tuner stays clean because
-       record-mode is entered only by the top-right corner triple-tap
-       / press-and-hold gesture). No separate studio class.
+       #rulerCanvas at ASPECT_DIMS exactly as today. The <video>
+       element keeps decoding (default rule keeps it at 1x1, opacity
+       0, off-screen) so drawCameraBackground can keep drawing from it.
        ───────────────────────────────────────────────────────────── */
-    body.desktop.record-mode #cameraFeed {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: calc(100% - 280px);
-      height: 100vh;
-      height: 100dvh;
-      opacity: 1;
-      pointer-events: none;
-      z-index: 0;
-      /* MUST match drawCameraBackground's cover (Math.max) scale —
-         contain here paired with cover in the canvas put the same
-         face at two different scales on top of each other and
-         produced a hard vertical seam at the canvas edges. With
-         cover on both sides, the canvas's cropped recording region
-         and the wider live preview share the same source-to-CSS
-         scale; the dark-mask surround now correctly shows the
-         pixels that ARE being cropped off the recording. */
-      object-fit: cover;
-      background: #000;
-    }
 
-    /* Mirror the live preview when on the front camera so it matches
-       drawCameraOnto's user-facing scale(-1, 1). body.cam-user is
-       toggled in setupCamera. */
-    body.desktop.record-mode.cam-user #cameraFeed {
-      transform: scaleX(-1);
-    }
-
-    /* Canvas paints above the live preview; the 9999px box-shadow
-       spreads darkness across the rest of the rulerContainer so the
-       recorded region reads as the bright island. overflow:hidden on
-       the container clips the shadow at the container edge. */
+    /* Vignette around the canvas — the surround is the rulerContainer's
+       solid #000 background, so this box-shadow is a no-op visually
+       (black on black) but kept as a hook for any future overlay. */
     body.desktop.record-mode #rulerContainer {
       overflow: hidden;
     }
@@ -820,13 +794,6 @@
       position: relative;
       z-index: 2;
       box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
-    }
-
-    /* When the dock is hidden via settings-hidden, the right-side
-       gutter collapses (existing rule on #rulerContainer) — give the
-       wide preview the full width too so the mask still tracks. */
-    body.desktop.record-mode.settings-hidden #cameraFeed {
-      width: 100%;
     }
 
     /* Desktop record-mode keeps the right-rail dock visible by
