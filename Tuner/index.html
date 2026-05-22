@@ -1962,9 +1962,59 @@
        future code accidentally adds the .visible class. */
     body:not(.record-mode) #layerAddBtn,
     body:not(.record-mode) #stackIndicator,
-    body:not(.record-mode) #layerVolumePanel {
+    body:not(.record-mode) #layerVolumePanel,
+    body:not(.record-mode) #audioOnlyBtn {
       display: none !important;
     }
+
+    /* Audio-only toggle — small chip in the record row that flips the
+       next take into audio-only mode (no canvas capture, no video cell
+       in the export, purely additive vocal layer over the existing
+       composite). Inactive state mirrors the muted look of layerAddBtn;
+       active state warms to amber so Thomas can see at a glance that
+       the next record press will skip video. */
+    #audioOnlyBtn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 1px solid #2a4a6a;
+      background: rgba(20, 40, 70, 0.85);
+      color: #8fc8ff;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 0;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    #audioOnlyBtn:active { transform: scale(0.92); }
+    #audioOnlyBtn.on {
+      background: rgba(120, 75, 20, 0.92);
+      border-color: #8a5a20;
+      color: #ffd28a;
+      box-shadow: 0 0 0 1px rgba(255, 180, 60, 0.35) inset;
+    }
+    /* When audio-only is active, badge the record button so the
+       behaviour change is visible without staring at the toggle. */
+    body.audio-only-mode #recBtn::after {
+      content: 'AUD';
+      position: absolute;
+      bottom: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      font-weight: 700;
+      color: #ffd28a;
+      letter-spacing: 1px;
+      pointer-events: none;
+    }
+    body.audio-only-mode #recBtn { position: relative; }
   </style>
 </head>
 <body>
@@ -2596,6 +2646,7 @@
     </div>
 
     <div class="record-row record-essential">
+      <button type="button" id="audioOnlyBtn" title="Audio-only take — overdub vocal without video. Mixes into the final reel over the existing composite, no new cell." aria-label="Toggle audio-only recording" aria-pressed="false">AUD</button>
       <button type="button" id="layerAddBtn" title="Add this take as a harmony layer" aria-label="Add layer">⊕</button>
       <button id="discardRecBtn" title="Discard recording" aria-label="Discard recording">🗑</button>
       <button id="recBtn" title="Record"></button>
@@ -2714,6 +2765,21 @@
 
     let recordMode = false;
     let recordHintShown = false;
+    // Audio-only mode: when on, startRecording captures mic only (no canvas
+    // video track), and the resulting blob is pushed as an audio-only layer
+    // that mixes into the export's audio without taking a video cell. Used
+    // for unison/harmony overdubs where Thomas wants to thicken the vocal
+    // without adding a new visual tile. Persisted under tuner.audioOnly.
+    let audioOnlyMode = false;
+    // Snapshot of audioOnlyMode at startRecording time so the in-flight
+    // onstop handler / pushLastTakeAsLayer decide consistently even if the
+    // user flips the toggle mid-recording.
+    let _audioOnlyInFlight = false;
+    // Set in onstop when the just-stopped take was audio-only — read by
+    // pushLastTakeAsLayer to decide whether to store videoBlob or flag as
+    // audio-only. Independent of audioOnlyMode (which may change between
+    // stop and the "+ layer" tap).
+    let _lastRecordedWasAudioOnly = false;
 
     // Analyser FFT sizes. YIN cost is now O((tauMax - tauMin) * halfBuffer)
     // thanks to the bounded tau search — at 48 kHz with YIN bounds
@@ -7990,11 +8056,14 @@
       const n = harmonyStack.length;
       if (n === 0) return;
 
-      // Verify every layer carries a videoBlob. Older entries pushed
-      // before stack-mode shipped won't — surface a clear message
-      // instead of crashing the canvas pipeline with a missing source.
+      // Verify every layer carries either a videoBlob (normal take) or
+      // the audioOnly flag (purely additive audio layer — no cell). Older
+      // entries pushed before stack-mode shipped won't have either, so
+      // surface a clear message instead of crashing the canvas pipeline
+      // with a missing source.
       for (let i = 0; i < n; i++) {
-        if (!harmonyStack[i] || !harmonyStack[i].videoBlob) {
+        const l = harmonyStack[i];
+        if (!l || (!l.audioOnly && !l.videoBlob)) {
           showRemuxIndicator(
             'Layer ' + (i + 1) + ' has no video blob — re-add it after recording.',
             { warning: true }
@@ -8017,14 +8086,28 @@
       // Reverse so cells[0] = most recent (harmonyStack is oldest-first).
       const ordered = harmonyStack.slice().reverse();
 
+      // Split out the video-bearing layers: only these get cells in the
+      // grid layout and a <video> element in the draw loop. Audio-only
+      // layers stay in `ordered` and contribute to the audio mix loop
+      // below — they do NOT add cells or change the video composite.
+      // videoLayerIdx[k] = index into `ordered` for the k-th video cell.
+      const videoLayerIdx = [];
+      for (let i = 0; i < ordered.length; i++) {
+        if (!ordered[i].audioOnly) videoLayerIdx.push(i);
+      }
+      const nVideo = videoLayerIdx.length;
+
       // No n=1 fast path: even a single take must be upscaled to IG
       // delivery dims, so it runs the same canvas+MediaRecorder
       // composite pipeline as a multi-layer stack. getStackCells(1)
       // returns a single full-frame cell at the IG output size, and
       // imageSmoothingEnabled=false keeps the upscale crisp.
+      // getStackCells gets the COUNT of video-bearing layers (audio-only
+      // takes never get a cell, so the layout is unchanged when the user
+      // adds audio overdubs on top of an existing video stack).
       const igDims = IG_OUTPUT_DIMS[recordAspect] || IG_OUTPUT_DIMS['9:16'];
       const igBitrate = IG_EXPORT_BITRATE[recordAspect] || IG_EXPORT_BITRATE['9:16'];
-      const layout = getStackCells(n, igDims);
+      const layout = getStackCells(Math.max(1, nVideo), igDims);
       const W = layout.outputW, H = layout.outputH;
 
       const layerWord = (n === 1) ? 'layer' : 'layers';
@@ -8054,7 +8137,11 @@
         //    (createMediaElementSource on every layer → per-layer gain
         //    → MediaStreamAudioDestinationNode). v.muted suppresses any
         //    native-output leak from the <video> elements themselves.
-        for (let i = 0; i < ordered.length; i++) {
+        // Build a <video> for every video-bearing layer (skipping
+        // audio-only takes — those contribute only to the audio mix).
+        // videoEls[k] corresponds to ordered[videoLayerIdx[k]].
+        for (let k = 0; k < videoLayerIdx.length; k++) {
+          const i = videoLayerIdx[k];
           const url = URL.createObjectURL(ordered[i].videoBlob);
           objectUrls.push(url);
 
@@ -8073,8 +8160,9 @@
           videoEls.push(v);
         }
 
-        // Wait for metadata on every input — durations and intrinsic
-        // dimensions aren't available before HAVE_METADATA.
+        // Wait for metadata on every video input — durations and intrinsic
+        // dimensions aren't available before HAVE_METADATA. Audio-only
+        // layers have no <video>, so they're not in this list.
         await Promise.all(videoEls.map(v => new Promise((resolve, reject) => {
           if (v.readyState >= 1 /* HAVE_METADATA */) return resolve();
           const onMeta = () => { cleanup(); resolve(); };
@@ -8087,20 +8175,29 @@
           v.addEventListener('error', onErr);
         })));
 
-        // Per-layer duration table. Prefer the decoded video.duration;
-        // fall back to harmonyStack.durationSec if a browser reports a
-        // non-finite duration (Chrome on some MediaRecorder MP4s does
-        // this until the first seek). Length used by both branches of
-        // the reel-length toggle.
-        const layerDurations = [];
-        for (let i = 0; i < videoEls.length; i++) {
-          const v = videoEls[i];
-          const d = v.duration;
-          if (isFinite(d) && d > 0) {
-            layerDurations.push(d);
+        // Per-layer duration + trim tables, indexed over ALL layers in
+        // `ordered` (audio-only and video). For video layers prefer the
+        // decoded video.duration; for audio-only layers use the decoded
+        // AudioBuffer's duration (no <video> exists for them). Both fall
+        // back to the stored durationSec if the primary source is
+        // non-finite. Length used by both branches of the reel-length
+        // toggle AND by the audio-mix scheduling below.
+        const videoElForLayer = new Array(ordered.length).fill(null);
+        for (let k = 0; k < videoLayerIdx.length; k++) {
+          videoElForLayer[videoLayerIdx[k]] = videoEls[k];
+        }
+        const layerDurations = new Array(ordered.length).fill(0);
+        for (let i = 0; i < ordered.length; i++) {
+          const layer = ordered[i];
+          const fb = (layer && typeof layer.durationSec === 'number' && layer.durationSec > 0)
+            ? layer.durationSec : 0;
+          if (layer.audioOnly) {
+            const ad = (layer.audioBuffer && layer.audioBuffer.duration) || 0;
+            layerDurations[i] = ad > 0 ? ad : fb;
           } else {
-            const fb = ordered[i] && ordered[i].durationSec;
-            layerDurations.push((fb && fb > 0) ? fb : 0);
+            const v = videoElForLayer[i];
+            const d = v ? v.duration : 0;
+            layerDurations[i] = (isFinite(d) && d > 0) ? d : fb;
           }
         }
         // Per-cell front trim (seconds). See the BAKE-DOWN FRONT-TRIM
@@ -8109,9 +8206,11 @@
         // bakeDownDelayMs is the silent intro the recorder captured
         // before its first baked-in voice (0 for take 1 / pre-fix
         // legacy layers); we'll seek each <video> past it before
-        // playback. effective duration = raw MP4 duration − trim.
-        const trimSec = new Array(videoEls.length).fill(0);
-        for (let i = 0; i < videoEls.length; i++) {
+        // playback (video layers) or use it as the AudioBufferSource
+        // offset (audio-only layers). effective duration = raw duration
+        // − trim.
+        const trimSec = new Array(ordered.length).fill(0);
+        for (let i = 0; i < ordered.length; i++) {
           const ms = (ordered[i] && typeof ordered[i].bakeDownDelayMs === 'number')
             ? Math.max(0, ordered[i].bakeDownDelayMs) : 0;
           trimSec[i] = ms / 1000;
@@ -8207,8 +8306,13 @@
         compositeMasterGain.gain.value = levelDbToLinear(masterOutputLevelDb);
         compositeMasterGain.connect(audioDest);
         audioNodes.push(compositeMasterGain);
+        // Iterate ALL layers (video + audio-only) for the audio mix.
+        // Audio-only layers contribute their AudioBufferSource through
+        // the same per-layer GainNode → compositeMasterGain → audioDest
+        // path as video layers — the video pipeline above never sees
+        // them, but they're full citizens of the mix bus.
         const audioSources = [];
-        for (let i = 0; i < videoEls.length; i++) {
+        for (let i = 0; i < ordered.length; i++) {
           const layer = ordered[i];
           if (!layer || !layer.audioBuffer) {
             // Defensive: a layer pushed before audioBuffer was a
@@ -8358,8 +8462,11 @@
         // position. 1500 ms safety timeout per video so a missed
         // 'seeked' event (some mobile decoders silently drop it on
         // small seeks) can't deadlock the export.
-        await Promise.all(videoEls.map((v, i) => new Promise((resolve) => {
-          const want = trimSec[i];
+        await Promise.all(videoEls.map((v, k) => new Promise((resolve) => {
+          // trimSec is keyed over `ordered` (every layer, audio + video).
+          // videoEls[k] corresponds to ordered[videoLayerIdx[k]] — index
+          // through the map to read this video's trim.
+          const want = trimSec[videoLayerIdx[k]];
           if (want <= 0) {
             try { v.currentTime = 0; } catch (_) {}
             return resolve();
@@ -8448,11 +8555,17 @@
           lastPaintMs = nowMs;
           ctx.fillStyle = '#000';
           ctx.fillRect(0, 0, W, H);
-          let allEnded = true;
-          for (let i = 0; i < videoEls.length && i < layout.cells.length; i++) {
-            const cell = layout.cells[i];
-            const v = videoEls[i];
-            const dur = layerDurations[i] || 0;
+          // allEnded starts true ONLY when there are video layers to
+          // track. With zero video (all-audio-only stack), no video
+          // element drives the end-of-reel signal; the elapsed >= target
+          // backstop must be the sole termination path in longest mode.
+          let allEnded = videoEls.length > 0;
+          for (let k = 0; k < videoEls.length && k < layout.cells.length; k++) {
+            const cell = layout.cells[k];
+            const v = videoEls[k];
+            // layerDurations is keyed over `ordered` (audio + video).
+            // Map k (videoEls index) → ordered index via videoLayerIdx.
+            const dur = layerDurations[videoLayerIdx[k]] || 0;
             // In longest mode, treat layers as "done" once they have
             // played past their declared duration (videoEl.ended is
             // unreliable on iOS Safari) and leave their cell black
@@ -8626,9 +8739,34 @@
       return '';
     }
 
+    // Audio-only mime hierarchy for the "+ audio layer" capture path.
+    // The blob from this recorder is decoded to AudioBuffer at push time
+    // (pushLastTakeAsLayer) and the buffer is what the composite mixes;
+    // the container itself never ships to IG, so we can take a permissive
+    // ordering. AAC-in-MP4 first (matches the video-take audio codec, so
+    // decodeAudioData stays on the same path), then Opus-in-WebM.
+    function pickAudioOnlyMime() {
+      const candidates = [
+        'audio/mp4;codecs=mp4a.40.2',
+        'audio/mp4',
+        'audio/webm;codecs=opus',
+        'audio/webm'
+      ];
+      for (const m of candidates) {
+        if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m;
+      }
+      return '';
+    }
+
     async function startRecording() {
       if (!recordMode) return;
       if (mediaRecorder && mediaRecorder.state === 'recording') return;
+
+      // Snapshot audio-only mode for the entire recording lifecycle —
+      // onstop and pushLastTakeAsLayer must agree with what startRecording
+      // saw, even if the toggle is flipped between stop and "+ layer".
+      _audioOnlyInFlight = audioOnlyMode === true;
+      const audioOnly = _audioOnlyInFlight;
 
       // Auto-activate the mic on first record press if the user hasn't
       // turned it on manually. Built-in mic is preferred when BT
@@ -8648,47 +8786,58 @@
       }
 
       const canvas = document.getElementById('rulerCanvas');
-      // Force a paint at the final 544x960 dimensions BEFORE acquiring
-      // captureStream. Symptoms on the third 0-byte cycle: chunks were
-      // empty even though MediaRecorder.start() ran and onerror never
-      // fired. Hypothesis: on at least some Chrome (Android) builds,
-      // canvas.captureStream(fps) needs a non-empty initial frame
-      // already painted at the canvas's *current* dimensions, or the
-      // first encoder slice can't find a keyframe and the track stays
-      // silent for the entire recording. The render loop normally
-      // paints on rAF, but startRecording is invoked synchronously from
-      // a click handler — so without an explicit draw() here,
-      // captureStream is acquired before any frame has been pushed
-      // since the last canvas.width=0 reset in enterRecordMode.
-      // Bypass the in-record-mode 33 ms throttle so this paint runs
-      // even if the rAF loop just drew a few ms ago.
-      lastDrawTime = 0;
-      try { draw(); } catch (_) {}
-      // Belt-and-suspenders: if the canvas is somehow still 0-sized
-      // (e.g. enterRecordMode hasn't yet rebuilt the buffer because the
-      // user managed to slip a record press in before the first rAF),
-      // bail loudly instead of silently producing a 0-byte file.
-      if (!canvas.width || !canvas.height) {
-        showRemuxIndicator(
-          'Canvas not ready (' + canvas.width + 'x' + canvas.height + ') — try again.',
-          { warning: true });
-        setTimeout(hideRemuxIndicator, 6000);
-        return;
+      // Audio-only mode skips the canvas pipeline entirely: no captureStream,
+      // no canvas-paint guards, no video track in the MediaRecorder input.
+      // The recording stream carries only the selected audio track. The
+      // resulting blob is decoded to AudioBuffer at "+ layer" time and
+      // mixed over the existing video composite at export — no new cell,
+      // no layout change.
+      let canvasStream = null;
+      if (!audioOnly) {
+        // Force a paint at the final 544x960 dimensions BEFORE acquiring
+        // captureStream. Symptoms on the third 0-byte cycle: chunks were
+        // empty even though MediaRecorder.start() ran and onerror never
+        // fired. Hypothesis: on at least some Chrome (Android) builds,
+        // canvas.captureStream(fps) needs a non-empty initial frame
+        // already painted at the canvas's *current* dimensions, or the
+        // first encoder slice can't find a keyframe and the track stays
+        // silent for the entire recording. The render loop normally
+        // paints on rAF, but startRecording is invoked synchronously from
+        // a click handler — so without an explicit draw() here,
+        // captureStream is acquired before any frame has been pushed
+        // since the last canvas.width=0 reset in enterRecordMode.
+        // Bypass the in-record-mode 33 ms throttle so this paint runs
+        // even if the rAF loop just drew a few ms ago.
+        lastDrawTime = 0;
+        try { draw(); } catch (_) {}
+        // Belt-and-suspenders: if the canvas is somehow still 0-sized
+        // (e.g. enterRecordMode hasn't yet rebuilt the buffer because the
+        // user managed to slip a record press in before the first rAF),
+        // bail loudly instead of silently producing a 0-byte file.
+        if (!canvas.width || !canvas.height) {
+          showRemuxIndicator(
+            'Canvas not ready (' + canvas.width + 'x' + canvas.height + ') — try again.',
+            { warning: true });
+          setTimeout(hideRemuxIndicator, 6000);
+          return;
+        }
+        // Browser-paced capture at the user-selected fps (30 / 24 / 18).
+        // The browser polls the canvas on its own clock, independent of
+        // rAF / main-thread jitter, so the muxer sees a steady video
+        // clock even when YIN, canvas blur, or UI work momentarily blocks
+        // the main thread. Audio packets stream on the audio thread and
+        // align cleanly against this steady clock — no per-frame resync,
+        // no clicks.
+        //
+        // captureStream(0) (manual requestFrame) was tried and made things
+        // worse: every main-thread stall translated directly into video
+        // clock stalls, and the muxer popped on each realignment. Do not
+        // switch to that mechanism even at low fps.
+        canvasStream = canvas.captureStream(recFps);
+        recordVideoTrack = canvasStream.getVideoTracks()[0] || null;
+      } else {
+        recordVideoTrack = null;
       }
-      // Browser-paced capture at the user-selected fps (30 / 24 / 18).
-      // The browser polls the canvas on its own clock, independent of
-      // rAF / main-thread jitter, so the muxer sees a steady video
-      // clock even when YIN, canvas blur, or UI work momentarily blocks
-      // the main thread. Audio packets stream on the audio thread and
-      // align cleanly against this steady clock — no per-frame resync,
-      // no clicks.
-      //
-      // captureStream(0) (manual requestFrame) was tried and made things
-      // worse: every main-thread stall translated directly into video
-      // clock stalls, and the muxer popped on each realignment. Do not
-      // switch to that mechanism even at low fps.
-      const canvasStream = canvas.captureStream(recFps);
-      recordVideoTrack = canvasStream.getVideoTracks()[0] || null;
       // Snapshot captureStream video-track health so the on-stop
       // diagnostic can include it even after the track has been ended.
       // Mobile users have no console; if the track was muted from the
@@ -8744,12 +8893,28 @@
           audioSource = needsProcessedAudio ? 'raw-fallback' : 'raw-direct';
         }
       }
-      if (audioTrack) {
-        canvasStream.addTrack(audioTrack);
+      // Recording stream — for video takes, the canvas captureStream with
+      // the audio track added on. For audio-only takes, a fresh MediaStream
+      // with just the audio track (no video).
+      let recordingStream;
+      if (audioOnly) {
+        if (!audioTrack) {
+          showRemuxIndicator('No audio track — turn the mic on first.', { warning: true });
+          setTimeout(hideRemuxIndicator, 6000);
+          return;
+        }
+        recordingStream = new MediaStream();
+        recordingStream.addTrack(audioTrack);
+      } else {
+        if (audioTrack) {
+          canvasStream.addTrack(audioTrack);
+        }
+        recordingStream = canvasStream;
       }
 
       const trackSettings = audioTrack && audioTrack.getSettings ? audioTrack.getSettings() : {};
       console.log('[record] start',
+        'audioOnly=', audioOnly,
         'audioSource=', audioSource,
         'trackLabel=', audioTrack && audioTrack.label,
         'ctxSampleRate=', audioContext && audioContext.sampleRate,
@@ -8757,9 +8922,9 @@
         'trackChannelCount=', trackSettings.channelCount,
         'ctxState=', audioContext && audioContext.state,
         'droneEnabled=', tanpuraEnabled,
-        'streamTracks=', canvasStream.getTracks().map(t => t.kind));
+        'streamTracks=', recordingStream.getTracks().map(t => t.kind));
 
-      const mime = pickRecorderMime();
+      const mime = audioOnly ? pickAudioOnlyMime() : pickRecorderMime();
       recordedChunks = [];
       // Diagnostic counters — distinguish "ondataavailable never fired"
       // from "fired but every chunk was empty". The size-guard at stop
@@ -8771,9 +8936,11 @@
         // (3 Mbps at 544×960, 2.2 Mbps at 416×720, 1.5 Mbps at 320×576).
         // Big drop from the prior 8 Mbps default - keeps mobile encoders
         // happy and shrinks output files for upload.
-        mediaRecorder = mime
-          ? new MediaRecorder(canvasStream, { mimeType: mime, videoBitsPerSecond: RECORD_BITRATE, audioBitsPerSecond: 128_000 })
-          : new MediaRecorder(canvasStream, { videoBitsPerSecond: RECORD_BITRATE, audioBitsPerSecond: 128_000 });
+        const recOpts = audioOnly
+          ? { audioBitsPerSecond: 128_000 }
+          : { videoBitsPerSecond: RECORD_BITRATE, audioBitsPerSecond: 128_000 };
+        if (mime) recOpts.mimeType = mime;
+        mediaRecorder = new MediaRecorder(recordingStream, recOpts);
       } catch (err) {
         console.error('MediaRecorder init failed:', err);
         alert('Recording is not supported on this browser.');
@@ -8807,10 +8974,13 @@
         // recorders both ending) versus something downstream of save.
         _onstopEntries++;
         const onstopIdx = _onstopEntries;
-        console.log('[record] onstop entered #' + onstopIdx);
+        console.log('[record] onstop entered #' + onstopIdx, 'audioOnly=', audioOnly);
 
-        // Stop only the canvas video track; keep the shared mic track alive
-        try { canvasStream.getVideoTracks().forEach(t => t.stop()); } catch (_) {}
+        // Stop only the canvas video track; keep the shared mic track alive.
+        // Audio-only path has no video track and no canvasStream.
+        if (canvasStream) {
+          try { canvasStream.getVideoTracks().forEach(t => t.stop()); } catch (_) {}
+        }
         recordVideoTrack = null;
 
         // Snapshot the chunk list *before* doing anything async. If a new
@@ -8863,9 +9033,27 @@
           return;
         }
 
-        const type = mediaRecorder.mimeType || mime || 'video/webm';
-        const ext = type.includes('mp4') ? 'mp4' : 'webm';
+        const type = mediaRecorder.mimeType || mime || (audioOnly ? 'audio/webm' : 'video/webm');
         const recordedBlob = new Blob(chunks, { type });
+
+        // Audio-only take: skip the FFmpeg faststart remux (the audio
+        // file never ships to IG — only the final composite reel does),
+        // skip the auto-download (no per-take artifact is needed for an
+        // overdub layer; saving them all would pollute Downloads), and
+        // route straight into lastRecordedBlob so "+ layer" can decode
+        // it on the next tap.
+        if (audioOnly) {
+          _lastRecordedWasAudioOnly = true;
+          lastRecordedBlob = recordedBlob;
+          try { updateStackIndicator(); } catch (_) {}
+          showRemuxIndicator('Audio take captured — tap + layer', { });
+          setTimeout(hideRemuxIndicator, 3500);
+          recordedChunks = [];
+          return;
+        }
+
+        const ext = type.includes('mp4') ? 'mp4' : 'webm';
+        _lastRecordedWasAudioOnly = false;
         // Track which branch produced outputBlob so the on-screen DL
         // toast can name the trigger. Three possibilities:
         //   - "onstop (raw)"        : non-MP4 mime, no remux attempted
@@ -8942,29 +9130,31 @@
         recordedChunks = [];
       };
 
-      // Yield one rAF tick before starting the encoder. captureStream
-      // was acquired moments ago and the canvas has been painted, but
-      // on Chromium-based browsers the captureStream's first sample
-      // happens on the *browser* clock, not synchronously. Letting the
-      // browser run one frame before MediaRecorder.start() guarantees
-      // the encoder sees a ready, non-muted track with at least one
-      // sampled frame buffered — without this, the third 0-byte cycle
-      // saw MediaRecorder.start() race past the captureStream's first
-      // sample and the encoder waited forever for a frame that the
-      // (now-paused-on-script) track never produced.
-      await new Promise(r => requestAnimationFrame(r));
-      // Force one explicit canvas paint immediately before start, then
-      // try requestFrame() if available. requestFrame() pushes a frame
-      // into the captureStream track unconditionally, kicking the
-      // encoder out of any "waiting for first frame" stall. It's a
-      // no-op if the browser doesn't expose it.
-      lastDrawTime = 0;
-      try { draw(); } catch (_) {}
-      try {
-        if (recordVideoTrack && typeof recordVideoTrack.requestFrame === 'function') {
-          recordVideoTrack.requestFrame();
-        }
-      } catch (_) {}
+      if (!audioOnly) {
+        // Yield one rAF tick before starting the encoder. captureStream
+        // was acquired moments ago and the canvas has been painted, but
+        // on Chromium-based browsers the captureStream's first sample
+        // happens on the *browser* clock, not synchronously. Letting the
+        // browser run one frame before MediaRecorder.start() guarantees
+        // the encoder sees a ready, non-muted track with at least one
+        // sampled frame buffered — without this, the third 0-byte cycle
+        // saw MediaRecorder.start() race past the captureStream's first
+        // sample and the encoder waited forever for a frame that the
+        // (now-paused-on-script) track never produced.
+        await new Promise(r => requestAnimationFrame(r));
+        // Force one explicit canvas paint immediately before start, then
+        // try requestFrame() if available. requestFrame() pushes a frame
+        // into the captureStream track unconditionally, kicking the
+        // encoder out of any "waiting for first frame" stall. It's a
+        // no-op if the browser doesn't expose it.
+        lastDrawTime = 0;
+        try { draw(); } catch (_) {}
+        try {
+          if (recordVideoTrack && typeof recordVideoTrack.requestFrame === 'function') {
+            recordVideoTrack.requestFrame();
+          }
+        } catch (_) {}
+      }
 
       // 1-second timeslice: the encoder flushes a chunk every second,
       // so the muxer never accumulates a long backlog of audio packets
@@ -9140,9 +9330,16 @@
         //   bakeDownDelayMs_1 = 0
         //   bakeDownDelayMs_N = delaySec_N  (N > 1)
         const bakeDownDelayMs = harmonyStack.length > 0 ? _lastTakeBakeDownDelayMs : 0;
+        // audioOnly layers carry the decoded buffer but no videoBlob —
+        // exportStackedReel's video pass filters them out of the cell
+        // layout while the audio mix loop still routes their buffer
+        // through a per-layer GainNode → MediaStreamAudioDestinationNode.
+        // Purely additive: zero impact on the video composite.
+        const isAudioOnly = !!_lastRecordedWasAudioOnly;
         harmonyStack.push({
           audioBuffer,
-          videoBlob: lastRecordedBlob,
+          videoBlob: isAudioOnly ? null : lastRecordedBlob,
+          audioOnly: isAudioOnly,
           durationSec: audioBuffer.duration,
           // gain: per-layer playback volume. Honoured in two places:
           //   - scheduleLayerPlayback wires layer.gain into a per-source
@@ -9157,8 +9354,14 @@
           bakeDownDelayMs,
         });
         updateStackIndicator();
-        showRemuxIndicator('Layer ' + harmonyStack.length + ' added');
+        const addedLabel = isAudioOnly
+          ? ('Audio layer ' + harmonyStack.length + ' added')
+          : ('Layer ' + harmonyStack.length + ' added');
+        showRemuxIndicator(addedLabel);
         setTimeout(hideRemuxIndicator, 1500);
+        // Reset the flag so a subsequent video take pushed without first
+        // recording doesn't accidentally inherit audio-only.
+        _lastRecordedWasAudioOnly = false;
       } catch (err) {
         console.warn('[stack] decode failed:', err);
         const msg = (err && err.message) ? err.message : String(err);
@@ -9359,7 +9562,10 @@
         row.className = 'lv-row';
         const label = document.createElement('span');
         label.className = 'lv-label';
-        label.textContent = 'L' + (origIdx + 1);
+        // Audio-only layers are tagged so Thomas can tell at a glance
+        // which rows have video cells and which are purely additive
+        // vocal overdubs. Same gain slider applies either way.
+        label.textContent = 'L' + (origIdx + 1) + (layer.audioOnly ? ' (audio)' : '');
         const dur = document.createElement('span');
         dur.className = 'lv-dur';
         const ds = (typeof layer.durationSec === 'number' && layer.durationSec > 0)
@@ -11327,6 +11533,30 @@
       if (layerAddBtn) {
         layerAddBtn.addEventListener('click', () => {
           pushLastTakeAsLayer();
+        });
+      }
+      // Audio-only toggle — restore from localStorage, then wire the
+      // click. Flipping the toggle applies immediately to the NEXT
+      // record press; an in-flight recording isn't affected
+      // (_audioOnlyInFlight snapshots the value at startRecording).
+      try {
+        const savedAO = localStorage.getItem('tuner.audioOnly');
+        if (savedAO === '1') audioOnlyMode = true;
+      } catch (_) {}
+      const audioOnlyBtn = document.getElementById('audioOnlyBtn');
+      const applyAudioOnlyUI = () => {
+        if (audioOnlyBtn) {
+          audioOnlyBtn.classList.toggle('on', audioOnlyMode);
+          audioOnlyBtn.setAttribute('aria-pressed', audioOnlyMode ? 'true' : 'false');
+        }
+        document.body.classList.toggle('audio-only-mode', audioOnlyMode);
+      };
+      applyAudioOnlyUI();
+      if (audioOnlyBtn) {
+        audioOnlyBtn.addEventListener('click', () => {
+          audioOnlyMode = !audioOnlyMode;
+          applyAudioOnlyUI();
+          try { localStorage.setItem('tuner.audioOnly', audioOnlyMode ? '1' : '0'); } catch (_) {}
         });
       }
       // Clear-stack: two-tap confirm. First tap arms the chip (visible
