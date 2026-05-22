@@ -2983,13 +2983,22 @@
     function setMasterOutputLevelDb(db) {
       masterOutputLevelDb = Math.max(-20, Math.min(6, db));
       try { localStorage.setItem('tuner.outputLevelDb', String(masterOutputLevelDb)); } catch (_) {}
-      if (micProcessing && micProcessing.masterOutputGain && micProcessing.ctx) {
+      if (micProcessing && micProcessing.ctx) {
         const t = micProcessing.ctx.currentTime;
-        try {
-          micProcessing.masterOutputGain.gain.setTargetAtTime(
-            levelDbToLinear(masterOutputLevelDb), t, 0.05
-          );
-        } catch (_) {}
+        const linear = levelDbToLinear(masterOutputLevelDb);
+        // Drive recording-bus gain AND monitor-side mirror in lockstep
+        // so the slider scales both the per-take MP4 audio and what
+        // the user hears through the speakers.
+        if (micProcessing.masterOutputGain) {
+          try {
+            micProcessing.masterOutputGain.gain.setTargetAtTime(linear, t, 0.05);
+          } catch (_) {}
+        }
+        if (micProcessing.monitorGain) {
+          try {
+            micProcessing.monitorGain.gain.setTargetAtTime(linear, t, 0.05);
+          } catch (_) {}
+        }
       }
     }
 
@@ -4211,7 +4220,11 @@
       gain.gain.setValueAtTime(0, now);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      // Speaker side via monitorGain so the master-output slider
+      // scales it; fall back to ctx.destination if monitorGain isn't
+      // available yet (defensive — micProcessing is built first in
+      // bootstrapAudio, so this branch is the normal case).
+      gain.connect((micProcessing && micProcessing.monitorGain) || ctx.destination);
       // Also feed the recorder bus so the drone bakes into the video.
       // Routes via micOut (same path mic uses) — direct connect to
       // micProcessing.dest can be silently dropped by Chrome.
@@ -4318,7 +4331,10 @@
         const gain = ctx.createGain();
         gain.gain.setValueAtTime(0, now);
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        // Speaker side via monitorGain so the master-output slider
+        // scales it. micProcessing is required for the recorder branch
+        // (see header) so monitorGain is reliably available here.
+        gain.connect((micProcessing && micProcessing.monitorGain) || ctx.destination);
         if (micProcessing && micProcessing.micOut) {
           try { gain.connect(micProcessing.micOut); } catch (_) {}
         }
@@ -6249,7 +6265,10 @@
       // Pitch tap (separate, parallel) runs through the 80-1200 Hz bandpass
       // -> analyser, so YIN sees a cleaner spectrum without colouring what
       // the user hears. The analyser is no longer in the speaker path.
-      sourceNode.connect(audioContext.destination);
+      // Routed through monitorGain so the master-output slider scales
+      // file playback too; falls back to ctx.destination if the mic-
+      // processing graph isn't built yet.
+      sourceNode.connect((micProcessing && micProcessing.monitorGain) || audioContext.destination);
       if (!connectSourceToPitchAnalyser(sourceNode)) {
         // Fallback if the bandpass couldn't be built - keep pitch detection alive.
         sourceNode.connect(analyser);
@@ -6716,23 +6735,36 @@
         // Master output trim (-20..+6 dB) sits between the mic bus
         // and the recorder destination so it scales the entire mix
         // (drone + processed mic) just before MediaStreamDestination.
-        // Initial value is restored from localStorage in the load
-        // section; default 1.0 (= 0 dB) here covers the first run.
+        // Seeded from masterOutputLevelDb so a value restored from
+        // localStorage at boot is honored on the first bootstrap —
+        // otherwise the slider position would lie until the user
+        // nudged it.
+        const initLinear = levelDbToLinear(masterOutputLevelDb);
         const masterOutputGain = ctx.createGain();
-        masterOutputGain.gain.value = 1.0;
+        masterOutputGain.gain.value = initLinear;
         micOut.connect(masterOutputGain);
+        // Monitor-side mirror of masterOutputGain. Every node that
+        // historically connected straight into ctx.destination (drone,
+        // auto-sines, file playback, stack-mode prior layers, tanpura)
+        // routes through this gain instead, so the "Master output
+        // level" slider scales BOTH the recording bus AND the speaker
+        // mix. Kept in lockstep with masterOutputGain by
+        // setMasterOutputLevelDb.
+        const monitorGain = ctx.createGain();
+        monitorGain.gain.value = initLinear;
+        monitorGain.connect(ctx.destination);
         // Brick-wall limiter on the RECORDING branch only. With drone
         // / tanpura + voice FX running into masterOutputGain alongside
         // the live mic the bus can occasionally tip 0 dBFS in the
         // recorded MP4 even if the mic alone is clean. Threshold -3
         // dBFS, hard knee, ratio 20:1, 1ms attack / 50ms release acts
         // as a ceiling without colouring normal-level material. The
-        // monitor path (audioContext.destination, attached per-source
-        // by scheduleLayerPlayback for stack monitoring) is
-        // intentionally unlimited so the user's live ears stay
-        // transparent. (Non-bake-down recording keeps prior layers
-        // out of the recording bus entirely — the limiter only sees
-        // mic + FX + drone.)
+        // monitor path (monitorGain → ctx.destination) is intentionally
+        // unlimited so the user's live ears stay transparent — the
+        // master slider scales monitorGain but nothing on the monitor
+        // side ever sees the limiter. (Non-bake-down recording keeps
+        // prior layers out of the recording bus entirely — the limiter
+        // only sees mic + FX + drone.)
         const recordingLimiter = ctx.createDynamicsCompressor();
         recordingLimiter.threshold.value = -3;     // dBFS
         recordingLimiter.knee.value = 0;            // hard knee
@@ -6776,6 +6808,7 @@
           dest,
           micOut,
           masterOutputGain,
+          monitorGain,
           recordingLimiter,
           meterPre,
           meterHP,
@@ -8165,6 +8198,15 @@
         const audioCtx = getAudioContext();
         const audioDest = audioCtx.createMediaStreamDestination();
         audioNodes.push(audioDest);
+        // Composite master gain. Mirrors the user-facing master slider
+        // so the exported MP4 reflects whatever level Thomas set during
+        // recording. Snapshot of masterOutputLevelDb at export time —
+        // there's no slider during the export pass so a static value
+        // is fine.
+        const compositeMasterGain = audioCtx.createGain();
+        compositeMasterGain.gain.value = levelDbToLinear(masterOutputLevelDb);
+        compositeMasterGain.connect(audioDest);
+        audioNodes.push(compositeMasterGain);
         const audioSources = [];
         for (let i = 0; i < videoEls.length; i++) {
           const layer = ordered[i];
@@ -8182,7 +8224,7 @@
           const safeGain = (typeof layer.gain === 'number' && isFinite(layer.gain))
             ? Math.max(0, Math.min(2, layer.gain)) : 1.0;
           gain.gain.value = safeGain;
-          src.connect(gain).connect(audioDest);
+          src.connect(gain).connect(compositeMasterGain);
           audioNodes.push(src, gain);
           audioSources.push({ src, trim: trimSec[i] });
         }
@@ -9240,7 +9282,10 @@
           ? Math.max(0, Math.min(2, layer.gain)) : 1.0;
         gainNode.gain.value = safeGain;
         source.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        // Per-layer gain feeds monitorGain so the master-output slider
+        // scales the prior-take monitor mix; per-layer balances (from
+        // the volume panel) still ride underneath as usual.
+        gainNode.connect((micProcessing && micProcessing.monitorGain) || audioContext.destination);
         // Skip each buffer's silent head so every singer's first voice
         // sounds at the same monitor t=0. Layer 1 (the base) has trim 0.
         const trimMs = (typeof layer.bakeDownDelayMs === 'number')
@@ -9940,7 +9985,11 @@
 
       const masterGain = ctx.createGain();
       masterGain.gain.value = 0;
-      masterGain.connect(ctx.destination);
+      // Speaker side via monitorGain so the user-facing master slider
+      // scales the drone. bootstrapAudio builds micProcessing FIRST
+      // (see bootstrapAudio), so monitorGain reliably exists here; the
+      // fallback to ctx.destination is purely defensive.
+      masterGain.connect((micProcessing && micProcessing.monitorGain) || ctx.destination);
       // Route into the recorder via micOut (the same node the mic flows
       // through), not directly into the MediaStreamDestination. Chrome
       // has historically dropped parallel buffer-source connections to
@@ -11441,13 +11490,15 @@
       }
       // If the audio graph is already up by the time we restore (e.g.
       // a fast reload), push the saved value into the live node now.
-      if (micProcessing && micProcessing.masterOutputGain && micProcessing.ctx) {
-        try {
-          micProcessing.masterOutputGain.gain.setValueAtTime(
-            levelDbToLinear(masterOutputLevelDb),
-            micProcessing.ctx.currentTime
-          );
-        } catch (_) {}
+      if (micProcessing && micProcessing.ctx) {
+        const _t = micProcessing.ctx.currentTime;
+        const _linear = levelDbToLinear(masterOutputLevelDb);
+        if (micProcessing.masterOutputGain) {
+          try { micProcessing.masterOutputGain.gain.setValueAtTime(_linear, _t); } catch (_) {}
+        }
+        if (micProcessing.monitorGain) {
+          try { micProcessing.monitorGain.gain.setValueAtTime(_linear, _t); } catch (_) {}
+        }
       }
 
       // -------- Feature 4: Tanpura drone --------
