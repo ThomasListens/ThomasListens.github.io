@@ -1532,13 +1532,17 @@
     #audioFXLevelStrip {
       display: none;
       position: fixed;
-      /* Sits ABOVE the centered record-essential row so the slider and
-         the #recBtn never collide on narrow viewports. recBtn is 72px
-         tall inside a dock with padding-bottom (14px + safe-area), so
-         its top edge lands at ~86px from viewport bottom; 96px gives
-         the slider its own horizontal band with a 10px gap. The LUFS
-         and MIC readouts (#audioFXMeter, #micRawMeter) stack above. */
-      bottom: calc(96px + env(safe-area-inset-bottom));
+      /* Holistic bottom-band stack on mobile portrait (from bottom up):
+           12-42  left chip row (rulerHide / drone / verb / flip)
+           14-86  record-essentials row (AUD / layer / discard / recBtn)
+           94-130 #stackIndicator (Layers / Export reel / Download / undo / clear)
+           144-184 master slider                  ← here (14px gap above pill)
+           190-200 LUFS readout
+           206-216 MIC readout
+         #layerVolumePanel still pops up from bottom: 126px (attached to
+         the indicator pill), and the slider + meters hide via :has()
+         while it's open so the panel has the right-edge column. */
+      bottom: calc(144px + env(safe-area-inset-bottom));
       right: 12px;
       left: auto;
       transform: none;
@@ -1649,10 +1653,9 @@
     #audioFXMeter {
       display: none;
       position: fixed;
-      /* Stacked above the level slider in the right-edge column. The
-         slider's top edge is at 96+36=132px from viewport bottom on
-         mobile portrait; 138px gives a 6px gap. */
-      bottom: calc(138px + env(safe-area-inset-bottom));
+      /* Stacked above the level slider (which tops out at ~184px from
+         viewport bottom). 190px gives a 6px gap. */
+      bottom: calc(190px + env(safe-area-inset-bottom));
       right: 12px;
       width: 130px;
       z-index: 250;
@@ -1679,10 +1682,11 @@
     #micRawMeter {
       display: none;
       position: fixed;
-      /* 16 px above #audioFXMeter — keeps the right-edge stack ordered
-         top-down: MIC, then LUFS, then the level slider, all above
-         the record button. */
-      bottom: calc(138px + env(safe-area-inset-bottom) + 16px);
+      /* 16 px above #audioFXMeter (LUFS top edge at ~200px). Keeps the
+         right-edge stack ordered top-down: MIC, then LUFS, then the
+         level slider, then the #stackIndicator pill, then the record
+         essentials row at the bottom. */
+      bottom: calc(206px + env(safe-area-inset-bottom));
       right: 12px;
       width: 130px;
       z-index: 250;
@@ -1828,6 +1832,18 @@
       pointer-events: auto;
     }
     #layerVolumePanel.visible { display: flex; }
+    /* When the per-layer volume panel is open, hide the right-edge
+       slider + meter stack so the panel owns its column. The panel
+       lives at bottom: 126px and grows upward (max-height 50vh); the
+       slider sits at bottom: 144px and would otherwise punch through
+       the panel because slider z-index (260) > panel z-index (202).
+       Visibility:hidden preserves layout and keeps the meter loop
+       alive — taps just don't land. */
+    body:has(#layerVolumePanel.visible) #audioFXLevelStrip,
+    body:has(#layerVolumePanel.visible) #audioFXMeter,
+    body:has(#layerVolumePanel.visible) #micRawMeter {
+      visibility: hidden;
+    }
     #layerVolumePanel .lv-row {
       display: grid;
       grid-template-columns: 56px 1fr 36px;
