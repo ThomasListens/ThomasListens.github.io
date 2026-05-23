@@ -6853,17 +6853,14 @@
         const monitorGain = ctx.createGain();
         monitorGain.gain.value = initLinear;
         monitorGain.connect(ctx.destination);
-        // NOTE: live monitoring of the FX-processed mic happens via
-        // direct parallel connections in applyVoiceFX — each FX
-        // terminal (reverb dry + wet, bare chainEnd) connects to
-        // micOut for recording AND to monitorGain for the speaker mix.
-        // No shared "fxBus" indirection: c6d4b55 tried routing FX →
-        // fxBus → {micOut, monitorGain} but that broke FX bake-in to
-        // the per-take MP4 in practice (recording path silent despite
-        // the graph looking correct on paper). Going back to direct
-        // connections keeps the recording leg bit-identical to the
-        // known-good pre-c6d4b55 topology while still giving the
-        // singer the live FX monitor.
+        // monitorGain feeds the speaker monitor for sources that
+        // legitimately need monitoring during a take: drone, auto-sines,
+        // file playback, and prior-layer playback during overdubs. The
+        // user's own FX-processed mic does NOT connect here — singers
+        // can't perform against their own BT-latency-delayed processed
+        // voice, and the FX only need to be on the RECORDING path
+        // (micOut → masterOutputGain → recordingLimiter → dest) so they
+        // bake into the per-take MP4 and the composite reel export.
         // Brick-wall limiter on the RECORDING branch only. With drone
         // / tanpura + voice FX running into masterOutputGain alongside
         // the live mic the bus can occasionally tip 0 dBFS in the
@@ -7110,16 +7107,19 @@
           chainEnd = block.output;
         }
 
-        // FX chain terminal connections. Each terminal node (reverb
-        // wet, reverb dry, or the bare dry-FX chainEnd) connects to
-        // BOTH micProcessing.micOut (the recording bus → masterOutputGain
-        // → recordingLimiter → dest → MediaRecorder) AND
-        // micProcessing.monitorGain (the live monitor → ctx.destination).
-        // Recording leg is bit-identical to pre-c6d4b55; monitor leg is
-        // a parallel additive tap. No shared fxBus indirection — c6d4b55
-        // tried that and broke FX bake-in to the per-take MP4 in
-        // practice, even though the graph looked correct on paper.
-        const monGain = micProcessing.monitorGain || null;
+        // FX chain terminal connections. The user's own processed voice
+        // is intentionally NOT routed to ctx.destination / monitorGain —
+        // singers can't perform against their own BT-latency-delayed
+        // headphone echo, and self-monitoring of the FX was a misread of
+        // Thomas's original "verb + delay disconnected" complaint (which
+        // was about EXPORT bake-in, not live monitor). monitorGain stays
+        // alive in buildMicProcessing for the drone / auto-sines / file
+        // playback / prior-layer monitor sources that DO need it; the
+        // FX-processed mic just doesn't tap it.
+        //
+        // Single path: terminal nodes → micProcessing.micOut → master
+        // OutputGain → recordingLimiter → dest → MediaRecorder → MP4
+        // → (decoded to AudioBuffer for composite export pipeline).
         if (voiceFX.reverb && chainEnd) {
           const reverb = buildShimmerReverb(ctx, {
             feedback: voiceFXTailToFeedback(voiceFXTail)
@@ -7132,25 +7132,14 @@
           chainEnd.connect(reverb.input);
           chainEnd.connect(dry);
           reverb.output.connect(wet);
-          // Recording (unchanged from working pre-c6d4b55 topology):
           dry.connect(micProcessing.micOut);
           wet.connect(micProcessing.micOut);
-          // Monitor (parallel additive tap):
-          if (monGain) {
-            dry.connect(monGain);
-            wet.connect(monGain);
-          }
           stages.push(reverb.input, reverb.output, wet, dry);
           micProcessing.reverb = reverb;
           micProcessing.wetGain = wet;
           micProcessing.dryGain = dry;
         } else if (chainEnd) {
-          // Recording:
           chainEnd.connect(micProcessing.micOut);
-          // Monitor (parallel):
-          if (monGain) {
-            chainEnd.connect(monGain);
-          }
         }
         // If chainEnd is null (all FX off, no makeup), nothing else
         // needs connecting — the mic source connects directly to
