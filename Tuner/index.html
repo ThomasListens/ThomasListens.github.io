@@ -4600,6 +4600,62 @@
       }
     }
 
+    // ---- Cached canvas + parent rects ----
+    // draw() reads canvas.parentElement.getBoundingClientRect() every
+    // rAF tick to size the backing store in non-record mode; the click
+    // and camera-pan pointer handlers read canvas.getBoundingClientRect()
+    // up to ~60 Hz during a drag. Each call forces a synchronous layout
+    // pass — cheap on desktop, a real cycle-sink on the Pixel 7 where
+    // the audio thread needs that headroom to avoid render-quantum
+    // underruns. Cache both rects and refresh only when geometry
+    // actually changes:
+    //   • window resize  (manual resize, most orientation flips)
+    //   • orientationchange  (some Pixel paths fire this without resize)
+    //   • visibilitychange  (the OS may relayout while the tab is hidden;
+    //                        refresh on return so the dock open/close
+    //                        case is covered)
+    //   • ResizeObserver on canvas + parent  (catches everything box-
+    //                        related — record-mode entry/exit, panel
+    //                        toggles, flexbox reflow from sibling
+    //                        changes — whatever the trigger)
+    let _cachedCanvasRect = null;
+    let _cachedCanvasParentRect = null;
+    let _canvasRectObserver = null;
+    function invalidateCanvasRects() {
+      _cachedCanvasRect = null;
+      _cachedCanvasParentRect = null;
+    }
+    function _ensureCanvasRectObserver() {
+      if (_canvasRectObserver) return;
+      if (typeof ResizeObserver === 'undefined') return;
+      const c = document.getElementById('rulerCanvas');
+      if (!c) return;
+      _canvasRectObserver = new ResizeObserver(invalidateCanvasRects);
+      try { _canvasRectObserver.observe(c); } catch (_) {}
+      if (c.parentElement) {
+        try { _canvasRectObserver.observe(c.parentElement); } catch (_) {}
+      }
+    }
+    function getCachedCanvasRect(canvasEl) {
+      if (_cachedCanvasRect) return _cachedCanvasRect;
+      const c = canvasEl || document.getElementById('rulerCanvas');
+      if (!c) return null;
+      _cachedCanvasRect = c.getBoundingClientRect();
+      _ensureCanvasRectObserver();
+      return _cachedCanvasRect;
+    }
+    function getCachedCanvasParentRect(canvasEl) {
+      if (_cachedCanvasParentRect) return _cachedCanvasParentRect;
+      const c = canvasEl || document.getElementById('rulerCanvas');
+      if (!c || !c.parentElement) return null;
+      _cachedCanvasParentRect = c.parentElement.getBoundingClientRect();
+      _ensureCanvasRectObserver();
+      return _cachedCanvasParentRect;
+    }
+    window.addEventListener('resize', invalidateCanvasRects);
+    window.addEventListener('orientationchange', invalidateCanvasRects);
+    document.addEventListener('visibilitychange', invalidateCanvasRects);
+
     function handleCanvasClick(event) {
       if (suppressNextCanvasClick) {
         suppressNextCanvasClick = false;
@@ -4611,7 +4667,8 @@
       // suppressNextCanvasClick flag set in setupCameraPan's endDrag.
 
       const canvas = document.getElementById('rulerCanvas');
-      const rect = canvas.getBoundingClientRect();
+      const rect = getCachedCanvasRect(canvas);
+      if (!rect) return;
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
 
@@ -4676,7 +4733,8 @@
           canvas.classList.add('dragging');
         }
         if (dragging) {
-          const rect = canvas.getBoundingClientRect();
+          const rect = getCachedCanvasRect(canvas);
+          if (!rect) return;
           const sign = cameraFacing === 'user' ? -1 : 1;
           cameraPanX = Math.max(-1, Math.min(1, startPanX + (dx / rect.width * 2) * sign));
           cameraPanY = Math.max(-1, Math.min(1, startPanY + dy / rect.height * 2));
@@ -5484,7 +5542,8 @@
         // is parked off-screen; only record mode composites it onto the
         // canvas. So when ruler is hidden in non-record mode, we just
         // leave a black canvas — there's no camera to preserve.
-        const rect = canvas.parentElement.getBoundingClientRect();
+        const rect = getCachedCanvasParentRect(canvas)
+          || canvas.parentElement.getBoundingClientRect();
         const targetWidth = rect.width * dpr;
         const targetHeight = rect.height * dpr;
 
@@ -6145,29 +6204,36 @@
       // mediaRecorder hasn't started yet, so these never enter the
       // captured stream — the recording opens cleanly on "0".
       if (countInNumeral !== null) {
-        let cx = W / 2;
-        let cy = H / 2;
-        if (recordMode && cameraVisibleRect) {
-          const v0 = Math.max(0, cameraVisibleRect.y0);
-          const v1 = Math.min(H, cameraVisibleRect.y1);
-          if (v1 > v0) cy = (v0 + v1) / 2;
-        }
         // sin(pi*t)^0.5 gives a soft rise / plateau / fall envelope
         // across the [0,1] beat window — fades in over the first
-        // ~17%, holds, fades out over the last ~17%.
+        // ~17%, holds, fades out over the last ~17%. Compute alpha
+        // first so we can skip the entire shadowed fill at t=0/t=1,
+        // where sin() returns 0 (or a sub-LSB float) — at that
+        // alpha the rendered output is byte-identical to a no-op,
+        // and the ~20 px shadowBlur is expensive on the Pixel-7
+        // Adreno fillrate.
         const t = Math.max(0, Math.min(1, countInProgress));
         const alpha = Math.max(0, Math.pow(Math.sin(Math.PI * t), 0.5));
-        const fontPx = 110 * S;
-        ctx.save();
-        ctx.font = `600 ${fontPx}px 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.shadowColor = 'rgba(0,0,0,0.85)';
-        ctx.shadowBlur = fontPx * 0.18;
-        ctx.shadowOffsetY = Math.max(2, fontPx * 0.04);
-        ctx.fillStyle = `rgba(255, 200, 130, ${(0.92 * alpha).toFixed(3)})`;
-        ctx.fillText(countInNumeral, cx, cy);
-        ctx.restore();
+        if (alpha > 0) {
+          let cx = W / 2;
+          let cy = H / 2;
+          if (recordMode && cameraVisibleRect) {
+            const v0 = Math.max(0, cameraVisibleRect.y0);
+            const v1 = Math.min(H, cameraVisibleRect.y1);
+            if (v1 > v0) cy = (v0 + v1) / 2;
+          }
+          const fontPx = 110 * S;
+          ctx.save();
+          ctx.font = `600 ${fontPx}px 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.shadowColor = 'rgba(0,0,0,0.85)';
+          ctx.shadowBlur = fontPx * 0.18;
+          ctx.shadowOffsetY = Math.max(2, fontPx * 0.04);
+          ctx.fillStyle = `rgba(255, 200, 130, ${(0.92 * alpha).toFixed(3)})`;
+          ctx.fillText(countInNumeral, cx, cy);
+          ctx.restore();
+        }
       }
 
       return true;
@@ -7520,6 +7586,16 @@
           // meter must be visible whenever the mic is on, NOT only during
           // recording.
           document.body.classList.add('mic-listening');
+
+          // Background-warm the FFmpeg.wasm core (~25 MB) the moment the
+          // mic is enabled, so the first take's onstop->remux doesn't
+          // stall while the wasm downloads. loadFFmpeg() memoizes via
+          // _ffmpegPromise — the export's own `await loadFFmpeg()` will
+          // resolve instantly if this preload finished, or simply
+          // attach to the in-flight download if it didn't. Swallow
+          // errors: the live mic path doesn't depend on FFmpeg, and
+          // export-time failure is reported by the export path itself.
+          try { loadFFmpeg().catch(() => {}); } catch (_) {}
           lastDetectTime = 0;
           // Guard against double rAF chains. enterRecordMode may have
           // already started a loop for the camera; starting another here
