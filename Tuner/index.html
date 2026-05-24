@@ -4295,6 +4295,41 @@
       if (!document.hidden && audioContext) {
         refreshAutoLatency();
       }
+      // -------- Visibility-driven monitor mute --------
+      // When the tuner tab goes hidden (Thomas switching to another
+      // window/tab to review a downloaded take), ramp monitorGain to 0
+      // so the drone, auto-sines, tanpura, file playback, and prior-
+      // layer monitor stop competing with whatever audio he's checking.
+      // When the tab becomes visible again, restore monitorGain to the
+      // current master output level — auto-resume is the less-surprising
+      // behaviour (the mute was implicit, the restore should be too;
+      // otherwise the drone looks broken when he comes back).
+      //
+      // monitorGain is the single tap every monitor source connects to,
+      // so this one node controls all of them. The recording bus is
+      // independent (mic → micOut → masterOutputGain → recordingLimiter
+      // → dest), so this never touches what the MediaRecorder captures.
+      //
+      // GUARDRAIL: do NOT touch monitorGain while a take is actively
+      // being recorded. Even though the recording itself is safe, the
+      // singer needs the drone and prior layers in their headphones to
+      // perform; muting mid-take would derail an overdub. Brief focus
+      // losses during a take (notification banner, screen dim) leave
+      // the monitor alone. The recording-state check uses the same
+      // mediaRecorder.state === 'recording' guard the rest of the
+      // codebase uses (see startRecording / pushLastTakeAsLayer).
+      if (micProcessing && micProcessing.monitorGain && micProcessing.ctx) {
+        const isRec = mediaRecorder && mediaRecorder.state === 'recording';
+        if (!isRec) {
+          const t = micProcessing.ctx.currentTime;
+          const target = document.hidden
+            ? 0
+            : levelDbToLinear(masterOutputLevelDb);
+          try {
+            micProcessing.monitorGain.gain.setTargetAtTime(target, t, 0.05);
+          } catch (_) {}
+        }
+      }
     });
 
     function toggleDrone(ratio) {
