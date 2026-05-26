@@ -1,0 +1,1491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thomas LeRoy Meier</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+  <style>
+    @page { size: 8.5in 11in; margin: 0; }
+
+    :root {
+      --navy: #1E6BB0;
+      --grid: #D8E8F4;
+      --bg:   #ffffff;
+      --ink:  #1a1a1a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; min-height: 100vh; }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Geist Mono', monospace;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 3rem 2rem 1rem;
+      -webkit-font-smoothing: antialiased;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    .geometry-bg {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 816px;
+      height: 1056px;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .doc {
+      width: 100%;
+      max-width: 800px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Unified entry: whole document fades in at once ──────────────── */
+    @keyframes docFadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .doc {
+      animation: docFadeIn 1.5s ease-out backwards;
+    }
+
+    /* Old keyframes kept for the few elements that still need them (rules breathe, etc) */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes drawRule {
+      from { transform: scaleX(0); }
+      to   { transform: scaleX(1); }
+    }
+    @keyframes ruleBreathe {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.55; }
+    }
+
+    .rule {
+      border: none;
+      border-top: 1px solid var(--grid);
+      margin: 0;
+      transform-origin: left center;
+      transform: scaleX(1);
+    }
+    .rule-top {
+      animation: ruleBreathe 5s ease-in-out 3s infinite;
+    }
+    .rule-bottom {
+      animation: ruleBreathe 5s ease-in-out 4s infinite;
+    }
+
+    .title-block { padding: 1.5rem 0 1.5rem; }
+
+    .name-wrap {
+      position: relative;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 1.75rem;
+    }
+
+    .name-waveform {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 420px;
+      height: 70px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 1.5s ease-out;
+    }
+
+    .name-waveform.active {
+      opacity: 0.4;
+    }
+
+    .name-waveform path {
+      stroke: var(--navy);
+      stroke-width: 1;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .name {
+      font-family: 'Geist Mono', monospace;
+      font-weight: 400;
+      font-size: 14px;
+      color: var(--navy);
+      text-align: center;
+      letter-spacing: 0.6em;
+      position: relative;
+      z-index: 2;
+      padding: 0.4em 1em;
+    }
+
+    .pyramid {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      flex-wrap: nowrap;
+    }
+
+    .col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0;
+      position: relative;
+    }
+
+    .qual {
+      font-family: 'Geist Mono', monospace;
+      font-weight: 400;
+      font-size: 12px;
+      color: var(--navy);
+      opacity: 0.55;
+      letter-spacing: 0.35em;
+      text-transform: lowercase;
+      margin-bottom: 0.15rem;
+      line-height: 1.1;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Wraps English role + Chinese backdrop together so they layer correctly */
+    .act-stack {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .han-backdrop {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Geist Mono', monospace;
+      font-weight: 400;
+      font-size: 38px;
+      color: var(--navy);
+      opacity: 0.22;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .act {
+      font-family: 'Geist Mono', monospace;
+      font-weight: 600;
+      font-size: 24px;
+      color: var(--navy);
+      position: relative;
+      z-index: 2;
+    }
+
+    .sep {
+      font-family: 'Geist Mono', monospace;
+      font-weight: 500;
+      font-size: 24px;
+      color: var(--navy);
+      opacity: 0.35;
+      align-self: center;
+      padding: 0 0.4em;
+      margin-top: 1.1rem;
+    }
+
+    /* ── Body content: claims + proofs ──────────────────────── */
+    .body-block {
+      padding: 2rem 1.5rem 1.5rem;
+      max-width: 880px;
+      margin: 0 auto;
+    }
+
+    .evidence-group {
+      display: flex;
+      align-items: flex-start;
+      gap: 1.5rem;
+      margin-bottom: 1.75rem;
+    }
+
+    .evidence-group:last-child { margin-bottom: 0; }
+
+    .evidence-visual {
+      flex: 0 0 64px;
+      width: 64px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* When the visual is wrapped in a link, make the whole zone interactive */
+    a.evidence-visual {
+      text-decoration: none;
+      color: inherit;
+      transition: opacity 0.3s ease;
+      opacity: 0.85;
+    }
+    a.evidence-visual:hover {
+      opacity: 1;
+    }
+
+    .evidence-visual svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    .evidence-text {
+      flex: 1 1 auto;
+      min-width: 0;
+      position: relative;
+    }
+
+    .han-rtd {
+      position: absolute;
+      right: 0.5rem;
+      bottom: -1.5rem;
+      font-family: 'Geist Mono', monospace;
+      font-weight: 400;
+      font-size: 32px;
+      color: var(--navy);
+      opacity: 0.22;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .evidence-sketch {
+      flex: 0 0 140px;
+      width: 140px;
+      height: 90px;
+      align-self: center;
+      opacity: 0.65;
+      transition: opacity 0.35s ease;
+    }
+
+    /* When the sketch is wrapped in a link, brighten on hover */
+    a.evidence-sketch {
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+    a.evidence-sketch:hover {
+      opacity: 1;
+    }
+
+    .evidence-sketch svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    .evidence-group:hover .evidence-sketch {
+      opacity: 1;
+    }
+
+    .sketch-stroke {
+      stroke: var(--navy);
+      stroke-width: 0.9;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .sketch-fill-soft {
+      fill: var(--navy);
+      opacity: 0.35;
+    }
+
+    .sketch-text {
+      font-family: 'Geist Mono', monospace;
+      font-size: 5px;
+      fill: var(--navy);
+      opacity: 0.7;
+    }
+
+    /* ── Scaffolding: dashed strokes for tool-in-progress visualization ── */
+    .sketch-stroke-dashed {
+      stroke: var(--navy);
+      stroke-width: 0.8;
+      fill: none;
+      stroke-linecap: round;
+      stroke-dasharray: 2 2;
+      opacity: 0.55;
+    }
+
+    /* ── Patent-pending stamp: rotated rubber-stamp look ── */
+    .stamp-frame {
+      stroke: var(--navy);
+      stroke-width: 1.2;
+      fill: none;
+      opacity: 0.85;
+    }
+    .stamp-text {
+      font-family: 'Geist Mono', monospace;
+      font-weight: 600;
+      font-size: 6.5px;
+      letter-spacing: 0.12em;
+      fill: var(--navy);
+      opacity: 0.85;
+      text-anchor: middle;
+      text-transform: uppercase;
+    }
+    .stamp-group {
+      transform: rotate(-4deg);
+      transform-origin: 70px 50px;
+      transform-box: view-box;
+    }
+
+    .claim {
+      font-family: 'Geist Mono', monospace;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--navy);
+      letter-spacing: 0;
+      line-height: 1.45;
+      margin-bottom: 0.65rem;
+    }
+
+    .claim .claim-qualifier {
+      font-weight: 500;
+      font-size: 10px;
+      opacity: 0.75;
+      letter-spacing: 0.02em;
+    }
+
+    .proof {
+      font-family: 'Geist Mono', monospace;
+      font-weight: 400;
+      font-size: 11.5px;
+      color: var(--navy);
+      opacity: 0.7;
+      letter-spacing: 0;
+      line-height: 1.65;
+      padding-left: 1.4rem;
+      border-left: 1px solid var(--grid);
+    }
+
+    .proof .project-name {
+      font-weight: 500;
+      opacity: 1;
+    }
+
+    .proof .quote {
+      font-style: italic;
+    }
+
+    .proof a.project-link {
+      color: var(--navy);
+      text-decoration: none;
+      border-bottom: 1px solid var(--grid);
+      transition: border-color 0.25s ease, opacity 0.25s ease;
+    }
+
+    .proof a.project-link:hover {
+      border-bottom-color: var(--navy);
+      opacity: 1;
+    }
+
+    /* ── Resume section: professional CV close ─────────────────────────── */
+    .resume-block {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 1.5rem 1.5rem 0.5rem;
+    }
+
+    .resume-section {
+      margin-bottom: 1.15rem;
+    }
+
+    .resume-section:last-child { margin-bottom: 0; }
+
+    .resume-section-header {
+      font-family: 'Geist Mono', monospace;
+      font-weight: 600;
+      font-size: 9.5px;
+      color: var(--navy);
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      padding-bottom: 0.3rem;
+      margin-bottom: 0.6rem;
+      border-bottom: 1px solid var(--grid);
+    }
+
+    .resume-entry {
+      margin-bottom: 0.6rem;
+      font-family: 'Geist Mono', monospace;
+      color: var(--navy);
+    }
+
+    .resume-entry:last-child { margin-bottom: 0; }
+
+    .resume-entry-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 1rem;
+      margin-bottom: 0.15rem;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .resume-role {
+      font-weight: 600;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .resume-meta {
+      font-weight: 400;
+      opacity: 0.65;
+      font-size: 10px;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .resume-detail {
+      font-size: 10px;
+      line-height: 1.5;
+      opacity: 0.75;
+      padding-left: 0.9rem;
+      border-left: 1px solid var(--grid);
+    }
+
+    .resume-references {
+      display: flex;
+      gap: 2rem;
+      font-family: 'Geist Mono', monospace;
+      font-size: 9.5px;
+      color: var(--navy);
+      line-height: 1.45;
+    }
+
+    .resume-reference {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .resume-reference .ref-name {
+      font-weight: 600;
+      font-size: 10px;
+      display: block;
+      margin-bottom: 0.1rem;
+    }
+
+    .resume-reference .ref-role {
+      opacity: 0.75;
+      display: block;
+    }
+
+    .resume-reference .ref-contact {
+      opacity: 0.85;
+      display: block;
+    }
+
+    .contact-footer {
+      margin-top: 1.25rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid var(--grid);
+      font-family: 'Geist Mono', monospace;
+      font-size: 9.5px;
+      color: var(--navy);
+      opacity: 0.75;
+      text-align: center;
+      letter-spacing: 0.04em;
+    }
+
+    .contact-footer .contact-sep {
+      opacity: 0.5;
+      padding: 0 0.6em;
+    }
+
+    /* ── Visual styles ──────────────────────────────────────── */
+    .viz-stroke {
+      stroke: var(--navy);
+      stroke-width: 1;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.7;
+    }
+
+    .viz-ratio {
+      font-family: 'Geist Mono', monospace;
+      font-weight: 400;
+      font-size: 7px;
+      fill: var(--navy);
+      opacity: 0.45;
+      text-anchor: middle;
+    }
+
+    .viz-bar {
+      fill: var(--navy);
+      opacity: 0.7;
+    }
+
+    .viz-heart-outline {
+      fill: none;
+      stroke: var(--navy);
+      stroke-width: 1;
+      stroke-linejoin: round;
+      opacity: 0.85;
+    }
+
+    .viz-pendulum-rod {
+      stroke: var(--navy);
+      stroke-width: 1;
+      stroke-linecap: round;
+      opacity: 0.85;
+    }
+
+    .viz-pendulum-bob {
+      fill: var(--navy);
+      opacity: 0.9;
+    }
+
+    .viz-pendulum-pivot {
+      fill: var(--navy);
+      opacity: 0.9;
+    }
+
+    /* ── EEG: scrolling window — wide waveform translates leftward, clipped to 64px viewport ── */
+    @keyframes eegScroll {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-128px); }
+    }
+    .viz-eeg-trace {
+      stroke: var(--navy);
+      stroke-width: 1;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.7;
+      animation: eegScroll 12s linear infinite;
+    }
+
+    /* ── Metronome pendulum: swings at ~60 BPM (1.1s per swing) ── */
+    @keyframes pendulumSwing {
+      0%   { transform: rotate(-25deg); }
+      50%  { transform: rotate( 25deg); }
+      100% { transform: rotate(-25deg); }
+    }
+    .viz-pendulum {
+      transform-origin: 32px 22px;
+      transform-box: view-box;
+      animation: pendulumSwing 2.2s ease-in-out 1.8s infinite;
+    }
+
+    /* ── Bars: each breathes independently, slight phase offsets ──── */
+    @keyframes barBreathe {
+      0%, 100% { transform: scaleY(1);    }
+      50%      { transform: scaleY(0.45); }
+    }
+    .viz-bar {
+      transform-origin: center bottom;
+      transform-box: fill-box;
+      animation: barBreathe 4s ease-in-out infinite;
+    }
+
+    /* ── Geometry styles — shared visual DNA ──────────────────── */
+    .grid-line {
+      stroke: var(--grid);
+      stroke-width: 1;
+      stroke-linecap: round;
+      fill: none;
+      opacity: 1;
+    }
+
+    .ripple-anim {
+      fill: none;
+      stroke: var(--grid);
+      stroke-width: 1.1;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0;
+    }
+
+    @media print {
+      * { animation: none !important; }
+      body { padding: 4rem 2rem; }
+    }
+  </style>
+</head>
+<body>
+  <svg class="geometry-bg" viewBox="0 0 816 1056" preserveAspectRatio="xMidYMin meet">
+    <defs>
+      <!-- Two moving spotlights with different Lissajous patterns -->
+      <radialGradient id="spotlight" gradientUnits="userSpaceOnUse" cx="408" cy="528" r="220">
+        <stop offset="0%"   stop-color="white" stop-opacity="1"/>
+        <stop offset="55%"  stop-color="white" stop-opacity="0.75"/>
+        <stop offset="100%" stop-color="white" stop-opacity="0"/>
+      </radialGradient>
+      <radialGradient id="spotlight2" gradientUnits="userSpaceOnUse" cx="200" cy="300" r="180">
+        <stop offset="0%"   stop-color="white" stop-opacity="1"/>
+        <stop offset="55%"  stop-color="white" stop-opacity="0.75"/>
+        <stop offset="100%" stop-color="white" stop-opacity="0"/>
+      </radialGradient>
+      <mask id="spotlight-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="816" height="1056">
+        <!-- Stack two gradient rects; SVG masks accumulate brightness additively -->
+        <rect width="816" height="1056" fill="url(#spotlight)"/>
+        <rect width="816" height="1056" fill="url(#spotlight2)"/>
+      </mask>
+    </defs>
+
+    <!-- Grid AND ripples both masked by moving spotlight — both only visible where focal reaches -->
+    <g mask="url(#spotlight-mask)">
+      <g id="grid-group"></g>
+      <g id="ripples-group"></g>
+    </g>
+  </svg>
+
+  <div class="doc">
+    <hr class="rule rule-top">
+    <div class="title-block">
+      <div class="name-wrap">
+        <svg class="name-waveform" id="name-waveform" viewBox="0 0 420 70" preserveAspectRatio="none">
+          <path id="name-waveform-path" d="M 0 35 L 420 35" />
+        </svg>
+        <div class="name">Thomas LeRoy Meier</div>
+      </div>
+      <div class="pyramid">
+        <div class="col">
+          <div class="qual">active</div>
+          <div class="act-stack">
+            <span class="han-backdrop">聆聽者</span>
+            <span class="act">Listener</span>
+          </div>
+        </div>
+        <div class="sep">·</div>
+        <div class="col">
+          <div class="qual">music</div>
+          <div class="act-stack">
+            <span class="han-backdrop">作曲家</span>
+            <span class="act">Composer</span>
+          </div>
+        </div>
+        <div class="sep">·</div>
+        <div class="col">
+          <div class="qual">innovative</div>
+          <div class="act-stack">
+            <span class="han-backdrop">研究者</span>
+            <span class="act">Researcher</span>
+          </div>
+        </div>
+        <div class="sep">·</div>
+        <div class="col">
+          <div class="qual">experienced</div>
+          <div class="act-stack">
+            <span class="han-backdrop">協作者</span>
+            <span class="act">Collaborator</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <hr class="rule rule-bottom">
+
+    <div class="body-block">
+      <div class="evidence-group eg-1">
+        <a class="evidence-visual" href="https://thomaslistens.github.io/seeg-sonification/" target="_blank" rel="noopener" aria-label="Open sEEG Sonification Toolkit">
+          <!-- EEG-like waveform: irregular trace mimicking neural data -->
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <!-- Clip to the visible 64x64 window so the wider waveform shows only within bounds -->
+              <clipPath id="eeg-window">
+                <rect x="0" y="0" width="64" height="64" />
+              </clipPath>
+            </defs>
+            <g clip-path="url(#eeg-window)">
+              <!-- Wide waveform (192px). Starts and ends at the same y so the loop is seamless.
+                   The path is doubled (0..128 then 128..192 repeats first 64) so when transform
+                   reaches -128 and resets to 0, the section now in view is identical. -->
+              <path class="viz-eeg-trace" d="
+                M 0 32  L 4 33  L 6 28  L 10 36  L 12 30  L 14 35
+                L 18 33 L 20 22 L 22 44 L 24 18  L 26 40  L 28 31
+                L 32 31 L 34 26 L 36 38 L 38 24  L 40 35  L 42 31
+                L 46 31 L 48 29 L 50 34 L 52 30  L 54 33  L 56 32
+                L 60 33 L 62 30 L 64 35
+                L 68 32 L 70 38 L 72 26 L 74 41  L 76 32  L 78 28
+                L 82 33 L 84 22 L 86 45 L 88 18  L 90 40  L 92 31
+                L 96 31 L 98 36 L 100 22 L 102 44 L 104 30 L 106 33
+                L 110 31 L 112 28 L 114 38 L 116 24 L 118 35 L 120 32
+                L 124 33 L 126 30 L 128 32
+                L 132 33 L 134 28 L 138 36 L 140 30 L 142 35
+                L 146 33 L 148 22 L 150 44 L 152 18 L 154 40 L 156 31
+                L 160 31 L 162 26 L 164 38 L 166 24 L 168 35 L 170 31
+                L 174 31 L 176 29 L 178 34 L 180 30 L 182 33 L 184 32
+                L 188 33 L 190 30 L 192 32
+              " />
+            </g>
+          </svg>
+        </a>
+        <div class="evidence-text">
+          <div class="claim">Connecting technology with the people it serves <span class="claim-qualifier">(B.A. Digital Culture)</span>.</div>
+          <div class="proof">
+            <a class="project-link project-name" href="https://thomaslistens.github.io/seeg-sonification/" target="_blank" rel="noopener">sEEG Sonification Toolkit v8.3</a> &mdash; translating intracranial EEG into navigable sound.
+            <span class="quote">&ldquo;Impressive and very interesting.&rdquo;</span> &mdash; Teunis van Beelen, creator of EDFbrowser.
+          </div>
+        </div>
+        <a class="evidence-sketch" href="https://thomaslistens.github.io/seeg-sonification/" target="_blank" rel="noopener" aria-label="Open sEEG Sonification Toolkit">
+          <!-- Sketch of sEEG Sonification interface: top bar, control panels, multi-channel waveforms -->
+          <svg viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg">
+            <!-- Title across the top -->
+            <text x="70" y="14" style="font-family:'Geist Mono',monospace; font-size:11px; font-weight:600; fill:var(--navy); text-anchor:middle; letter-spacing:0.02em">sEEG Sonification</text>
+            <!-- Thin rule beneath title -->
+            <line class="sketch-stroke" x1="2" y1="20" x2="138" y2="20" />
+            <!-- Wireframe sits below as supporting interface sketch -->
+            <line class="sketch-stroke" x1="50" y1="20" x2="50" y2="56" />
+            <line class="sketch-stroke" x1="6" y1="26" x2="46" y2="26" />
+            <line class="sketch-stroke" x1="6" y1="31" x2="46" y2="31" />
+            <line class="sketch-stroke" x1="6" y1="36" x2="46" y2="36" />
+            <line class="sketch-stroke" x1="6" y1="41" x2="46" y2="41" />
+            <line class="sketch-stroke" x1="6" y1="46" x2="46" y2="46" />
+            <line class="sketch-stroke" x1="6" y1="51" x2="46" y2="51" />
+            <circle class="sketch-fill-soft" cx="20" cy="26" r="1" />
+            <circle class="sketch-fill-soft" cx="32" cy="31" r="1" />
+            <circle class="sketch-fill-soft" cx="15" cy="36" r="1" />
+            <circle class="sketch-fill-soft" cx="38" cy="41" r="1" />
+            <circle class="sketch-fill-soft" cx="25" cy="46" r="1" />
+            <circle class="sketch-fill-soft" cx="30" cy="51" r="1" />
+            <line class="sketch-stroke" x1="95" y1="20" x2="95" y2="56" />
+            <line class="sketch-stroke" x1="54" y1="26" x2="91" y2="26" />
+            <line class="sketch-stroke" x1="54" y1="31" x2="91" y2="31" />
+            <line class="sketch-stroke" x1="54" y1="36" x2="91" y2="36" />
+            <line class="sketch-stroke" x1="54" y1="41" x2="91" y2="41" />
+            <circle class="sketch-fill-soft" cx="70" cy="26" r="1" />
+            <circle class="sketch-fill-soft" cx="80" cy="31" r="1" />
+            <circle class="sketch-fill-soft" cx="60" cy="36" r="1" />
+            <circle class="sketch-fill-soft" cx="85" cy="41" r="1" />
+            <line class="sketch-stroke" x1="99" y1="26" x2="135" y2="26" />
+            <line class="sketch-stroke" x1="99" y1="31" x2="135" y2="31" />
+            <circle class="sketch-fill-soft" cx="110" cy="26" r="1" />
+            <circle class="sketch-fill-soft" cx="120" cy="31" r="1" />
+            <line class="sketch-stroke" x1="2" y1="59" x2="138" y2="59" />
+            <!-- Multi-channel waveforms -->
+            <path class="sketch-stroke" d="M 4 65 L 12 64 L 20 67 L 28 63 L 36 66 L 44 64 L 52 67 L 60 63 L 68 66 L 76 64 L 84 67 L 92 63 L 100 66 L 108 64 L 116 67 L 124 63 L 132 65 L 136 65" />
+            <path class="sketch-stroke" d="M 4 72 L 12 71 L 20 74 L 28 70 L 36 73 L 44 71 L 52 74 L 60 70 L 68 73 L 76 71 L 84 74 L 92 70 L 100 73 L 108 71 L 116 74 L 124 70 L 132 72 L 136 72" />
+            <path class="sketch-stroke" d="M 4 79 L 12 78 L 20 81 L 28 77 L 36 80 L 44 78 L 52 81 L 60 77 L 68 80 L 76 78 L 84 81 L 92 77 L 100 80 L 108 78 L 116 81 L 124 77 L 132 79 L 136 79" />
+            <path class="sketch-stroke" d="M 4 86 L 12 85 L 20 88 L 28 84 L 36 87 L 44 85 L 52 88 L 60 84 L 68 87 L 76 85 L 84 88 L 92 84 L 100 87 L 108 85 L 116 88 L 124 84 L 132 86 L 136 86" />
+          </svg>
+        </a>
+      </div>
+
+      <div class="evidence-group eg-2">
+        <div class="evidence-visual">
+          <!-- JI ratio stack: harmonic intervals as text fractions -->
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+            <!-- Heart outline (minimal, no fill) — the vessel -->
+            <path class="viz-heart-outline" d="M 32 50
+              C 26 44, 18 39, 18 32
+              C 18 28, 21 25, 25 25
+              C 28 25, 31 27, 32 30
+              C 33 27, 36 25, 39 25
+              C 43 25, 46 28, 46 32
+              C 46 39, 38 44, 32 50 Z" />
+
+            <!-- Metronome pendulum: rod + bob, pivoting from top inside heart -->
+            <g class="viz-pendulum">
+              <line class="viz-pendulum-rod" x1="32" y1="22" x2="32" y2="42" />
+              <circle class="viz-pendulum-bob" cx="32" cy="42" r="2" />
+            </g>
+            <!-- Pivot point (small dot at top of pendulum) -->
+            <circle class="viz-pendulum-pivot" cx="32" cy="22" r="1.2" />
+
+            <!-- Four JI ratios at compass positions, recessed -->
+            <text class="viz-ratio" x="32" y="8" >3:1</text>
+            <text class="viz-ratio" x="60" y="34">3:2</text>
+            <text class="viz-ratio" x="32" y="62">4:3</text>
+            <text class="viz-ratio" x="4"  y="34">5:4</text>
+          </svg>
+        </div>
+        <div class="evidence-text">
+          <div class="claim">Inventing a framework for human tempo <span class="claim-qualifier">(provisional patent in preparation)</span>.</div>
+          <div class="proof">
+            <span class="project-name">Relative Tempo Derivation (RTD)</span> &mdash; biomarker-to-tempo mapping rooted in just-intonation ratios.
+          </div>
+          <div class="han-rtd">相對節奏推導</div>
+        </div>
+        <div class="evidence-sketch">
+          <!-- RTD: Patent Pending — dotted square + intersecting solid circle -->
+          <svg viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg">
+            <!-- Solid circle pushed into the upper-right corner, sitting behind everything -->
+            <circle cx="100" cy="24" r="16"
+                    stroke="var(--navy)" stroke-width="1" fill="none"
+                    opacity="0.7" />
+            <!-- Dotted square boundary — renders on top of circle, cutting through it -->
+            <rect x="35" y="22" width="70" height="46"
+                  stroke="var(--navy)" stroke-width="1" fill="none"
+                  stroke-dasharray="2.5 2.5" opacity="0.75" />
+            <!-- Patent Pending: artwork carries the aspiration of the framework's IP status -->
+            <text x="70" y="43" style="font-family:'Geist Mono',monospace; font-size:9px; font-weight:600; fill:var(--navy); text-anchor:middle; letter-spacing:0.15em; text-transform:uppercase">Patent</text>
+            <text x="70" y="55" style="font-family:'Geist Mono',monospace; font-size:9px; font-weight:600; fill:var(--navy); text-anchor:middle; letter-spacing:0.15em; text-transform:uppercase">Pending</text>
+          </svg>
+        </div>
+      </div>
+
+      <div class="evidence-group eg-3">
+        <a class="evidence-visual" href="https://thomaslistens.github.io/MetabolicHarmony/" target="_blank" rel="noopener" aria-label="Open Metabolic Harmony">
+          <!-- Frequency spectrum: irregular bars echoing the Metabolic Harmony UI -->
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+            <rect class="viz-bar" x="2"  y="38" width="2" height="22" style="animation-delay: -0.0s"  />
+            <rect class="viz-bar" x="6"  y="28" width="2" height="32" style="animation-delay: -0.4s"  />
+            <rect class="viz-bar" x="10" y="44" width="2" height="16" style="animation-delay: -0.9s"  />
+            <rect class="viz-bar" x="14" y="20" width="2" height="40" style="animation-delay: -1.3s"  />
+            <rect class="viz-bar" x="18" y="34" width="2" height="26" style="animation-delay: -1.8s"  />
+            <rect class="viz-bar" x="22" y="14" width="2" height="46" style="animation-delay: -2.2s"  />
+            <rect class="viz-bar" x="26" y="40" width="2" height="20" style="animation-delay: -2.7s"  />
+            <rect class="viz-bar" x="30" y="24" width="2" height="36" style="animation-delay: -3.1s"  />
+            <rect class="viz-bar" x="34" y="46" width="2" height="14" style="animation-delay: -3.6s"  />
+            <rect class="viz-bar" x="38" y="30" width="2" height="30" style="animation-delay: -0.2s"  />
+            <rect class="viz-bar" x="42" y="18" width="2" height="42" style="animation-delay: -0.7s"  />
+            <rect class="viz-bar" x="46" y="36" width="2" height="24" style="animation-delay: -1.1s"  />
+            <rect class="viz-bar" x="50" y="42" width="2" height="18" style="animation-delay: -1.6s"  />
+            <rect class="viz-bar" x="54" y="26" width="2" height="34" style="animation-delay: -2.0s"  />
+            <rect class="viz-bar" x="58" y="32" width="2" height="28" style="animation-delay: -2.5s"  />
+            <rect class="viz-bar" x="62" y="40" width="2" height="20" style="animation-delay: -2.9s"  />
+          </svg>
+        </a>
+        <div class="evidence-text">
+          <div class="claim">Composer exploring new ways of using harmony.</div>
+          <div class="proof">
+            <a class="project-link project-name" href="https://thomaslistens.github.io/MetabolicHarmony/" target="_blank" rel="noopener">Metabolic Harmony</a> &mdash; an interactive web sonification that lets you hear the gut microbiome. 350 metabolic pathways rendered as harmonic ratios across 4,869 samples, with built-in comparison between healthy reference and Multiple Sclerosis states &mdash; built to make complex pathway data audible, and accessible to researchers and patients alike.
+          </div>
+        </div>
+        <a class="evidence-sketch" href="https://thomaslistens.github.io/MetabolicHarmony/" target="_blank" rel="noopener" aria-label="Open Metabolic Harmony">
+          <!-- Sketch of Metabolic Harmony interface: left sidebar, spectrum chart with bars, bottom info bar -->
+          <svg viewBox="0 0 140 90" xmlns="http://www.w3.org/2000/svg">
+            <!-- Title across the top -->
+            <text x="70" y="14" style="font-family:'Geist Mono',monospace; font-size:11px; font-weight:600; fill:var(--navy); text-anchor:middle; letter-spacing:0.02em">Metabolic Harmony</text>
+            <!-- Thin rule beneath title -->
+            <line class="sketch-stroke" x1="2" y1="20" x2="138" y2="20" />
+            <!-- Wireframe sits below -->
+            <line class="sketch-stroke" x1="38" y1="20" x2="38" y2="88" />
+            <!-- Sidebar toggle buttons -->
+            <rect class="sketch-stroke" x="6" y="26" width="13" height="6" rx="0.5" />
+            <rect class="sketch-stroke" x="21" y="26" width="13" height="6" rx="0.5" />
+            <!-- Sidebar info blocks -->
+            <rect class="sketch-fill-soft" x="6" y="38" width="28" height="6" />
+            <line class="sketch-stroke" x1="6" y1="48" x2="34" y2="48" />
+            <line class="sketch-stroke" x1="6" y1="52" x2="30" y2="52" />
+            <line class="sketch-stroke" x1="6" y1="58" x2="34" y2="58" />
+            <line class="sketch-stroke" x1="6" y1="62" x2="30" y2="62" />
+            <!-- Sliders -->
+            <line class="sketch-stroke" x1="6" y1="70" x2="34" y2="70" />
+            <circle class="sketch-fill-soft" cx="18" cy="70" r="1" />
+            <line class="sketch-stroke" x1="6" y1="75" x2="34" y2="75" />
+            <circle class="sketch-fill-soft" cx="14" cy="75" r="1" />
+            <line class="sketch-stroke" x1="6" y1="80" x2="34" y2="80" />
+            <circle class="sketch-fill-soft" cx="26" cy="80" r="1" />
+            <line class="sketch-stroke" x1="6" y1="85" x2="34" y2="85" />
+            <circle class="sketch-fill-soft" cx="22" cy="85" r="1" />
+            <!-- Spectrum bars baseline -->
+            <line class="sketch-stroke" x1="42" y1="80" x2="134" y2="80" />
+            <!-- Spectrum bars (irregular heights) -->
+            <line class="sketch-stroke" x1="44" y1="80" x2="44" y2="62" />
+            <line class="sketch-stroke" x1="47" y1="80" x2="47" y2="50" />
+            <line class="sketch-stroke" x1="50" y1="80" x2="50" y2="68" />
+            <line class="sketch-stroke" x1="53" y1="80" x2="53" y2="42" />
+            <line class="sketch-stroke" x1="56" y1="80" x2="56" y2="58" />
+            <line class="sketch-stroke" x1="59" y1="80" x2="59" y2="34" />
+            <line class="sketch-stroke" x1="62" y1="80" x2="62" y2="66" />
+            <line class="sketch-stroke" x1="65" y1="80" x2="65" y2="46" />
+            <line class="sketch-stroke" x1="68" y1="80" x2="68" y2="55" />
+            <line class="sketch-stroke" x1="71" y1="80" x2="71" y2="40" />
+            <line class="sketch-stroke" x1="74" y1="80" x2="74" y2="58" />
+            <line class="sketch-stroke" x1="77" y1="80" x2="77" y2="50" />
+            <line class="sketch-stroke" x1="80" y1="80" x2="80" y2="70" />
+            <line class="sketch-stroke" x1="83" y1="80" x2="83" y2="38" />
+            <line class="sketch-stroke" x1="86" y1="80" x2="86" y2="55" />
+            <line class="sketch-stroke" x1="89" y1="80" x2="89" y2="44" />
+            <line class="sketch-stroke" x1="92" y1="80" x2="92" y2="62" />
+            <line class="sketch-stroke" x1="95" y1="80" x2="95" y2="48" />
+            <line class="sketch-stroke" x1="98" y1="80" x2="98" y2="66" />
+            <line class="sketch-stroke" x1="101" y1="80" x2="101" y2="40" />
+            <line class="sketch-stroke" x1="104" y1="80" x2="104" y2="56" />
+            <line class="sketch-stroke" x1="107" y1="80" x2="107" y2="52" />
+            <line class="sketch-stroke" x1="110" y1="80" x2="110" y2="36" />
+            <line class="sketch-stroke" x1="113" y1="80" x2="113" y2="62" />
+            <line class="sketch-stroke" x1="116" y1="80" x2="116" y2="44" />
+            <line class="sketch-stroke" x1="119" y1="80" x2="119" y2="58" />
+            <line class="sketch-stroke" x1="122" y1="80" x2="122" y2="50" />
+            <line class="sketch-stroke" x1="125" y1="80" x2="125" y2="66" />
+            <line class="sketch-stroke" x1="128" y1="80" x2="128" y2="38" />
+            <line class="sketch-stroke" x1="131" y1="80" x2="131" y2="55" />
+            <line class="sketch-stroke" x1="134" y1="80" x2="134" y2="46" />
+            <!-- Play button -->
+            <circle class="sketch-stroke" cx="46" cy="85" r="2.5" />
+          </svg>
+        </a>
+      </div>
+    </div>
+
+    <hr class="rule rule-bottom" style="margin-top: 1rem;">
+
+    <div class="resume-block">
+
+      <div class="resume-section">
+        <div class="resume-section-header">Composition, Coaching &amp; Production</div>
+
+        <div class="resume-entry">
+          <div class="resume-entry-header">
+            <div class="resume-role">Percussion Coach, Arranger &amp; Educator</div>
+            <div class="resume-meta">Casa Grande HS &middot; Villago MS &middot; Flux Indoor &middot; 2013&ndash;2022</div>
+          </div>
+          <div class="resume-detail">
+            Six Arizona state championships with Casa Grande HS (2015&ndash;2020). Wrote and arranged original competitive percussion scores; integrated live sound &mdash; microphones, synths, samplers, mixing &mdash; for full production value. Private percussion instruction. Performer and section contributor with ASU World Drumline and The Academy Drum &amp; Bugle Corps.
+          </div>
+        </div>
+
+        <div class="resume-entry">
+          <div class="resume-entry-header">
+            <div class="resume-role">Independent Composer &amp; Arranger</div>
+            <div class="resume-meta">Lifelong Practice</div>
+          </div>
+          <div class="resume-detail">
+            Self-directed creative and research practice. Original frameworks in harmonic theory, data sonification methodology, and audio tools. Collaborates across disciplines, managing creative input from multiple contributors to produce cohesive final work. Independently releases musical projects.
+          </div>
+        </div>
+      </div>
+
+      <div class="resume-section">
+        <div class="resume-section-header">Education &amp; Training</div>
+
+        <div class="resume-entry">
+          <div class="resume-entry-header">
+            <div class="resume-role">Bachelor of Arts, Digital Culture</div>
+            <div class="resume-meta">Arizona State University &middot; 2017</div>
+          </div>
+          <div class="resume-detail">
+            Arts, Media &amp; Engineering. Technology integration, digital systems, human-computer interaction. Direct academic foundation for audio technology, signal processing, and interactive media research.
+          </div>
+        </div>
+
+        <div class="resume-entry">
+          <div class="resume-entry-header">
+            <div class="resume-role">Neurologic Music Therapy &mdash; Volunteer Observer</div>
+            <div class="resume-meta">NMTSA &middot; 2025 &ndash; Present</div>
+          </div>
+          <div class="resume-detail">
+            Observed clinical NMT sessions with detailed protocol notes. Direct exposure to therapeutic audio applications including rhythmic auditory stimulation in stroke gait rehabilitation.
+          </div>
+        </div>
+      </div>
+
+      <div class="resume-section">
+        <div class="resume-section-header">Additional Experience</div>
+
+        <div class="resume-entry">
+          <div class="resume-entry-header">
+            <div class="resume-role">Market Hand &amp; Sales Partner</div>
+            <div class="resume-meta">Bene Vivendo &middot; 2023 &ndash; Present</div>
+          </div>
+          <div class="resume-detail">
+            Small-team operation working directly with the owner. Customer education, product presentation, sales, and community engagement at weekly farmers market. Hands-on experience in the rhythms of a founder-run business.
+          </div>
+        </div>
+
+        <div class="resume-entry">
+          <div class="resume-entry-header">
+            <div class="resume-role">Aircraft Security Check</div>
+            <div class="resume-meta">Phoenix Sky Harbor &middot; Current</div>
+          </div>
+          <div class="resume-detail">
+            Situational awareness and effective work under strenuous, time-sensitive conditions.
+          </div>
+        </div>
+
+        <div class="resume-entry">
+          <div class="resume-entry-header">
+            <div class="resume-role">Barback</div>
+            <div class="resume-meta">Local bar &middot; Phoenix, AZ</div>
+          </div>
+          <div class="resume-detail">
+            Fast-paced service environment. Team coordination, stock management, and customer-facing work in a high-volume setting.
+          </div>
+        </div>
+      </div>
+
+      <div class="resume-section">
+        <div class="resume-section-header">References</div>
+        <div class="resume-references">
+          <div class="resume-reference">
+            <span class="ref-name">Leanna Moore</span>
+            <span class="ref-role">Education Director, NMTSA</span>
+            <span class="ref-contact">lmoore@nmtsa.org</span>
+          </div>
+          <div class="resume-reference">
+            <span class="ref-name">Emily Heller</span>
+            <span class="ref-role">Owner, Bene Vivendo</span>
+            <span class="ref-contact">emily.bene.vivendo.arizona@gmail.com</span>
+            <span class="ref-contact">602-573-5878</span>
+          </div>
+          <div class="resume-reference">
+            <span class="ref-name">Matt Geres</span>
+            <span class="ref-role">Coordinator, Casa Grande HS</span>
+            <span class="ref-contact">mattgeres@gmail.com</span>
+            <span class="ref-contact">520-280-7212</span>
+          </div>
+        </div>
+
+        <div class="contact-footer">
+          meier.thomas@gmail.com<span class="contact-sep">&middot;</span>480-388-4733<span class="contact-sep">&middot;</span>Phoenix, AZ
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    (function() {
+      const svgNS = 'http://www.w3.org/2000/svg';
+
+      // ── Build tighter grid (32px spacing) with subtle opacity variation ──
+      const gridGroup = document.getElementById('grid-group');
+      const W = 816, H = 1056;
+      const SPACING = 32;
+
+      function appendGridLine(x1, y1, x2, y2) {
+        const line = document.createElementNS(svgNS, 'line');
+        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+        line.setAttribute('class', 'grid-line');
+        // Subtle organic variation: 0.4–0.65 opacity range
+        line.style.opacity = 0.4 + Math.random() * 0.25;
+        gridGroup.appendChild(line);
+      }
+
+      for (let x = SPACING; x < W; x += SPACING) appendGridLine(x, 0, x, H);
+      for (let y = SPACING; y < H; y += SPACING) appendGridLine(0, y, W, y);
+
+      // ── Build arc paths (replacing concentric ellipses) ──
+      const ripplesGroup = document.getElementById('ripples-group');
+      const RIPPLE_COUNT = 6;
+      const PHI = 1.6180339887;
+      const ripples = [];
+      const rippleBirths = [];
+      const rippleStartAngles = [];   // each ripple's "starting position" on its arc
+      const offsets = [];              // golden-ratio-derived phase offsets
+
+      for (let i = 0; i < RIPPLE_COUNT; i++) {
+        const path = document.createElementNS(svgNS, 'path');
+        path.setAttribute('class', 'ripple-anim');
+        ripplesGroup.appendChild(path);
+        ripples.push(path);
+        rippleBirths.push({ x: 408, y: 528 });
+        // Each ripple unfurls from a different starting angle around its center
+        rippleStartAngles.push((i / RIPPLE_COUNT) * 2 * Math.PI);
+      }
+
+      const RIPPLE_LIFE = 30;          // truly glacial — full unfurl takes half a minute
+      const RIPPLE_MAX_RX = 240;
+      const RIPPLE_ASPECT = 0.55;
+      const SWEEP_FRACTION = 0.78;
+      const ANGLE_SNAP = Math.PI / 4;  // 45° quantization aligns spines with grid axes
+
+      // Golden-ratio offsets: aperiodic phasing that takes a long time to feel like it repeats
+      for (let i = 0; i < RIPPLE_COUNT; i++) {
+        offsets.push((i * RIPPLE_LIFE / PHI) % RIPPLE_LIFE);
+      }
+
+      // ── Focal-point parameters (Lissajous) — two spotlights with incommensurable rhythms ──
+      // Spotlight A
+      const FOCAL_BASE_X  = 408;
+      const FOCAL_BASE_Y  = 525;
+      const FOCAL_AMP_X   = 300;
+      const FOCAL_AMP_Y   = 400;
+      const FREQ_X        = 0.029;
+      const FREQ_Y        = 0.0205;
+      const PHASE_OFFSET  = 1.2;
+      // Spotlight B — different center bias, different frequencies, different phase
+      const FOCAL2_BASE_X = 408;
+      const FOCAL2_BASE_Y = 540;
+      const FOCAL2_AMP_X  = 280;
+      const FOCAL2_AMP_Y  = 380;
+      const FREQ2_X       = 0.023;     // ~80% of FREQ_X — never syncs
+      const FREQ2_Y       = 0.031;     // ~150% of FREQ_Y
+      const PHASE2_OFFSET = 2.7;
+
+      const spotlight  = document.getElementById('spotlight');
+      const spotlight2 = document.getElementById('spotlight2');
+      const lastAges = new Array(RIPPLE_COUNT).fill(0);
+
+      const START_DELAY = 1200;
+      let startTime = null;
+
+      function tick(timestamp) {
+        if (!startTime) startTime = timestamp;
+        const t = (timestamp - startTime) / 1000;
+
+        // Spotlight A position
+        const cx  = FOCAL_BASE_X  + FOCAL_AMP_X  * Math.sin(t * FREQ_X  * 2 * Math.PI);
+        const cy  = FOCAL_BASE_Y  + FOCAL_AMP_Y  * Math.sin(t * FREQ_Y  * 2 * Math.PI + PHASE_OFFSET);
+        spotlight.setAttribute('cx', cx);
+        spotlight.setAttribute('cy', cy);
+
+        // Spotlight B position
+        const cx2 = FOCAL2_BASE_X + FOCAL2_AMP_X * Math.sin(t * FREQ2_X * 2 * Math.PI);
+        const cy2 = FOCAL2_BASE_Y + FOCAL2_AMP_Y * Math.sin(t * FREQ2_Y * 2 * Math.PI + PHASE2_OFFSET);
+        spotlight2.setAttribute('cx', cx2);
+        spotlight2.setAttribute('cy', cy2);
+
+        let totalEnergy = 0;
+
+        for (let i = 0; i < RIPPLE_COUNT; i++) {
+          const age = (t + offsets[i]) % RIPPLE_LIFE;
+          const progress = age / RIPPLE_LIFE;
+
+          // Detect respawn — assign birth to either spotlight A (even indices) or B (odd)
+          if (age < lastAges[i]) {
+            if (i % 2 === 0) {
+              rippleBirths[i].x = cx;
+              rippleBirths[i].y = cy;
+            } else {
+              rippleBirths[i].x = cx2;
+              rippleBirths[i].y = cy2;
+            }
+          }
+          lastAges[i] = age;
+
+          const r = ripples[i];
+          const birth = rippleBirths[i];
+
+          // Both grow AND unfurl simultaneously, symmetric outward from a quantized spine
+          const rx = 8 + progress * RIPPLE_MAX_RX;
+          const ry = rx * RIPPLE_ASPECT;
+
+          // Quantize this ripple's spine direction to a 45° axis (grid-aligned)
+          const spineAngle = Math.round(rippleStartAngles[i] / ANGLE_SNAP) * ANGLE_SNAP;
+
+          // Total sweep grows with progress, opens symmetrically around spine
+          const totalSweep = progress * (Math.PI * 2 * SWEEP_FRACTION);
+          const halfSweep = totalSweep / 2;
+          const startAngle = spineAngle - halfSweep;
+          const endAngle   = spineAngle + halfSweep;
+
+          // ── Grid-anchored Bezier arc: sample points, softly snap toward grid intersections ──
+          // Soft-snap: each point blends between its raw curve position and the nearest grid
+          // intersection based on how close it already is. Points very near a grid corner are pulled
+          // fully onto it; points midway between corners stay near their true curve position. This
+          // eliminates the per-frame teleport that hard snapping causes.
+          const SAMPLE_COUNT = 10;
+          const SNAP_RANGE = SPACING * 0.5;   // distance within which magnetic pull begins
+          const anchors = [];
+
+          for (let s = 0; s <= SAMPLE_COUNT; s++) {
+            const a = startAngle + (endAngle - startAngle) * (s / SAMPLE_COUNT);
+            const rawX = birth.x + rx * Math.cos(a);
+            const rawY = birth.y + ry * Math.sin(a);
+
+            // Nearest grid intersection
+            const gridX = Math.round(rawX / SPACING) * SPACING;
+            const gridY = Math.round(rawY / SPACING) * SPACING;
+
+            // Distance from raw point to nearest grid intersection
+            const dx = rawX - gridX;
+            const dy = rawY - gridY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            // Magnetic pull factor: 1 = fully snapped to grid, 0 = at raw position
+            // Smoothstep curve: gentle pull at the edge of the snap range, strong pull near the corner
+            let pull;
+            if (dist >= SNAP_RANGE) {
+              pull = 0;
+            } else {
+              const t = 1 - (dist / SNAP_RANGE);
+              pull = t * t * (3 - 2 * t);   // smoothstep easing
+            }
+
+            const x = rawX + (gridX - rawX) * pull;
+            const y = rawY + (gridY - rawY) * pull;
+            anchors.push({ x: x, y: y });
+          }
+
+          // Build path with quadratic Beziers through the anchor points
+          let pathStr = '';
+          if (anchors.length === 1) {
+            pathStr = 'M ' + anchors[0].x.toFixed(2) + ' ' + anchors[0].y.toFixed(2);
+          } else if (anchors.length === 2) {
+            pathStr = 'M ' + anchors[0].x.toFixed(2) + ' ' + anchors[0].y.toFixed(2) +
+                      ' L ' + anchors[1].x.toFixed(2) + ' ' + anchors[1].y.toFixed(2);
+          } else {
+            pathStr = 'M ' + anchors[0].x.toFixed(2) + ' ' + anchors[0].y.toFixed(2);
+            for (let k = 1; k < anchors.length - 1; k++) {
+              const ctrl = anchors[k];
+              const next = anchors[k + 1];
+              const midX = (ctrl.x + next.x) / 2;
+              const midY = (ctrl.y + next.y) / 2;
+              pathStr += ' Q ' + ctrl.x.toFixed(2) + ' ' + ctrl.y.toFixed(2) + ' ' + midX.toFixed(2) + ' ' + midY.toFixed(2);
+            }
+            const lastCtrl = anchors[anchors.length - 2];
+            const finalPt  = anchors[anchors.length - 1];
+            pathStr += ' Q ' + lastCtrl.x.toFixed(2) + ' ' + lastCtrl.y.toFixed(2) + ' ' + finalPt.x.toFixed(2) + ' ' + finalPt.y.toFixed(2);
+          }
+          r.setAttribute('d', pathStr);
+
+          // Opacity peaks at mid-life (sin curve). Higher base since mask softens edges.
+          const opacity = Math.sin(progress * Math.PI) * 0.95;
+          r.style.opacity = opacity;
+
+          // Each ripple contributes its current life-energy to the spotlight pulse
+          totalEnergy += Math.sin(progress * Math.PI);
+        }
+
+        // Pulse both spotlight radii with collective ripple energy
+        const avgEnergy = totalEnergy / RIPPLE_COUNT;
+        spotlight.setAttribute('r',  200 + avgEnergy * 60);
+        spotlight2.setAttribute('r', 165 + avgEnergy * 50);
+
+        requestAnimationFrame(tick);
+      }
+
+      setTimeout(() => requestAnimationFrame(tick), START_DELAY);
+    })();
+  </script>
+
+  <script>
+    // ── Ambient JI chord drone: six voices, slow tremolo and panning ──
+    // Ratios: 1/1, 21/20, 5/4, 4/3, 11/7, 5/3
+    // Fundamental: A2 = 110Hz
+    (function() {
+      const FUNDAMENTAL = 110;
+      // Voiced across octaves to give each ratio its own acoustic space.
+      // Lower voices ground the chord; higher voices add air and clarity.
+      // "octave" field multiplies the fundamental*ratio by 2^octave.
+      const RATIOS = [
+        { num: 1,  den: 1,  octave: 0 },   // 1/1   × 1  = 110.00 Hz  (low root)
+        { num: 5,  den: 4,  octave: 0 },   // 5/4   × 1  = 137.50 Hz  (low major 3rd)
+        { num: 4,  den: 3,  octave: 1 },   // 4/3   × 2  = 293.33 Hz  (mid 4th, octave up)
+        { num: 5,  den: 3,  octave: 1 },   // 5/3   × 2  = 366.67 Hz  (mid 6th, octave up)
+        { num: 21, den: 20, octave: 2 },   // 21/20 × 4  = 462.00 Hz  (high septimal, 2 octaves up)
+        { num: 11, den: 7,  octave: 2 }    // 11/7  × 4  = 691.43 Hz  (high undecimal, 2 octaves up)
+      ];
+
+      let started = false;
+
+      async function startDrone() {
+        if (started) return;
+        if (typeof Tone === 'undefined') {
+          console.error('[chord] Tone.js not loaded');
+          return;
+        }
+        console.log('[chord] attempting to start audio context…');
+
+        try {
+          await Tone.start();
+          console.log('[chord] audio context state:', Tone.context.state);
+
+          // Only mark started=true if the context actually transitioned to running
+          if (Tone.context.state !== 'running') {
+            console.warn('[chord] context did not enter running state — will retry on next gesture');
+            return;
+          }
+
+          started = true;
+          console.log('[chord] starting drone…');
+
+          // Master chain: lowpass → analyser → compressor → gain → destination
+          // Build destination-first using .chain() pattern
+          const masterGain = new Tone.Gain(0.25);
+          masterGain.toDestination();
+
+          const compressor = new Tone.Compressor(-24, 3);
+          compressor.connect(masterGain);
+
+          // Waveform analyser — taps into the live audio so we can draw it
+          const analyser = new Tone.Analyser('waveform', 512);
+          analyser.connect(compressor);
+
+          const lowpass = new Tone.Filter(3200, 'lowpass');
+          lowpass.connect(analyser);
+
+          // Reveal the waveform SVG once audio is running
+          const waveformSvg = document.getElementById('name-waveform');
+          const waveformPath = document.getElementById('name-waveform-path');
+          if (waveformSvg) waveformSvg.classList.add('active');
+
+          // Morphing waveform: slow orbital drift driven by smoothed audio energy.
+          // Raw audio amplitude fluctuates at audio-rate even when "volume" is steady,
+          // so we smooth it over a long window first to get true envelope behavior.
+          const W = 420, H = 70, MID = H / 2;
+          const CURVE_POINTS = 24;
+          const EASE = 0.004;             // very slow morphing — Mario Galaxy orbital pacing
+          const AMP_SMOOTH = 0.012;       // smoothing factor for audio amplitude envelope
+          const curveCurrent = new Array(CURVE_POINTS).fill(0);
+          const curveTarget  = new Array(CURVE_POINTS).fill(0);
+          let smoothedAmp = 0;            // long-window-smoothed audio amplitude
+
+          // Per-point phase offsets for natural-looking independent motion
+          const pointPhases = new Array(CURVE_POINTS).fill(0).map((_, i) => i * 0.7);
+
+          function drawWaveform() {
+            const data = analyser.getValue();
+            const dataLen = data.length;
+
+            // RMS of current audio buffer (instantaneous loudness)
+            let sumSq = 0;
+            for (let i = 0; i < dataLen; i++) sumSq += data[i] * data[i];
+            const instantAmp = Math.sqrt(sumSq / dataLen);
+
+            // Smooth amplitude over long window — produces gentle envelope follower
+            smoothedAmp += (instantAmp - smoothedAmp) * AMP_SMOOTH;
+
+            const now = performance.now() / 1000;
+
+            // Update targets very slowly — points wander like distant orbiting bodies
+            for (let p = 0; p < CURVE_POINTS; p++) {
+              const phase = pointPhases[p] + now * 0.035;   // very slow phase drift
+              const wave = Math.sin(phase) * 0.6 + Math.sin(phase * 1.7 + p * 0.3) * 0.4;
+              curveTarget[p] = wave * smoothedAmp * 120;   // amplitude scales with smoothed energy
+              curveCurrent[p] += (curveTarget[p] - curveCurrent[p]) * EASE;
+            }
+
+            // Build smooth path through the morphing points using quadratic Bezier
+            const step = W / (CURVE_POINTS - 1);
+            let d = 'M 0 ' + (MID + curveCurrent[0]).toFixed(2);
+            for (let p = 1; p < CURVE_POINTS - 1; p++) {
+              const x = p * step;
+              const y = MID + curveCurrent[p];
+              const nextX = (p + 1) * step;
+              const nextY = MID + curveCurrent[p + 1];
+              const midX = (x + nextX) / 2;
+              const midY = (y + nextY) / 2;
+              d += ' Q ' + x.toFixed(2) + ' ' + y.toFixed(2) + ' ' + midX.toFixed(2) + ' ' + midY.toFixed(2);
+            }
+            const lastX = (CURVE_POINTS - 1) * step;
+            const lastY = MID + curveCurrent[CURVE_POINTS - 1];
+            d += ' T ' + lastX.toFixed(2) + ' ' + lastY.toFixed(2);
+
+            if (waveformPath) waveformPath.setAttribute('d', d);
+            requestAnimationFrame(drawWaveform);
+          }
+          requestAnimationFrame(drawWaveform);
+
+          // Build each voice — using manual gain modulation for organic motion
+          // Pure sine LFOs feel mechanical; instead, each voice's gain is driven by
+          // a sum of multiple incommensurable slow sines, producing quasi-periodic
+          // motion that never quite repeats — like orbital mechanics.
+          const voiceStates = [];
+
+          RATIOS.forEach((r, i) => {
+            const freq = FUNDAMENTAL * (r.num / r.den) * Math.pow(2, r.octave);
+            console.log('[chord] voice', i, 'at', freq.toFixed(2), 'Hz');
+
+            // Two detuned oscillators per voice for shimmer
+            const osc1 = new Tone.Oscillator(freq, 'sine');
+            const osc2 = new Tone.Oscillator(freq * 1.003, 'sine');
+
+            // Voice gain starts at 0 — will be modulated manually each frame
+            const voiceGain = new Tone.Gain(0);
+            const panner = new Tone.Panner(0);
+
+            // Chain: oscillators → voiceGain → panner → lowpass
+            osc1.connect(voiceGain);
+            osc2.connect(voiceGain);
+            voiceGain.connect(panner);
+            panner.connect(lowpass);
+
+            // Each voice gets two very slow incommensurable rates — true orbital motion.
+            // Periods chosen so the fastest is still ~3 minutes, longest is ~10 minutes.
+            // Voices truly emerge from silence, sustain, recede to silence, return.
+            voiceStates.push({
+              voiceGain: voiceGain,
+              panner: panner,
+              // Two slow rates only (dropped the third, faster one that was creating tremolo feel)
+              rates: [
+                0.0021 + i * 0.00037,    // ~475s primary cycle (~8 min)
+                0.0036 + i * 0.00051     // ~280s secondary cycle (~4.5 min)
+              ],
+              phases: [i * 1.31, i * 2.17],
+              // Pan rates: even slower
+              panRates: [
+                0.0018 + i * 0.00043,    // ~555s
+                0.0027 + i * 0.00031     // ~370s
+              ],
+              panPhases: [i * 0.83, i * 1.57],
+              targetGain: 0.34,
+              currentGain: 0
+            });
+
+            osc1.start();
+            osc2.start();
+          });
+
+          // Master modulation loop — drives all voice gains and pans manually
+          function modulate() {
+            const t = performance.now() / 1000;
+            voiceStates.forEach((v) => {
+              // Two weighted sines at incommensurable rates → quasi-periodic envelope
+              const s1 = Math.sin(t * v.rates[0] * 2 * Math.PI + v.phases[0]);
+              const s2 = Math.sin(t * v.rates[1] * 2 * Math.PI + v.phases[1]);
+              // Combine and map to [-1, 1] then to [0, 1]
+              const raw = (s1 * 0.6 + s2 * 0.4);   // [-1, 1] range
+              // Strong nonlinear curve so voices spend more time at silence and at full presence
+              // (rather than meandering through the middle). This creates clearer "appear/disappear" feel.
+              const env = Math.max(0, raw);        // half-wave rectify: voice is silent for half its cycle
+              const eased = Math.pow(env, 1.8);    // soften the rise/fall edges
+
+              // Slow ease toward target — much longer easing window than before
+              const targetGain = v.targetGain * eased;
+              v.currentGain += (targetGain - v.currentGain) * 0.008;   // ~1/8 of v52, very gentle
+              v.voiceGain.gain.value = v.currentGain;
+
+              // Pan position from two incommensurable sines
+              const p1 = Math.sin(t * v.panRates[0] * 2 * Math.PI + v.panPhases[0]);
+              const p2 = Math.sin(t * v.panRates[1] * 2 * Math.PI + v.panPhases[1]);
+              v.panner.pan.value = (p1 * 0.6 + p2 * 0.4) * 0.7;
+            });
+
+            requestAnimationFrame(modulate);
+          }
+          requestAnimationFrame(modulate);
+
+          console.log('[chord] drone running');
+        } catch (err) {
+          console.error('[chord] failed to start:', err);
+        }
+      }
+
+      // Start on first real user gesture
+      // Critical: mousemove and scroll do NOT count as gestures for autoplay-unlock.
+      // Only click, keydown, touchstart, pointerdown will unlock the audio context.
+      // We don't use { once: true } because the first attempt might fail silently —
+      // we want to retry on each subsequent gesture until startDrone() succeeds.
+      const trigger = (e) => {
+        console.log('[chord] gesture detected:', e.type);
+        startDrone();
+      };
+      window.addEventListener('click',       trigger);
+      window.addEventListener('keydown',     trigger);
+      window.addEventListener('touchstart',  trigger);
+      window.addEventListener('pointerdown', trigger);
+
+      console.log('[chord] click, tap, or press any key to start audio…');
+    })();
+  </script>
+</body>
+</html>
