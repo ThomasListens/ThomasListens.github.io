@@ -2679,6 +2679,14 @@
       <span id="compositeFpsVal" class="value-badge">30 fps</span>
     </div>
 
+    <!-- Load a previous take (an MP4 from disk) as a harmony layer, so a
+         fresh reel can be stacked on top of an earlier take. Gated behind
+         the studio reveal like the other settings rows (non-essential). -->
+    <div class="aspect-row">
+      <button class="aspect-btn" id="loadTakeBtn" style="max-width: none;" title="Load a previous take (MP4) from disk as a harmony layer">+ Load take</button>
+    </div>
+    <input type="file" id="loadTakeFile" accept="video/*" style="display:none">
+
     <div class="record-row record-essential">
       <button type="button" id="audioOnlyBtn" title="Audio-only take — overdub vocal without video. Mixes into the final reel over the existing composite, no new cell." aria-label="Toggle audio-only recording" aria-pressed="false">AUD</button>
       <button type="button" id="layerAddBtn" title="Add this take as a harmony layer" aria-label="Add layer">⊕</button>
@@ -9536,6 +9544,81 @@
       }
     }
 
+    // Read videoWidth/videoHeight from an MP4 (or any video file) by
+    // loading just its metadata into a throwaway <video>. Resolves
+    // { w, h }; rejects on decode error. Used to auto-match the reel
+    // aspect to a loaded take.
+    function probeVideoAspect(file) {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const v = document.createElement('video');
+        v.preload = 'metadata';
+        v.muted = true;
+        v.onloadedmetadata = () => {
+          const w = v.videoWidth, h = v.videoHeight;
+          URL.revokeObjectURL(url);
+          resolve({ w, h });
+        };
+        v.onerror = () => { URL.revokeObjectURL(url); reject(new Error('probe failed')); };
+        v.src = url;
+      });
+    }
+
+    // Load a previous take from disk as a harmony layer — lets Thomas
+    // stack fresh takes on top of an earlier take he liked. Mirrors the
+    // layer shape pushLastTakeAsLayer produces: a full videoBlob (the
+    // file itself) + decoded AudioBuffer, so the composite/bake-down
+    // treats it exactly like a take captured in-app. If the file's
+    // aspect differs from the current reel aspect we auto-switch to the
+    // nearest matching aspect (least surprising — the take fills its
+    // cell the way it was filmed). bakeDownDelayMs 0: a previously
+    // recorded MP4 already has the voice where it lies, no front-trim.
+    async function loadTakeFromFile(file) {
+      if (!file) return;
+      if (harmonyStack.length >= HARMONY_STACK_MAX) {
+        showRemuxIndicator('Stack full (' + HARMONY_STACK_MAX + ' layers max)', { warning: true });
+        setTimeout(hideRemuxIndicator, 3000);
+        return;
+      }
+      try {
+        showRemuxIndicator('Loading take…');
+        // Auto-match reel aspect to the loaded file. Best-effort: if the
+        // probe fails we just push and let the composite math handle it.
+        try {
+          const dims = await probeVideoAspect(file);
+          if (dims && dims.w && dims.h) {
+            const r = dims.w / dims.h;
+            const targets = [['9:16', 0.5625], ['4:5', 0.8], ['1:1', 1.0]];
+            let best = targets[0], bestD = Infinity;
+            for (const t of targets) { const d = Math.abs(r - t[1]); if (d < bestD) { bestD = d; best = t; } }
+            if (best[0] !== recordAspect) {
+              const btn = document.querySelector('.aspect-btn[data-aspect="' + best[0] + '"]');
+              if (btn) btn.click();
+            }
+          }
+        } catch (_) {}
+        getAudioContext();
+        const arrayBuffer = await file.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+        harmonyStack.push({
+          audioBuffer,
+          videoBlob: file,
+          audioOnly: false,
+          durationSec: audioBuffer.duration,
+          gain: 1.0,
+          bakeDownDelayMs: 0,
+        });
+        updateStackIndicator();
+        showRemuxIndicator('Layer ' + harmonyStack.length + ' loaded from file');
+        setTimeout(hideRemuxIndicator, 1500);
+      } catch (err) {
+        console.warn('[stack] load-from-file failed:', err);
+        const msg = (err && err.message) ? err.message : String(err);
+        showRemuxIndicator('Couldn\'t load take: ' + msg, { warning: true });
+        setTimeout(hideRemuxIndicator, 6000);
+      }
+    }
+
     function clearHarmonyStack() {
       stopActiveLayerSources();
       harmonyStack.length = 0;
@@ -11699,6 +11782,19 @@
       if (layerAddBtn) {
         layerAddBtn.addEventListener('click', () => {
           pushLastTakeAsLayer();
+        });
+      }
+      // "+ Load take" — open a file picker and push the chosen MP4 onto
+      // the harmony stack as a layer. Reset .value after so picking the
+      // same file twice still fires the change event.
+      const loadTakeBtn = document.getElementById('loadTakeBtn');
+      const loadTakeFile = document.getElementById('loadTakeFile');
+      if (loadTakeBtn && loadTakeFile) {
+        loadTakeBtn.addEventListener('click', () => loadTakeFile.click());
+        loadTakeFile.addEventListener('change', (e) => {
+          const f = e.target.files && e.target.files[0];
+          if (f) loadTakeFromFile(f);
+          e.target.value = '';
         });
       }
       // Audio-only toggle — restore from localStorage, then wire the
