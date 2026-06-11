@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RTD — Slide 06 · You set the pace</title>
+  <meta name="description" content="Slide 06 of the Relative Tempo Derivation deck. Auto-looping prototype: footsteps tick to heart rate while α and tempo update live, making the adaptive coefficient visible.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper:    #F4F1EC;
+      --ink:      #1A1A1A;
+      --ink-blue: #143E63;
+      --meta:     #6B6860;
+      --dusty:    #7A93A8;
+      --font-body: 'EB Garamond', Garamond, 'Adobe Garamond Pro', Baskerville, Georgia, serif;
+      --font-meta: 'IBM Plex Mono', 'Courier New', Courier, monospace;
+      --meta-size: clamp(0.69rem, 0.56vw + 0.2rem, 0.81rem);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      overflow: hidden;
+      font-family: var(--font-body);
+      font-weight: 400;
+      line-height: 1.2;
+    }
+
+    .slide {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: var(--paper);
+    }
+
+    /* Background orbit — single dusty circle, echoes the deck's trace
+       ellipses on slides 4-6. Centered, low opacity. */
+    .slide-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Page chrome (matches the deck's slide-meta pattern). */
+    .meta {
+      position: absolute;
+      left: clamp(0.8rem, 1.5vw, 1.5rem);
+      right: clamp(0.8rem, 1.5vw, 1.5rem);
+      color: var(--meta);
+      font-family: var(--font-meta);
+      font-size: var(--meta-size);
+      font-weight: 400;
+      letter-spacing: 0.12em;
+      text-transform: lowercase;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 3;
+    }
+    .meta-top    { top:    clamp(0.6rem, 1.2vw, 1.2rem); }
+    .meta-bottom { bottom: clamp(0.6rem, 1.2vw, 1.2rem); }
+
+    /* Headline — italic ink-blue, top zone. */
+    .personal-top {
+      position: absolute;
+      top: 18%;
+      left: 0;
+      right: 0;
+      margin: 0;
+      text-align: center;
+      font-family: var(--font-body);
+      font-style: italic;
+      font-weight: 400;
+      font-size: clamp(24px, 2.8vw, 36px);
+      color: var(--ink-blue);
+      z-index: 2;
+    }
+
+    /* Footstep band — dashed line + SVG layer for the prints. The line
+       is a separate <line> so its dash pattern doesn't interact with
+       the print transitions. */
+    .footstep-band {
+      position: absolute;
+      top: 36%;
+      left: 0;
+      right: 0;
+      height: 14%;
+      z-index: 2;
+    }
+    .footstep-band svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .gait-path {
+      stroke: var(--ink-blue);
+      stroke-width: 1.0;
+      stroke-dasharray: 2 8;
+      vector-effect: non-scaling-stroke;
+      opacity: 0.45;
+    }
+
+    /* Footstep group — JS sets its translate(x,y). The inner ellipse
+       handles its own scale/opacity entry via the footstep-land animation
+       and a leaving class for exit. Transition on transform smooths
+       the queue's left-shift when the oldest print is dropped. */
+    .footstep {
+      transition: transform 280ms cubic-bezier(0.4, 0, 0.4, 1);
+    }
+
+    .footstep-print {
+      fill: var(--ink);
+      transform-box: fill-box;
+      transform-origin: 50% 50%;
+      opacity: 0;
+      animation: footstep-land 200ms ease-out forwards;
+    }
+
+    .footstep[data-side="L"] .footstep-print {
+      animation-name: footstep-land-l;
+    }
+    .footstep[data-side="R"] .footstep-print {
+      animation-name: footstep-land-r;
+    }
+
+    /* Horizontal orientation — long axis of each oval points in the
+       direction of travel (left → right). Slight toe-out (±6°) gives
+       a natural walking gait when viewed from above. */
+    @keyframes footstep-land-l {
+      from { transform: rotate(-6deg) scale(0.78); opacity: 0; }
+      to   { transform: rotate(-6deg) scale(1);    opacity: 0.85; }
+    }
+    @keyframes footstep-land-r {
+      from { transform: rotate(6deg) scale(0.78); opacity: 0; }
+      to   { transform: rotate(6deg) scale(1);    opacity: 0.85; }
+    }
+
+    .footstep.leaving .footstep-print {
+      animation: footstep-leave 360ms ease-in forwards;
+    }
+    @keyframes footstep-leave {
+      to { opacity: 0; }
+    }
+
+    /* Citation — italic body, mono cite, dusty-blue, beneath the band. */
+    .research-quote {
+      position: absolute;
+      top: 56%;
+      left: 0;
+      right: 0;
+      text-align: center;
+      z-index: 2;
+    }
+    .quote-text {
+      margin: 0 auto 6px;
+      max-width: 70%;
+      font-family: var(--font-body);
+      font-style: italic;
+      font-weight: 400;
+      font-size: clamp(15px, 1.4vw, 20px);
+      color: var(--dusty);
+      letter-spacing: -0.005em;
+    }
+    .quote-cite {
+      margin: 0;
+      font-family: var(--font-meta);
+      font-weight: 400;
+      font-size: clamp(10px, 1.0vw, 12px);
+      color: var(--meta);
+      letter-spacing: 0.12em;
+      opacity: 0.85;
+    }
+
+    /* Formula block — three live rows in a grid for column alignment.
+       The "main" formula at top is a wider mono line; the rows beneath
+       split label / colon / value / unit into grid columns so HR, α
+       and Tempo all align at the colon and at the value. */
+    .formula-display {
+      position: absolute;
+      top: 68%;
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      z-index: 2;
+    }
+    .formula-main {
+      font-family: var(--font-meta);
+      font-size: clamp(18px, 1.8vw, 24px);
+      color: var(--ink-blue);
+      letter-spacing: 0.04em;
+      margin: 0;
+    }
+    .formula-main .glyph {
+      font-family: var(--font-body);
+      font-style: italic;
+      font-size: 1.05em;
+    }
+
+    .formula-rows {
+      display: grid;
+      grid-template-columns: auto auto auto auto;
+      column-gap: 14px;
+      row-gap: 6px;
+      align-items: baseline;
+      font-family: var(--font-meta);
+      font-size: clamp(15px, 1.45vw, 19px);
+      color: var(--ink);
+      letter-spacing: 0.03em;
+    }
+    .formula-rows .label {
+      text-align: right;
+      color: var(--meta);
+    }
+    .formula-rows .label.glyph {
+      font-family: var(--font-body);
+      font-style: italic;
+      font-size: 1.15em;
+      color: var(--ink-blue);
+    }
+    .formula-rows .sep {
+      color: var(--dusty);
+    }
+    .formula-rows .value {
+      font-variant-numeric: tabular-nums;
+      min-width: 4ch;
+      text-align: right;
+      color: var(--ink);
+    }
+    .formula-rows .value.value-alpha {
+      color: var(--ink-blue);
+      font-weight: 500;
+    }
+    .formula-rows .unit {
+      color: var(--meta);
+      font-size: 0.85em;
+      letter-spacing: 0.1em;
+    }
+
+    /* Caption — italic, muted, just below the formula. */
+    .caption {
+      position: absolute;
+      top: 87%;
+      left: 0;
+      right: 0;
+      margin: 0;
+      text-align: center;
+      font-family: var(--font-body);
+      font-style: italic;
+      font-weight: 400;
+      font-size: clamp(13px, 1.15vw, 16px);
+      color: var(--meta);
+      letter-spacing: 0.005em;
+      z-index: 2;
+    }
+    .caption .glyph {
+      color: var(--ink-blue);
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <main class="slide">
+    <svg class="slide-bg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <!-- Single subtle circle — echoes the inner trace from slides 4-5. -->
+      <ellipse cx="800" cy="500" rx="540" ry="540"
+               fill="none"
+               stroke="#143E63" stroke-width="0.8"
+               vector-effect="non-scaling-stroke"
+               opacity="0.18" />
+      <ellipse cx="800" cy="500" rx="400" ry="400"
+               fill="none"
+               stroke="#143E63" stroke-width="0.8"
+               vector-effect="non-scaling-stroke"
+               opacity="0.28" />
+    </svg>
+
+    <div class="meta meta-top">
+      <span>iii. the build</span>
+      <span>06 / 11</span>
+    </div>
+
+    <p class="personal-top">You set the pace.</p>
+
+    <div class="footstep-band" aria-hidden="true">
+      <svg viewBox="0 0 1200 200" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+        <line class="gait-path" x1="60" y1="100" x2="1140" y2="100" />
+        <g id="footstep-layer"></g>
+      </svg>
+    </div>
+
+    <div class="research-quote">
+      <p class="quote-text">Heart rate and step rate naturally synchronize to a constant ratio at steady state.</p>
+      <p class="quote-cite">— Constantini et al., 2018</p>
+    </div>
+
+    <div class="formula-display" role="presentation">
+      <p class="formula-main">Tempo&nbsp;=&nbsp;HR&nbsp;×&nbsp;<span class="glyph">α</span></p>
+      <div class="formula-rows">
+        <span class="label">HR</span>
+        <span class="sep">:</span>
+        <span class="value" id="val-hr">72</span>
+        <span class="unit">BPM</span>
+
+        <span class="label glyph">α</span>
+        <span class="sep">:</span>
+        <span class="value value-alpha" id="val-alpha">1.35</span>
+        <span class="unit"></span>
+
+        <span class="label">Tempo</span>
+        <span class="sep">:</span>
+        <span class="value" id="val-tempo">97.2</span>
+        <span class="unit">BPM</span>
+      </div>
+    </div>
+
+    <p class="caption"><span class="glyph">α</span> adapts continuously — from 3/2 at rest to 1 at high intensity.</p>
+
+    <div class="meta meta-bottom">
+      <span>thomaslistens.github.io/rtd</span>
+      <span>Thomas LeRoy Meier · 2026</span>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // ---- Tunables --------------------------------------------------
+      const LOOP_MS      = 20000;   // full accel + decel cycle
+      const HR_MIN       = 60;
+      const HR_MAX       = 100;
+      const ALPHA_AT_LOW = 1.5;     // α at HR_MIN  (3/2 at rest)
+      const ALPHA_AT_HI  = 1.0;     // α at HR_MAX  (1 at high intensity)
+
+      const MAX_PRINTS   = 14;      // visible footprints at any time
+      const BAND_LEFT    = 90;      // viewBox x of leftmost slot
+      const BAND_RIGHT   = 1110;    // viewBox x of rightmost slot
+      const BAND_MID_Y   = 100;     // viewBox y centerline
+      const STEP_OFFSET  = 11;      // ± y offset L vs R foot
+      const LEAVE_MS     = 360;     // matches footstep-leave duration
+
+      // ---- Domain math ----------------------------------------------
+      // Keep alpha(hr) callable & swappable — presenter may replace this
+      // with a physiologically-grounded curve later.
+      function alpha(hr) {
+        const clamped = Math.max(HR_MIN, Math.min(HR_MAX, hr));
+        const t = (clamped - HR_MIN) / (HR_MAX - HR_MIN);
+        return ALPHA_AT_LOW + (ALPHA_AT_HI - ALPHA_AT_LOW) * t;
+      }
+
+      function tempo(hr) {
+        return hr * alpha(hr);
+      }
+
+      // Sinusoidal ease — 0..1 → 0..1, slow at both ends, fast at midpoint.
+      // Cleaner than cubic for a "breathing" body-state oscillation.
+      function easeInOutSine(t) {
+        return -(Math.cos(Math.PI * t) - 1) / 2;
+      }
+
+      // HR over the loop:
+      //   0   .. 0.5  →  HR_MIN → HR_MAX  (accelerate)
+      //   0.5 .. 1.0  →  HR_MAX → HR_MIN  (decelerate)
+      // Use a single full-cycle sine so the apex is at t=0.5 and the
+      // loop seam at t=0 / t=1 is exactly the same value & derivative.
+      function currentHR(loopT) {
+        // -cos(2π·t) maps t=0 → -1, t=0.5 → 1, t=1 → -1
+        const s = (1 - Math.cos(2 * Math.PI * loopT)) / 2; // 0 at edges, 1 at middle
+        return HR_MIN + (HR_MAX - HR_MIN) * s;
+      }
+
+      // ---- Footstep queue ------------------------------------------
+      const layer = document.getElementById('footstep-layer');
+      const SVG_NS = 'http://www.w3.org/2000/svg';
+
+      const queue = []; // { el, id }
+      let nextId  = 0;
+
+      function makeFootstep(id) {
+        const g = document.createElementNS(SVG_NS, 'g');
+        g.classList.add('footstep');
+        g.dataset.id = id;
+        g.dataset.side = (id % 2 === 0) ? 'L' : 'R';
+
+        // Horizontal oval: long axis = walking direction (left → right).
+        // Viewed from above, this reads as a foot pointing forward.
+        const ellipse = document.createElementNS(SVG_NS, 'ellipse');
+        ellipse.setAttribute('class', 'footstep-print');
+        ellipse.setAttribute('rx', '13');
+        ellipse.setAttribute('ry', '7');
+        g.appendChild(ellipse);
+
+        return g;
+      }
+
+      function slotX(slotIdx) {
+        // slot index in [0, MAX_PRINTS-1] → x along band
+        const denom = Math.max(1, MAX_PRINTS - 1);
+        return BAND_LEFT + (slotIdx / denom) * (BAND_RIGHT - BAND_LEFT);
+      }
+
+      function repositionAll() {
+        // Footsteps land in slots starting from the right and walk
+        // left as new ones join. Newest is always at the rightmost slot;
+        // oldest fills the leftmost occupied slot.
+        const N = queue.length;
+        const startSlot = MAX_PRINTS - N;
+        for (let i = 0; i < N; i++) {
+          const fs = queue[i];
+          const slot = startSlot + i;
+          const x = slotX(slot);
+          const y = BAND_MID_Y + ((fs.id % 2 === 0) ? -STEP_OFFSET : STEP_OFFSET);
+          fs.el.setAttribute('transform', 'translate(' + x.toFixed(2) + ' ' + y + ')');
+        }
+      }
+
+      function spawnFootstep() {
+        const id = nextId++;
+        const el = makeFootstep(id);
+        // Place at its target slot immediately (no slide-in); the
+        // entry animation is the scale/opacity of the inner ellipse.
+        layer.appendChild(el);
+        queue.push({ el: el, id: id });
+        repositionAll();
+
+        if (queue.length > MAX_PRINTS) {
+          const oldest = queue.shift();
+          oldest.el.classList.add('leaving');
+          // Reposition the remaining queue immediately so they slide
+          // one slot left while the leaving print fades in place.
+          repositionAll();
+          window.setTimeout(function () {
+            if (oldest.el.parentNode) oldest.el.parentNode.removeChild(oldest.el);
+          }, LEAVE_MS);
+        }
+      }
+
+      // ---- Live formula display ------------------------------------
+      const hrEl    = document.getElementById('val-hr');
+      const aEl     = document.getElementById('val-alpha');
+      const tempoEl = document.getElementById('val-tempo');
+
+      // Cache last-written text to avoid redundant DOM writes; the
+      // formula is the focal element of the slide and any unnecessary
+      // text mutation is a subtle flicker we want to avoid.
+      let lastHR = '', lastA = '', lastT = '';
+
+      function paintFormula(hr) {
+        const a = alpha(hr);
+        const t = tempo(hr);
+        const hrStr    = Math.round(hr).toString();
+        const aStr     = a.toFixed(2);
+        const tempoStr = t.toFixed(1);
+        if (hrStr    !== lastHR) { hrEl.textContent    = hrStr;    lastHR = hrStr; }
+        if (aStr     !== lastA)  { aEl.textContent     = aStr;     lastA  = aStr; }
+        if (tempoStr !== lastT)  { tempoEl.textContent = tempoStr; lastT  = tempoStr; }
+      }
+
+      // ---- Main loop -----------------------------------------------
+      // Phase accumulator keeps footstep timing locked to instantaneous HR
+      // even as HR ramps. Each frame: dt seconds × (HR/60) beats/sec is
+      // added to `phase`; when phase crosses 1.0, a footstep lands.
+      let startTime = null;
+      let lastFrame = null;
+      let phase     = 0;
+
+      function frame(now) {
+        if (startTime === null) {
+          startTime = now;
+          lastFrame = now;
+        }
+        const dt = Math.min(0.1, (now - lastFrame) / 1000); // clamp big tab-switch dt
+        lastFrame = now;
+
+        const loopT = ((now - startTime) % LOOP_MS) / LOOP_MS;
+        const hr    = currentHR(loopT);
+
+        phase += (hr / 60) * dt;
+        while (phase >= 1) {
+          spawnFootstep();
+          phase -= 1;
+        }
+
+        paintFormula(hr);
+
+        window.requestAnimationFrame(frame);
+      }
+
+      // Seed the band with a few prints so the first second doesn't
+      // start empty (loop is meant to feel mid-stride from t=0).
+      function seedFootsteps() {
+        const seedCount = 4;
+        for (let i = 0; i < seedCount; i++) spawnFootstep();
+      }
+
+      // Respect reduced-motion: still show live values + a static band
+      // of prints, but skip the entry animation flicker on each beat.
+      const prefersReduced = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      if (prefersReduced) {
+        // Paint a static, mid-loop snapshot. No animation loop.
+        for (let i = 0; i < MAX_PRINTS; i++) spawnFootstep();
+        paintFormula((HR_MIN + HR_MAX) / 2);
+      } else {
+        seedFootsteps();
+        window.requestAnimationFrame(frame);
+      }
+    })();
+  </script>
+</body>
+</html>

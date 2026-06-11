@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RTD — IAF as frame rate (two clocks)</title>
+  <meta name="description" content="Frame-rate analogy for Individual Alpha Frequency: two clocks complete one turn per second, one sampling at 30 steps, the other at 13. Same flow of time, different temporal resolution.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper:     #F4F1EC;
+      --ink:       #1A1A1A;
+      --ink-blue:  #143E63;
+      --ink-blue-2:#5C7FA3;
+      --meta:      #6B6860;
+      --dusty:     #7A93A8;
+      --font-body: 'EB Garamond', Garamond, 'Adobe Garamond Pro', Baskerville, Georgia, serif;
+      --font-meta: 'IBM Plex Mono', 'Courier New', Courier, monospace;
+      --meta-size: clamp(0.69rem, 0.56vw + 0.2rem, 0.81rem);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%; height: 100%; margin: 0;
+      background: var(--paper); color: var(--ink);
+      overflow: hidden;
+      font-family: var(--font-body); font-weight: 400; line-height: 1.2;
+    }
+
+    .slide { position: relative; width: 100vw; height: 100vh; background: var(--paper); }
+
+    /* Same dusty-blue orbit pair as slides 06–08 so the deck reads as one frame. */
+    .slide-bg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+
+    /* Page chrome — identical to 06/07/08. */
+    .meta {
+      position: absolute;
+      left: clamp(0.8rem, 1.5vw, 1.5rem); right: clamp(0.8rem, 1.5vw, 1.5rem);
+      color: var(--meta); font-family: var(--font-meta); font-size: var(--meta-size);
+      font-weight: 400; letter-spacing: 0.12em; text-transform: lowercase;
+      display: flex; justify-content: space-between; align-items: center; z-index: 3;
+    }
+    .meta-top    { top:    clamp(0.6rem, 1.2vw, 1.2rem); }
+    .meta-bottom { bottom: clamp(0.6rem, 1.2vw, 1.2rem); }
+
+    /* Headline — same italic ink-blue voice as the other build slides. */
+    .clocks-head {
+      position: absolute; top: 13%; left: 0; right: 0;
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      z-index: 2; padding: 0 6vw; text-align: center;
+    }
+    .clocks-headline {
+      margin: 0; font-style: italic; font-weight: 400;
+      font-size: clamp(28px, 3.2vw, 42px); color: var(--ink-blue); line-height: 1.1;
+    }
+    .clocks-subtitle {
+      margin: 0; font-style: italic; font-weight: 400;
+      font-size: clamp(16px, 1.6vw, 21px); color: var(--meta); line-height: 1.35; max-width: 60ch;
+    }
+
+    /* The pair — two clocks centred on the focus axis. */
+    .clocks-stage {
+      position: absolute; top: 50%; left: 0; right: 0;
+      transform: translateY(-50%);
+      display: flex; justify-content: center; align-items: flex-start;
+      gap: clamp(3rem, 9vw, 9rem); z-index: 2;
+    }
+    .clock-unit { display: flex; flex-direction: column; align-items: center; gap: 0.9rem; }
+
+    .clock-rate {
+      font-family: var(--font-meta); font-weight: 500; color: var(--ink-blue);
+      letter-spacing: 0.04em; text-align: center; line-height: 1.05;
+    }
+    .clock-rate .num  { font-size: clamp(30px, 3.4vw, 46px); }
+    .clock-rate .unit { display: block; font-size: clamp(11px, 1.0vw, 13px); color: var(--meta);
+                        letter-spacing: 0.18em; text-transform: uppercase; margin-top: 4px; }
+
+    .clock-face { width: clamp(180px, 19vw, 250px); height: auto; display: block; }
+
+    .clock-tag {
+      font-family: var(--font-body); font-style: italic;
+      font-size: clamp(15px, 1.5vw, 19px); color: var(--meta); text-align: center;
+    }
+
+    /* SVG element styling. */
+    .clock-rim   { fill: none; stroke: var(--dusty); stroke-width: 1.5; opacity: 0.55; }
+    .tick        { stroke: var(--dusty); stroke-width: 1.6; opacity: 0.5; }
+    .tick-active { stroke: var(--ink-blue); stroke-width: 2.6; opacity: 1; }
+    .hand        { stroke: var(--ink-blue); stroke-width: 3; stroke-linecap: round; }
+    .sample-dot  { fill: var(--ink-blue); }
+    .hub         { fill: var(--ink-blue); }
+
+    /* Footer thesis — same anchor/treatment as slide 08. */
+    .clocks-thesis {
+      position: absolute; bottom: 11%; left: 0; right: 0;
+      display: flex; flex-direction: column; align-items: center; gap: 14px; z-index: 2;
+      padding: 0 8vw; text-align: center;
+    }
+    .clocks-thesis-rule { width: 24%; height: 1px; margin: 0; border: none; background: var(--dusty); opacity: 0.5; }
+    .clocks-thesis-line {
+      margin: 0; font-style: italic; font-weight: 400;
+      font-size: clamp(19px, 2.1vw, 28px); color: var(--ink-blue);
+      letter-spacing: -0.005em; max-width: 64ch;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hand, .sample-dot { /* held static at 12 o'clock by JS */ }
+    }
+  </style>
+</head>
+<body>
+  <main class="slide">
+    <svg class="slide-bg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <ellipse cx="800" cy="500" rx="540" ry="540" fill="none" stroke="#143E63" stroke-width="0.8" vector-effect="non-scaling-stroke" opacity="0.18" />
+      <ellipse cx="800" cy="500" rx="400" ry="400" fill="none" stroke="#143E63" stroke-width="0.8" vector-effect="non-scaling-stroke" opacity="0.28" />
+    </svg>
+
+    <div class="meta meta-top">
+      <span>iii. the build</span>
+      <span>07 / 11</span>
+    </div>
+
+    <div class="clocks-head">
+      <p class="clocks-headline">Your brain samples time at its own rate.</p>
+      <p class="clocks-subtitle">Individual Alpha Frequency is a frame rate for perception — how many moments of the world you resolve each second.</p>
+    </div>
+
+    <div class="clocks-stage">
+      <div class="clock-unit">
+        <div class="clock-rate"><span class="num">30</span><span class="unit">samples / sec</span></div>
+        <svg class="clock-face" data-ticks="30" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle class="clock-rim" cx="110" cy="110" r="92" />
+        </svg>
+        <div class="clock-tag">fine resolution</div>
+      </div>
+
+      <div class="clock-unit">
+        <div class="clock-rate"><span class="num">13</span><span class="unit">samples / sec</span></div>
+        <svg class="clock-face" data-ticks="13" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle class="clock-rim" cx="110" cy="110" r="92" />
+        </svg>
+        <div class="clock-tag">alpha-band rate</div>
+      </div>
+    </div>
+
+    <div class="clocks-thesis">
+      <hr class="clocks-thesis-rule">
+      <p class="clocks-thesis-line">Both hands turn once each second — but the 13-step clock skips the moments in between.</p>
+    </div>
+
+    <div class="meta meta-bottom">
+      <span>thomaslistens.github.io/rtd</span>
+      <span>Thomas LeRoy Meier · 2026</span>
+    </div>
+  </main>
+
+  <script>
+    /* Two-clock frame-rate analogy for IAF.
+       Each clock has N tick marks and advances exactly one tick per
+       (1000 / N) ms — i.e. N "frames" per second — so BOTH complete one
+       full revolution every second. With N = 30 vs 13 the hands turn at
+       the same overall speed, but the 13-step hand jumps in coarser
+       steps: a lower frame rate sampling the same flow of time.
+       The pointed tick lights up and a dot marks each sampled moment. */
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    const CX = 110, CY = 110;
+    const R_TICK_IN = 78, R_TICK_OUT = 90, R_HAND = 64, R_DOT = 84;
+    const REV_MS = 1000;  // one revolution per second for both clocks
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function buildClock(svg) {
+      const n = parseInt(svg.dataset.ticks, 10);
+
+      const ticksGroup = document.createElementNS(SVG_NS, 'g');
+      const ticks = [];
+      for (let i = 0; i < n; i++) {
+        const a = (i / n * 360 - 90) * Math.PI / 180;  // i=0 at 12 o'clock
+        const line = document.createElementNS(SVG_NS, 'line');
+        line.setAttribute('x1', (CX + R_TICK_IN  * Math.cos(a)).toFixed(2));
+        line.setAttribute('y1', (CY + R_TICK_IN  * Math.sin(a)).toFixed(2));
+        line.setAttribute('x2', (CX + R_TICK_OUT * Math.cos(a)).toFixed(2));
+        line.setAttribute('y2', (CY + R_TICK_OUT * Math.sin(a)).toFixed(2));
+        line.setAttribute('class', 'tick');
+        ticksGroup.appendChild(line);
+        ticks.push(line);
+      }
+      svg.appendChild(ticksGroup);
+
+      const hand = document.createElementNS(SVG_NS, 'line');
+      hand.setAttribute('x1', CX); hand.setAttribute('y1', CY);
+      hand.setAttribute('x2', CX); hand.setAttribute('y2', CY - R_HAND);
+      hand.setAttribute('class', 'hand');
+      svg.appendChild(hand);
+
+      const dot = document.createElementNS(SVG_NS, 'circle');
+      dot.setAttribute('r', '5'); dot.setAttribute('class', 'sample-dot');
+      svg.appendChild(dot);
+
+      const hub = document.createElementNS(SVG_NS, 'circle');
+      hub.setAttribute('cx', CX); hub.setAttribute('cy', CY); hub.setAttribute('r', '4.5');
+      hub.setAttribute('class', 'hub');
+      svg.appendChild(hub);
+
+      return { n, hand, dot, ticks, lastIdx: -1 };
+    }
+
+    function render(clock, idx) {
+      const angle = idx / clock.n * 360;
+      clock.hand.setAttribute('transform', `rotate(${angle} ${CX} ${CY})`);
+      const a = (angle - 90) * Math.PI / 180;
+      clock.dot.setAttribute('cx', (CX + R_DOT * Math.cos(a)).toFixed(2));
+      clock.dot.setAttribute('cy', (CY + R_DOT * Math.sin(a)).toFixed(2));
+      for (let i = 0; i < clock.ticks.length; i++) {
+        clock.ticks[i].classList.toggle('tick-active', i === idx);
+      }
+      clock.lastIdx = idx;
+    }
+
+    const clocks = [...document.querySelectorAll('.clock-face')].map(buildClock);
+
+    if (reduced) {
+      clocks.forEach((c) => render(c, 0));   // static snapshot at 12 o'clock
+    } else {
+      const frame = (now) => {
+        for (const c of clocks) {
+          const stepMs = REV_MS / c.n;        // = 1000 / fps, since fps = n
+          const idx = Math.floor(now / stepMs) % c.n;
+          if (idx !== c.lastIdx) render(c, idx);
+        }
+        requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    }
+  </script>
+</body>
+</html>

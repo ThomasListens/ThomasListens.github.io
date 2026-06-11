@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RTD — Slide 07 · Your perspective makes a difference</title>
+  <meta name="description" content="Slide 07 of the Relative Tempo Derivation deck. Auto-looping prototype: the brain-wave inside the parens morphs to its current IAF while α and tempo update live, making the modulation visible.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper:    #F4F1EC;
+      --ink:      #1A1A1A;
+      --ink-blue: #143E63;
+      --meta:     #6B6860;
+      --dusty:    #7A93A8;
+      --font-body: 'EB Garamond', Garamond, 'Adobe Garamond Pro', Baskerville, Georgia, serif;
+      --font-meta: 'IBM Plex Mono', 'Courier New', Courier, monospace;
+      --meta-size: clamp(0.69rem, 0.56vw + 0.2rem, 0.81rem);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      overflow: hidden;
+      font-family: var(--font-body);
+      font-weight: 400;
+      line-height: 1.2;
+    }
+
+    .slide {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: var(--paper);
+    }
+
+    /* Background orbit — same dusty circles as slide 6 so the two
+       slides feel like sibling frames. */
+    .slide-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Page chrome — matches slide 6 exactly. */
+    .meta {
+      position: absolute;
+      left: clamp(0.8rem, 1.5vw, 1.5rem);
+      right: clamp(0.8rem, 1.5vw, 1.5rem);
+      color: var(--meta);
+      font-family: var(--font-meta);
+      font-size: var(--meta-size);
+      font-weight: 400;
+      letter-spacing: 0.12em;
+      text-transform: lowercase;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 3;
+    }
+    .meta-top    { top:    clamp(0.6rem, 1.2vw, 1.2rem); }
+    .meta-bottom { bottom: clamp(0.6rem, 1.2vw, 1.2rem); }
+
+    /* Headline — same italic ink-blue + size scale as slide 6's
+       "You set the pace." so the two land as siblings. */
+    .personal-top {
+      position: absolute;
+      top: 16%;
+      left: 0;
+      right: 0;
+      margin: 0;
+      text-align: center;
+      font-family: var(--font-body);
+      font-style: italic;
+      font-weight: 400;
+      font-size: clamp(24px, 2.8vw, 36px);
+      color: var(--ink-blue);
+      z-index: 2;
+    }
+
+    /* Brain-wave band — two static parens with a JS-driven wave
+       between them. The wave path is re-emitted each frame so its
+       cycle count and phase can both vary continuously. */
+    .iaf-band {
+      position: absolute;
+      top: 28%;
+      left: 0;
+      right: 0;
+      height: 22%;
+      z-index: 2;
+    }
+    .iaf-band svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .iaf-curve {
+      stroke: var(--ink-blue);
+      stroke-width: 1.4;
+      stroke-linecap: round;
+      fill: none;
+      vector-effect: non-scaling-stroke;
+      opacity: 0.85;
+    }
+
+    .iaf-wave {
+      stroke: var(--dusty);
+      stroke-width: 1.4;
+      fill: none;
+      vector-effect: non-scaling-stroke;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.9;
+    }
+
+    .iaf-wave-label {
+      font-family: var(--font-body);
+      font-style: italic;
+      font-size: 18px;
+      fill: var(--ink-blue);
+      opacity: 0.85;
+    }
+
+    /* Citation — italic body, mono cite. Same treatment as slide 6's
+       Constantini quote. */
+    .research-quote {
+      position: absolute;
+      top: 52%;
+      left: 0;
+      right: 0;
+      text-align: center;
+      z-index: 2;
+    }
+    .quote-text {
+      margin: 0 auto 6px;
+      max-width: 70%;
+      font-family: var(--font-body);
+      font-style: italic;
+      font-weight: 400;
+      font-size: clamp(15px, 1.4vw, 20px);
+      color: var(--dusty);
+      letter-spacing: -0.005em;
+    }
+    .quote-cite {
+      margin: 0;
+      font-family: var(--font-meta);
+      font-weight: 400;
+      font-size: clamp(10px, 1.0vw, 12px);
+      color: var(--meta);
+      letter-spacing: 0.12em;
+      opacity: 0.85;
+    }
+
+    /* Bridge sentence — sits between citation and formula. Expository
+       (not animated). */
+    .bridge {
+      position: absolute;
+      top: 61%;
+      left: 0;
+      right: 0;
+      margin: 0;
+      text-align: center;
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: clamp(15px, 1.4vw, 20px);
+      color: var(--ink);
+      max-width: 76%;
+      margin-inline: auto;
+      z-index: 2;
+    }
+
+    /* Live formula block — four rows now (HR, IAF, α, Tempo).
+       grid columns: label / sep / value / unit. tabular-nums + min-width
+       on the value cells keeps digits from jittering as values tick. */
+    .formula-display {
+      position: absolute;
+      top: 70%;
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      z-index: 2;
+    }
+    .formula-main {
+      font-family: var(--font-meta);
+      font-size: clamp(18px, 1.8vw, 24px);
+      color: var(--ink-blue);
+      letter-spacing: 0.04em;
+      margin: 0;
+    }
+    .formula-main .glyph {
+      font-family: var(--font-body);
+      font-style: italic;
+      font-size: 1.05em;
+    }
+    .formula-main .regime {
+      margin-left: 14px;
+      color: var(--meta);
+      font-size: 0.7em;
+      letter-spacing: 0.14em;
+    }
+
+    .formula-rows {
+      display: grid;
+      grid-template-columns: auto auto auto auto;
+      column-gap: 14px;
+      row-gap: 4px;
+      align-items: baseline;
+      font-family: var(--font-meta);
+      font-size: clamp(15px, 1.45vw, 19px);
+      color: var(--ink);
+      letter-spacing: 0.03em;
+    }
+    .formula-rows .label {
+      text-align: right;
+      color: var(--meta);
+    }
+    .formula-rows .label.glyph {
+      font-family: var(--font-body);
+      font-style: italic;
+      font-size: 1.15em;
+      color: var(--ink-blue);
+    }
+    .formula-rows .sep {
+      color: var(--meta);
+      opacity: 0.55;
+    }
+    .formula-rows .value {
+      font-variant-numeric: tabular-nums;
+      min-width: 4ch;
+      text-align: right;
+      color: var(--ink);
+    }
+    .formula-rows .value.value-mu {
+      color: var(--ink-blue);
+      font-weight: 500;
+    }
+    .formula-rows .unit {
+      color: var(--meta);
+      font-size: 0.85em;
+      letter-spacing: 0.1em;
+      min-width: 3ch;
+      text-align: left;
+    }
+
+    .caption {
+      position: absolute;
+      top: 89%;
+      left: 0;
+      right: 0;
+      margin: 0;
+      text-align: center;
+      font-family: var(--font-body);
+      font-style: italic;
+      font-weight: 400;
+      font-size: clamp(13px, 1.15vw, 16px);
+      color: var(--meta);
+      letter-spacing: 0.005em;
+      z-index: 2;
+    }
+    .caption .glyph {
+      color: var(--ink-blue);
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <main class="slide">
+    <svg class="slide-bg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <ellipse cx="800" cy="500" rx="540" ry="540"
+               fill="none"
+               stroke="#143E63" stroke-width="0.8"
+               vector-effect="non-scaling-stroke"
+               opacity="0.18" />
+      <ellipse cx="800" cy="500" rx="400" ry="400"
+               fill="none"
+               stroke="#143E63" stroke-width="0.8"
+               vector-effect="non-scaling-stroke"
+               opacity="0.28" />
+    </svg>
+
+    <div class="meta meta-top">
+      <span>iii. the build</span>
+      <span>07 / 11</span>
+    </div>
+
+    <p class="personal-top">Your perspective makes a difference.</p>
+
+    <div class="iaf-band" aria-hidden="true">
+      <svg viewBox="0 0 800 320" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+        <!-- Two static parens — the "skull" outline. -->
+        <path class="iaf-curve" d="M 200 30 Q 150 160 200 290" />
+        <path class="iaf-curve" d="M 600 30 Q 650 160 600 290" />
+        <!-- JS rewrites `d` each frame: cycle count tracks IAF,
+             phase drifts at a rate proportional to IAF. -->
+        <path id="iaf-wave" class="iaf-wave"
+              d="M 220 160 L 580 160" />
+        <text class="iaf-wave-label" x="600" y="166">α</text>
+      </svg>
+    </div>
+
+    <div class="research-quote">
+      <p class="quote-text">Alpha frequency shapes the precision of how we sample the world.</p>
+      <p class="quote-cite">— Romei &amp; Tarasi (2026)</p>
+    </div>
+
+    <p class="bridge">IAF reflects the rate at which the brain samples sensory and temporal information.</p>
+
+    <div class="formula-display" role="presentation">
+      <p class="formula-main">Tempo&nbsp;=&nbsp;HR&nbsp;×&nbsp;2&nbsp;×&nbsp;<span class="glyph">μ</span><span class="regime">(walking)</span></p>
+      <div class="formula-rows">
+        <span class="label">HR</span>
+        <span class="sep">:</span>
+        <span class="value" id="val-hr">80</span>
+        <span class="unit">BPM</span>
+
+        <span class="label">IAF</span>
+        <span class="sep">:</span>
+        <span class="value" id="val-iaf">10.5</span>
+        <span class="unit">Hz</span>
+
+        <span class="label glyph">μ</span>
+        <span class="sep">:</span>
+        <span class="value value-mu" id="val-mu">1.02</span>
+        <span class="unit"></span>
+
+        <span class="label">Tempo</span>
+        <span class="sep">:</span>
+        <span class="value" id="val-tempo">163</span>
+        <span class="unit">BPM</span>
+      </div>
+    </div>
+
+    <p class="caption"><span class="glyph">μ</span> modulates subtly with IAF — fine-tuning the tempo to your brain's own sampling rate.</p>
+
+    <div class="meta meta-bottom">
+      <span>thomaslistens.github.io/rtd</span>
+      <span>Thomas LeRoy Meier · 2026</span>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // ---- Tunables --------------------------------------------------
+      const LOOP_MS         = 24000;   // gentler than slide 6's 20s
+      const IAF_MIN         = 8.0;
+      const IAF_MAX         = 13.0;
+      const MU_AT_LOW       = 0.80;    // 4/5 at IAF=8
+      const MU_AT_HI        = 1.25;    // 5/4 at IAF=13
+      const HR_FIXED        = 80;      // stipulated; this slide is about IAF
+
+      // Brain-wave geometry inside the parens (viewBox 0..800).
+      const WAVE_X_START    = 220;
+      const WAVE_X_END      = 580;
+      const WAVE_Y_CENTER   = 160;
+      const WAVE_AMPLITUDE  = 14;
+      const WAVE_SAMPLES    = 90;
+
+      // Drift rate scales with IAF but is *much* slower than literal
+      // 8–13 Hz (which would blur). 0.32 rad·s⁻¹·Hz⁻¹ puts IAF=10 at
+      // ~0.5 cycles/sec drift across the band — visible but trackable.
+      const DRIFT_RATE      = 0.32;
+
+      // ---- Domain math ----------------------------------------------
+      // μ is the IAF-driven modulation coefficient (slide 5 uses α for
+      // the state/HR modulation; renamed here to keep them distinct).
+      // Kept as a plain top-level function so the presenter can swap
+      // mu(iaf) for a log-frequency or anchored-at-10.5 curve later
+      // without touching the loop.
+      function mu(iaf) {
+        const clamped = Math.max(IAF_MIN, Math.min(IAF_MAX, iaf));
+        return MU_AT_LOW + ((clamped - IAF_MIN) / (IAF_MAX - IAF_MIN)) * (MU_AT_HI - MU_AT_LOW);
+      }
+
+      function tempo(hr, iaf) {
+        return hr * 2 * mu(iaf);
+      }
+
+      // IAF over the loop — one full cosine cycle: t=0 → IAF_MIN,
+      // t=0.5 → IAF_MAX, t=1 → IAF_MIN. Both value and derivative
+      // match at the seam so the loop restart is invisible.
+      function currentIAF(loopT) {
+        const s = (1 - Math.cos(2 * Math.PI * loopT)) / 2;
+        return IAF_MIN + (IAF_MAX - IAF_MIN) * s;
+      }
+
+      // ---- Wave path emitter ---------------------------------------
+      // Each frame we synthesise a smooth sine across [WAVE_X_START,
+      // WAVE_X_END] with `iaf` cycles in that span, offset by `phase`.
+      // The path uses Q (quadratic) segments stepping through midpoints
+      // — same technique as the existing deck's slide-6 wave, which
+      // gives a visibly smoother curve than raw L commands.
+      const waveEl = document.getElementById('iaf-wave');
+
+      function paintWave(iaf, phase) {
+        const span = WAVE_X_END - WAVE_X_START;
+        const dx   = span / WAVE_SAMPLES;
+        let d = 'M ' + WAVE_X_START + ' ' + WAVE_Y_CENTER;
+        for (let i = 1; i <= WAVE_SAMPLES; i++) {
+          const x      = WAVE_X_START + i * dx;
+          const xPrev  = WAVE_X_START + (i - 1) * dx;
+          const xMid   = (xPrev + x) / 2;
+          const tMid   = (xMid - WAVE_X_START) / span;
+          const tEnd   = (x    - WAVE_X_START) / span;
+          const yMid   = WAVE_Y_CENTER + WAVE_AMPLITUDE * Math.sin(tMid * iaf * 2 * Math.PI + phase);
+          const yEnd   = WAVE_Y_CENTER + WAVE_AMPLITUDE * Math.sin(tEnd * iaf * 2 * Math.PI + phase);
+          d += ' Q ' + xMid.toFixed(2) + ' ' + yMid.toFixed(2) + ', ' + x.toFixed(2) + ' ' + yEnd.toFixed(2);
+        }
+        waveEl.setAttribute('d', d);
+      }
+
+      // ---- Live formula display ------------------------------------
+      const hrEl    = document.getElementById('val-hr');
+      const iafEl   = document.getElementById('val-iaf');
+      const muEl    = document.getElementById('val-mu');
+      const tempoEl = document.getElementById('val-tempo');
+
+      // HR is static on this slide; paint it once and never touch again.
+      hrEl.textContent = HR_FIXED.toString();
+
+      let lastIAF = '', lastMu = '', lastTempo = '';
+
+      function paintFormula(iaf) {
+        const m = mu(iaf);
+        const t = tempo(HR_FIXED, iaf);
+        const iafStr   = iaf.toFixed(1);
+        const muStr    = m.toFixed(2);
+        const tempoStr = Math.round(t).toString();
+        if (iafStr   !== lastIAF)   { iafEl.textContent   = iafStr;   lastIAF   = iafStr; }
+        if (muStr    !== lastMu)    { muEl.textContent    = muStr;    lastMu    = muStr; }
+        if (tempoStr !== lastTempo) { tempoEl.textContent = tempoStr; lastTempo = tempoStr; }
+      }
+
+      // ---- Main loop -----------------------------------------------
+      // Phase is integrated from instantaneous IAF (not just loop time)
+      // so the wave's drift speed actually tracks the current frequency.
+      let startTime = null;
+      let lastFrame = null;
+      let phase     = 0;
+
+      function frame(now) {
+        if (startTime === null) {
+          startTime = now;
+          lastFrame = now;
+        }
+        const dt = Math.min(0.1, (now - lastFrame) / 1000);
+        lastFrame = now;
+
+        const loopT = ((now - startTime) % LOOP_MS) / LOOP_MS;
+        const iaf   = currentIAF(loopT);
+
+        phase += iaf * DRIFT_RATE * dt;
+
+        paintWave(iaf, phase);
+        paintFormula(iaf);
+
+        window.requestAnimationFrame(frame);
+      }
+
+      // Reduced motion: paint a single mid-loop snapshot and skip the
+      // rAF loop. The wave will be visible at IAF=10.5 with phase=0.
+      const prefersReduced = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      if (prefersReduced) {
+        const midIAF = (IAF_MIN + IAF_MAX) / 2;
+        paintWave(midIAF, 0);
+        paintFormula(midIAF);
+      } else {
+        // Paint t=0 immediately so the slide doesn't flash empty on load.
+        paintWave(IAF_MIN, 0);
+        paintFormula(IAF_MIN);
+        window.requestAnimationFrame(frame);
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -137,9 +137,10 @@ body {
   inset: 0;
   display: flex;
   flex-direction: column;
-  align-items: left;
-  justify-content:  center;
-  gap: px;
+  align-items: flex-start;
+  justify-content: center;
+  margin-inline: var(--margin-x);
+  gap: 8px;
 }
 
 .title-en {
@@ -162,6 +163,87 @@ body {
   opacity: 0.88;
   letter-spacing: 0.06em;
   text-align: left;
+}
+
+/* EEG-style waveform that scrolls along the dotted title rule. The
+   path is 7 identical 400-unit tiles chained end-to-end (total span
+   x = -300 → 2500 in viewBox coords). One full scroll cycle
+   translates the path by exactly one tile width (-400 SVG units) so
+   the loop is seamless — the wave at the end of one cycle is
+   visually identical to the start of the next. A linear-gradient
+   mask anchored to the dotted-line span (x=240..1620) fades the
+   wave in/out at both edges so it doesn't bleed past the rule.
+   Stays subtle (final opacity 0.55) so the title-en/title-zh text
+   remains the focal point. */
+.slide-title .title-eeg-group {
+  opacity: 0;
+  animation: title-eeg-fade-in 1.6s ease-in forwards 1.0s;
+}
+
+.slide-title .title-eeg-wave {
+  animation: title-eeg-scroll 10s linear infinite;
+}
+
+/* Three layered LFOs on nested wrapper groups give the wave an
+   organic, never-quite-repeating feel. Periods are coprime to the
+   10s scroll and to each other, so the combined motion takes
+   minutes to ever return to the same state.
+       drift   9.7s   slow Y wander  (±~1.7 SVG units)
+       jitter  2.3s   faster Y noise (±~0.7)
+       amp     6.3s   amplitude breath (scaleY 0.90↔1.13 around y=450)
+   Irregular keyframe stops within each animation are what make the
+   curve feel sampled-and-noised rather than mechanical. */
+.slide-title .title-eeg-drift {
+  animation: title-eeg-drift 9.7s ease-in-out infinite;
+}
+
+.slide-title .title-eeg-jitter {
+  animation: title-eeg-jitter 2.3s ease-in-out infinite;
+}
+
+.slide-title .title-eeg-amp {
+  transform-origin: 50% 50%;
+  animation: title-eeg-amp 6.3s ease-in-out infinite;
+}
+
+@keyframes title-eeg-fade-in {
+  to { opacity: 0.55; }
+}
+
+@keyframes title-eeg-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-400px); }
+}
+
+@keyframes title-eeg-drift {
+  0%   { transform: translateY(0); }
+  13%  { transform: translateY(1.4px); }
+  27%  { transform: translateY(-0.9px); }
+  41%  { transform: translateY(0.5px); }
+  56%  { transform: translateY(-1.7px); }
+  70%  { transform: translateY(0.3px); }
+  84%  { transform: translateY(1.1px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes title-eeg-jitter {
+  0%   { transform: translateY(0); }
+  19%  { transform: translateY(0.5px); }
+  37%  { transform: translateY(-0.6px); }
+  58%  { transform: translateY(0.7px); }
+  74%  { transform: translateY(-0.4px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes title-eeg-amp {
+  0%   { transform: scaleY(1); }
+  11%  { transform: scaleY(1.10); }
+  26%  { transform: scaleY(0.90); }
+  39%  { transform: scaleY(1.06); }
+  54%  { transform: scaleY(0.93); }
+  68%  { transform: scaleY(1.13); }
+  83%  { transform: scaleY(0.96); }
+  100% { transform: scaleY(1); }
 }
 
 /* === SLIDE 1: THE QUESTION ===========================================
@@ -965,33 +1047,112 @@ body {
   /* Slide 7a reduced-motion: skip the alternating reveal cadence and
      show the opening line + both halves fully populated. The two
      warped carry-over ellipses are static anyway. */
-  .slide-bloom-cadence.active .bloom-opening,
-  .slide-bloom-cadence.active .bloom-heading,
-  .slide-bloom-cadence.active .bloom-item {
+  .slide-bloom-cadence.active .bloom-title-line,
+  .slide-bloom-cadence.active .bloom-sig,
+  .slide-bloom-cadence.active .bloom-ctx,
+  .slide-bloom-cadence.active .bloom-connector,
+  .slide-bloom-cadence.active .bloom-row::before,
+  .slide-bloom-cadence.active .bloom-music,
+  .slide-bloom-cadence.active .bloom-close {
     animation: none;
   }
-  .slide-bloom-cadence .bloom-opening,
-  .slide-bloom-cadence .bloom-heading,
-  .slide-bloom-cadence .bloom-item {
+  .slide-bloom-cadence .bloom-title-line,
+  .slide-bloom-cadence .bloom-sig,
+  .slide-bloom-cadence .bloom-ctx,
+  .slide-bloom-cadence .bloom-connector,
+  .slide-bloom-cadence .bloom-music,
+  .slide-bloom-cadence .bloom-close {
     opacity: 1;
   }
+  .slide-bloom-cadence .bloom-row::before {
+    opacity: 0.22;
+  }
 
-  /* Slide 7b reduced-motion: skip the build-out, show the integrated
-     schematic + legend + question all present. Legend rests at 0.75
-     opacity to preserve its subordination to the schematic. */
+  /* Demo-slide reduced-motion: skip both the build-out cadence and
+     the continuous LFO breathing, show the integrated schematic +
+     legend + question fully present. Legend rests at 0.75 opacity
+     to preserve its subordination to the schematic. Whispers stay
+     hidden — animation:none on whisper-active strands them at 0.
+     Drone-glyph glow also disabled (text-shadow set to none). */
   .slide-integrate-cadence.active .schematic-piece,
   .slide-integrate-cadence.active .schematic-colon,
   .slide-integrate-cadence.active .schematic-legend-integrated,
-  .slide-integrate-cadence.active .integrated-question {
+  .slide-integrate-cadence.active .integrated-question,
+  .slide-integrate-cadence.active .integrate-deriv,
+  .slide-integrate-cadence.active .ig-graph,
+  .slide-integrate-cadence.active .integrate-conclusion,
+  .slide-integrate-cadence.active .head-eeg-wave-1,
+  .slide-integrate-cadence.active .head-eeg-wave-2,
+  .slide-integrate-cadence .whisper.whisper-active {
     animation: none;
   }
   .slide-integrate-cadence .schematic-piece,
   .slide-integrate-cadence .schematic-colon,
-  .slide-integrate-cadence .integrated-question {
+  .slide-integrate-cadence .integrated-question,
+  .slide-integrate-cadence .integrate-deriv,
+  .slide-integrate-cadence .ig-graph,
+  .slide-integrate-cadence .integrate-conclusion {
     opacity: 1;
   }
   .slide-integrate-cadence .schematic-legend-integrated {
     opacity: 0.75;
+  }
+  .slide-integrate-cadence .schematic-piece .glyph,
+  .slide-integrate-cadence .schematic-piece .num,
+  .slide-integrate-cadence .integrated-question {
+    text-shadow: none;
+  }
+
+  /* Implications-slide reduced-motion: skip the alternating reveal
+     cadence and show the opening line + both halves fully populated. */
+  .slide-impl-cadence.active .impl-opening,
+  .slide-impl-cadence.active .impl-heading,
+  .slide-impl-cadence.active .impl-item,
+  .slide-impl-cadence.active .impl-close-line,
+  .slide-impl-cadence.active .impl-grid {
+    animation: none;
+  }
+  .slide-impl-cadence .impl-opening,
+  .slide-impl-cadence .impl-heading,
+  .slide-impl-cadence .impl-item,
+  .slide-impl-cadence .impl-close-line,
+  .slide-impl-cadence .impl-grid {
+    opacity: 1;
+  }
+
+  /* Pillar overview columns + pillar detail slides reduced-motion: skip
+     the staggered reveal, show everything at its target opacity. */
+  .slide-impl-cadence.active .pillar-col,
+  .slide-pillar-cadence.active .pillar-tag,
+  .slide-pillar-cadence.active .pillar-title,
+  .slide-pillar-cadence.active .pillar-thesis,
+  .slide-pillar-cadence.active .pillar-point,
+  .slide-pillar-cadence.active .pillar-foot,
+  .slide-pillar-cadence.active .pillar-note {
+    animation: none;
+  }
+  .pillars-overview .pillar-col,
+  .slide-pillar .pillar-tag,
+  .slide-pillar .pillar-title,
+  .slide-pillar .pillar-thesis,
+  .slide-pillar .pillar-point,
+  .slide-pillar .pillar-foot,
+  .slide-pillar .pillar-note {
+    opacity: 1;
+  }
+
+  /* Close-slide reduced-motion: skip the staggered reveal, show both
+     lines at their target opacities (English at 1, Mandarin at 0.88
+     to match slide 0's hierarchy). */
+  .slide-close.active .close-line-1,
+  .slide-close.active .close-line-zh {
+    animation: none;
+  }
+  .slide-close .close-line-1 {
+    opacity: 1;
+  }
+  .slide-close .close-line-zh {
+    opacity: 0.88;
   }
 }
 
@@ -1242,6 +1403,18 @@ body {
 
 .slide-heart-cadence.active .research-quote {
   animation: slide4-fade-in 1.0s ease-in forwards 4.2s;
+}
+
+/* The new heart quote is ~30 words — too long for the default 26px
+   quote-text size, which would either overflow the trace ellipse
+   (rx=400 centered at cx=800, so chord width ~50% of slide) or wrap
+   to three lines. Drop the size to match the gait quote and cap
+   max-width so it wraps to exactly two balanced lines that sit
+   inside the circle. */
+.slide-heart-cadence .research-quote .quote-text {
+  margin: 0 auto 8px;
+  max-width: 56%;
+  font-size: clamp(14px, 1.35vw, 19px);
 }
 
 /* === Slide 5 (iii. the build) — Gait =================================
@@ -1557,6 +1730,178 @@ body {
   to { opacity: 1; }
 }
 
+/* === Slide 5 (gait) — continuous loop ================================
+   The slide replaces its earlier paced reveal with an auto-looping
+   animation: HR sweeps 60→100→60 over a 20s cycle, footsteps fire on
+   each beat (so the cadence visibly accelerates and decelerates),
+   and α + Tempo update in real time below — making the variability of
+   α the focal claim of the slide rather than a static line of math.
+
+   The footsteps and live values are driven by startGaitLoop() in
+   app.js (mirrors startBiomarkerDrift on the demo slide). The static
+   step ellipses and formula-block markup from the previous version
+   were removed in HTML; their old CSS above is left as dead rules but
+   doesn't render because the selectors no longer match anything.
+
+   Hero-visual sits a touch lower than the global 35% so the live
+   formula block underneath has headroom inside the trace ellipse. */
+.slide-gait-cadence .hero-visual--gait {
+  top: 38%;
+}
+
+/* The dashed path doesn't draw-in anymore — having a fully-present
+   line lets footsteps land on it from t=0 of the loop, instead of
+   appearing ahead of a partially-drawn line. */
+.slide-gait-cadence .gait-path {
+  clip-path: none;
+}
+.slide-gait-cadence.active .gait-path {
+  animation: none;
+}
+
+/* Each footstep is a <g> at translate(x,y) containing an <ellipse>.
+   Transform on the <g> handles slot-shift transitions (CSS
+   `transition: transform`); transform on the ellipse handles entry
+   scale + tilt via keyframes. */
+.slide-gait-cadence .gait-footstep {
+  transition: transform 280ms cubic-bezier(0.4, 0, 0.4, 1);
+}
+
+.slide-gait-cadence .gait-footstep-print {
+  fill: var(--ink);
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  opacity: 0;
+}
+
+/* Horizontal-oriented oval (rx=13, ry=7) viewed from above — the long
+   axis points in the walking direction (left→right). Slight ±6°
+   toe-out tilt + ±11 y-offset (L above the line, R below) sells the
+   gait. Each foot keeps its tilt for the full lifecycle so the entry
+   scale animation doesn't drop the rotation. */
+.slide-gait-cadence .gait-footstep[data-side="L"] .gait-footstep-print {
+  animation: gait-footstep-land-l 200ms ease-out forwards;
+}
+.slide-gait-cadence .gait-footstep[data-side="R"] .gait-footstep-print {
+  animation: gait-footstep-land-r 200ms ease-out forwards;
+}
+
+@keyframes gait-footstep-land-l {
+  from { transform: rotate(-6deg) scale(0.78); opacity: 0; }
+  to   { transform: rotate(-6deg) scale(1);    opacity: 0.85; }
+}
+@keyframes gait-footstep-land-r {
+  from { transform: rotate(6deg) scale(0.78); opacity: 0; }
+  to   { transform: rotate(6deg) scale(1);    opacity: 0.85; }
+}
+
+.slide-gait-cadence .gait-footstep.leaving .gait-footstep-print {
+  animation: gait-footstep-leave 360ms ease-in forwards;
+}
+@keyframes gait-footstep-leave {
+  to { opacity: 0; }
+}
+
+/* Live formula block — replaces the old `.formula-block`. Three rows
+   in a grid so HR / α / Tempo line up at the colon and at the value.
+   tabular-nums + min-width: 4ch on the value cells keeps digits from
+   jittering as the numbers update each frame. */
+.slide-gait-cadence .gait-live {
+  position: absolute;
+  bottom: 8%;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  z-index: 2;
+}
+
+.slide-gait-cadence .gait-live-main {
+  font-family: var(--font-meta);
+  font-size: clamp(20px, 2.0vw, 26px);
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  margin: 0;
+}
+.slide-gait-cadence .gait-live-main .glyph {
+  font-family: var(--font-body);
+  font-style: italic;
+  color: var(--ink-blue);
+  font-size: 1.08em;
+}
+
+.slide-gait-cadence .gait-live-rows {
+  display: grid;
+  grid-template-columns: auto auto auto auto;
+  column-gap: 14px;
+  row-gap: 4px;
+  align-items: baseline;
+  font-family: var(--font-meta);
+  font-size: clamp(14px, 1.4vw, 18px);
+  letter-spacing: 0.03em;
+}
+.slide-gait-cadence .gait-live-label {
+  text-align: right;
+  color: var(--meta);
+}
+.slide-gait-cadence .gait-live-label-glyph {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 1.15em;
+  color: var(--ink-blue);
+}
+.slide-gait-cadence .gait-live-sep {
+  color: var(--meta);
+  opacity: 0.55;
+}
+.slide-gait-cadence .gait-live-value {
+  font-variant-numeric: tabular-nums;
+  min-width: 4ch;
+  text-align: right;
+  color: var(--ink);
+}
+.slide-gait-cadence .gait-live-value-alpha {
+  color: var(--ink-blue);
+  font-weight: 500;
+}
+.slide-gait-cadence .gait-live-unit {
+  color: var(--meta);
+  font-size: 0.85em;
+  letter-spacing: 0.1em;
+  min-width: 3ch;
+  text-align: left;
+}
+
+.slide-gait-cadence .gait-caption {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(13px, 1.15vw, 16px);
+  color: var(--meta);
+  letter-spacing: 0.005em;
+}
+.slide-gait-cadence .gait-caption .glyph {
+  color: var(--ink-blue);
+  font-style: italic;
+}
+
+/* Reduced-motion fallback for the loop: show a static mid-loop
+   snapshot (a band of fully-drawn prints at uniform opacity) and
+   freeze the live formula at its baseline. startGaitLoop()
+   short-circuits when prefers-reduced-motion matches, but we still
+   need the prints' entry animation to land at the resting state
+   rather than stay invisible. */
+@media (prefers-reduced-motion: reduce) {
+  .slide-gait-cadence .gait-footstep-print {
+    opacity: 0.85;
+    animation: none;
+  }
+}
+
 /* === Slide 6 (iii. the build) — IAF cadence ==========================
    The slide locates IAF as the *interior space between the ears*. Two
    vertical curves draw inward like the inner walls of an enclosure;
@@ -1570,17 +1915,16 @@ body {
    in iaf_shimmer at 0.6 over 800ms. No per-slide audio element needed.
 
    Visual cadence (slide.active at t=0):
-      0.4s   personal-top "Your perspective..." fades in (1.0s)
-      1.4s   two vertical curves draw simultaneously top→bottom (1.6s)
-      3.2s   oscillating wave + α label fade in (0.8s); JS frequency
+      0.2s   personal-top "Your perspective..." fades in (0.8s)
+      0.8s   two vertical curves draw simultaneously top→bottom (1.2s)
+      1.8s   oscillating wave + α label fade in (0.6s); JS frequency
              modulation runs continuously throughout the slide
-      4.5s   ellipse trace begins counter-clockwise from bottom (3.0s)
-      5.0s   research quote fades in / sits / fades out (2.0s cycle)
-      7.5s   trace converges back at bottom
-      7.8s   bridge "Tempo from your perception of time." fades in
-      8.5s   main formula "Tempo = HR × 2 × α (walking)" fades in
-      9.2s   α definition "α ∈ [4/5, 5/4]" fades in below
-     10.0s   slide rests; wave continues oscillating
+      2.2s   inner ellipse warp begins (2.0s); outer follows at 2.4s
+      2.8s   research quote fades in (1.0s) and stays visible
+      4.4s   bridge "Tempo from your perception of time." fades in
+      5.0s   main formula "Tempo = HR × 2 × α (walking)" fades in
+      5.6s   α definition "α ∈ [4/5, 5/4]" fades in below
+      6.4s   slide rests; wave continues oscillating
    ===================================================================== */
 .slide-body-iaf {
   position: relative;
@@ -1594,7 +1938,7 @@ body {
 }
 
 .slide-iaf-cadence.active .personal-top {
-  animation: iaf-fade-in 1.0s ease-in forwards 0.4s;
+  animation: iaf-fade-in 0.8s ease-in forwards 0.2s;
 }
 
 @keyframes iaf-fade-in {
@@ -1622,7 +1966,7 @@ body {
 
 .slide-iaf-cadence.active .iaf-curve-left,
 .slide-iaf-cadence.active .iaf-curve-right {
-  animation: iaf-curve-draw 1.6s cubic-bezier(0.4, 0, 0.4, 1) forwards 1.4s;
+  animation: iaf-curve-draw 1.2s cubic-bezier(0.4, 0, 0.4, 1) forwards 0.8s;
 }
 
 @keyframes iaf-curve-draw {
@@ -1633,11 +1977,11 @@ body {
    oscillation (frequency-modulated 2.0 → 5.0 cycles over a 12s period,
    plus rightward phase drift) is driven by JS in startSlide6Wave(). */
 .slide-iaf-cadence.active .iaf-wave {
-  animation: iaf-wave-fade-in 0.8s ease-in forwards 3.2s;
+  animation: iaf-wave-fade-in 0.6s ease-in forwards 1.8s;
 }
 
 .slide-iaf-cadence.active .iaf-wave-label {
-  animation: iaf-wave-label-fade-in 0.8s ease-in forwards 3.2s;
+  animation: iaf-wave-label-fade-in 0.6s ease-in forwards 1.8s;
 }
 
 @keyframes iaf-wave-fade-in {
@@ -1683,14 +2027,7 @@ body {
 }
 
 .slide-iaf-cadence.active .research-quote {
-  animation: slide6-quote-cycle 2.0s ease-in-out forwards 5.0s;
-}
-
-@keyframes slide6-quote-cycle {
-  0%   { opacity: 0; }
-  40%  { opacity: 1; }
-  60%  { opacity: 1; }
-  100% { opacity: 0; }
+  animation: iaf-fade-in 1.0s ease-in forwards 2.8s;
 }
 
 /* Carry-over circles from slides 4 and 5 — both pre-drawn so the
@@ -1713,15 +2050,15 @@ body {
    dash-pattern's start direction — visually inert on fully-drawn
    circles, so we override with pure scale here.
 
-   Begins at t=4.5s, completes by t=7.5s — fills the window the old
-   slide-6 trace animation used, finishing just before the bridge
-   sentence appears at t=7.8s. */
+   Begins at t=2.2s, completes by t=4.4s — overlaps with the wave
+   fade-in and the quote, finishing just before the bridge sentence
+   appears at t=4.4s. */
 .slide-iaf-cadence.active .trace-ellipse-inner {
-  animation: iaf-circle-warp 3.0s cubic-bezier(0.4, 0, 0.4, 1) forwards 4.5s;
+  animation: iaf-circle-warp 2.0s cubic-bezier(0.4, 0, 0.4, 1) forwards 2.2s;
 }
 
 .slide-iaf-cadence.active .trace-ellipse-outer {
-  animation: iaf-circle-warp 3.0s cubic-bezier(0.4, 0, 0.4, 1) forwards 4.7s;
+  animation: iaf-circle-warp 2.0s cubic-bezier(0.4, 0, 0.4, 1) forwards 2.4s;
 }
 
 @keyframes iaf-circle-warp {
@@ -1747,7 +2084,7 @@ body {
 }
 
 .slide-iaf-cadence.active .bridge {
-  animation: iaf-fade-in 0.8s ease-in forwards 7.8s;
+  animation: iaf-fade-in 0.8s ease-in forwards 4.4s;
 }
 
 /* Formula extension — slide 5's formula returns on top, then α
@@ -1789,11 +2126,11 @@ body {
 .slide-iaf-cadence.active .formula-mult-2,
 .slide-iaf-cadence.active .formula-mult-alpha,
 .slide-iaf-cadence.active .formula-regime {
-  animation: formula-piece-in 0.6s ease-in forwards 8.5s;
+  animation: formula-piece-in 0.6s ease-in forwards 5.0s;
 }
 
 .slide-iaf-cadence.active .formula-alpha-def {
-  animation: formula-piece-in 0.8s ease-in forwards 9.2s;
+  animation: formula-piece-in 0.8s ease-in forwards 5.6s;
 }
 
 /* Regime annotation — same approach as slide 5: smaller, meta-grey,
@@ -1812,6 +2149,132 @@ body {
 .slide-iaf-cadence .formula-mult-alpha,
 .slide-iaf-cadence .formula-alpha-def {
   font-family: var(--font-body);
+}
+
+/* === Slide 6 (IAF) — continuous loop =================================
+   Replaces the earlier paced reveal. IAF sweeps 8→13→8 over a 24s
+   cycle (gentler than slide 5's 20s HR sweep — IAF is a trait-like
+   parameter, not a state-like one). The wave's cycle count tracks
+   IAF, its drift speed scales with IAF, and the live HR/IAF/α/Tempo
+   rows underneath update each frame.
+
+   Driven by startIAFLoop() in app.js. The static formula-extended
+   markup from the previous version was removed in HTML; its old CSS
+   above is left as dead rules but doesn't render because the
+   selectors no longer match anything. */
+
+/* The wave + α label were previously hidden until the iaf-wave-fade-in
+   animation fired at t=1.8s. For a continuous loop we want them
+   visible from t=0, so cancel the entry animations. */
+.slide-iaf-cadence .iaf-wave,
+.slide-iaf-cadence .iaf-wave-label {
+  opacity: 0.9;
+}
+.slide-iaf-cadence.active .iaf-wave,
+.slide-iaf-cadence.active .iaf-wave-label {
+  animation: none;
+}
+
+/* Live formula block — mirrors slide 5's .gait-live structure so the
+   two slides read as a sequence. 4 rows here (HR, IAF, α, Tempo)
+   instead of 3 — IAF is the new live readout this slide introduces. */
+.slide-iaf-cadence .iaf-live {
+  position: absolute;
+  bottom: 7%;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 2;
+}
+
+.slide-iaf-cadence .iaf-live-main {
+  font-family: var(--font-meta);
+  font-size: clamp(18px, 1.8vw, 24px);
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  margin: 0;
+}
+.slide-iaf-cadence .iaf-live-main .glyph {
+  font-family: var(--font-body);
+  font-style: italic;
+  color: var(--ink-blue);
+  font-size: 1.08em;
+}
+.slide-iaf-cadence .iaf-live-main .regime {
+  margin-left: 12px;
+  color: var(--meta);
+  font-size: 0.7em;
+  letter-spacing: 0.14em;
+}
+
+.slide-iaf-cadence .iaf-live-rows {
+  display: grid;
+  grid-template-columns: auto auto auto auto;
+  column-gap: 14px;
+  row-gap: 3px;
+  align-items: baseline;
+  font-family: var(--font-meta);
+  font-size: clamp(14px, 1.4vw, 18px);
+  letter-spacing: 0.03em;
+}
+.slide-iaf-cadence .iaf-live-label {
+  text-align: right;
+  color: var(--meta);
+}
+.slide-iaf-cadence .iaf-live-label-glyph {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 1.15em;
+  color: var(--ink-blue);
+}
+.slide-iaf-cadence .iaf-live-sep {
+  color: var(--meta);
+  opacity: 0.55;
+}
+.slide-iaf-cadence .iaf-live-value {
+  font-variant-numeric: tabular-nums;
+  min-width: 4ch;
+  text-align: right;
+  color: var(--ink);
+}
+.slide-iaf-cadence .iaf-live-value-mu {
+  color: var(--ink-blue);
+  font-weight: 500;
+}
+.slide-iaf-cadence .iaf-live-unit {
+  color: var(--meta);
+  font-size: 0.85em;
+  letter-spacing: 0.1em;
+  min-width: 3ch;
+  text-align: left;
+}
+
+.slide-iaf-cadence .iaf-caption {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(13px, 1.15vw, 16px);
+  color: var(--meta);
+  letter-spacing: 0.005em;
+}
+.slide-iaf-cadence .iaf-caption .glyph {
+  color: var(--ink-blue);
+  font-style: italic;
+}
+
+/* Reduced-motion fallback: paint the wave at IAF=10.5 statically and
+   freeze the formula at baseline. startIAFLoop() short-circuits when
+   prefers-reduced-motion matches. */
+@media (prefers-reduced-motion: reduce) {
+  .slide-iaf-cadence .iaf-wave,
+  .slide-iaf-cadence .iaf-wave-label {
+    opacity: 0.9;
+  }
 }
 
 /* === Slide 7a (iii. the build) — Expansion ==========================
@@ -1836,157 +2299,306 @@ body {
   inset: 0;
 }
 
+/* Two-line italic title — both lines share the existing title voice
+   (italic Garamond, ink-blue) used on slide 0's title-en, with airier
+   letter-spacing for delicacy. The two lines correspond to the two
+   columns below: line 1 anchors left over the biological column;
+   line 2 anchors right over the contextual column. Line 1 is also
+   slightly larger so the typography descends as the eye moves from
+   biological certainty to contextual qualification. Each line fades
+   in on its own beat so the second statement reads as an unfolding
+   consequence of the first. */
 .slide-bloom-cadence .bloom-opening {
   position: absolute;
-  top: 18%;
+  top: 12%;
   left: 0;
   right: 0;
   margin: 0;
-  text-align: center;
+}
+
+.slide-bloom-cadence .bloom-title-line {
+  margin: 0;
   font-family: var(--font-body);
-  font-size: clamp(28px, 3.0vw, 38px);
+  font-style: italic;
   font-weight: 400;
-  color: var(--ink);
+  color: var(--ink-blue);
+  letter-spacing: 0.01em;
+  /* Match the column gutters so each line aligns with its column edge. */
+  padding-left: 22%;
+  padding-right: 22%;
   opacity: 0;
 }
 
-.slide-bloom-cadence.active .bloom-opening {
-  animation: bloom-fade-in 1.0s ease-in forwards 0.4s;
+.slide-bloom-cadence .bloom-title-line-1 {
+  font-size: clamp(36px, 4.1vw, 56px);
+  text-align: left;
+}
+
+.slide-bloom-cadence .bloom-title-line-2 {
+  font-size: clamp(22px, 2.5vw, 32px);
+  text-align: right;
+  margin-top: 24px;
+}
+
+.slide-bloom-cadence.active .bloom-title-line-1 {
+  animation: bloom-fade-in 0.9s ease-in-out forwards 0.4s;
+}
+
+.slide-bloom-cadence.active .bloom-title-line-2 {
+  animation: bloom-fade-in 0.9s ease-in-out forwards 2.6s;
 }
 
 @keyframes bloom-fade-in {
   to { opacity: 1; }
 }
 
-.bloom-halves {
+/* Tighter columns + center hairline, mirroring the implications slide.
+   Columns used to hug the slide edges (left/right: 12%) which left a
+   barren middle and let the carry-over ellipse strokes cut across the
+   text. With the inner ellipse removed and the columns pulled inward
+   to 22%, the divider hairline becomes the central feature. */
+/* === Slide 8 (bloom) — connector spine + music lane =================
+   Three zones per row: measured body signals (left) and life pressures
+   (right) meet at a named human state in the center. A faint bridge
+   hairline runs behind each row; the connector node sits on it (paper
+   background breaks the line) as the keystone where body and world
+   converge. STRESS (accent-red — the focal "what we solve") sits above
+   the music; MINDSET (ink-blue — the reward) below. The music lane
+   between them is the payoff, built + animated by startBloomLoop().
+   ===================================================================== */
+.bloom-bridge {
   position: absolute;
-  top: 32%;
-  left: 12%;
-  right: 12%;
-  bottom: 16%;
+  top: 30%;
+  left: 16%;
+  right: 16%;
+  bottom: 18%;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10%;
+  /* The lane is a fixed height (below) rather than 1fr, and the three
+     rows cluster in the vertical center — so the lane sits snug between
+     the two rows instead of floating in a tall empty band. */
+  grid-template-rows: auto auto auto;
+  align-content: center;
+  gap: 4%;
 }
 
-.bloom-half {
+/* One row = [ bio | connector | context ]. The bridge hairline spans
+   behind it; the connector + label chips sit on top. */
+.bloom-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 4%;
+}
+
+.bloom-row::before {
+  content: '';
+  position: absolute;
+  left: 7%;
+  right: 7%;
+  top: 50%;
+  height: 1px;
+  background: var(--meta);
+  opacity: 0.22;
+  transform: translateY(-50%);
+  transition: opacity 0.9s ease-in-out;
+}
+
+/* Body signals (left, clustered toward the spine) and life pressures
+   (right, clustered toward the spine). */
+.bloom-side {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 10px;
+}
+.bloom-side--bio { align-items: flex-end; text-align: right; }
+.bloom-side--context { align-items: flex-start; text-align: left; }
+
+/* Each label sits on its own paper chip so the bridge hairline reads
+   as connecting them rather than striking through the text. */
+.bloom-sig,
+.bloom-ctx {
+  font-family: var(--font-body);
+  font-size: clamp(20px, 2.05vw, 28px);
+  color: var(--ink);
+  background: var(--paper);
+  padding: 2px 12px;
+}
+.bloom-ctx {
+  font-style: italic;
+  color: var(--ink-blue);
+}
+.bloom-sig .bloom-glyph {
+  color: var(--ink-blue);
+  margin-right: 4px;
 }
 
-/* Heading: small mono lowercase, meta-grey. The two heading words
-   ("biological", "contextual") establish the conceptual category for
-   each half. */
-.bloom-heading {
+/* The keystone — the human state where the two sides meet. Paper
+   background lets it sit atop the bridge hairline. */
+.bloom-connector {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 22px;
+  background: var(--paper);
+}
+.bloom-connector-name {
+  font-family: var(--font-body);
+  font-size: clamp(32px, 3.7vw, 50px);
+  letter-spacing: 0.01em;
+  line-height: 1.05;
+}
+.bloom-connector-role {
   font-family: var(--font-meta);
   font-size: clamp(11px, 1.1vw, 14px);
-  letter-spacing: 0.18em;
-  color: var(--meta);
+  letter-spacing: 0.16em;
   text-transform: lowercase;
-  border-bottom: 0.5px solid var(--meta);
-  padding-bottom: 10px;
-  margin-bottom: 6px;
-  opacity: 0;
+  color: var(--meta);
+}
+/* Stress is the focal draw (accent-red, echoing the heart slide);
+   mindset is the reward (ink-blue). */
+.bloom-row--stress .bloom-connector-name { color: var(--accent-red); }
+.bloom-row--mindset .bloom-connector-name { color: var(--ink-blue); }
+
+/* --- Center music lane — the payoff -------------------------------- */
+.bloom-music {
+  position: relative;
+  width: 100%;
+  height: clamp(115px, 13vh, 190px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bloom-music-svg {
+  width: 100%;
+  height: 100%;
+}
+/* Strict metronome grid (the "measured" ideal the notes deviate from). */
+.bloom-gridline {
+  stroke: var(--meta);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.16;
+}
+.bloom-gridline-beat { opacity: 0.32; }
+/* Noteheads — tilted ovals. Main beats ink-blue + solid; subdivisions
+   lighter (meta) and fade in as tension/beta rises. */
+.bloom-note-head {
+  fill: var(--ink-blue);
+  transform: rotate(-20deg);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.bloom-note:not(.bloom-note-beat) .bloom-note-head { fill: var(--meta); }
+/* Accent wedge — downbeats, plus the 3-over-4 cross-rhythm at high
+   subdivision (tempos within the tempo). */
+.bloom-note-accent {
+  fill: none;
+  stroke: var(--accent-red);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.bloom-note-cross .bloom-note-head { fill: var(--accent-red); }
+
+/* === Slide 8 (bloom) staged reveal ==================================
+   A 7-beat build driven by runBloomReveal() in app.js, which toggles the
+   classes below on a timer:
+     0.4s  title 1                                  (CSS, .active)
+     1.4s  bio list fades in, merged toward center  .bloom-show-bio
+     2.6s  title 2                                  (CSS, .active)
+     3.2s  context list fades in beside it          .bloom-show-context
+            → two lists, centered, not yet split
+     4.4s  the music lane parts the two lists into  .bloom-parted
+            the stress / mindset rows
+     5.6s  stress + mindset connectors rise         .bloom-show-connectors
+     6.6s  the bridge hairlines draw                .bloom-show-bridges
+     7.0s  bloom-close                              (CSS, .active)
+   Default (no JS / reduced motion) is the finished composition; the
+   .bloom-animating class is what hides + merges things to start, so a
+   non-animating viewer always sees the complete slide.
+   ===================================================================== */
+.slide-bloom .bloom-row,
+.slide-bloom .bloom-side,
+.slide-bloom .bloom-sig,
+.slide-bloom .bloom-ctx,
+.slide-bloom .bloom-connector,
+.slide-bloom .bloom-music {
+  transition: opacity 0.9s ease-in-out, transform 1.2s ease-in-out;
 }
 
-.bloom-list {
-  list-style: none;
+/* Lists fade in top-to-bottom — each item a beat after the one above it
+   (breath → HRV → valence+arousal → beta on the left; the world side
+   mirrors it). The delay only affects the opacity fade, not the split. */
+.slide-bloom .bloom-row--stress  .bloom-sig[data-sig="1"],
+.slide-bloom .bloom-row--stress  .bloom-ctx[data-ctx="1"] { transition-delay: 0s; }
+.slide-bloom .bloom-row--stress  .bloom-sig[data-sig="2"],
+.slide-bloom .bloom-row--stress  .bloom-ctx[data-ctx="2"] { transition-delay: 0.16s; }
+.slide-bloom .bloom-row--mindset .bloom-sig[data-sig="1"],
+.slide-bloom .bloom-row--mindset .bloom-ctx[data-ctx="1"] { transition-delay: 0.32s; }
+.slide-bloom .bloom-row--mindset .bloom-sig[data-sig="2"],
+.slide-bloom .bloom-row--mindset .bloom-ctx[data-ctx="2"] { transition-delay: 0.48s; }
+
+/* Initial animating state — lists hidden; the two rows pulled together
+   vertically so each column reads as one unbroken list (not split yet);
+   music + connectors hidden; bridge hairlines hidden. --bloom-merge-y is
+   how far each row travels toward center during the split (tune here). */
+.slide-bloom.bloom-animating { --bloom-merge-y: 8vh; }
+.slide-bloom.bloom-animating .bloom-sig,
+.slide-bloom.bloom-animating .bloom-ctx,
+.slide-bloom.bloom-animating .bloom-connector,
+.slide-bloom.bloom-animating .bloom-music {
+  opacity: 0;
+}
+/* Before the split the two lists are larger (the "first part," easy to
+   read); they scale back down to their composition size as they part. */
+.slide-bloom.bloom-animating .bloom-row--stress  { transform: translateY(var(--bloom-merge-y)) scale(1.16); }
+.slide-bloom.bloom-animating .bloom-row--mindset { transform: translateY(calc(-1 * var(--bloom-merge-y))) scale(1.16); }
+.slide-bloom.bloom-animating .bloom-row::before  { opacity: 0; }
+
+/* Beat — bio list in (still merged). */
+.slide-bloom.bloom-animating.bloom-show-bio .bloom-side--bio .bloom-sig { opacity: 1; }
+/* Beat — context list in (still merged): two lists, centered. */
+.slide-bloom.bloom-animating.bloom-show-context .bloom-side--context .bloom-ctx { opacity: 1; }
+/* Beat — the music parts the lists: rows release to their positions,
+   the lane fades in between them. */
+.slide-bloom.bloom-animating.bloom-parted .bloom-row--stress,
+.slide-bloom.bloom-animating.bloom-parted .bloom-row--mindset { transform: none; }
+.slide-bloom.bloom-animating.bloom-parted .bloom-music { opacity: 1; }
+/* Beat — the connectors rise. */
+.slide-bloom.bloom-animating.bloom-show-connectors .bloom-connector { opacity: 1; }
+/* Beat — the bridge hairlines draw. */
+.slide-bloom.bloom-animating.bloom-show-bridges .bloom-row::before { opacity: 0.22; }
+
+/* Closing line — italic ink-blue serif (same voice as section
+   headers and the title above), slightly smaller than the slide's
+   title so it reads as a quiet resolution rather than a second
+   headline. Sits centered below the columns. */
+.slide-bloom-cadence .bloom-close {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 9%;
   margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.bloom-item {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
+  text-align: center;
   font-family: var(--font-body);
-  font-size: clamp(18px, 1.7vw, 22px);
-  color: var(--ink);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(24px, 2.7vw, 34px);
+  color: var(--ink-blue);
+  letter-spacing: -0.005em;
   opacity: 0;
 }
 
-/* Glyph column — alpha, breath, HRV plus, etc. Min-width keeps items
-   vertically aligned with their labels regardless of glyph width.
-   ink-blue on the biological column; the contextual column has no
-   glyphs to color. */
-.bloom-item .bloom-glyph {
-  font-family: var(--font-body);
-  color: var(--ink-blue);
-  min-width: 1.5em;
-  display: inline-block;
-}
-
-.bloom-item .bloom-num {
-  font-family: var(--font-meta);
-  color: var(--meta);
-  font-size: 0.85em;
-  min-width: 1.8em;
-}
-
-.bloom-item .bloom-label {
-  font-family: var(--font-body);
-  color: var(--ink);
-}
-
-/* "derived" items (valence + arousal) — visually subordinate. Glyph
-   in meta-grey rather than ink-blue, label in italic. Signals to
-   careful viewers that this item is *inferred* (frontal alpha
-   asymmetry, valence-arousal plane) rather than directly measured. */
-.bloom-item-derived .bloom-glyph {
-  color: var(--meta);
-}
-
-.bloom-item-derived .bloom-label {
-  font-style: italic;
-}
-
-/* Reveal cadence (slide.active at t=0):
-     0.4s   bloom-opening fades in
-     1.6s   both half headings fade in
-     2.4s   biological item 1 (breath)
-     2.8s   contextual item 1 (time of day)
-     3.2s   biological item 2 (HRV)
-     3.6s   contextual item 2 (location)
-     4.0s   biological item 3 (valence + arousal)
-     4.4s   contextual item 3 (schedule)
-     4.8s   biological item 4 (beta)
-     5.2s   contextual item 4 (environment)
-     ~6.0s  slide rests; presenter advances
-   The alternation between halves visually demonstrates that both
-   categories grow together — neither half is primary. */
-.slide-bloom-cadence.active .bloom-half--biological .bloom-heading,
-.slide-bloom-cadence.active .bloom-half--contextual .bloom-heading {
-  animation: bloom-fade-in 0.6s ease-in forwards 1.6s;
-}
-
-.slide-bloom-cadence.active .bloom-half--biological .bloom-item[data-item="1"] {
-  animation: bloom-fade-in 0.5s ease-in forwards 2.4s;
-}
-.slide-bloom-cadence.active .bloom-half--biological .bloom-item[data-item="2"] {
-  animation: bloom-fade-in 0.5s ease-in forwards 3.2s;
-}
-.slide-bloom-cadence.active .bloom-half--biological .bloom-item[data-item="3"] {
-  animation: bloom-fade-in 0.5s ease-in forwards 4.0s;
-}
-.slide-bloom-cadence.active .bloom-half--biological .bloom-item[data-item="4"] {
-  animation: bloom-fade-in 0.5s ease-in forwards 4.8s;
-}
-
-.slide-bloom-cadence.active .bloom-half--contextual .bloom-item[data-item="1"] {
-  animation: bloom-fade-in 0.5s ease-in forwards 2.8s;
-}
-.slide-bloom-cadence.active .bloom-half--contextual .bloom-item[data-item="2"] {
-  animation: bloom-fade-in 0.5s ease-in forwards 3.6s;
-}
-.slide-bloom-cadence.active .bloom-half--contextual .bloom-item[data-item="3"] {
-  animation: bloom-fade-in 0.5s ease-in forwards 4.4s;
-}
-.slide-bloom-cadence.active .bloom-half--contextual .bloom-item[data-item="4"] {
-  animation: bloom-fade-in 0.5s ease-in forwards 5.2s;
+/* The closing line appears after the split (added by the transform
+   sequence in app.js), not on a fixed timer — so it always lands once
+   the composition has resolved, however long the presenter holds. */
+.slide-bloom.bloom-animating.bloom-show-close .bloom-close {
+  animation: bloom-fade-in 1.0s ease-in-out forwards;
 }
 
 /* === Slide 7b (iii. the build) — Integration ========================
@@ -2017,7 +2629,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 64px;
+  gap: clamp(18px, 3vh, 38px);
 }
 
 .integrated-schematic {
@@ -2084,14 +2696,144 @@ body {
   opacity: 0;
 }
 
-/* Reveal — schematic pieces left-to-right at 0.4s intervals. Each
-   colon appears with the piece that follows it, so the visual reads
-   as α : β : ↟ : ♥ : ◯ unfolding as a single line. */
-.slide-integrate-cadence.active .schematic-alpha   { animation: integrate-fade-in 0.6s ease-in forwards 0.5s; }
-.slide-integrate-cadence.active .schematic-beta    { animation: integrate-fade-in 0.6s ease-in forwards 0.9s; }
-.slide-integrate-cadence.active .schematic-stride  { animation: integrate-fade-in 0.6s ease-in forwards 1.3s; }
-.slide-integrate-cadence.active .schematic-pulse   { animation: integrate-fade-in 0.6s ease-in forwards 1.7s; }
-.slide-integrate-cadence.active .schematic-breath  { animation: integrate-fade-in 0.6s ease-in forwards 2.1s; }
+/* Derivation — the hero formula. Two aligned rows (symbols, then numbers)
+   in a 7-column grid so the columns line up; μ is drawn as the head-EEG
+   glyph below. Sized up so the formula reads as the page's focus. */
+.integrate-deriv {
+  display: grid;
+  grid-template-columns: repeat(7, max-content);
+  column-gap: clamp(8px, 1vw, 14px);
+  row-gap: 6px;
+  align-items: center;
+  justify-items: center;
+  font-family: var(--font-meta);
+  font-size: clamp(26px, 3vw, 42px);
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  opacity: 0;
+}
+.integrate-deriv .id-label { justify-self: end; color: var(--meta); }
+.integrate-deriv .id-eq,
+.integrate-deriv .id-op    { color: var(--meta); opacity: 0.5; }
+.integrate-deriv .id-term  {
+  font-family: var(--font-body);
+  font-style: italic;
+  color: var(--ink-blue);
+  min-width: 1.2ch;
+}
+.integrate-deriv .id-num {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  min-width: 1.2ch;
+  font-size: 0.62em;        /* numbers subordinate to the symbols above them */
+}
+.integrate-deriv .id-num-mu { color: var(--ink-blue); font-weight: 500; }
+
+/* μ as a little head full of EEG — the IAF / alpha rhythm. */
+.head-eeg { width: 1.6em; height: 1.25em; display: block; overflow: visible; }
+.head-eeg-skull { fill: none; stroke: var(--ink-blue); stroke-width: 1.6; }
+.head-eeg-wave  { fill: none; stroke: var(--ink-blue); stroke-width: 1.4; stroke-linecap: round; }
+.head-eeg-wave-1 { opacity: 0.9; }
+.head-eeg-wave-2 { opacity: 0.5; }
+@keyframes head-eeg-pulse { 0%, 100% { opacity: 0.9; } 50% { opacity: 0.35; } }
+.slide-integrate-cadence.active .head-eeg-wave-1 { animation: head-eeg-pulse 2.6s ease-in-out infinite 3.6s; }
+.slide-integrate-cadence.active .head-eeg-wave-2 { animation: head-eeg-pulse 2.6s ease-in-out infinite 4.9s; }
+
+/* Stage — the two graphs flank the centered formula + result. */
+.integrate-stage {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(1.5rem, 4.5vw, 4.5rem);
+}
+.integrate-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(12px, 2.2vh, 24px);
+}
+
+/* The two dashboard graphs — where m and μ come from. */
+.ig-graph { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; opacity: 0; }
+.ig-svg   { width: clamp(180px, 17vw, 224px); height: auto; display: block; }
+.ig-cap {
+  font-family: var(--font-meta);
+  font-size: clamp(11px, 1.1vw, 14px);
+  color: var(--meta);
+  letter-spacing: 0.05em;
+}
+.ig-term { font-family: var(--font-body); font-style: italic; color: var(--ink-blue); font-weight: 500; font-size: 1.2em; }
+
+/* Graph internals — ports of the dashboard's Hill + IAF curves. */
+.ig-axis   { stroke: var(--dusty, #7A93A8); stroke-width: 1; opacity: 0.55; }
+.ig-ref    { stroke: var(--dusty, #7A93A8); stroke-width: 1; opacity: 0.45; stroke-dasharray: 3 3; }
+.ig-curve  { fill: none; stroke: var(--ink-blue); stroke-width: 2; }
+.ig-marker { fill: var(--ink-blue); stroke: var(--paper); stroke-width: 1.5; }
+.ig-tick   { font-family: var(--font-meta); font-size: 9px; fill: var(--meta); }
+.ig-hint   { font-family: var(--font-meta); font-size: 8px; fill: var(--meta); font-style: italic; opacity: 0.75; }
+
+/* The conclusion — the emphasized result. */
+.integrate-conclusion {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--font-meta);
+  opacity: 0;
+}
+.integrate-conclusion .ic-eq { color: var(--meta); opacity: 0.5; font-size: clamp(22px, 2.4vw, 32px); }
+.integrate-conclusion .ic-tempo {
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(42px, 5.2vw, 70px);
+  font-weight: 600;
+  color: var(--ink-blue);
+}
+.integrate-conclusion .ic-unit {
+  font-size: clamp(13px, 1.4vw, 18px);
+  color: var(--meta);
+  letter-spacing: 0.16em;
+}
+
+/* Reveal cadence: formula → graphs → conclusion, after the schematic lands. */
+.slide-integrate-cadence.active .integrate-deriv      { animation: integrate-fade-in 0.8s ease-in forwards 3.4s; }
+.slide-integrate-cadence.active .ig-graph             { animation: integrate-fade-in 0.8s ease-in forwards 3.9s; }
+.slide-integrate-cadence.active .integrate-conclusion { animation: integrate-fade-in 0.8s ease-in forwards 4.4s; }
+
+/* Reveal — schematic pieces left-to-right at 0.4s intervals, in
+   descending-frequency order: β (20Hz) → α (10Hz) → stride → pulse
+   → breath. Each colon appears with the piece that follows it, so
+   the visual reads as β : α : ↟ : ♥ : ◯ unfolding as a single line.
+
+   Each piece chains a continuous LFO breath after its fade-in lands.
+   Periods are distinct per piece (β fastest, ◯ slowest) so the
+   ratios feel embodied even as the drone holds steady underneath.
+   The LFO modulates opacity only; --drone-rms (set per-frame by
+   AudioEngine) drives an additive text-shadow glow on the glyphs
+   so audio amplitude reads as light. */
+.slide-integrate-cadence.active .schematic-beta {
+  animation:
+    integrate-fade-in 0.6s ease-in forwards 0.5s,
+    lfo-beta 3.2s ease-in-out infinite 3.5s;
+}
+.slide-integrate-cadence.active .schematic-alpha {
+  animation:
+    integrate-fade-in 0.6s ease-in forwards 0.9s,
+    lfo-alpha 4.6s ease-in-out infinite 4.0s;
+}
+.slide-integrate-cadence.active .schematic-stride {
+  animation:
+    integrate-fade-in 0.6s ease-in forwards 1.3s,
+    lfo-stride 6.0s ease-in-out infinite 4.5s;
+}
+.slide-integrate-cadence.active .schematic-pulse {
+  animation:
+    integrate-fade-in 0.6s ease-in forwards 1.7s,
+    lfo-pulse 8.0s ease-in-out infinite 5.0s;
+}
+.slide-integrate-cadence.active .schematic-breath {
+  animation:
+    integrate-fade-in 0.6s ease-in forwards 2.1s,
+    lfo-breath 11.0s ease-in-out infinite 5.5s;
+}
 
 .slide-integrate-cadence.active .schematic-colon-1 { animation: integrate-fade-in 0.6s ease-in forwards 0.9s; }
 .slide-integrate-cadence.active .schematic-colon-2 { animation: integrate-fade-in 0.6s ease-in forwards 1.3s; }
@@ -2105,7 +2847,9 @@ body {
 }
 
 .slide-integrate-cadence.active .integrated-question {
-  animation: integrate-fade-in 1.0s ease-in forwards 4.0s;
+  animation:
+    integrate-fade-in 1.0s ease-in forwards 5.0s,
+    lfo-question 14s ease-in-out infinite 7.0s;
 }
 
 @keyframes integrate-fade-in {
@@ -2114,6 +2858,84 @@ body {
 
 @keyframes integrate-legend-in {
   to { opacity: 0.75; }
+}
+
+/* Per-element opacity LFOs. Distinct periods preserve the felt ratio
+   between the rhythms even when the drone is steady. Troughs reach
+   ~0.55 so the breathing is clearly visible from the back of the
+   room, while staying contemplative rather than strobing. */
+@keyframes lfo-beta    { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@keyframes lfo-alpha   { 0%, 100% { opacity: 1; } 50% { opacity: 0.62; } }
+@keyframes lfo-stride  { 0%, 100% { opacity: 1; } 50% { opacity: 0.70; } }
+@keyframes lfo-pulse   { 0%, 100% { opacity: 1; } 50% { opacity: 0.66; } }
+@keyframes lfo-breath  { 0%, 100% { opacity: 1; } 50% { opacity: 0.74; } }
+@keyframes lfo-question { 0%, 100% { opacity: 1; } 50% { opacity: 0.80; } }
+
+/* Drone amplitude → glyph glow + line breath. --drone-rms is pumped
+   to :root each frame by AudioEngine.startRmsPump(); typical range
+   is 0–~0.25. Two amplifications drive the visual reaction:
+     • text-shadow on glyph/num: bigger blur (up to ~25px at peak),
+       so the schematic visibly lights up with the bed audio.
+     • transform: scale on the schematic line: a tiny breath in size
+       so the whole row inhales with the drone. Kept under +3% so the
+       layout stays put. */
+.slide-integrate-cadence .schematic-piece .glyph,
+.slide-integrate-cadence .schematic-piece .num {
+  text-shadow: 0 0 calc(var(--drone-rms, 0) * 220px) currentColor;
+  transition: text-shadow 80ms ease-out;
+}
+
+.slide-integrate-cadence .integrated-question {
+  text-shadow: 0 0 calc(var(--drone-rms, 0) * 280px) var(--ink-blue);
+  transition: text-shadow 80ms ease-out;
+}
+
+.slide-integrate-cadence .schematic-line-integrated {
+  transform: scale(calc(1 + var(--drone-rms, 0) * 0.30));
+  transform-origin: 50% 50%;
+  transition: transform 100ms ease-out;
+}
+
+/* === Whispers — past phrases surfacing during the demo ===============
+   Six positioned slots (corners + sides) hold low-opacity ghosts of
+   prior text. JS rotates which slot is active and writes a phrase
+   into it; the whisper-active class triggers a single fade in/hold/
+   fade-out cycle. While the demo runs, ~one whisper at a time drifts
+   past, never overlapping the schematic or the question. */
+.whispers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.whisper {
+  position: absolute;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(16px, 1.4vw, 24px);
+  color: var(--ink-blue);
+  opacity: 0;
+  letter-spacing: 0.02em;
+  max-width: 28%;
+}
+
+.whisper[data-pos="tl"] { top: 16%;  left: 6%;  text-align: left; }
+.whisper[data-pos="tr"] { top: 16%;  right: 6%; text-align: right; }
+.whisper[data-pos="ml"] { top: 38%;  left: 4%;  text-align: left; }
+.whisper[data-pos="mr"] { top: 38%;  right: 4%; text-align: right; }
+.whisper[data-pos="bl"] { bottom: 18%; left: 6%;  text-align: left; }
+.whisper[data-pos="br"] { bottom: 18%; right: 6%; text-align: right; }
+
+.whisper.whisper-active {
+  animation: whisper-cycle 9.5s ease-in-out forwards;
+}
+
+@keyframes whisper-cycle {
+  0%   { opacity: 0;    transform: translateY(4px); }
+  18%  { opacity: 0.42; transform: translateY(0); }
+  72%  { opacity: 0.42; transform: translateY(0); }
+  100% { opacity: 0;    transform: translateY(-4px); }
 }
 
 .placeholder {
@@ -2200,3 +3022,1111 @@ body {
 .iaf-toggle:focus-visible {
   background: color-mix(in srgb, var(--ink-blue) 7%, transparent);
 }
+
+/* === Slide 10 (v. what comes next) — Implications ====================
+   Two halves: applications on the left (what RTD makes buildable now),
+   implications on the right (categories that get transformed because
+   RTD exists). Three items per side, alternating reveal so both
+   columns accumulate together. Two warped carry-over ellipses (further
+   compressed vertically than slides 7-9) hold as the geometric frame.
+   ===================================================================== */
+.slide-impl-cadence .slide-body-impl {
+  position: absolute;
+  inset: 0;
+}
+
+.slide-impl-cadence .impl-opening {
+  position: absolute;
+  top: 18%;
+  left: 0;
+  right: 0;
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: clamp(28px, 3.0vw, 38px);
+  font-weight: 400;
+  color: var(--ink);
+  opacity: 0;
+}
+
+.slide-impl-cadence.active .impl-opening {
+  animation: impl-fade-in 1.0s ease-in forwards 0.4s;
+}
+
+@keyframes impl-fade-in {
+  to { opacity: 1; }
+}
+
+/* Tighter columns + center hairline. The two halves used to hug the
+   slide edges (left/right: 12%) which left a barren middle and let
+   the carry-over ellipse strokes cut across the text. With the inner
+   ellipse removed and the columns pulled inward to 22%, the divider
+   hairline becomes the central feature and apps/impl read as paired
+   panels rather than two separate corners. */
+.impl-halves {
+  position: absolute;
+  top: 32%;
+  left: 22%;
+  right: 22%;
+  bottom: 16%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5%;
+}
+
+.impl-halves::before {
+  content: '';
+  position: absolute;
+  top: 4%;
+  /* Bottom is measured from .impl-halves' bottom edge (16% from slide
+     bottom). With the close pulled up to bottom: 30%, the divider used
+     to extend past the close into the grid area. 46% of the container
+     height (52% of slide) puts the divider's lower terminus at ~40%
+     from the slide bottom — just above the close text. */
+  bottom: 46%;
+  left: 50%;
+  width: 1px;
+  background: var(--meta);
+  opacity: 0.22;
+  transform: translateX(-50%);
+}
+
+.impl-half {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Heading base — applications uses this default (mono "engineering
+   spec" voice). Implications overrides it below to read as italic
+   Garamond ("philosophical label") so the two halves announce
+   themselves with distinct typographic registers. */
+.impl-heading {
+  font-family: var(--font-meta);
+  font-size: clamp(11px, 1.1vw, 14px);
+  letter-spacing: 0.18em;
+  color: var(--meta);
+  text-transform: lowercase;
+  border-bottom: 0.5px solid var(--meta);
+  padding-bottom: 10px;
+  margin-bottom: 6px;
+  opacity: 0;
+}
+
+.impl-half--implications .impl-heading {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(14px, 1.35vw, 18px);
+  letter-spacing: 0.04em;
+  color: var(--ink-blue);
+  text-transform: lowercase;
+  border-bottom-color: var(--ink-blue);
+}
+
+.impl-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.impl-item {
+  font-family: var(--font-body);
+  font-size: clamp(18px, 1.7vw, 22px);
+  color: var(--ink);
+  opacity: 0;
+}
+
+/* Applications items pick up a mono "01 / 02 / 03" prefix so they
+   read as enumerated products. counter-reset on the list lets the
+   prefix stay in sync with data-item without hard-coding values. */
+.impl-half--applications .impl-list {
+  counter-reset: apps-counter;
+}
+
+.impl-half--applications .impl-item {
+  counter-increment: apps-counter;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+
+.impl-half--applications .impl-item::before {
+  content: counter(apps-counter, decimal-leading-zero);
+  font-family: var(--font-meta);
+  font-size: 0.62em;
+  color: var(--meta);
+  letter-spacing: 0.16em;
+  flex: 0 0 auto;
+}
+
+/* Implications items render in italic ink-blue Garamond — the
+   philosophical voice. No numbering: these aren't enumerated
+   products, they're paradigm shifts. */
+.impl-half--implications .impl-item {
+  font-style: italic;
+  color: var(--ink-blue);
+}
+
+/* Acronym + expansion pairing — used for RAS in the applications list.
+   The acronym renders at the regular item size; the expansion follows
+   on the same line in slightly smaller meta-grey italic. The em-dash
+   is CSS-generated so the spacing stays consistent if the expansion
+   is reformatted. */
+.slide-impl-cadence .impl-item .impl-acronym {
+  display: inline;
+}
+
+.slide-impl-cadence .impl-item .impl-expansion {
+  display: inline;
+  margin-left: 8px;
+  font-size: 0.78em;
+  color: var(--meta);
+  font-style: italic;
+}
+
+.slide-impl-cadence .impl-item .impl-expansion::before {
+  content: "— ";
+  margin-right: 2px;
+}
+
+/* Reveal cadence (slide.active at t=0):
+     0.4s   impl-opening "What we can build with RTD." fades in
+     1.6s   both half headings fade in
+     2.4s   apps item 01 (Music Curation & Discovery)
+     2.8s   impl item 1 (Music as a Science)
+     3.2s   apps item 02 (RAS — Rhythmic Auditory Stimulation)
+     3.6s   impl item 2 (Bio-Adaptive Music Therapy)
+     4.0s   apps item 03 (Real-Time Audio Neurofeedback)
+     4.4s   impl item 3 (AI Composition as Neuromodulation)
+     5.4s   impl-close line 1 ("The synergy of sound, motion, and intelligence")
+     6.0s   impl-close line 2 ("in real time.")
+     ~7.5s  slide rests
+   The alternation between halves visually demonstrates that each
+   buildable application has a paired implication — neither half is
+   primary. The closing line resolves the pairing into a single
+   synthesis. */
+.slide-impl-cadence.active .impl-half--applications .impl-heading,
+.slide-impl-cadence.active .impl-half--implications .impl-heading {
+  animation: impl-fade-in 0.6s ease-in forwards 1.6s;
+}
+
+.slide-impl-cadence.active .impl-half--applications .impl-item[data-item="1"] {
+  animation: impl-fade-in 0.5s ease-in forwards 2.4s;
+}
+.slide-impl-cadence.active .impl-half--applications .impl-item[data-item="2"] {
+  animation: impl-fade-in 0.5s ease-in forwards 3.2s;
+}
+.slide-impl-cadence.active .impl-half--applications .impl-item[data-item="3"] {
+  animation: impl-fade-in 0.5s ease-in forwards 4.0s;
+}
+
+.slide-impl-cadence.active .impl-half--implications .impl-item[data-item="1"] {
+  animation: impl-fade-in 0.5s ease-in forwards 2.8s;
+}
+.slide-impl-cadence.active .impl-half--implications .impl-item[data-item="2"] {
+  animation: impl-fade-in 0.5s ease-in forwards 3.6s;
+}
+.slide-impl-cadence.active .impl-half--implications .impl-item[data-item="3"] {
+  animation: impl-fade-in 0.5s ease-in forwards 4.4s;
+}
+
+/* Closing line — italic ink-blue serif, mirroring the close treatment
+   on slide 8 (bloom). Two stacked centered lines, sized slightly
+   smaller than the slide title above so they read as a quiet resolution
+   rather than a second headline. Sits in the breathing room below the
+   columns; line 2 fades in shortly after line 1 so the second clause
+   feels like an exhale completing the first. */
+.slide-impl-cadence .impl-close {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* Sits just below where the column items visually end — the columns'
+     container extends further down (bottom: 16%) but the items only
+     fill the top portion of that container, so anchoring the close to
+     the container's edge leaves a large dead zone. Pulling the close
+     up to 30% puts it in conversation with the items above, and frees
+     the lower third of the slide for the receding-horizon grid. */
+  bottom: 30%;
+  margin: 0;
+  text-align: center;
+}
+
+.slide-impl-cadence .impl-close-line {
+  margin: 0;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(20px, 2.2vw, 28px);
+  color: var(--ink-blue);
+  letter-spacing: -0.005em;
+  opacity: 0;
+}
+
+.slide-impl-cadence .impl-close-line-2 {
+  margin-top: 6px;
+}
+
+.slide-impl-cadence.active .impl-close-line-1 {
+  animation: impl-fade-in 1.0s ease-in forwards 5.4s;
+}
+
+.slide-impl-cadence.active .impl-close-line-2 {
+  animation: impl-fade-in 1.0s ease-in forwards 6.0s;
+}
+
+/* Receding-horizon grid at the bottom of the slide — four nested
+   ellipses centered well below the visible area so only their top
+   arcs cross the slide. Each outer ring is fainter than the last,
+   giving depth without color cost. Sits behind everything else in
+   the SVG so the trace-ellipse and the body content render on top.
+   Fades in slowly on slide entry so it appears as residue settling
+   rather than a hard cut. */
+/* Static — present as soon as the slide is active. Each ring carries
+   its own inline opacity so depth is encoded per-ellipse rather than
+   through a group-level fade. */
+.slide-impl-cadence .impl-grid {
+  opacity: 1;
+}
+
+/* === Slides 10–13 — "what comes next", three-horizon arc =============
+   The old single applications/implications slide (now the overview,
+   slide 10) names three pillars at once; slides 11–13 give each its own
+   page. available → emerging → frontier.
+
+   FRAMEWORK SCAFFOLD: layout + first-draft copy only. Per-pillar hero
+   visuals/animations are still to come — each detail slide currently
+   carries just the warped carry-over ellipse. The overview reuses the
+   impl cadence (opening line, receding-horizon grid, close couplet);
+   only the three-column body below is new.
+   ===================================================================== */
+
+/* --- Overview: three pillar columns (slide 10) --------------------- */
+.slide-impl-cadence .pillars-overview {
+  position: absolute;
+  top: 32%;
+  left: 12%;
+  right: 12%;
+  bottom: 40%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4%;
+}
+
+.pillars-overview .pillar-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-inline: 1.4%;
+  opacity: 0;
+}
+
+/* Hairline dividers between the three columns, echoing the impl-halves
+   center rule. */
+.pillars-overview .pillar-col + .pillar-col {
+  border-left: 1px solid var(--meta);
+  border-image: linear-gradient(transparent, var(--meta) 18%, var(--meta) 82%, transparent) 1;
+}
+
+.pillars-overview .pillar-horizon {
+  font-family: var(--font-meta);
+  font-size: clamp(11px, 1.05vw, 13px);
+  letter-spacing: 0.18em;
+  text-transform: lowercase;
+  color: var(--ink-blue);
+}
+
+.pillars-overview .pillar-name {
+  font-family: var(--font-body);
+  font-size: clamp(18px, 1.8vw, 24px);
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.pillars-overview .pillar-blurb {
+  margin: 0;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(13px, 1.2vw, 16px);
+  line-height: 1.4;
+  color: var(--ink-blue);
+}
+
+/* Columns reveal left-to-right after the opening line lands. */
+.slide-impl-cadence.active .pillar-col[data-pillar="1"] { animation: impl-fade-in 0.6s ease-in forwards 1.6s; }
+.slide-impl-cadence.active .pillar-col[data-pillar="2"] { animation: impl-fade-in 0.6s ease-in forwards 2.2s; }
+.slide-impl-cadence.active .pillar-col[data-pillar="3"] { animation: impl-fade-in 0.6s ease-in forwards 2.8s; }
+
+/* --- Pillar detail slides (11–13) ---------------------------------- */
+.slide-pillar .slide-body-pillar {
+  position: absolute;
+  inset: 0;
+}
+
+.slide-pillar .pillar-tag {
+  display: block;
+  margin-bottom: 12px;
+  font-family: var(--font-meta);
+  font-size: clamp(11px, 1.05vw, 13px);
+  letter-spacing: 0.18em;
+  text-transform: lowercase;
+  color: var(--meta);
+}
+
+.slide-pillar .pillar-title {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: clamp(30px, 3.3vw, 46px);
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.slide-pillar .pillar-thesis {
+  margin: 0;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(18px, 2.0vw, 26px);
+  line-height: 1.3;
+  color: var(--ink-blue);
+}
+
+.slide-pillar .pillar-points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  counter-reset: pillar-pt;
+}
+
+.slide-pillar .pillar-point {
+  counter-increment: pillar-pt;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  font-family: var(--font-body);
+  font-size: clamp(17px, 1.7vw, 22px);
+  color: var(--ink);
+}
+
+.slide-pillar .pillar-point::before {
+  content: counter(pillar-pt, decimal-leading-zero);
+  flex: 0 0 auto;
+  font-family: var(--font-meta);
+  font-size: 0.62em;
+  letter-spacing: 0.16em;
+  color: var(--meta);
+}
+
+.slide-pillar .pillar-foot {
+  margin: 0;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(18px, 1.9vw, 24px);
+  color: var(--ink-blue);
+}
+
+.slide-pillar .pillar-note {
+  margin: 0;
+  font-family: var(--font-meta);
+  font-size: clamp(10px, 1.0vw, 12px);
+  letter-spacing: 0.04em;
+  color: var(--meta);
+}
+
+/* Reveal cadence — tag, title, thesis, then points, then the closing
+   line. Reuses the global impl-fade-in keyframe (opacity 0 → 1). */
+.slide-pillar-cadence .pillar-tag,
+.slide-pillar-cadence .pillar-title,
+.slide-pillar-cadence .pillar-thesis,
+.slide-pillar-cadence .pillar-point,
+.slide-pillar-cadence .pillar-foot,
+.slide-pillar-cadence .pillar-note {
+  opacity: 0;
+}
+
+.slide-pillar-cadence.active .pillar-tag    { animation: impl-fade-in 0.6s ease-in forwards 0.3s; }
+.slide-pillar-cadence.active .pillar-title  { animation: impl-fade-in 0.8s ease-in forwards 0.6s; }
+.slide-pillar-cadence.active .pillar-thesis { animation: impl-fade-in 0.8s ease-in forwards 1.3s; }
+.slide-pillar-cadence.active .pillar-point[data-item="1"] { animation: impl-fade-in 0.5s ease-in forwards 2.0s; }
+.slide-pillar-cadence.active .pillar-point[data-item="2"] { animation: impl-fade-in 0.5s ease-in forwards 2.4s; }
+.slide-pillar-cadence.active .pillar-point[data-item="3"] { animation: impl-fade-in 0.5s ease-in forwards 2.8s; }
+.slide-pillar-cadence.active .pillar-foot   { animation: impl-fade-in 1.0s ease-in forwards 3.5s; }
+.slide-pillar-cadence.active .pillar-note   { animation: impl-fade-in 1.0s ease-in forwards 4.0s; }
+
+/* === Breakdown slides (11-13) — three-beat shape + star inheritance ==
+   Each slide wears its star's colour (near blue · mid amber · far red)
+   and carries a small glow at its map position (near→top, mid→middle,
+   far→bottom). Shared shape: head (title + thesis) → triad (what it is)
+   → beats (how it works · why it sits here). A faint Mandarin character
+   resonates behind. Built atop the .slide-pillar base. ================ */
+/* Title + Mandarin sit above the formed rule (~y300 in the SVG viewBox);
+   the body sits below it. */
+.slide-pillar .pillar-head {
+  position: absolute;
+  top: 18%;
+  left: 16%;
+  right: 16%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.slide-pillar .pillar-lower {
+  position: absolute;
+  top: 37%;
+  bottom: 9%;
+  left: 16%;
+  right: 16%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 20px;
+}
+
+/* English title + Mandarin on one line, sharing a baseline. */
+.slide-pillar .pillar-titles {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.65em;
+}
+
+/* Subtext row (arc phrase + Mandarin), below the rule, sharing a baseline. */
+.slide-pillar .pillar-subtext {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.6em;
+}
+
+/* Listener constellation (slide 11) — a drifting sky behind the text; the
+   blue matches share a pulse and align into a direction. Positions +
+   opacities are driven per-frame by startCurateLoop(); colours live here.
+   Neutral stars = the crowd; blue stars = listeners who respond like you. */
+.slide-pillar .curate-star { fill: var(--meta); }
+.slide-pillar .curate-star-blue { fill: #5C7FA3; }
+.slide-pillar .curate-line {
+  fill: none;
+  stroke: #5C7FA3;
+  stroke-width: 1;
+  stroke-dasharray: 2 8;
+  vector-effect: non-scaling-stroke;
+}
+.slide-pillar .curate-arrow {
+  fill: none;
+  stroke: #5C7FA3;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Swaying wave rule (slides without a bespoke constellation, e.g. slide
+   12). Shape is drawn per-frame in app.js; colour follows the star. */
+.slide-pillar .pillar-wave {
+  fill: none;
+  stroke-width: 1;
+  stroke-dasharray: 2 8;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+}
+.slide-pillar[data-pillar="2"] .pillar-wave { stroke: #C89B52; }
+.slide-pillar[data-pillar="3"] .pillar-wave { stroke: var(--accent-red); }
+@keyframes pillar-wave-in { to { opacity: 0.5; } }
+.slide-pillar-cadence.active .pillar-wave { animation: pillar-wave-in 1.2s ease-in-out forwards 1.15s; }
+
+/* Refining constellation (slide 12) — neutral stars fade; the kept ones
+   warm from blue to yellow (fill set per-frame in app.js) and ride the
+   quickening amber wave. */
+.slide-pillar .therapy-star { fill: var(--meta); }
+.slide-pillar .therapy-wave {
+  fill: none;
+  stroke: #C89B52;
+  stroke-width: 1;
+  stroke-dasharray: 2 8;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Resonance (slide 13) — the carried wave (A) meets a generated wave (B);
+   they lock to one frequency and resonate. Strokes/fills warm to red in
+   app.js; these are the resting colours. */
+.slide-pillar .frontier-wave-a {
+  fill: none;
+  stroke: #C89B52;
+  stroke-width: 1.1;
+  stroke-dasharray: 2 8;
+  vector-effect: non-scaling-stroke;
+}
+.slide-pillar .frontier-wave-b {
+  fill: none;
+  stroke: #E0635A;
+  stroke-width: 1;
+  stroke-dasharray: 2 8;
+  vector-effect: non-scaling-stroke;
+}
+.slide-pillar .frontier-star { fill: #DCA94A; }
+
+/* Star colour inheritance — tag, triad labels, beat labels carry it. */
+.slide-pillar[data-pillar="1"] .pillar-tag,
+.slide-pillar[data-pillar="1"] .triad-label,
+.slide-pillar[data-pillar="1"] .beat-label { color: #3E6488; }
+.slide-pillar[data-pillar="2"] .pillar-tag,
+.slide-pillar[data-pillar="2"] .triad-label,
+.slide-pillar[data-pillar="2"] .beat-label { color: #9A6B1F; }
+.slide-pillar[data-pillar="3"] .pillar-tag,
+.slide-pillar[data-pillar="3"] .triad-label,
+.slide-pillar[data-pillar="3"] .beat-label { color: var(--accent-red); }
+
+/* the slide's star + faint Mandarin resonance */
+.slide-pillar .pillar-star-glow,
+.slide-pillar .pillar-star-core { opacity: 0; }
+/* Mandarin line — sits directly under the English title as its
+   translation (the presenter speaks it). Legible, not a watermark. */
+.slide-pillar .pillar-zh {
+  margin: 0;
+  font-family: var(--font-zh);
+  font-size: clamp(20px, 2.1vw, 30px);
+  letter-spacing: 0.08em;
+  color: var(--ink-blue);
+  opacity: 0;
+}
+
+/* triad — "what it is", three compact items across */
+.slide-pillar .pillar-triad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4%;
+}
+.slide-pillar .triad-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  opacity: 0;
+}
+.slide-pillar .triad-label {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(18px, 1.7vw, 24px);
+}
+.slide-pillar .triad-desc {
+  font-family: var(--font-body);
+  font-size: clamp(14px, 1.3vw, 17px);
+  color: var(--ink);
+  line-height: 1.35;
+}
+
+/* beats — "how it works" and "why it sits here" */
+.slide-pillar .pillar-beats {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.slide-pillar .pillar-beat {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: clamp(14px, 1.35vw, 18px);
+  color: var(--ink);
+  line-height: 1.4;
+  opacity: 0;
+}
+.slide-pillar .beat-label {
+  font-family: var(--font-meta);
+  font-size: 0.72em;
+  letter-spacing: 0.16em;
+  text-transform: lowercase;
+  margin-right: 12px;
+}
+
+/* Reveal cadence — star + Mandarin settle in, then head (handled by the
+   base pillar cadence), then the triad item-by-item, then the two beats. */
+.slide-pillar-cadence.active .pillar-star-glow { animation: impl-fade-in 1.6s ease-in-out forwards 0.4s; }
+.slide-pillar-cadence.active .pillar-star-core { animation: impl-fade-in 1.0s ease-in-out forwards 0.6s; }
+.slide-pillar-cadence.active .pillar-zh        { animation: impl-fade-in 0.9s ease-in-out forwards 0.95s; }
+.slide-pillar-cadence.active .triad-item[data-item="1"] { animation: impl-fade-in 0.6s ease-in-out forwards 1.9s; }
+.slide-pillar-cadence.active .triad-item[data-item="2"] { animation: impl-fade-in 0.6s ease-in-out forwards 2.2s; }
+.slide-pillar-cadence.active .triad-item[data-item="3"] { animation: impl-fade-in 0.6s ease-in-out forwards 2.5s; }
+.slide-pillar-cadence.active .pillar-beat[data-beat="how"] { animation: impl-fade-in 0.9s ease-in-out forwards 3.1s; }
+.slide-pillar-cadence.active .pillar-beat[data-beat="why"] { animation: impl-fade-in 0.9s ease-in-out forwards 3.6s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-pillar-cadence.active .pillar-star-glow,
+  .slide-pillar-cadence.active .pillar-star-core,
+  .slide-pillar-cadence.active .pillar-zh,
+  .slide-pillar-cadence.active .pillar-wave,
+  .slide-pillar-cadence.active .triad-item,
+  .slide-pillar-cadence.active .pillar-beat {
+    animation: none;
+  }
+  .slide-pillar .pillar-star-glow,
+  .slide-pillar .pillar-star-core,
+  .slide-pillar .triad-item,
+  .slide-pillar .pillar-beat {
+    opacity: 1;
+  }
+  .slide-pillar .pillar-zh { opacity: 1; }
+  .slide-pillar .pillar-wave { opacity: 0.5; }
+}
+
+/* === Slide 10 — "What we build with RTD": redshifted star map ========
+   Three pillars as a charted course, near→far = now→future. Redshift
+   (blue→amber→red with distance) rhymes with RTD's own frequency/Doppler
+   core. The pillar names are the hero (ink, legible); the map frames
+   them. The field (built by buildStarfield() in app.js) is the many other
+   applications. Entrance: headline → field → each star ignites near→far
+   with its label, the course drawn between. Reduced motion → all at rest.
+   ===================================================================== */
+.slide-starmap .starmap-headline {
+  position: absolute;
+  top: 8%;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(24px, 2.6vw, 34px);
+  color: var(--ink-blue);
+  opacity: 0;
+}
+
+/* SVG text — names are the hero; tags carry the redshift colour. */
+.starmap-name {
+  font-family: var(--font-body);
+  font-size: 38px;
+  fill: var(--ink);
+}
+.starmap-tag {
+  font-family: var(--font-meta);
+  font-size: 15px;
+  letter-spacing: 0.16em;
+}
+.starmap-label--near .starmap-tag { fill: #3E6488; }
+.starmap-label--mid  .starmap-tag { fill: #9A6B1F; }
+.starmap-label--far  .starmap-tag { fill: var(--accent-red); }
+
+.starmap-axis-end,
+.starmap-axis-caption {
+  font-family: var(--font-meta);
+  fill: var(--meta);
+}
+.starmap-axis-end { font-size: 15px; letter-spacing: 0.16em; }
+.starmap-axis-caption { font-size: 13px; letter-spacing: 0.22em; opacity: 0.85; }
+
+/* --- Entrance cadence — headline, then the course charts itself out --- */
+/* The dotted lines (axis thread + course) are revealed by the growing
+   clip, not by a fade — only the field, horizon, stars and titles fade. */
+.slide-starmap .starmap-field,
+.slide-starmap .starmap-horizon,
+.slide-starmap .starmap-star,
+.slide-starmap .starmap-label {
+  opacity: 0;
+}
+
+@keyframes starmap-fade { to { opacity: 1; } }
+
+.slide-starmap-cadence.active .starmap-headline   { animation: starmap-fade 1.0s ease-in-out forwards 0.3s; }
+.slide-starmap-cadence.active .starmap-field      { animation: starmap-fade 1.6s ease-in-out forwards 0.6s; }
+.slide-starmap-cadence.active .starmap-horizon    { animation: starmap-fade 1.6s ease-in-out forwards 0.6s; }
+
+/* Stars + titles fade in as the drawing front (the clip, ~3.5s top→bottom)
+   passes each one: near → mid → far. */
+.slide-starmap-cadence.active .starmap-star--near  { animation: starmap-fade 0.9s ease-in-out forwards 0.6s; }
+.slide-starmap-cadence.active .starmap-label--near { animation: starmap-fade 0.9s ease-in-out forwards 0.9s; }
+.slide-starmap-cadence.active .starmap-star--mid   { animation: starmap-fade 0.9s ease-in-out forwards 1.7s; }
+.slide-starmap-cadence.active .starmap-label--mid  { animation: starmap-fade 0.9s ease-in-out forwards 2.0s; }
+.slide-starmap-cadence.active .starmap-star--far   { animation: starmap-fade 1.0s ease-in-out forwards 2.8s; }
+.slide-starmap-cadence.active .starmap-label--far  { animation: starmap-fade 1.0s ease-in-out forwards 3.1s; }
+
+/* --- Ambient motion — slow orbital drift, breathing glows, faint twinkle.
+   All very slow / low-amplitude: "things are changing but no one's
+   alarmed." Disabled under reduced motion below. --------------------- */
+.starmap-atmos {
+  transform-box: view-box;
+  transform-origin: 800px 450px;
+}
+/* Each ring is tilted back (rotateX) into the slide-ellipse's perspective
+   and slowly precesses (rotate, in-plane), so the slight ellipticity reads
+   as a 3D orbital plane turning in space — a quiet cosmic orrery. */
+.starmap-atmos-1 { animation: starmap-orbit-1 100s linear infinite; opacity: 0.13; }
+.starmap-atmos-2 { animation: starmap-orbit-2 150s linear infinite; opacity: 0.11; }
+.starmap-atmos-3 { animation: starmap-orbit-3 210s linear infinite; opacity: 0.09; }
+@keyframes starmap-orbit-1 { from { transform: rotateX(62deg) rotate(0deg);   } to { transform: rotateX(62deg) rotate(360deg); } }
+@keyframes starmap-orbit-2 { from { transform: rotateX(56deg) rotate(360deg); } to { transform: rotateX(56deg) rotate(0deg);   } }
+@keyframes starmap-orbit-3 { from { transform: rotateX(68deg) rotate(0deg);   } to { transform: rotateX(68deg) rotate(360deg); } }
+
+.starmap-star--near .starmap-glow { animation: starmap-breathe 7s   ease-in-out infinite; }
+.starmap-star--mid  .starmap-glow { animation: starmap-breathe 8.5s ease-in-out 1s infinite; }
+.starmap-star--far  .starmap-glow { animation: starmap-breathe 6s   ease-in-out 0.5s infinite; }
+@keyframes starmap-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.78; } }
+
+/* Field twinkle — each star dips toward 40% of its own base opacity
+   (--o, set inline per star in buildStarfield). */
+@keyframes starmap-twinkle {
+  0%, 100% { opacity: var(--o, 0.3); }
+  50%      { opacity: calc(var(--o, 0.3) * 0.4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-starmap-cadence.active .starmap-headline,
+  .slide-starmap-cadence.active .starmap-atmosphere,
+  .slide-starmap-cadence.active .starmap-field,
+  .slide-starmap-cadence.active .starmap-horizon,
+  .slide-starmap-cadence.active .starmap-track,
+  .slide-starmap-cadence.active .starmap-track-head,
+  .slide-starmap-cadence.active .starmap-star,
+  .slide-starmap-cadence.active .starmap-label,
+  .slide-starmap-cadence.active .starmap-axis,
+  .slide-starmap-cadence.active .starmap-axis-end,
+  .slide-starmap-cadence.active .starmap-axis-caption,
+  .slide-starmap .starmap-atmos,
+  .slide-starmap .starmap-glow,
+  .slide-starmap .starmap-field > * {
+    animation: none;
+  }
+  .slide-starmap .starmap-headline,
+  .slide-starmap .starmap-atmosphere,
+  .slide-starmap .starmap-field,
+  .slide-starmap .starmap-horizon,
+  .slide-starmap .starmap-track,
+  .slide-starmap .starmap-track-head,
+  .slide-starmap .starmap-star,
+  .slide-starmap .starmap-label,
+  .slide-starmap .starmap-axis,
+  .slide-starmap .starmap-axis-end,
+  .slide-starmap .starmap-axis-caption {
+    opacity: 1;
+  }
+}
+
+/* === Slide 14 (vi. close) ============================================
+   Mirror of slide 0 typographically. Two italic English lines plus
+   a Mandarin third line, all left-aligned, ink-blue EB Garamond.
+   The deck closes with the same composition it opened with — paper
+   and typography only, no ellipse, no animation beyond the staggered
+   fade-in. The drone audio continues at 0.30 from slide 9 onward and
+   fades only on page unload.
+
+   The English lines stagger so the audience reads "Thank you for
+   listening." before "Let's continue making good time." arrives.
+   The Mandarin (謝謝你們的聆聽) follows last — echoes slide 0's
+   bilingual gesture in the inverse direction (we hear you → thank
+   you for listening).
+   ===================================================================== */
+.slide-close .slide-body-close {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding-top: 15%;     /* lifted up to meet the line carried up to y=300 */
+  margin-inline: var(--margin-x);
+  gap: 8px;
+}
+
+/* Close EEG trace — the line carried up to y=300 with a gentle drift,
+   reusing slide 0's title-eeg keyframes to bookend "we hear you." */
+.slide-close .close-eeg-group {
+  opacity: 0;
+  animation: title-eeg-fade-in 1.6s ease-in forwards 1.2s;
+}
+.slide-close .close-eeg-wave   { animation: title-eeg-scroll 10s linear infinite; }
+.slide-close .close-eeg-drift  { animation: title-eeg-drift 9.7s ease-in-out infinite; }
+.slide-close .close-eeg-jitter { animation: title-eeg-jitter 2.3s ease-in-out infinite; }
+.slide-close .close-eeg-amp    { transform-origin: 50% 50%; animation: title-eeg-amp 6.3s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-close .close-eeg-group { animation: none; opacity: 0.5; }
+  .slide-close .close-eeg-wave,
+  .slide-close .close-eeg-drift,
+  .slide-close .close-eeg-jitter,
+  .slide-close .close-eeg-amp { animation: none; }
+}
+
+.close-line {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  opacity: 0;
+  text-align: right;
+}
+
+.close-line-1 {
+  font-style: italic;
+  font-size: clamp(28px, 3.4vw, 46px);
+  color: var(--ink-blue);
+}
+
+/* Mandarin line — Noto Serif TC, slightly smaller than the English
+   lines (matches slide 0's hierarchy). Upright (not italic): Noto
+   Serif TC's italic is synthesized rather than designed; upright
+   reads as intentional rather than as a fallback rendering. */
+.close-line-zh {
+  font-family: var(--font-zh);
+  font-style: normal;
+  font-size: clamp(22px, 2.6vw, 36px);
+  color: var(--ink-blue);
+  letter-spacing: 0.06em;
+}
+
+.slide-close.active .close-line-1 {
+  animation: close-fade-in 1.2s ease-in forwards 0.4s;
+}
+
+.slide-close.active .close-line-zh {
+  animation: close-zh-fade-in 1.2s ease-in forwards 1.6s;
+}
+
+@keyframes close-fade-in {
+  to { opacity: 1; }
+}
+
+/* Mandarin rests at 0.88 opacity (matching slide 0's title-zh) so
+   it sits slightly subordinate to the English lines visually. */
+@keyframes close-zh-fade-in {
+  to { opacity: 0.88; }
+}
+
+/* === Volume control =================================================
+   Fixed bottom-right master-volume slider. Visible by default at a
+   subdued opacity so it doesn't compete with the slide content; fades
+   to full opacity on hover/focus. The 'v' hotkey toggles a hidden
+   class — useful for presentations where the slider would distract.
+   Lives outside any slide, so its visibility is global, not per-slide. */
+.volume-control {
+  position: fixed;
+  bottom: 56px;
+  right: 18px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  /* As discreet as possible: no panel chrome, just a bare thin slider
+     resting at very low opacity. It surfaces on hover/focus. */
+  opacity: 0.22;
+  transition: opacity 0.25s ease;
+}
+
+.volume-control:hover,
+.volume-control:focus-within {
+  opacity: 0.85;
+}
+
+.volume-control.volume-control-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.volume-label {
+  font-family: var(--font-meta);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--meta);
+  text-transform: lowercase;
+  user-select: none;
+  /* Hidden at rest; only appears when the control is engaged. */
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.volume-control:hover .volume-label,
+.volume-control:focus-within .volume-label {
+  opacity: 1;
+}
+
+.volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  /* Vertical orientation: modern writing-mode (Chrome 121+, Firefox, Edge)
+     with a slider-vertical fallback for older WebKit. Narrow footprint so
+     it tucks into the corner without covering slide content. */
+  writing-mode: vertical-lr;
+  direction: rtl;
+  -webkit-appearance: slider-vertical;
+  width: 2px;
+  height: 110px;
+  background: var(--meta);
+  outline: none;
+  margin: 0;
+  cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--meta);
+  cursor: pointer;
+  border: none;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--meta);
+  cursor: pointer;
+  border: none;
+}
+
+.volume-slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink-blue) 25%, transparent);
+}
+
+.volume-slider:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink-blue) 25%, transparent);
+}
+
+/* === IAF frame-rate clocks (intermediate reveal) ====================
+   Revealed in place on the IAF slide by a forward keypress (showIAFClocks
+   in app.js). Two clocks turn at the same speed but sample at different
+   rates — the frame-rate analogy for Individual Alpha Frequency. They
+   occupy the band vacated by the wave visual (top ~28%) and the quote
+   (top ~56%), which fade out while the step is active. No labels — the
+   rates are narrated. z-index 2 keeps them above the body, below the
+   meta chrome (z-index 3). */
+.iaf-clocks {
+  position: absolute;
+  top: 46%;                       /* centred in the visual + quote band */
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: max-content;             /* sizes to the clock row; lanes match via 100% */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: clamp(1rem, 3vh, 2.2rem);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Warm→cool backdrop — a barely-there gradient behind the whole pair,
+   framing the fast (left/warm) ↔ slow (right/cool) feel as one continuum.
+   Heavily blurred so it melts into the paper rather than reading as a
+   shape; fades in with the reveal and sits behind the clocks + lanes. */
+.iaf-clocks::before {
+  content: "";
+  position: absolute;
+  inset: -10% -14%;
+  z-index: -1;
+  border-radius: 50%;
+  background: linear-gradient(to right, var(--iaf-fast), var(--iaf-slow));
+  filter: blur(38px);
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  pointer-events: none;
+}
+
+.iaf-clocks-active .iaf-clocks::before { opacity: 0.22; }
+
+.iaf-clocks-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(2.5rem, 10vw, 10rem);
+}
+
+/* Racing lanes span the full width of the clock row (both clocks + gap). */
+.iaf-tracks {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.6vh, 18px);
+}
+
+.iaf-track-row {
+  position: relative;
+  height: 10px;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.iaf-track-row.is-shown { opacity: 1; }
+
+/* The lane line itself. */
+.iaf-track-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1.5px;
+  transform: translateY(-50%);
+  background: var(--iaf-accent);
+  opacity: 0.3;
+  border-radius: 2px;
+}
+
+.iaf-track-marker {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;              /* centre the dot on its left% */
+  border-radius: 50%;
+  background: var(--iaf-accent);
+  transform: translateY(-50%);
+}
+
+.iaf-track-marker-ghost {
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;            /* opacity + left set inline by JS */
+}
+
+.iaf-track-row[data-role="low"]  { --iaf-accent: var(--iaf-fast); }
+.iaf-track-row[data-role="high"] { --iaf-accent: var(--iaf-slow); }
+
+/* Clocks reveal one step at a time — left/low first, then right/high —
+   each fading in when JS adds .is-shown. */
+.iaf-clock-face { opacity: 0; transition: opacity 0.5s ease; }
+.iaf-clock-face.is-shown { opacity: 1; }
+
+/* When any clock is showing, the wave visual and the quote step aside so
+   the clocks stand alone. Scoped with the cadence class so the override
+   beats the slide's fade-in animations by specificity + order. */
+.slide-iaf-cadence .hero-visual--iaf {
+  transition: opacity 0.4s ease;
+}
+
+.slide-iaf-cadence.iaf-clocks-active .hero-visual--iaf {
+  opacity: 0;
+}
+
+.slide-iaf-cadence.iaf-clocks-active .research-quote {
+  animation: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.iaf-clock-face { width: clamp(180px, 20vw, 260px); height: auto; display: block; }
+
+/* Rim + resting tick ring stay neutral dusty; the moving parts (hand,
+   trail, sample dot, hub, lit tick) take the clock's warm/cool accent. */
+.iaf-clock-rim { fill: none; stroke: var(--dusty, #7A93A8); stroke-width: 1.5; opacity: 0.55; }
+.iaf-clock-face .tick        { stroke: var(--dusty, #7A93A8); stroke-width: 1.6; opacity: 0.5; }
+.iaf-clock-face .tick-active { stroke: var(--iaf-accent); stroke-width: 2.6; opacity: 1; }
+.iaf-clock-face .hand        { stroke: var(--iaf-accent); stroke-width: 3; stroke-linecap: round; }
+.iaf-clock-face .hand-ghost  { stroke-width: 2.4; }   /* opacity set inline per ghost */
+.iaf-clock-face .sample-dot  { fill: var(--iaf-accent); }
+.iaf-clock-face .hub         { fill: var(--iaf-accent); }
+
+/* Fast/slow colour cues — warm reads fast/urgent, cool reads slow/calm,
+   both muted to sit in the cream-paper palette. The dials stay ink-blue
+   (time is neutral); only the racing line + a faint ambient wash carry
+   the temperature. Swap which clock gets which by flipping the two role
+   selectors below. */
+.iaf-clocks { --iaf-fast: #B0623E; --iaf-slow: #5E84A6; }
+.iaf-clock-face[data-role="low"]  { --iaf-accent: var(--iaf-fast); }
+.iaf-clock-face[data-role="high"] { --iaf-accent: var(--iaf-slow); }
+
+.iaf-clock-face .iaf-wash          { fill: var(--iaf-accent); opacity: 0.08; }   /* ambient temperature behind the dial */

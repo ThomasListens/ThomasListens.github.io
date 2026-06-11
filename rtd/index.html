@@ -13,6 +13,38 @@
 <body>
   <main class="deck" aria-live="polite">
     <section class="slide slide-title active" data-slide-index="0" data-section="">
+      <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="title-eeg-fade" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0"    stop-color="black" />
+            <stop offset="0.06" stop-color="white" />
+            <stop offset="0.94" stop-color="white" />
+            <stop offset="1"    stop-color="black" />
+          </linearGradient>
+          <mask id="title-eeg-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1600" height="900">
+            <rect x="240" y="420" width="1380" height="60" fill="url(#title-eeg-fade)" />
+          </mask>
+        </defs>
+        <line class="title-rule"
+              x1="240" y1="450" x2="1620" y2="450"
+              stroke="var(--ink-blue)" stroke-width="1.0"
+              vector-effect="non-scaling-stroke"
+              stroke-dasharray="2,8"
+              opacity="0.5" />
+        <g class="title-eeg-group" mask="url(#title-eeg-mask)">
+          <g class="title-eeg-drift">
+            <g class="title-eeg-jitter">
+              <g class="title-eeg-amp">
+                <path class="title-eeg-wave"
+                d="M -300 450 Q -270 443 -240 450 Q -210 457 -180 450 L -170 445 L -162 440 L -154 460 L -146 438 L -138 460 L -130 444 L -120 450 Q -90 444 -60 450 Q -30 456 0 450 L 12 446 L 20 440 L 28 460 L 36 442 L 44 450 Q 70 457 100 450 Q 130 443 160 450 Q 190 457 220 450 L 230 445 L 238 440 L 246 460 L 254 438 L 262 460 L 270 444 L 280 450 Q 310 444 340 450 Q 370 456 400 450 L 412 446 L 420 440 L 428 460 L 436 442 L 444 450 Q 470 457 500 450 Q 530 443 560 450 Q 590 457 620 450 L 630 445 L 638 440 L 646 460 L 654 438 L 662 460 L 670 444 L 680 450 Q 710 444 740 450 Q 770 456 800 450 L 812 446 L 820 440 L 828 460 L 836 442 L 844 450 Q 870 457 900 450 Q 930 443 960 450 Q 990 457 1020 450 L 1030 445 L 1038 440 L 1046 460 L 1054 438 L 1062 460 L 1070 444 L 1080 450 Q 1110 444 1140 450 Q 1170 456 1200 450 L 1212 446 L 1220 440 L 1228 460 L 1236 442 L 1244 450 Q 1270 457 1300 450 Q 1330 443 1360 450 Q 1390 457 1420 450 L 1430 445 L 1438 440 L 1446 460 L 1454 438 L 1462 460 L 1470 444 L 1480 450 Q 1510 444 1540 450 Q 1570 456 1600 450 L 1612 446 L 1620 440 L 1628 460 L 1636 442 L 1644 450 Q 1670 457 1700 450 Q 1730 443 1760 450 Q 1790 457 1820 450 L 1830 445 L 1838 440 L 1846 460 L 1854 438 L 1862 460 L 1870 444 L 1880 450 Q 1910 444 1940 450 Q 1970 456 2000 450 L 2012 446 L 2020 440 L 2028 460 L 2036 442 L 2044 450 Q 2070 457 2100 450 Q 2130 443 2160 450 Q 2190 457 2220 450 L 2230 445 L 2238 440 L 2246 460 L 2254 438 L 2262 460 L 2270 444 L 2280 450 Q 2310 444 2340 450 Q 2370 456 2400 450 L 2412 446 L 2420 440 L 2428 460 L 2436 442 L 2444 450 Q 2470 457 2500 450"
+                      stroke="var(--ink-blue)" stroke-width="1.2"
+                      fill="none" stroke-linecap="round" stroke-linejoin="round"
+                      vector-effect="non-scaling-stroke" />
+              </g>
+            </g>
+          </g>
+        </g>
+      </svg>
       <div class="slide-body slide-body-title">
         <p class="title-en">We hear you.</p>
         <p class="title-zh">我們聽見你了</p>
@@ -48,7 +80,7 @@
 
       <div class="slide-body slide-body-canary">
         <div class="statement">
-          <p class="line line-1">Time is Everything.</p>
+          <p class="line line-1">Timing is Everything.</p>
           <p class="line line-2">And everyone</p>
           <p class="line line-3">
             <span class="word w-1">moves</span>
@@ -102,7 +134,7 @@
       <div class="slide-body slide-body-method">
         <div class="collapse-bundle">
           <div class="echo echo-statement">
-            <p class="line line-1">Time is Everything.</p>
+            <p class="line line-1">Timing is Everything.</p>
             <p class="line line-2">And everyone</p>
             <p class="line line-3">moves to their own beat.</p>
           </div>
@@ -164,7 +196,7 @@
           </svg>
         </div>
         <div class="research-quote" aria-hidden="false">
-          <p class="quote-text">Wrinkles in time perception are synchronized to the heart.</p>
+          <p class="quote-text">The heartbeat is a rhythm that our brain is using to give us our sense of time passing.<br>And that is not linear&nbsp;– it is constantly contracting and expanding.</p>
           <p class="quote-cite">— Sadeghi et al., 2023</p>
         </div>
         <p class="payoff">a 1 of 1.</p>
@@ -193,26 +225,15 @@
         <div class="hero-visual hero-visual--gait" aria-hidden="true">
           <svg viewBox="0 0 1200 200" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
             <line class="gait-path"
-                  x1="50" y1="100" x2="1150" y2="100"
+                  x1="60" y1="100" x2="1140" y2="100"
                   stroke="var(--ink-blue)" stroke-width="1.0"
                   vector-effect="non-scaling-stroke"
                   stroke-dasharray="2,8"
                   opacity="0.5" />
-            <g class="step-marks">
-              <ellipse class="step step-l" data-step-index="0"  cx="120"  cy="92"  rx="9" ry="14" fill="var(--ink)" />
-              <ellipse class="step step-r" data-step-index="1"  cx="200"  cy="108" rx="9" ry="14" fill="var(--ink)" />
-              <ellipse class="step step-l" data-step-index="2"  cx="280"  cy="92"  rx="9" ry="14" fill="var(--ink)" />
-              <ellipse class="step step-r" data-step-index="3"  cx="360"  cy="108" rx="9" ry="14" fill="var(--ink)" />
-              <ellipse class="step step-l" data-step-index="4"  cx="440"  cy="92"  rx="9" ry="14" fill="var(--ink)" />
-              <ellipse class="step step-r" data-step-index="5"  cx="520"  cy="108" rx="9" ry="14" fill="var(--ink)" />
-              <ellipse class="step step-l" data-step-index="6"  cx="600"  cy="92"  rx="9" ry="14" fill="var(--ink)" />
-              <ellipse class="step step-r" data-step-index="7"  cx="680"  cy="108" rx="9" ry="14" fill="var(--ink)" />
-              <ellipse class="step step-l" data-step-index="8"  cx="760"  cy="92"  rx="9" ry="14" fill="var(--ink)" />
-              <ellipse class="step step-r" data-step-index="9"  cx="840"  cy="108" rx="9" ry="14" fill="var(--ink)" />
-              <ellipse class="step step-l" data-step-index="10" cx="920"  cy="92"  rx="9" ry="14" fill="var(--ink)" />
-              <ellipse class="step step-r" data-step-index="11" cx="1000" cy="108" rx="9" ry="14" fill="var(--ink)" />
-              <ellipse class="step step-l" data-step-index="12" cx="1080" cy="92"  rx="9" ry="14" fill="var(--ink)" />
-            </g>
+            <!-- JS-populated. Each beat spawns one .gait-footstep group; the
+                 queue caps at MAX_PRINTS and the oldest fades out as new
+                 ones land. See startGaitLoop() in app.js. -->
+            <g class="gait-footstep-layer"></g>
           </svg>
         </div>
 
@@ -221,21 +242,30 @@
           <p class="quote-cite">— Constantini et al., 2018</p>
         </div>
 
-        <div class="formula-block">
-          <div class="formula formula-line-main" aria-label="Tempo equals heart rate times 2 times alpha (walking)">
-            <span class="formula-prefix">Tempo&nbsp;=&nbsp;</span><span class="formula-hr">HR</span><span class="formula-mult-2">&nbsp;×&nbsp;2</span><span class="formula-mult-alpha">&nbsp;×&nbsp;α</span>
-            <span class="formula-regime">(walking)</span>
+        <div class="gait-live" role="presentation">
+          <p class="gait-live-main">Tempo&nbsp;=&nbsp;HR&nbsp;×&nbsp;<span class="glyph">m</span></p>
+          <div class="gait-live-rows">
+            <span class="gait-live-label">HR</span>
+            <span class="gait-live-sep">:</span>
+            <span class="gait-live-value" data-gait-val="hr">80</span>
+            <span class="gait-live-unit">BPM</span>
+
+            <span class="gait-live-label">SPM</span>
+            <span class="gait-live-sep">:</span>
+            <span class="gait-live-value" data-gait-val="spm">113</span>
+            <span class="gait-live-unit">spm</span>
+
+            <span class="gait-live-label gait-live-label-glyph">m</span>
+            <span class="gait-live-sep">:</span>
+            <span class="gait-live-value gait-live-value-alpha" data-gait-val="mult">2.00</span>
+            <span class="gait-live-unit"></span>
+
+            <span class="gait-live-label">Tempo</span>
+            <span class="gait-live-sep">:</span>
+            <span class="gait-live-value" data-gait-val="tempo">160</span>
+            <span class="gait-live-unit">BPM</span>
           </div>
-          <div class="schematic-line" aria-label="stride 2 to 1 pulse">
-            <span class="schematic-ratio">
-              <span class="glyph glyph-stride">↟</span>
-              <span class="num">2</span>
-              <span class="colon">:</span>
-              <span class="num">1</span>
-              <span class="glyph glyph-heart">♥</span>
-            </span>
-            <span class="schematic-legend">stride : pulse</span>
-          </div>
+          <p class="gait-caption"><span class="glyph">m</span>&nbsp;=&nbsp;coupling(SPM&nbsp;⁄&nbsp;HR) — your step rate against your pulse. It climbs from a 4/3 floor at rest toward 3 at a run.</p>
         </div>
       </div>
       <div class="slide-meta slide-meta-bottom"><span>thomaslistens.github.io/rtd</span><span>Thomas LeRoy Meier · 2026</span></div>
@@ -278,41 +308,106 @@
                   vector-effect="non-scaling-stroke"
                   stroke-linecap="round"
                   opacity="0.85" />
-            <path class="iaf-wave"
-                  d="M 220 160 Q 240 150, 260 160 T 300 160 T 340 160 T 380 160 T 420 160 T 460 160 T 500 160 T 540 160 T 580 160"
+            <!-- JS-driven (startIAFLoop in app.js). Cycle count tracks
+                 the current IAF; phase drifts at a rate proportional to
+                 IAF. d= seed value below is just so the path is visible
+                 for the single frame before the loop's first paint. -->
+            <path id="iaf-wave"
+                  class="iaf-wave"
+                  d="M 220 160 L 580 160"
                   fill="none"
                   stroke="var(--ink-blue-2)"
                   stroke-width="1.3"
-                  vector-effect="non-scaling-stroke"
-                  opacity="0" />
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  vector-effect="non-scaling-stroke" />
             <text class="iaf-wave-label"
                   x="595" y="164"
                   font-family="var(--font-meta)"
                   font-size="10"
                   fill="var(--meta)"
-                  letter-spacing="0.1em"
-                  opacity="0">α</text>
+                  letter-spacing="0.1em">α</text>
           </svg>
         </div>
 
         <div class="research-quote" aria-hidden="false">
-          <p class="quote-text">Cardiac and respiratory rhythms shape our experience of subjective time.</p>
-          <p class="quote-cite">— Wittmann (2009)</p>
+          <p class="quote-text">Alpha frequency shapes the precision of how we sample the world.</p>
+          <p class="quote-cite">— Romei &amp; Tarasi (2026)</p>
         </div>
 
-        <p class="bridge">Tempo from your perception of time.</p>
+        <p class="bridge">IAF reflects the rate at which the brain samples sensory and temporal information.</p>
 
-        <div class="formula formula-extended" aria-label="Alpha is in the range 4/5 to 5/4">
-          <div class="formula-line formula-line-main">
-            <span class="formula-prefix">Tempo&nbsp;=&nbsp;</span>
-            <span class="formula-hr">HR</span>
-            <span class="formula-mult-2">&nbsp;×&nbsp;2</span>
-            <span class="formula-mult-alpha">&nbsp;×&nbsp;α</span>
-            <span class="formula-regime">(walking)</span>
+        <div class="iaf-live" role="presentation">
+          <p class="iaf-live-main">Tempo&nbsp;=&nbsp;HR&nbsp;×&nbsp;<span class="glyph">m</span>&nbsp;×&nbsp;<span class="glyph">μ</span></p>
+          <div class="iaf-live-rows">
+            <span class="iaf-live-label">HR</span>
+            <span class="iaf-live-sep">:</span>
+            <span class="iaf-live-value" data-iaf-val="hr">80</span>
+            <span class="iaf-live-unit">BPM</span>
+
+            <span class="iaf-live-label iaf-live-label-glyph">m</span>
+            <span class="iaf-live-sep">:</span>
+            <span class="iaf-live-value">2.00</span>
+            <span class="iaf-live-unit">walk</span>
+
+            <span class="iaf-live-label">IAF</span>
+            <span class="iaf-live-sep">:</span>
+            <span class="iaf-live-value" data-iaf-val="iaf">8.0</span>
+            <span class="iaf-live-unit">Hz</span>
+
+            <span class="iaf-live-label iaf-live-label-glyph">μ</span>
+            <span class="iaf-live-sep">:</span>
+            <span class="iaf-live-value iaf-live-value-mu" data-iaf-val="mu">1.25</span>
+            <span class="iaf-live-unit"></span>
+
+            <span class="iaf-live-label">Tempo</span>
+            <span class="iaf-live-sep">:</span>
+            <span class="iaf-live-value" data-iaf-val="tempo">200</span>
+            <span class="iaf-live-unit">BPM</span>
           </div>
-          <div class="formula-line formula-line-alpha">
-            <span class="formula-alpha-def">α ∈ [4/5,&nbsp;5/4]</span>
-          </div>
+          <p class="iaf-caption"><span class="glyph">μ</span>&nbsp;=&nbsp;IAF₀&nbsp;⁄&nbsp;IAF — your alpha is the pivot. Sample faster and μ dips below 1, easing the tempo; slower lifts it.</p>
+        </div>
+      </div>
+
+      <!-- Intermediate step: a forward keypress reveals the frame-rate
+           analogy in place of the wave visual + quote. BOTH clocks share
+           the SAME lap time (data-rev-ms) — they start at 12 together and
+           meet at 12 together every lap, so the same amount of time
+           objectively passes. The ONLY difference is the frame rate: the
+           high-fps clock glides smoothly with a dense tick ring; the
+           low-fps clock stutters in coarse snaps (lagging behind, then
+           jumping to rejoin at the lap line) with a short motion-blur
+           trail. Same elapsed time, different felt tempo. Revealed in two
+           steps — low clock (left) first, then the high clock (right); a
+           third press advances. No on-screen numbers (narrated 12 vs 120).
+           Built + animated by app.js; hidden at first.
+             data-ticks  — tick-ring density (sampling fineness)
+             data-rev-ms — lap time, SHARED; keep a multiple of 1000 so the
+                           snaps land exactly on the lap line at any fps
+             data-fps    — frame rate (low = choppy, high = smooth)
+             data-ghosts — motion-blur trail length -->
+      <div class="iaf-clocks" id="iaf-clocks" aria-hidden="true">
+        <div class="iaf-clocks-row">
+          <!-- Left = low frame rate (12); revealed first. Stutters, feels faster. -->
+          <svg class="iaf-clock-face" data-role="low" data-ticks="8" data-rev-ms="2000" data-fps="12" data-ghosts="3"
+               viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle class="iaf-clock-rim" cx="110" cy="110" r="92" />
+          </svg>
+          <!-- Right = high frame rate (120); added second. Glides, feels slower. -->
+          <svg class="iaf-clock-face" data-role="high" data-ticks="36" data-rev-ms="2000" data-fps="120" data-ghosts="0"
+               viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle class="iaf-clock-rim" cx="110" cy="110" r="92" />
+          </svg>
+        </div>
+
+        <!-- Racing lanes — full width, spanning both clocks. Each lane's
+             marker is a linear echo of its clock's hand (matched by
+             data-role): the high-fps marker glides, the low-fps marker
+             lags then snaps, both finishing each lap together. Ghost dots
+             are injected by app.js for lanes whose clock has a trail. -->
+        <div class="iaf-tracks">
+          <div class="iaf-track-row" data-role="low"><span class="iaf-track-marker"></span></div>
+          <div class="iaf-track-row" data-role="high"><span class="iaf-track-marker"></span></div>
         </div>
       </div>
 
@@ -321,15 +416,10 @@
 
     <section class="slide slide-bloom slide-bloom-cadence" data-slide-index="7" data-section="iii. the build">
       <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <!-- Carry-over inner ellipse from slides 4-5-6, in slide 6's
-             warped end-state. Geometry stays as the original circle
-             (rx=ry=400); the .warped class applies the same scale
-             transform slide 6's final keyframe leaves behind. -->
-        <ellipse class="trace-ellipse trace-ellipse-inner warped"
-                 cx="800" cy="500" rx="400" ry="400"
-                 fill="none" stroke="var(--ink-blue)" stroke-width="0.8"
-                 vector-effect="non-scaling-stroke" opacity="0.42" />
-        <!-- Carry-over outer ellipse from slides 5-6, warped. -->
+        <!-- Carry-over outer ellipse from slides 5-6, warped. The
+             inner ring is released here at the IAF→bloom handoff and
+             stays absent through demo + impl, dissolving completely
+             at the close. The outer holds as the persistent frame. -->
         <ellipse class="trace-ellipse trace-ellipse-outer warped"
                  cx="800" cy="500" rx="540" ry="540"
                  fill="none" stroke="var(--ink-blue)" stroke-width="0.8"
@@ -342,43 +432,72 @@
       </div>
 
       <div class="slide-body slide-body-bloom">
-        <p class="bloom-opening">The body keeps many clocks. So does the day.</p>
-
-        <div class="bloom-halves">
-          <div class="bloom-half bloom-half--biological" data-half="biological">
-            <div class="bloom-heading">biological</div>
-            <ul class="bloom-list">
-              <li class="bloom-item" data-item="1">
-                <span class="bloom-glyph">◯</span>
-                <span class="bloom-num">¼</span>
-                <span class="bloom-label">breath</span>
-              </li>
-              <li class="bloom-item" data-item="2">
-                <span class="bloom-glyph">+</span>
-                <span class="bloom-label">HRV</span>
-              </li>
-              <li class="bloom-item bloom-item-derived" data-item="3">
-                <span class="bloom-glyph">~</span>
-                <span class="bloom-label">valence + arousal</span>
-              </li>
-              <li class="bloom-item" data-item="4">
-                <span class="bloom-glyph">β</span>
-                <span class="bloom-num">20</span>
-                <span class="bloom-label">beta</span>
-              </li>
-            </ul>
-          </div>
-
-          <div class="bloom-half bloom-half--contextual" data-half="contextual">
-            <div class="bloom-heading">contextual</div>
-            <ul class="bloom-list">
-              <li class="bloom-item" data-item="1"><span class="bloom-label">time of day</span></li>
-              <li class="bloom-item" data-item="2"><span class="bloom-label">location</span></li>
-              <li class="bloom-item" data-item="3"><span class="bloom-label">schedule</span></li>
-              <li class="bloom-item" data-item="4"><span class="bloom-label">environment</span></li>
-            </ul>
-          </div>
+        <div class="bloom-opening bloom-title">
+          <p class="bloom-title-line bloom-title-line-1">The body keeps many clocks.</p>
+          <p class="bloom-title-line bloom-title-line-2">Yet time seems to change as we meet the demands of the day.</p>
         </div>
+
+        <!-- Connector spine. Measured body signals (left) and life
+             pressures (right) meet at a named human state in the middle.
+             STRESS — the problem we solve — sits above the music; MINDSET
+             — the reward — below it. The center music lane is the payoff:
+             a strict metronome grid (measured) overlaid with notes that
+             swing off it and subdivide (composed). Built + animated by
+             startBloomLoop() in app.js. Reveal cadence in styles.css. -->
+        <div class="bloom-bridge">
+
+          <!-- Row 1 — STRESS: breath + HRV (body) ⟷ schedule + deadlines (world) -->
+          <div class="bloom-row bloom-row--stress" data-row="1">
+            <div class="bloom-side bloom-side--bio">
+              <span class="bloom-sig" data-sig="1"><span class="bloom-glyph">◯</span> breath</span>
+              <span class="bloom-sig" data-sig="2"><span class="bloom-glyph">+</span> HRV</span>
+            </div>
+            <div class="bloom-connector" data-connector="stress">
+              <span class="bloom-connector-name">stress</span>
+              <span class="bloom-connector-role">what we solve</span>
+            </div>
+            <div class="bloom-side bloom-side--context">
+              <span class="bloom-ctx" data-ctx="1">schedule</span>
+              <span class="bloom-ctx" data-ctx="2">deadlines</span>
+            </div>
+          </div>
+
+          <!-- Center — the music lane (full width, the slide's centerpiece) -->
+          <div class="bloom-music" aria-hidden="true">
+            <svg class="bloom-music-svg" viewBox="0 0 1000 150" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+              <!-- Strict metronome grid (measured) — JS-populated. -->
+              <g class="bloom-grid"></g>
+              <line class="bloom-staff" x1="60" y1="78" x2="940" y2="78"
+                    stroke="var(--ink-blue)" stroke-width="1.0"
+                    vector-effect="non-scaling-stroke" opacity="0.5" />
+              <!-- Notes that swing + subdivide (composed) — JS-populated. -->
+              <g class="bloom-notes"></g>
+              <!-- Sweeping playhead — JS-driven. -->
+              <line class="bloom-playhead" x1="0" y1="40" x2="0" y2="116"
+                    stroke="var(--accent-red)" stroke-width="1.2"
+                    vector-effect="non-scaling-stroke" opacity="0.55" />
+            </svg>
+          </div>
+
+          <!-- Row 2 — MINDSET: valence/arousal + beta (body) ⟷ relationships + commitments (world) -->
+          <div class="bloom-row bloom-row--mindset" data-row="2">
+            <div class="bloom-side bloom-side--bio">
+              <span class="bloom-sig" data-sig="1"><span class="bloom-glyph">~</span> valence + arousal</span>
+              <span class="bloom-sig" data-sig="2"><span class="bloom-glyph">β</span> beta power</span>
+            </div>
+            <div class="bloom-connector" data-connector="mindset">
+              <span class="bloom-connector-name">mindset</span>
+              <span class="bloom-connector-role">the reward</span>
+            </div>
+            <div class="bloom-side bloom-side--context">
+              <span class="bloom-ctx" data-ctx="1">relationships</span>
+              <span class="bloom-ctx" data-ctx="2">commitments</span>
+            </div>
+          </div>
+
+        </div>
+
+        <p class="bloom-close">Time isn't just measured. It's composed.</p>
       </div>
 
       <div class="slide-meta slide-meta-bottom">
@@ -387,15 +506,12 @@
       </div>
     </section>
 
-    <section class="slide slide-integrate slide-integrate-cadence" data-slide-index="8" data-section="iii. the build">
+    <section class="slide slide-integrate slide-integrate-cadence" data-slide-index="8" data-section="iv. the demo">
       <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <!-- Two warped carry-over ellipses persist from slides 6 / 7a.
-             Geometry stays as the original circles; the .warped class
-             applies the same scale transform slide 6 ends in. -->
-        <ellipse class="trace-ellipse trace-ellipse-inner warped"
-                 cx="800" cy="500" rx="400" ry="400"
-                 fill="none" stroke="var(--ink-blue)" stroke-width="0.8"
-                 vector-effect="non-scaling-stroke" opacity="0.42" />
+        <!-- Outer ellipse only; the inner ring was released on slide 7
+             after IAF completed. The schematic sits at the equator of
+             the warped outer (effective 810×459 oval) so this single
+             frame reads as both a stage and a horizon. -->
         <ellipse class="trace-ellipse trace-ellipse-outer warped"
                  cx="800" cy="500" rx="540" ry="540"
                  fill="none" stroke="var(--ink-blue)" stroke-width="0.8"
@@ -403,21 +519,30 @@
       </svg>
 
       <div class="slide-meta slide-meta-top">
-        <span>iii. the build</span>
+        <span>iv. the demo</span>
         <span>09 / 14</span>
+      </div>
+
+      <div class="whispers" aria-hidden="true">
+        <span class="whisper" data-pos="tl"></span>
+        <span class="whisper" data-pos="tr"></span>
+        <span class="whisper" data-pos="ml"></span>
+        <span class="whisper" data-pos="mr"></span>
+        <span class="whisper" data-pos="bl"></span>
+        <span class="whisper" data-pos="br"></span>
       </div>
 
       <div class="slide-body slide-body-integrate">
         <div class="integrated-schematic">
           <div class="schematic-line-integrated">
-            <span class="schematic-piece schematic-alpha">
-              <span class="glyph">α</span>
-              <span class="num">10</span>
-            </span>
-            <span class="schematic-colon schematic-colon-1">:</span>
             <span class="schematic-piece schematic-beta">
               <span class="glyph">β</span>
               <span class="num">20</span>
+            </span>
+            <span class="schematic-colon schematic-colon-1">:</span>
+            <span class="schematic-piece schematic-alpha">
+              <span class="glyph">α</span>
+              <span class="num">10</span>
             </span>
             <span class="schematic-colon schematic-colon-2">:</span>
             <span class="schematic-piece schematic-stride">
@@ -435,7 +560,57 @@
               <span class="num">¼</span>
             </span>
           </div>
-          <div class="schematic-legend-integrated">alpha : beta : stride : pulse : breath</div>
+          <div class="schematic-legend-integrated">beta : alpha : stride : pulse : breath</div>
+        </div>
+
+        <!-- Stage: the two dashboard graphs flank the formula. Hill (m, the
+             step/heart coupling) on the left, IAF (μ, brain rhythm) on the
+             right — matching the formula's ♥ × ↟ … head order. The captions
+             point inward toward the term each graph computes. Built + animated
+             by app.js (buildIntegrateGraphs); the IAF marker drifts with α. -->
+        <div class="integrate-stage">
+          <figure class="ig-graph ig-graph-left" aria-hidden="true">
+            <svg class="ig-svg" id="ig-hill" viewBox="0 0 240 150" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
+            <figcaption class="ig-cap">step ⁄ heart&nbsp;&nbsp;→&nbsp;&nbsp;<span class="ig-term">m</span></figcaption>
+          </figure>
+
+          <div class="integrate-center">
+            <!-- The formula — the hero. Two aligned rows (symbols, then
+                 numbers). μ is drawn as a little head full of EEG. -->
+            <div class="integrate-deriv" aria-label="Tempo = heart × step × brain rhythm = 80 × 2 × 1.00">
+              <span class="id-label">Tempo</span>
+              <span class="id-eq">=</span>
+              <span class="id-term">♥</span>
+              <span class="id-op">×</span>
+              <span class="id-term">↟</span>
+              <span class="id-op">×</span>
+              <svg class="head-eeg" viewBox="0 0 46 36" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="brain rhythm">
+                <ellipse class="head-eeg-skull" cx="23" cy="18" rx="18" ry="15" />
+                <path class="head-eeg-wave head-eeg-wave-1" d="M9 15 q3 -4.5 6 0 t6 0 t6 0 t6 0 t6 0" />
+                <path class="head-eeg-wave head-eeg-wave-2" d="M9 22 q3 4.5 6 0 t6 0 t6 0 t6 0 t6 0" />
+              </svg>
+
+              <span class="id-label"></span>
+              <span class="id-eq">=</span>
+              <span class="id-num">80</span>
+              <span class="id-op">×</span>
+              <span class="id-num">2</span>
+              <span class="id-op">×</span>
+              <span class="id-num id-num-mu" data-derive="mu">1.00</span>
+            </div>
+
+            <!-- The conclusion — the result, emphasized. -->
+            <div class="integrate-conclusion" aria-label="Tempo result">
+              <span class="ic-eq">=</span>
+              <span class="ic-tempo" data-derive="tempo">160</span>
+              <span class="ic-unit">BPM</span>
+            </div>
+          </div>
+
+          <figure class="ig-graph ig-graph-right" aria-hidden="true">
+            <svg class="ig-svg" id="ig-iaf" viewBox="0 0 240 150" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
+            <figcaption class="ig-cap"><span class="ig-term ig-term-mu">μ</span>&nbsp;&nbsp;←&nbsp;&nbsp;brain rhythm</figcaption>
+          </figure>
         </div>
 
         <p class="integrated-question">What is your tempo?</p>
@@ -447,59 +622,428 @@
       </div>
     </section>
 
-    <section class="slide" data-slide-index="9" data-section="iv. the demo">
-      <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <ellipse cx="800" cy="450" rx="620" ry="300" fill="none" stroke="var(--ink-blue)" stroke-width="1.1" vector-effect="non-scaling-stroke" opacity="0.68" />
-        <ellipse cx="800" cy="450" rx="780" ry="420" fill="none" stroke="var(--ink-blue)" stroke-width="0.8" vector-effect="non-scaling-stroke" opacity="0.25" />
+    <!-- ===================================================================
+         SLIDE 10 — "What we build with RTD": redshifted star map.
+         Three application pillars as a charted course, near→far = now→
+         future. Redshift (blue→amber→red with distance) rhymes with RTD's
+         own frequency/Doppler core. The pillar NAMES are the hero; the map
+         frames them. Near = available (blue, present), mid = emerging
+         (amber), far = frontier (red — a bright beacon you steer by, not a
+         dying star). The faint field behind = the many other applications
+         RTD could touch (built by buildStarfield() in app.js). The three
+         breakdown slides (11-13) inherit each star's colour + distance.
+         ==================================================================== -->
+    <section class="slide slide-starmap slide-starmap-cadence" data-slide-index="9" data-section="v. what comes next">
+      <svg class="slide-ellipse starmap-svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="starmap-glow-near" cx="50%" cy="50%" r="50%">
+            <stop offset="0"    stop-color="#FFFFFF" stop-opacity="0.95" />
+            <stop offset="0.28" stop-color="#9CC2E0" stop-opacity="0.55" />
+            <stop offset="1"    stop-color="#5C7FA3" stop-opacity="0" />
+          </radialGradient>
+          <radialGradient id="starmap-glow-mid" cx="50%" cy="50%" r="50%">
+            <stop offset="0"    stop-color="#FFF4E0" stop-opacity="0.92" />
+            <stop offset="0.30" stop-color="#D7A85A" stop-opacity="0.50" />
+            <stop offset="1"    stop-color="#C89B52" stop-opacity="0" />
+          </radialGradient>
+          <radialGradient id="starmap-glow-far" cx="50%" cy="50%" r="50%">
+            <stop offset="0"    stop-color="#FFE3DC" stop-opacity="1" />
+            <stop offset="0.30" stop-color="#E0635A" stop-opacity="0.60" />
+            <stop offset="1"    stop-color="#B83A36" stop-opacity="0" />
+          </radialGradient>
+          <!-- the charted course itself redshifts as it descends outward -->
+          <linearGradient id="starmap-route" gradientUnits="userSpaceOnUse" x1="845" y1="225" x2="855" y2="675">
+            <stop offset="0"   stop-color="#5C7FA3" />
+            <stop offset="0.5" stop-color="#C89B52" />
+            <stop offset="1"   stop-color="#B83A36" />
+          </linearGradient>
+          <!-- draws the dotted lines downward: the rect's height grows from
+               0 (top) on slide entry, set by runStarmapReveal() in app.js.
+               Defaults to fully open so a no-JS view still shows the lines. -->
+          <clipPath id="starmap-reveal" clipPathUnits="userSpaceOnUse">
+            <rect class="starmap-reveal-rect" x="0" y="104" width="1600" height="716" />
+          </clipPath>
+        </defs>
+
+        <!-- slow orbital atmosphere — faint ellipses drifting behind the map -->
+        <!-- Orbital atmosphere — near-circular rings tilted into depth
+             (rotateX, under the slide-ellipse's perspective) so they read
+             as 3D orbital planes precessing around the map. Direct children
+             of the SVG so the perspective applies (as the slide-1/2 orbits). -->
+        <ellipse class="starmap-atmos starmap-atmos-1" cx="800" cy="450" rx="560" ry="500"
+                 fill="none" stroke="var(--ink-blue)" stroke-width="0.7" vector-effect="non-scaling-stroke" />
+        <ellipse class="starmap-atmos starmap-atmos-2" cx="800" cy="450" rx="410" ry="370"
+                 fill="none" stroke="var(--ink-blue)" stroke-width="0.7" vector-effect="non-scaling-stroke" />
+        <ellipse class="starmap-atmos starmap-atmos-3" cx="800" cy="450" rx="710" ry="630"
+                 fill="none" stroke="var(--accent-red)" stroke-width="0.7" vector-effect="non-scaling-stroke" />
+
+        <!-- faint cosmic horizon (carry-over warped ellipse, dissolved low) -->
+        <ellipse class="starmap-horizon" cx="800" cy="1340" rx="1280" ry="560"
+                 fill="none" stroke="var(--ink-blue)" stroke-width="0.7"
+                 vector-effect="non-scaling-stroke" opacity="0.09" />
+
+        <!-- background field — the many other applications (JS-populated) -->
+        <g class="starmap-field"></g>
+
+        <!-- The dotted lines that draw downward (clipped by #starmap-reveal,
+             whose rect grows top→bottom on entry). The centred time thread
+             (now → future) and the charted course both chart themselves out;
+             the stars + titles fade in sequentially as the front passes. -->
+        <g class="starmap-draw" clip-path="url(#starmap-reveal)">
+          <!-- the centred time thread: now (top) → future (bottom) -->
+          <line class="starmap-axis" x1="800" y1="150" x2="800" y2="780"
+                stroke="var(--meta)" stroke-width="0.8" stroke-dasharray="2 9"
+                vector-effect="non-scaling-stroke" opacity="0.42" />
+          <text class="starmap-axis-end" x="800" y="126" text-anchor="middle">now</text>
+          <text class="starmap-axis-end" x="800" y="808" text-anchor="middle">future</text>
+
+          <!-- the charted course: a descending constellation that grows more
+               distant (redshifts) as it falls, weaving across the centre —
+               near (right) → mid (left) → far (right). -->
+          <path class="starmap-track"
+                d="M 845 225 C 800 330, 752 355, 745 450 C 738 562, 885 590, 855 675"
+                fill="none" stroke="url(#starmap-route)" stroke-width="1.4"
+                stroke-dasharray="2 9" stroke-linecap="round"
+                vector-effect="non-scaling-stroke" />
+          <!-- arrowhead — the course continues past the frontier, downward -->
+          <path class="starmap-track-head"
+                d="M 835 707 L 851 729 L 869 707"
+                fill="none" stroke="var(--accent-red)" stroke-width="1.4"
+                stroke-linecap="round" stroke-linejoin="round"
+                vector-effect="non-scaling-stroke" />
+        </g>
+
+        <!-- the three named stars -->
+        <g class="starmap-star starmap-star--near" data-star="1">
+          <circle class="starmap-glow" cx="845" cy="225" r="108" fill="url(#starmap-glow-near)" />
+          <circle class="starmap-core" cx="845" cy="225" r="7.5" fill="#EAF2FA" />
+        </g>
+        <g class="starmap-star starmap-star--mid" data-star="2">
+          <circle class="starmap-glow" cx="745" cy="450" r="96" fill="url(#starmap-glow-mid)" />
+          <circle class="starmap-core" cx="745" cy="450" r="6.5" fill="#FBEFD9" />
+        </g>
+        <g class="starmap-star starmap-star--far" data-star="3">
+          <circle class="starmap-glow" cx="855" cy="675" r="142" fill="url(#starmap-glow-far)" />
+          <!-- diffraction spikes — the brightest, the beacon you steer by -->
+          <g class="starmap-spikes" stroke="#F6D2CB" stroke-width="1.1" vector-effect="non-scaling-stroke" stroke-linecap="round" opacity="0.85">
+            <line x1="855" y1="633" x2="855" y2="717" />
+            <line x1="813" y1="675" x2="897" y2="675" />
+          </g>
+          <circle class="starmap-core" cx="855" cy="675" r="9" fill="#FFEDE7" />
+        </g>
+
+        <!-- pillar labels — the hero content, flanking into the open margin
+             opposite each star's lean (near→left, mid→right, far→left). -->
+        <g class="starmap-label starmap-label--near" data-star="1">
+          <text class="starmap-name" x="725" y="218" text-anchor="end">Curation, Discovery &amp; Catalogue</text>
+          <text class="starmap-tag"  x="725" y="247" text-anchor="end">available · now</text>
+        </g>
+        <g class="starmap-label starmap-label--mid" data-star="2">
+          <text class="starmap-name" x="850" y="443" text-anchor="start">Bio-Adaptive Therapy &amp; Neurofeedback</text>
+          <text class="starmap-tag"  x="850" y="472" text-anchor="start">emerging</text>
+        </g>
+        <g class="starmap-label starmap-label--far" data-star="3">
+          <text class="starmap-name" x="705" y="668" text-anchor="end">Neuromodulation &amp; Music Generation</text>
+          <text class="starmap-tag"  x="705" y="697" text-anchor="end">frontier</text>
+        </g>
       </svg>
-      <div class="slide-meta slide-meta-top"><span>iv. the demo</span><span>10 / 14</span></div>
-      <div class="slide-body"><p class="placeholder">Slide 8 — Demo frame, what the demo is and is not</p></div>
+
+      <div class="slide-meta slide-meta-top">
+        <span>v. what comes next</span>
+        <span>10 / 14</span>
+      </div>
+
+      <p class="starmap-headline">What do we build with RTD?</p>
+
+      <div class="slide-meta slide-meta-bottom">
+        <span>thomaslistens.github.io/rtd</span>
+        <span>Thomas LeRoy Meier · 2026</span>
+      </div>
+    </section>
+
+    <!-- ===================================================================
+         PILLAR DETAIL SLIDES (11–13) — framework scaffold.
+         One slide per horizon. Structure + first-draft copy are in place;
+         per-pillar hero visuals/animations are still to be built (each
+         currently carries only the warped carry-over ellipse for
+         continuity with slides 7–10). Shared classes: .slide-pillar /
+         .slide-pillar-cadence, styled in styles.css.
+         ==================================================================== -->
+
+    <!-- Pillar 1 — NEAR · available now · blue. The arc opens: "Listen."
+         Star sits top-right, echoing its near position on the hero map. -->
+    <section class="slide slide-pillar slide-pillar-cadence" data-slide-index="10" data-section="v. what comes next" data-pillar="1">
+      <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <radialGradient id="pillar-glow-1" cx="50%" cy="50%" r="50%">
+            <stop offset="0"   stop-color="#FFFFFF" stop-opacity="0.9" />
+            <stop offset="0.3" stop-color="#9CC2E0" stop-opacity="0.5" />
+            <stop offset="1"   stop-color="#5C7FA3" stop-opacity="0" />
+          </radialGradient>
+        </defs>
+        <!-- Listener constellation — a scattered, drifting sky; the blue
+             matches (sharing one pulse — listeners who respond like you)
+             slowly align into a clear direction. Built + animated by
+             startCurateLoop() in app.js. Sits behind the text. -->
+        <g class="curate-field"></g>
+        <!-- this slide's star, carried over from the map at its near (top) position -->
+        <circle class="pillar-star-glow" cx="1410" cy="205" r="120" fill="url(#pillar-glow-1)" />
+        <circle class="pillar-star-core" cx="1410" cy="205" r="6" fill="#EAF2FA" />
+      </svg>
+
+      <div class="slide-meta slide-meta-top"><span>v. what comes next</span><span>11 / 14</span></div>
+
+      <div class="slide-body slide-body-pillar">
+        <div class="pillar-head">
+          <span class="pillar-tag">available · now</span>
+          <div class="pillar-titles">
+            <h1 class="pillar-title">Music Curation on a New Timeline</h1>
+            <p class="pillar-zh" lang="zh-Hant">音樂策展的時間軸</p>
+          </div>
+        </div>
+
+        <!-- The dotted rule under the title is FORMED by the listener
+             constellation aligning onto it (startCurateLoop in app.js):
+             title + Mandarin sit above it, the body below — nothing covered. -->
+        <div class="pillar-lower">
+          <p class="pillar-thesis">RTD listens to you through the music you love. That feeling is what connects us.</p>
+
+          <!-- what it is — the triad -->
+        <div class="pillar-triad">
+          <div class="triad-item" data-item="1">
+            <span class="triad-label">Curate</span>
+            <span class="triad-desc">music matched to what your body is doing, not just your taste.</span>
+          </div>
+          <div class="triad-item" data-item="2">
+            <span class="triad-label">Discover</span>
+            <span class="triad-desc">surfaced by effect, the engine that knows your state, not your genre.</span>
+          </div>
+          <div class="triad-item" data-item="3">
+            <span class="triad-label">Catalogue</span>
+            <span class="triad-desc">a bio-response database that compounds with every listener.</span>
+          </div>
+        </div>
+
+        <!-- how it works · why it sits here -->
+        <div class="pillar-beats">
+          <p class="pillar-beat" data-beat="how">
+            <span class="beat-label">how it works</span>
+            Spotify, but it knows what your body is doing. RTD reads the response, de-identifies it, and matches you to people who share it.
+          </p>
+          <p class="pillar-beat" data-beat="why">
+            <span class="beat-label">why it's near</span>
+            Lowest technical bar, highest immediate value. It pairs with the earbuds you already make, needs no new infrastructure, and the catalogue becomes a moat competitors can't copy.
+          </p>
+          </div>
+        </div>
+      </div>
+
       <div class="slide-meta slide-meta-bottom"><span>thomaslistens.github.io/rtd</span><span>Thomas LeRoy Meier · 2026</span></div>
     </section>
 
-    <section class="slide" data-slide-index="10" data-section="iv. the demo">
+    <!-- Pillar 2 — EMERGING · amber. The arc's middle: "listen with you in
+         mind" (用心聆聽, listen with the heart). Wellness-first, no medical
+         claims. Star sits mid-right (its place on the map); a swaying amber
+         wave forms the rule under the title. -->
+    <section class="slide slide-pillar slide-pillar-cadence" data-slide-index="11" data-section="v. what comes next" data-pillar="2">
       <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <ellipse cx="800" cy="450" rx="620" ry="300" fill="none" stroke="var(--ink-blue)" stroke-width="1.1" vector-effect="non-scaling-stroke" opacity="0.68" />
-        <ellipse cx="800" cy="450" rx="780" ry="420" fill="none" stroke="var(--ink-blue)" stroke-width="0.8" vector-effect="non-scaling-stroke" opacity="0.25" />
+        <defs>
+          <radialGradient id="pillar-glow-2" cx="50%" cy="50%" r="50%">
+            <stop offset="0"   stop-color="#FFF4E0" stop-opacity="0.9" />
+            <stop offset="0.3" stop-color="#D7A85A" stop-opacity="0.5" />
+            <stop offset="1"   stop-color="#C89B52" stop-opacity="0" />
+          </radialGradient>
+        </defs>
+        <!-- this slide's star, at its mid (middle-right) position on the map -->
+        <circle class="pillar-star-glow" cx="1420" cy="450" r="118" fill="url(#pillar-glow-2)" />
+        <circle class="pillar-star-core" cx="1420" cy="450" r="6" fill="#FBEFD9" />
+        <!-- Refining constellation: stars turn yellow + align onto a
+             quickening wave (the rule), the rest fade away. JS-built. -->
+        <g class="therapy-field"></g>
       </svg>
-      <div class="slide-meta slide-meta-top"><span>iv. the demo</span><span>11 / 14</span></div>
-      <div class="slide-body"><p class="placeholder">Slide 9 — The live demo</p></div>
-      <div class="slide-meta slide-meta-bottom"><span>thomaslistens.github.io/rtd</span><span>Thomas LeRoy Meier · 2026</span></div>
-    </section>
 
-    <section class="slide" data-slide-index="11" data-section="v. what comes next">
-      <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <ellipse cx="800" cy="450" rx="620" ry="300" fill="none" stroke="var(--ink-blue)" stroke-width="1.1" vector-effect="non-scaling-stroke" opacity="0.68" />
-        <ellipse cx="800" cy="450" rx="780" ry="420" fill="none" stroke="var(--ink-blue)" stroke-width="0.8" vector-effect="non-scaling-stroke" opacity="0.25" />
-      </svg>
       <div class="slide-meta slide-meta-top"><span>v. what comes next</span><span>12 / 14</span></div>
-      <div class="slide-body"><p class="placeholder">Slide 10 — What becomes buildable, product categories</p></div>
+
+      <div class="slide-body slide-body-pillar">
+        <div class="pillar-head">
+          <span class="pillar-tag">emerging · next</span>
+          <h1 class="pillar-title">Bio-Adaptive Music Therapy &amp; Neurofeedback</h1>
+        </div>
+
+        <div class="pillar-lower">
+          <div class="pillar-subtext">
+            <p class="pillar-thesis">RTD listens with you in mind.</p>
+            <p class="pillar-zh" lang="zh-Hant">用心聆聽</p>
+          </div>
+
+          <!-- the triad (what it is) -->
+          <div class="pillar-triad">
+            <div class="triad-item" data-item="1">
+              <span class="triad-label">Adapt</span>
+              <span class="triad-desc">a bio-adaptive metronome for RAS, gait training, and anxiety regulation.</span>
+            </div>
+            <div class="triad-item" data-item="2">
+              <span class="triad-label">Reveal</span>
+              <span class="triad-desc">a clear read on a patient, even one who can't say so.</span>
+            </div>
+            <div class="triad-item" data-item="3">
+              <span class="triad-label">Guide</span>
+              <span class="triad-desc">focus and calm, the same technology brought to everyone's ears.</span>
+            </div>
+          </div>
+
+          <div class="pillar-beats">
+            <p class="pillar-beat" data-beat="how">
+              <span class="beat-label">how it works</span>
+              On earbuds, RTD shapes the music to the patient's state and gives the therapist an objective read. The clinical work, made measurable and portable.
+            </p>
+            <p class="pillar-beat" data-beat="why">
+              <span class="beat-label">why it's emerging</span>
+              It extends the rehabilitation direction Merry's team already backs, so it's a market you're partly in. It needs the ear-EEG and validation, and it opens a clinical lane and a consumer-wellness lane at once.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div class="slide-meta slide-meta-bottom"><span>thomaslistens.github.io/rtd</span><span>Thomas LeRoy Meier · 2026</span></div>
     </section>
 
-    <section class="slide" data-slide-index="12" data-section="v. what comes next">
+    <!-- Pillar 3 — FRONTIER · red. The arc's close: "a future we can hear
+         together" (同頻共振, resonating at the same frequency). The carried
+         wave meets a generated wave; they lock to one frequency and
+         resonate (amplitude swells), everything warming to red. Star is the
+         bottom beacon. Guardrails: body-to-music (never thought-to-music);
+         sensory/auditory entrainment (not implants). -->
+    <section class="slide slide-pillar slide-pillar-cadence" data-slide-index="12" data-section="v. what comes next" data-pillar="3">
       <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <ellipse cx="800" cy="450" rx="620" ry="300" fill="none" stroke="var(--ink-blue)" stroke-width="1.1" vector-effect="non-scaling-stroke" opacity="0.68" />
-        <ellipse cx="800" cy="450" rx="780" ry="420" fill="none" stroke="var(--ink-blue)" stroke-width="0.8" vector-effect="non-scaling-stroke" opacity="0.25" />
+        <defs>
+          <radialGradient id="pillar-glow-3" cx="50%" cy="50%" r="50%">
+            <stop offset="0"   stop-color="#FFE3DC" stop-opacity="1" />
+            <stop offset="0.3" stop-color="#E0635A" stop-opacity="0.55" />
+            <stop offset="1"   stop-color="#B83A36" stop-opacity="0" />
+          </radialGradient>
+        </defs>
+        <!-- this slide's star: the bottom beacon (its place on the map) -->
+        <circle class="pillar-star-glow" cx="1430" cy="715" r="130" fill="url(#pillar-glow-3)" />
+        <circle class="pillar-star-core" cx="1430" cy="715" r="7" fill="#FFEDE7" />
+        <!-- Resonance: the carried wave meets a generated wave; they lock to
+             one frequency and resonate, amplitude swelling. JS-built. -->
+        <g class="frontier-field"></g>
       </svg>
+
       <div class="slide-meta slide-meta-top"><span>v. what comes next</span><span>13 / 14</span></div>
-      <div class="slide-body"><p class="placeholder">Slide 11 — Roadmap</p></div>
+
+      <div class="slide-body slide-body-pillar">
+        <div class="pillar-head">
+          <span class="pillar-tag">frontier · later</span>
+          <h1 class="pillar-title">Neuromodulation &amp; Music Generation</h1>
+        </div>
+
+        <div class="pillar-lower">
+          <div class="pillar-subtext">
+            <p class="pillar-thesis">RTD can help create a future we can hear together.</p>
+            <p class="pillar-zh" lang="zh-Hant">同頻共振</p>
+          </div>
+
+          <!-- the triad (what it is) -->
+          <div class="pillar-triad">
+            <div class="triad-item" data-item="1">
+              <span class="triad-label">Generate</span>
+              <span class="triad-desc">a real-time compositional engine, writing the music as it learns the listener.</span>
+            </div>
+            <div class="triad-item" data-item="2">
+              <span class="triad-label">Entrain</span>
+              <span class="triad-desc">music that doesn't just respond, it moves you, toward focus, calm, or flow.</span>
+            </div>
+            <div class="triad-item" data-item="3">
+              <span class="triad-label">Together</span>
+              <span class="triad-desc">flow, the most universally wanted state, made reachable for everyone.</span>
+            </div>
+          </div>
+
+          <div class="pillar-beats">
+            <p class="pillar-beat" data-beat="how">
+              <span class="beat-label">how it works</span>
+              RTD reads your state and composes in real time to steer it. Read, generate, steer, repeat.
+            </p>
+            <p class="pillar-beat" data-beat="why">
+              <span class="beat-label">why it's far</span>
+              The biggest market and the longest horizon. Real category, real risk, and it rests on everything the near stars prove first. The destination the whole map points toward.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div class="slide-meta slide-meta-bottom"><span>thomaslistens.github.io/rtd</span><span>Thomas LeRoy Meier · 2026</span></div>
     </section>
 
-    <section class="slide" data-slide-index="13" data-section="vi. close">
+    <section class="slide slide-close" data-slide-index="13" data-section="vi. close">
       <svg class="slide-ellipse" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <ellipse cx="800" cy="450" rx="620" ry="300" fill="none" stroke="var(--ink-blue)" stroke-width="1.1" vector-effect="non-scaling-stroke" opacity="0.68" />
-        <ellipse cx="800" cy="450" rx="780" ry="420" fill="none" stroke="var(--ink-blue)" stroke-width="0.8" vector-effect="non-scaling-stroke" opacity="0.25" />
+        <defs>
+          <!-- Same end-fade as slide 0: the trace dissolves at both ends so
+               it eases in and out rather than running edge to edge. -->
+          <linearGradient id="close-eeg-fade" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0"    stop-color="black" />
+            <stop offset="0.06" stop-color="white" />
+            <stop offset="0.94" stop-color="white" />
+            <stop offset="1"    stop-color="black" />
+          </linearGradient>
+          <mask id="close-eeg-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1600" height="900">
+            <rect x="240" y="270" width="1380" height="60" fill="url(#close-eeg-fade)" />
+          </mask>
+        </defs>
+        <!-- The line carried up from the previous slide (y=300), with a
+             gentle EEG trace drifting along it — bookending slide 0's
+             "we hear you." The group is shifted up 150 so the slide-0 wave
+             (baseline 450) sits at 300; it reuses the title-eeg keyframes. -->
+        <line class="close-rule"
+              x1="240" y1="300" x2="1620" y2="300"
+              stroke="var(--ink-blue)" stroke-width="1.0"
+              vector-effect="non-scaling-stroke"
+              stroke-dasharray="2,8"
+              opacity="0.5" />
+        <g mask="url(#close-eeg-mask)">
+        <g class="close-eeg-group" transform="translate(0 -150)">
+          <g class="close-eeg-drift">
+            <g class="close-eeg-jitter">
+              <g class="close-eeg-amp">
+                <path class="close-eeg-wave"
+                d="M -300 450 Q -270 443 -240 450 Q -210 457 -180 450 L -170 445 L -162 440 L -154 460 L -146 438 L -138 460 L -130 444 L -120 450 Q -90 444 -60 450 Q -30 456 0 450 L 12 446 L 20 440 L 28 460 L 36 442 L 44 450 Q 70 457 100 450 Q 130 443 160 450 Q 190 457 220 450 L 230 445 L 238 440 L 246 460 L 254 438 L 262 460 L 270 444 L 280 450 Q 310 444 340 450 Q 370 456 400 450 L 412 446 L 420 440 L 428 460 L 436 442 L 444 450 Q 470 457 500 450 Q 530 443 560 450 Q 590 457 620 450 L 630 445 L 638 440 L 646 460 L 654 438 L 662 460 L 670 444 L 680 450 Q 710 444 740 450 Q 770 456 800 450 L 812 446 L 820 440 L 828 460 L 836 442 L 844 450 Q 870 457 900 450 Q 930 443 960 450 Q 990 457 1020 450 L 1030 445 L 1038 440 L 1046 460 L 1054 438 L 1062 460 L 1070 444 L 1080 450 Q 1110 444 1140 450 Q 1170 456 1200 450 L 1212 446 L 1220 440 L 1228 460 L 1236 442 L 1244 450 Q 1270 457 1300 450 Q 1330 443 1360 450 Q 1390 457 1420 450 L 1430 445 L 1438 440 L 1446 460 L 1454 438 L 1462 460 L 1470 444 L 1480 450 Q 1510 444 1540 450 Q 1570 456 1600 450 L 1612 446 L 1620 440 L 1628 460 L 1636 442 L 1644 450 Q 1670 457 1700 450 Q 1730 443 1760 450 Q 1790 457 1820 450 L 1830 445 L 1838 440 L 1846 460 L 1854 438 L 1862 460 L 1870 444 L 1880 450 Q 1910 444 1940 450 Q 1970 456 2000 450 L 2012 446 L 2020 440 L 2028 460 L 2036 442 L 2044 450 Q 2070 457 2100 450 Q 2130 443 2160 450 Q 2190 457 2220 450 L 2230 445 L 2238 440 L 2246 460 L 2254 438 L 2262 460 L 2270 444 L 2280 450 Q 2310 444 2340 450 Q 2370 456 2400 450 L 2412 446 L 2420 440 L 2428 460 L 2436 442 L 2444 450 Q 2470 457 2500 450"
+                      stroke="var(--ink-blue)" stroke-width="1.2"
+                      fill="none" stroke-linecap="round" stroke-linejoin="round"
+                      vector-effect="non-scaling-stroke" />
+              </g>
+            </g>
+          </g>
+        </g>
+        </g>
       </svg>
-      <div class="slide-meta slide-meta-top"><span>vi. close</span><span>14 / 14</span></div>
-      <div class="slide-body"><p class="placeholder">Slide 12 — Partnership frame</p></div>
-      <div class="slide-meta slide-meta-bottom"><span>thomaslistens.github.io/rtd</span><span>Thomas LeRoy Meier · 2026</span></div>
+      <div class="slide-meta slide-meta-top">
+        <span>vi. close</span>
+        <span>14 / 14</span>
+      </div>
+
+      <div class="slide-body slide-body-close">
+        <p class="close-line close-line-1">Thank you for listening.</p>
+        <p class="close-line close-line-zh">讓我們繼續譜寫美好時光</p>
+      </div>
+
+      <div class="slide-meta slide-meta-bottom">
+        <span>thomaslistens.github.io/rtd</span>
+        <span>Thomas LeRoy Meier · 2026</span>
+      </div>
     </section>
   </main>
 
   <div class="progress" aria-hidden="true">
     <div class="progress-fill" id="progress-fill"></div>
+  </div>
+
+  <div class="volume-control" id="volume-control">
+    <label for="volume-slider" class="volume-label">vol</label>
+    <input type="range" id="volume-slider" class="volume-slider"
+           min="0" max="1" step="0.01" value="1"
+           aria-label="Master volume" />
   </div>
 
   <script src="./app.js"></script>

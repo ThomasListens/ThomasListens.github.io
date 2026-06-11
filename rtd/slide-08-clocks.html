@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RTD — Slide 08 · The body keeps many clocks</title>
+  <meta name="description" content="Slide 08 of the Relative Tempo Derivation deck. Static two-column inventory: biological and contextual inputs that shape an individual's tempo derivation.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper:    #F4F1EC;
+      --ink:      #1A1A1A;
+      --ink-blue: #143E63;
+      --meta:     #6B6860;
+      --dusty:    #7A93A8;
+      --font-body: 'EB Garamond', Garamond, 'Adobe Garamond Pro', Baskerville, Georgia, serif;
+      --font-meta: 'IBM Plex Mono', 'Courier New', Courier, monospace;
+      --meta-size: clamp(0.69rem, 0.56vw + 0.2rem, 0.81rem);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      overflow: hidden;
+      font-family: var(--font-body);
+      font-weight: 400;
+      line-height: 1.2;
+    }
+
+    .slide {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: var(--paper);
+    }
+
+    /* Same dusty-blue orbit pair as slides 06–07 so the triptych
+       reads as a continuous frame. */
+    .slide-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Page chrome — identical to 06/07. */
+    .meta {
+      position: absolute;
+      left: clamp(0.8rem, 1.5vw, 1.5rem);
+      right: clamp(0.8rem, 1.5vw, 1.5rem);
+      color: var(--meta);
+      font-family: var(--font-meta);
+      font-size: var(--meta-size);
+      font-weight: 400;
+      letter-spacing: 0.12em;
+      text-transform: lowercase;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 3;
+    }
+    .meta-top    { top:    clamp(0.6rem, 1.2vw, 1.2rem); }
+    .meta-bottom { bottom: clamp(0.6rem, 1.2vw, 1.2rem); }
+
+    /* Headline + subtitle — asymmetric left/right pair on the same
+       baseline. The split visually performs the "and yet" rhetorical
+       move described in the brief: a claim on the left, a tension on
+       the right. */
+    .clocks-head {
+      position: absolute;
+      top: 12%;
+      left: clamp(2.5rem, 5vw, 4.5rem);
+      right: clamp(2.5rem, 5vw, 4.5rem);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: clamp(2rem, 4vw, 4rem);
+      z-index: 2;
+    }
+    .clocks-headline {
+      margin: 0;
+      font-family: var(--font-body);
+      font-style: italic;
+      font-weight: 400;
+      font-size: clamp(28px, 3.2vw, 42px);
+      color: var(--ink-blue);
+      text-align: left;
+      max-width: 50%;
+      line-height: 1.1;
+    }
+    .clocks-subtitle {
+      margin: 0;
+      font-family: var(--font-body);
+      font-style: italic;
+      font-weight: 400;
+      font-size: clamp(17px, 1.7vw, 22px);
+      color: var(--meta);
+      text-align: right;
+      max-width: 44%;
+      line-height: 1.35;
+    }
+
+    /* Two-column inventory — the dominant element of the slide.
+       Each column is a grid (glyph / label / arrow / note) so labels
+       and arrows align vertically and the note flows freely on the
+       right edge. */
+    .clocks-columns {
+      position: absolute;
+      top: 28%;
+      left: clamp(2.5rem, 5vw, 4.5rem);
+      right: clamp(2.5rem, 5vw, 4.5rem);
+      bottom: 23%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(2rem, 4vw, 5rem);
+      z-index: 2;
+    }
+
+    .clocks-col {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Column header — monospace, uppercase, letter-spaced. CSS
+       `font-variant: small-caps` is unreliable across system fonts,
+       so we use uppercase + tracking which renders consistently in
+       IBM Plex Mono. Thin rule underneath unifies the two columns
+       as parallel categories. */
+    .clocks-header {
+      margin: 0 0 clamp(1.6rem, 2.4vw, 2.4rem) 0;
+      font-family: var(--font-meta);
+      font-weight: 500;
+      font-size: clamp(13px, 1.25vw, 17px);
+      color: var(--dusty);
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--dusty);
+      border-bottom-color: rgba(122, 147, 168, 0.45);
+    }
+
+    .clocks-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: max-content max-content max-content 1fr;
+      column-gap: clamp(10px, 1.2vw, 16px);
+      row-gap: clamp(1.4rem, 2.2vw, 2.2rem);
+      align-items: baseline;
+    }
+    /* Each <li> is a "transparent" container — its four spans
+       participate directly in the parent grid so glyph / label /
+       arrow columns align vertically across all rows. */
+    .clocks-row {
+      display: contents;
+    }
+
+    .clocks-glyph {
+      font-family: var(--font-body);
+      color: var(--ink-blue);
+      font-size: clamp(20px, 2.0vw, 26px);
+      min-width: 1.4ch;
+      text-align: center;
+      line-height: 1;
+    }
+    /* Beta letter wants italic; the other glyphs (○ + ~ ☉ ⌖ ▢ ≈) read
+       better upright. */
+    .clocks-glyph.glyph-beta {
+      font-style: italic;
+    }
+
+    .clocks-label {
+      font-family: var(--font-meta);
+      font-weight: 400;
+      font-size: clamp(17px, 1.7vw, 22px);
+      color: var(--ink);
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+
+    .clocks-arrow {
+      font-family: var(--font-meta);
+      color: var(--meta);
+      font-size: clamp(15px, 1.5vw, 19px);
+      opacity: 0.7;
+    }
+
+    .clocks-note {
+      font-family: var(--font-body);
+      font-style: italic;
+      font-weight: 400;
+      font-size: clamp(15px, 1.55vw, 20px);
+      color: var(--meta);
+      letter-spacing: 0;
+      line-height: 1.4;
+    }
+
+    /* Open question — italic ink-blue so it visibly invites Merry to
+       contribute rather than reads as another descriptive note. */
+    .clocks-question {
+      display: block;
+      margin-top: 6px;
+      font-family: var(--font-body);
+      font-style: italic;
+      color: var(--ink-blue);
+      font-size: 0.95em;
+      opacity: 0.95;
+    }
+
+    /* Footer thesis — anchored in the bottom 15–20% with a thin
+       dusty-blue rule above so it lands as "and so —" rather than
+       crowding the column tails. */
+    .clocks-thesis {
+      position: absolute;
+      bottom: 10%;
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      z-index: 2;
+    }
+    .clocks-thesis-rule {
+      width: 24%;
+      height: 1px;
+      margin: 0;
+      border: none;
+      background: var(--dusty);
+      opacity: 0.5;
+    }
+    .clocks-thesis-line {
+      margin: 0;
+      font-family: var(--font-body);
+      font-style: italic;
+      font-weight: 400;
+      font-size: clamp(22px, 2.4vw, 32px);
+      color: var(--ink-blue);
+      letter-spacing: -0.005em;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <main class="slide">
+    <svg class="slide-bg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <ellipse cx="800" cy="500" rx="540" ry="540"
+               fill="none"
+               stroke="#143E63" stroke-width="0.8"
+               vector-effect="non-scaling-stroke"
+               opacity="0.18" />
+      <ellipse cx="800" cy="500" rx="400" ry="400"
+               fill="none"
+               stroke="#143E63" stroke-width="0.8"
+               vector-effect="non-scaling-stroke"
+               opacity="0.28" />
+    </svg>
+
+    <div class="meta meta-top">
+      <span>iii. the build</span>
+      <span>08 / 11</span>
+    </div>
+
+    <div class="clocks-head">
+      <p class="clocks-headline">The body keeps many clocks.</p>
+      <p class="clocks-subtitle">Yet time seems to change as we meet the demands of the day.</p>
+    </div>
+
+    <div class="clocks-columns">
+      <section class="clocks-col clocks-col--biological" aria-labelledby="clocks-bio-header">
+        <h3 id="clocks-bio-header" class="clocks-header">Biological</h3>
+        <ul class="clocks-list">
+          <li class="clocks-row">
+            <span class="clocks-glyph">○</span>
+            <span class="clocks-label">breath</span>
+            <span class="clocks-arrow">→</span>
+            <span class="clocks-note">1:4 to heart rate at rest</span>
+          </li>
+          <li class="clocks-row">
+            <span class="clocks-glyph">+</span>
+            <span class="clocks-label">HRV</span>
+            <span class="clocks-arrow">→</span>
+            <span class="clocks-note">tempo swing / irregularity</span>
+          </li>
+          <li class="clocks-row">
+            <span class="clocks-glyph glyph-beta">β</span>
+            <span class="clocks-label">EEG beta</span>
+            <span class="clocks-arrow">→</span>
+            <span class="clocks-note">cognitive engagement</span>
+          </li>
+          <li class="clocks-row">
+            <span class="clocks-glyph">~</span>
+            <span class="clocks-label">valence + arousal</span>
+            <span class="clocks-arrow">→</span>
+            <span class="clocks-note">
+              emotional &amp; physiological states that shape time perception.
+              <em class="clocks-question">How do they inform musical character?</em>
+            </span>
+          </li>
+        </ul>
+      </section>
+
+      <section class="clocks-col clocks-col--contextual" aria-labelledby="clocks-ctx-header">
+        <h3 id="clocks-ctx-header" class="clocks-header">Contextual</h3>
+        <ul class="clocks-list">
+          <li class="clocks-row">
+            <span class="clocks-glyph">☉</span>
+            <span class="clocks-label">time of day</span>
+            <span class="clocks-arrow">→</span>
+            <span class="clocks-note">circadian shifts in physiology</span>
+          </li>
+          <li class="clocks-row">
+            <span class="clocks-glyph">⌖</span>
+            <span class="clocks-label">location</span>
+            <span class="clocks-arrow">→</span>
+            <span class="clocks-note">environmental physiological response</span>
+          </li>
+          <li class="clocks-row">
+            <span class="clocks-glyph">▢</span>
+            <span class="clocks-label">schedule</span>
+            <span class="clocks-arrow">→</span>
+            <span class="clocks-note">anticipated stress and demand</span>
+          </li>
+          <li class="clocks-row">
+            <span class="clocks-glyph">≈</span>
+            <span class="clocks-label">environment</span>
+            <span class="clocks-arrow">→</span>
+            <span class="clocks-note">ambient stimuli — light, sound, temperature</span>
+          </li>
+        </ul>
+      </section>
+    </div>
+
+    <div class="clocks-thesis">
+      <hr class="clocks-thesis-rule">
+      <p class="clocks-thesis-line">Time isn't measured. It's composed.</p>
+    </div>
+
+    <div class="meta meta-bottom">
+      <span>thomaslistens.github.io/rtd</span>
+      <span>Thomas LeRoy Meier · 2026</span>
+    </div>
+  </main>
+</body>
+</html>
