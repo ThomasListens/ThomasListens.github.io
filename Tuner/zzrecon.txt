@@ -1,0 +1,129 @@
+### pushLastTakeAsLayer
+2809:    // onstop handler / pushLastTakeAsLayer decide consistently even if the
+2813:    // pushLastTakeAsLayer to decide whether to store videoBlob or flag as
+2895:    // export time. pushLastTakeAsLayer stores this DIRECTLY as the new
+4320:      // codebase uses (see startRecording / pushLastTakeAsLayer).
+8423:        //    pushLastTakeAsLayer) so we already have the PCM in hand;
+8910:    // (pushLastTakeAsLayer) and the buffer is what the composite mixes;
+8932:      // onstop and pushLastTakeAsLayer must agree with what startRecording
+9289:        // pushLastTakeAsLayer feeds it to decodeAudioData. If the
+9456:    async function pushLastTakeAsLayer() {
+9620:    // captured in their take, see pushLastTakeAsLayer.)
+9631:      // pushLastTakeAsLayer stores this directly as the new layer's
+11701:          pushLastTakeAsLayer();
+### harmonyLayers
+### harmonyStack
+1905:       the most recent take off harmonyStack — middle layers can't be
+2853:    // harmonyStack:        decoded AudioBuffers, oldest first
+2880:    const harmonyStack = [];
+8025:    // Each take in harmonyStack is a complete MP4 (videoBlob), captured
+8222:      const n = harmonyStack.length;
+8231:        const l = harmonyStack[i];
+8252:      // Reverse so cells[0] = most recent (harmonyStack is oldest-first).
+8253:      const ordered = harmonyStack.slice().reverse();
+9338:      if (harmonyStack.length > 0) {
+9458:      if (harmonyStack.length >= HARMONY_STACK_MAX) {
+9498:        const bakeDownDelayMs = harmonyStack.length > 0 ? _lastTakeBakeDownDelayMs : 0;
+9505:        harmonyStack.push({
+9524:          ? ('Audio layer ' + harmonyStack.length + ' added')
+9525:          : ('Layer ' + harmonyStack.length + ' added');
+9541:      harmonyStack.length = 0;
+9553:      if (!harmonyStack.length) return;
+9555:      harmonyStack.pop();
+9625:      if (!harmonyStack.length) return;
+9645:      for (let i = 0; i < harmonyStack.length; i++) {
+9646:        const layer = harmonyStack[i];
+9678:      if (!harmonyStack.length) return;
+9701:    // Build the panel DOM from harmonyStack. Called on open and on any
+9713:      const rows = harmonyStack.slice().reverse();
+9723:        // origIdx maps the visual (reversed) index back to harmonyStack
+9726:        const origIdx = harmonyStack.length - 1 - visIdx;
+9793:        const n = harmonyStack.length;
+9800:      // reflect harmonyStack right now. If it's closed this is a noop.
+9802:        if (!harmonyStack.length) closeLayerVolumePanel();
+9807:        const canAdd = !!lastRecordedBlob && harmonyStack.length < HARMONY_STACK_MAX;
+9817:        expBtn.classList.toggle('visible', harmonyStack.length > 0);
+9821:        undoBtn.classList.toggle('visible', harmonyStack.length > 0);
+### audioOnly
+2000:    body:not(.record-mode) #audioOnlyBtn {
+2010:    #audioOnlyBtn {
+2030:    #audioOnlyBtn:active { transform: scale(0.92); }
+2031:    #audioOnlyBtn.on {
+2683:      <button type="button" id="audioOnlyBtn" title="Audio-only take — overdub vocal without video
+2806:    // without adding a new visual tile. Persisted under tuner.audioOnly.
+2807:    let audioOnlyMode = false;
+2808:    // Snapshot of audioOnlyMode at startRecording time so the in-flight
+2811:    let _audioOnlyInFlight = false;
+2814:    // audio-only. Independent of audioOnlyMode (which may change between
+8226:      // the audioOnly flag (purely additive audio layer — no cell). Older
+8232:        if (!l || (!l.audioOnly && !l.videoBlob)) {
+8262:        if (!ordered[i].audioOnly) videoLayerIdx.push(i);
+8360:          if (layer.audioOnly) {
+8934:      _audioOnlyInFlight = audioOnlyMode === true;
+8935:      const audioOnly = _audioOnlyInFlight;
+8962:      if (!audioOnly) {
+9066:      if (audioOnly) {
+9083:        'audioOnly=', audioOnly,
+9093:      const mime = audioOnly ? pickAudioOnlyMime() : pickRecorderMime();
+9105:        const recOpts = audioOnly
+9143:        console.log('[record] onstop entered #' + onstopIdx, 'audioOnly=', audioOnly);
+9202:        const type = mediaRecorder.mimeType || mime || (audioOnly ? 'audio/webm' : 'video/webm');
+9211:        if (audioOnly) {
+9299:      if (!audioOnly) {
+9499:        // audioOnly layers carry the decoded buffer but no videoBlob —
+9508:          audioOnly: isAudioOnly,
+9734:        label.textContent = 'L' + (origIdx + 1) + (layer.audioOnly ? ' (audio)' : '');
+11707:      // (_audioOnlyInFlight snapshots the value at startRecording).
+11709:        const savedAO = localStorage.getItem('tuner.audioOnly');
+11710:        if (savedAO === '1') audioOnlyMode = true;
+11712:      const audioOnlyBtn = document.getElementById('audioOnlyBtn');
+11714:        if (audioOnlyBtn) {
+11715:          audioOnlyBtn.classList.toggle('on', audioOnlyMode);
+11716:          audioOnlyBtn.setAttribute('aria-pressed', audioOnlyMode ? 'true' : 'false');
+11718:        document.body.classList.toggle('audio-only-mode', audioOnlyMode);
+11721:      if (audioOnlyBtn) {
+11722:        audioOnlyBtn.addEventListener('click', () => {
+11723:          audioOnlyMode = !audioOnlyMode;
+11725:          try { localStorage.setItem('tuner.audioOnly', audioOnlyMode ? '1' : '0'); } catch (_) {}
+### bakeDownDelay
+2896:    // layer's bakeDownDelayMs — per-take, NOT cumulative. The prior
+2897:    // layers are scheduled past their own bakeDownDelayMs during
+2902:    // seek each layer past bakeDownDelayMs so every singer's first voice
+8372:        // bakeDownDelayMs is the silent intro the recorder captured
+8380:          const ms = (ordered[i] && typeof ordered[i].bakeDownDelayMs === 'number')
+8381:            ? Math.max(0, ordered[i].bakeDownDelayMs) : 0;
+8590:        //    with bakeDownDelayMs of reaction-time silence at the head:
+8597:        //    Per-layer bakeDownDelayMs is PER-TAKE, NOT cumulative.
+9475:        // bakeDownDelayMs: front-trim (ms) for this layer at monitor
+9482:        // PER-TAKE, NOT cumulative. Each take's bakeDownDelayMs is the
+9486:        // bakeDownDelayMs_{N-1} into its MP4, so the offsets compound"
+9493:        // layer past its own bakeDownDelayMs, so the audible monitor
+9496:        //   bakeDownDelayMs_1 = 0
+9497:        //   bakeDownDelayMs_N = delaySec_N  (N > 1)
+9498:        const bakeDownDelayMs = harmonyStack.length > 0 ? _lastTakeBakeDownDelayMs : 0;
+9520:          bakeDownDelayMs,
+9616:    // Each layer plays starting from offset = layer.bakeDownDelayMs/1000
+9619:    // starts. (bakeDownDelayMs is the singer's reaction-to-monitor delay
+9632:      // bakeDownDelayMs — per-take, NOT cumulative. Each prior layer
+9633:      // is played starting from its OWN bakeDownDelayMs offset (see
+9660:        const trimMs = (typeof layer.bakeDownDelayMs === 'number')
+9661:          ? Math.max(0, layer.bakeDownDelayMs) : 0;
+### recordDock
+### stackToggle
+### triple
+10574:    // Record-mode entry gesture: triple-tap OR press-and-hold on the
+### decodeAudioData
+6435:        audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+8913:    // decodeAudioData stays on the same path), then Opus-in-WebM.
+9289:        // pushLastTakeAsLayer feeds it to decodeAudioData. If the
+9292:        // MP4 audio tracks via decodeAudioData).
+9466:        // decodeAudioData consumes the buffer, so feed it a fresh copy.
+9467:        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+### indexedDB
+### saveSession
+10659:    function saveSession() {
+11084:      document.getElementById('saveBtn').addEventListener('click', saveSession);
+11982:        saveTimeout = setTimeout(saveSession, 500);
+### loadSession
+10712:    function loadSession() {
+11970:      const loaded = loadSession();

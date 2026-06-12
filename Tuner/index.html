@@ -3690,9 +3690,20 @@
       const parts = text.trim().split(/[\s,\n]+/);
       const ratios = [];
       
-      for (const part of parts) {
+      for (let part of parts) {
         if (!part) continue;
         
+        // Optional display-name override:  32/11[16/11]  tunes to 32/11
+        // but shows "16/11" on screen. The [bracketed] text becomes the
+        // visible label; the part before it sets the actual pitch/color.
+        let displayLabel = null;
+        const nameMatch = part.match(/^(.+?)\[(.+)\]$/);
+        if (nameMatch) {
+          part = nameMatch[1].trim();
+          displayLabel = nameMatch[2].trim();
+        }
+        const startLen = ratios.length;
+
         if (part.includes('/')) {
           const [num, den] = part.split('/').map(Number);
           if (!isNaN(num) && !isNaN(den) && den !== 0) {
@@ -3741,6 +3752,12 @@
               type: 'decimal'
             });
           }
+        }
+
+        // Apply the bracketed display name (if any) to whatever this entry
+        // produced — its ratio/cents/color stay derived from the real value.
+        if (displayLabel && ratios.length > startLen) {
+          ratios[ratios.length - 1].label = displayLabel;
         }
       }
       
