@@ -545,7 +545,7 @@
       color: var(--ink);
       text-align: center;
     }
-    .build-close .key { color: var(--ink-blue); font-style: italic; }
+    .build-close .key { color: var(--ink-blue); }
 
     .tier-beats { margin-top: 1.6rem; }
     .tier-beat {
@@ -875,6 +875,8 @@
       filter: url(#ink-boil);
       opacity: 0.6;
       pointer-events: none;
+      white-space: pre-line;       /* honor explicit breaks in data-text so the
+                                      underlayer wraps exactly like the crisp text */
 
       /* A soft band travels left→right; the boiling ink is only revealed where
          the band currently is, so the agitation cycles THROUGH the line rather
@@ -1082,7 +1084,7 @@
 
         <!-- The answer — the highlighted, dominant result of the equation. -->
         <div class="answer-block answer-highlight">
-          <p class="answer-statement inky" data-text="By turning our hardware into instrumental tools that define the work music therapists already do.">By turning our hardware into <span class="key">instrumental tools<br>that define the work</span> music therapists already do.</p>
+          <p class="answer-statement inky" data-text="By turning our hardware into instrumental tools&#10;that define the work music therapists already do.">By turning our hardware into <span class="key">instrumental tools<br>that define the work</span> music therapists already do.</p>
           <p class="answer-statement answer-statement--second inky" data-text="And delivering those results to their patients and our customers alike.">And delivering those results to their patients and <span class="key">our customers</span> alike.</p>
         </div>
       </div>
@@ -1317,7 +1319,7 @@
         </div>
       </div>
 
-      <p class="build-close inky" data-text="The team makes it real, I help build it and carry it home, and the results speak for themselves. This is how we deliver excellent sound where it can do the most good, and help more people be heard.">The team makes it real, I help build it and carry it home, and the
+      <p class="build-close inky" data-text="The team makes it real, I help build it and carry it home, and the results speak for themselves. This is how we deliver excellent sound where it can do the most good,&#10;and help more people be heard.">The team makes it real, I help build it and carry it home, and the
         results speak for themselves. This is how we deliver excellent sound where it can do the most
         good,<br><span class="key">and help more people be heard.</span></p>
     </div>
