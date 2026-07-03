@@ -151,6 +151,23 @@ function safeLabel(label) {
   return label.replace(/[^a-zA-Z0-9_-]/g, '_');
 }
 
+/**
+ * Master-bus brick-wall limiter — IDENTICAL to engine.js live playback chain.
+ * Without this the summed voices clip on export (live is tamed by this node),
+ * which is why an un-limited export sounds harsher/"jittery" than the synth.
+ * @param {BaseAudioContext} ctx
+ * @returns {DynamicsCompressorNode}
+ */
+function _createLimiter(ctx) {
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -1;
+  limiter.knee.value      = 0;
+  limiter.ratio.value     = 20;
+  limiter.attack.value    = 0.002;
+  limiter.release.value   = 0.050;
+  return limiter;
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. WAV AUDIO EXPORT
@@ -247,10 +264,13 @@ export async function exportWAV(channels, options = {}) {
       const n = channels.length || 1;
       const vol = synthParams.masterVolume ?? 0.7;
       masterGain.gain.value = vol / Math.sqrt(n);
-      masterGain.connect(offCtx.destination);
+      // Match live playback: masterGain → limiter → destination (engine.js).
+      const limiter = _createLimiter(offCtx);
+      masterGain.connect(limiter);
+      limiter.connect(offCtx.destination);
 
       _renderVoices(offCtx, masterGain, channels, synthParams, pitchMapExport,
-        layerMix, startSec, renderDuration, AUTOMATION_RATE);
+        layerMix, startSec, renderDuration, AUTOMATION_RATE, playbackRate);
 
       const rendered = await offCtx.startRendering();
       const chBufs = [];
@@ -267,10 +287,13 @@ export async function exportWAV(channels, options = {}) {
         const offCtx = new OfflineAudioContext(2, Math.ceil(renderDuration * sampleRate), sampleRate);
         const masterGain = offCtx.createGain();
         masterGain.gain.value = synthParams.masterVolume ?? 0.7;
-        masterGain.connect(offCtx.destination);
+        // Match live playback: masterGain → limiter → destination (engine.js).
+        const limiter = _createLimiter(offCtx);
+        masterGain.connect(limiter);
+        limiter.connect(offCtx.destination);
 
         _renderVoices(offCtx, masterGain, [ch], synthParams, pitchMapExport,
-          layerMix, startSec, renderDuration, AUTOMATION_RATE);
+          layerMix, startSec, renderDuration, AUTOMATION_RATE, playbackRate);
 
         const rendered = await offCtx.startRendering();
         const chBufs = [];
@@ -288,7 +311,7 @@ export async function exportWAV(channels, options = {}) {
  * Build and activate voice graphs on an OfflineAudioContext.
  * Mirrors engine.js #activateVoices but for offline rendering.
  */
-function _renderVoices(ctx, destination, channels, synthParams, pitchMap, layerMix, startSec, renderDuration, AUTOMATION_RATE) {
+function _renderVoices(ctx, destination, channels, synthParams, pitchMap, layerMix, startSec, renderDuration, AUTOMATION_RATE, playbackRate = 1.0) {
   const START_LATENCY = 0.05;
   const t0 = ctx.currentTime + START_LATENCY;
 
@@ -317,7 +340,13 @@ function _renderVoices(ctx, destination, channels, synthParams, pitchMap, layerM
 
     const rootAmpCurve  = buildRootAmpCurve(masterAmp, activityCurve);
     const morphology    = buildMorphologyCurves(features, masterAmp, synthParams, activityCurve);
-    const fmIndexCurve  = buildFMIndexCurve(features, synthParams, durCh, pitch.hz, activityCurve);
+    // FM Focus blends centroid ↔ selectedBandPower. The live engine injects
+    // selectedBandPower (engine.js #computeSelectedBandPower); export omitted it,
+    // so the FM index read as 0 for the band-power half → halved FM at focus=0.5.
+    // 'full' band mode (the only mode export renders) ⇒ adaptiveRMS ?? slowRMS.
+    const featuresForFM = { ...features,
+      selectedBandPower: features.adaptiveRMS ?? features.slowRMS };
+    const fmIndexCurve  = buildFMIndexCurve(featuresForFM, synthParams, durCh, pitch.hz, activityCurve);
     const maxFMIndex    = (synthParams.fmDepthScale ?? 0) * pitch.hz;
     const fmAmpCurve    = buildFMAmpCurve(masterAmp, activityCurve, fmIndexCurve, maxFMIndex);
 
@@ -346,6 +375,12 @@ function _renderVoices(ctx, destination, channels, synthParams, pitchMap, layerM
 
     if (rootSlice.length < 2) continue;
 
+    // Each voice's curves span only its OWN data (live: per-voice `remaining`).
+    // Scheduling a short channel's curve over the global renderDuration would
+    // time-stretch it. Tie duration to the slice's own frame count.
+    const voiceDur = Math.min(renderDuration, rootSlice.length / AUTOMATION_RATE / playbackRate);
+    if (voiceDur < 0.05) continue;
+
     // Create voice graph
     const graph = createVoiceGraph(ctx, destination, pitch.hz, pitch.pan, distortionCurve);
 
@@ -358,13 +393,13 @@ function _renderVoices(ctx, destination, channels, synthParams, pitchMap, layerM
     // Start oscillators
     for (const osc of graph.allOscs) {
       osc.start(t0);
-      osc.stop(t0 + renderDuration + 0.1);
+      osc.stop(t0 + voiceDur + 0.1);
     }
     graph.noiseSource.start(t0);
-    graph.noiseSource.stop(t0 + renderDuration + 0.1);
+    graph.noiseSource.stop(t0 + voiceDur + 0.1);
 
     // Schedule automation curves
-    try { graph.rootGain.gain.setValueCurveAtTime(rootSlice, t0, renderDuration); } catch (_) {}
+    try { graph.rootGain.gain.setValueCurveAtTime(rootSlice, t0, voiceDur); } catch (_) {}
 
     const morphTargets = [
       { gain: graph.overGains[0],  curve: morphSlices.over2 },
@@ -375,11 +410,11 @@ function _renderVoices(ctx, destination, channels, synthParams, pitchMap, layerM
     ];
     for (const { gain, curve } of morphTargets) {
       if (curve.length < 2) continue;
-      try { gain.gain.setValueCurveAtTime(curve, t0, renderDuration); } catch (_) {}
+      try { gain.gain.setValueCurveAtTime(curve, t0, voiceDur); } catch (_) {}
     }
 
-    try { graph.fmModGain.gain.setValueCurveAtTime(fmIdxSlice, t0, renderDuration); } catch (_) {}
-    try { graph.fmAmpGain.gain.setValueCurveAtTime(fmAmpSlice, t0, renderDuration); } catch (_) {}
+    try { graph.fmModGain.gain.setValueCurveAtTime(fmIdxSlice, t0, voiceDur); } catch (_) {}
+    try { graph.fmAmpGain.gain.setValueCurveAtTime(fmAmpSlice, t0, voiceDur); } catch (_) {}
 
     // ── Schedule transient events (mirrors engine.js #schedulerTick) ──
     // Pre-schedule all noise bursts + saturation spikes at once since
@@ -396,7 +431,7 @@ function _renderVoices(ctx, destination, channels, synthParams, pitchMap, layerM
 
       for (const ev of events) {
         const evTime = ev.timeSec - startSec;
-        if (evTime < 0 || evTime > renderDuration) continue;
+        if (evTime < 0 || evTime > (durCh - startSec)) continue;
 
         const exc    = Math.min(1, ev.excitation * detLevel) * transientLevel;
         const attack = attackMax - (attackMax - attackMin) * exc;

@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Designed at US Letter (8.5×11in = 816×1056 css px). Document-first:
+       each .page is one sheet, prints/exports to one PDF page, and renders
+       live as a stack of sheets. Desktop layout forced on phones so the
+       proportions never break; pinch-zoom stays available. -->
+  <meta name="viewport" content="width=816, user-scalable=yes">
+  <title>RTD × Music Therapy: Internal Opportunity Brief</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    @page { size: 8.5in 11in; margin: 0; }
+
+    :root {
+      /* Locked RTD identity — warm paper, charcoal ink, working-man's blue. */
+      --paper:    #F4F1EC;
+      --ink:      #1A1A1A;
+      --ink-blue: #143E63;   /* geometry, questions, "ink" moments */
+      --meta:     #6B6860;   /* metadata only */
+      --accent:   #B83A36;   /* Venetian red — sparing focal accent */
+      --grid:     #7C93A6;   /* blueprint grid line — lightened ink-blue, per-line opacity varies */
+
+      --font-body: 'EB Garamond', Garamond, 'Adobe Garamond Pro', Baskerville, Georgia, serif;
+      --font-meta: 'IBM Plex Mono', 'Courier New', Courier, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; min-height: 100vh; }
+
+    body {
+      background: #E7E2D8;               /* darker than paper so each sheet reads as a sheet on screen */
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-weight: 400;
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2.5rem 1rem;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── The sheet — one US Letter page ─────────────────────── */
+    .page {
+      position: relative;
+      width: 816px;
+      min-height: 1056px;
+      background: var(--paper);
+      box-shadow: 0 2px 24px rgba(0,0,0,0.12);
+      overflow: hidden;
+      padding: 72px;
+      margin-bottom: 2.5rem;
+      display: flex;
+      flex-direction: column;
+    }
+    .page:last-child { margin-bottom: 0; }
+
+    /* Elliptical motif — load-bearing geometry behind content. For this
+       document the two foci ARE the therapist and the patient; the tempo
+       lives on the axis between them. Never decorative. */
+    .page-ellipse {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Living background — ported from the résumé. A 32px grid + slow
+       grid-magnetized ripples, both revealed only where two roaming
+       Lissajous spotlights fall (SVG luminance mask). Built per sheet in
+       JS so each page has its own unique mask ids and drifts independently. */
+    .geometry-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .grid-line {
+      stroke: var(--grid);
+      stroke-width: 1;
+      stroke-linecap: round;
+      fill: none;
+    }
+    .ripple-anim {
+      fill: none;
+      stroke: var(--grid);
+      stroke-width: 1.1;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0;
+    }
+
+    .content { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; }
+
+    /* ── Metadata tiers ─────────────────────────────────────── */
+    .meta {
+      color: var(--meta);
+      font-family: var(--font-meta);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: lowercase;
+      display: flex;
+      justify-content: space-between;
+    }
+    .meta-top    { margin-bottom: 2.5rem; }
+    .meta-bottom {
+      position: absolute;
+      left: 72px; right: 72px; bottom: 40px;
+      z-index: 1;
+    }
+
+    /* ── Type scale ─────────────────────────────────────────── */
+    .kicker {
+      font-family: var(--font-meta);
+      font-size: 12px;
+      letter-spacing: 0.2em;
+      text-transform: lowercase;
+      color: var(--ink-blue);
+      margin-bottom: 1rem;
+    }
+
+    .title {
+      font-size: 40px;
+      font-weight: 500;
+      line-height: 1.08;
+      color: var(--ink);
+      margin-bottom: 1rem;
+    }
+
+    /* Cover: two roman-ink declarations, then the italic ink-blue question —
+       the RTD slide-1 register. Spoken, unhurried. */
+    .cover-statement {
+      font-weight: 400;
+      line-height: 1.3;
+      color: var(--ink);
+    }
+    /* Crescendo into the question: first belief quieter, second bigger. Second
+       still pushed right for the off-axis motion. */
+    .cover-statement--first  { font-size: 24px; margin-bottom: 0.3rem; }
+    .cover-statement--second { font-size: 28px; text-align: right; margin-bottom: 0; }
+    /* Page 1 hero stack: statements → question → answer, filling the sheet. */
+    .hook {
+      padding-top: 0;
+    }
+    .cover-question {
+      font-style: italic;
+      font-size: 31px;
+      line-height: 1.3;
+      color: var(--ink-blue);
+      text-align: center;
+      margin-top: 1.1rem;
+    }
+    /* Operators that organize the turn: the two beliefs add up (+), and the
+       answer is what they equal (=). A centered spine down the hook. */
+    .hook-op {
+      text-align: center;
+      font-family: var(--font-body);
+      font-size: 32px;
+      font-weight: 400;
+      color: var(--ink-blue);
+      opacity: 0.6;
+      line-height: 1;
+      margin: 0.35rem 0 0.25rem;   /* the + sits below the built-up statements, leading into the question */
+    }
+    .hook-op--eq { margin: 0.3rem 0; }
+
+    /* Lower page 1 — the obvious questions, answered. Concern as an italic
+       ink-blue question (identity: questions are italic ink-blue), answer in
+       roman ink. Closes on the mutual "why." */
+    .grounding { margin-top: 0.85rem; }
+    .grounding-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.2rem;
+    }
+    .ground-q {
+      font-style: italic;
+      font-size: 19px;
+      line-height: 1.3;
+      color: var(--ink-blue);
+      margin-bottom: 0.45rem;
+    }
+    .ground-a {
+      font-size: 16px;
+      line-height: 1.55;
+      color: var(--ink);
+    }
+    .ground-a .key { color: var(--ink-blue); }
+
+    /* Zigzag: each point constrained and positioned left / center / right. */
+    .ground-point { max-width: 76%; }
+    .ground-point--left   { justify-self: start;  text-align: left;   }
+    .ground-point--center { justify-self: center; text-align: center; }
+    .ground-point--right  { justify-self: end;    text-align: right;  }
+    /* The fourth point — the "why." Set apart and given weight so it lands as
+       the strategic close, not just another line. */
+    .grounding-why {
+      margin-top: 0.6rem;
+      padding-top: 0.6rem;
+      border-top: 1px solid rgba(20, 62, 99, 0.22);
+      text-align: center;
+    }
+    .why-q {
+      font-style: italic;
+      font-size: 26px;
+      color: var(--ink-blue);
+      margin-bottom: 0.5rem;
+    }
+    .why-a {
+      font-size: 16px;
+      line-height: 1.55;
+      color: var(--ink);
+      max-width: 94%;
+      margin: 0 auto;
+    }
+    .why-a .key { color: var(--ink-blue); }
+
+    /* ── Page 2: A Bio-Adaptive Metronome ─────────────────────── */
+    /* The metronome sits BEHIND the title as a layered backdrop; title and
+       subtitle read in front of it. */
+    .metronome-hero {
+      position: relative;
+      min-height: 300px;   /* trimmed so the structured body has room on one sheet */
+      padding-top: 108px;   /* title sits in the upper area; metronome rises behind it */
+      text-align: center;
+    }
+    /* Title/subtitle sit ON TOP with a paper backing, so the metronome lines
+       behind the text are masked out and the type stays crisp. The backing is a
+       blurred paper "cloud" (::before) rather than a solid box, so its edges
+       feather softly into the metronome lines in every direction. */
+    .page-title,
+    .page-subtitle {
+      position: relative;
+      z-index: 1;
+    }
+    .page-title::before,
+    .page-subtitle::before {
+      content: "";
+      position: absolute;
+      inset: -2px -10px;
+      z-index: -1;
+      background: var(--paper);
+      border-radius: 50%;
+      filter: blur(9px);
+    }
+    .page-title {
+      width: fit-content;
+      max-width: 100%;
+      margin: 0 auto 0.6rem;
+      padding: 0.3rem 1.4rem;
+      font-family: var(--font-body);
+      font-size: 44px;
+      font-weight: 500;
+      line-height: 1.08;
+      color: var(--ink);
+      text-align: center;
+    }
+    .page-subtitle {
+      width: fit-content;
+      max-width: 72%;
+      margin: 0 auto;
+      padding: 0.3rem 1.3rem;
+      font-family: var(--font-body);
+      font-style: italic;
+      font-size: 21px;
+      line-height: 1.35;
+      color: var(--ink-blue);
+      text-align: center;
+    }
+    .mtr-body-copy {
+      font-family: var(--font-body);
+      font-size: 20px;
+      line-height: 1.6;
+      color: var(--ink);
+      text-align: center;
+      max-width: 66%;
+      margin: 2.8rem auto 0;
+    }
+    .mtr-body-copy .key { color: var(--ink-blue); }
+
+    /* Condensed page-1 → page-2 bridge, set as a single italic thesis line. */
+    .mtr-thesis {
+      max-width: 92%;
+      margin: -2.25rem auto 0;
+      font-family: var(--font-body);
+      font-style: italic;
+      font-size: 22px;
+      line-height: 1.34;
+      color: var(--ink-blue);
+      text-align: center;
+    }
+
+    /* The mechanism as a three-beat sequence: LISTENS → MEASURES → DEFINES.
+       A ledger of three columns, each capped by a blueprint hairline and an
+       accented step number — the argument made scannable. */
+    .mtr-steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      max-width: 94%;
+      margin: 1.7rem auto 0;
+      align-items: center;             /* shared center — descending heights taper into an arrow */
+    }
+    .mtr-step {
+      position: relative;
+      padding: 0.55rem 0 0 0.8rem;
+      border-left: 3px solid var(--accent);   /* the signal bar; heights descend 01 → 03 */
+      text-align: left;
+    }
+    .mtr-step-hd {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .mtr-step-num {
+      font-family: var(--font-meta);
+      font-size: 19px;
+      font-weight: 500;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .mtr-step-label {
+      font-family: var(--font-meta);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-blue);
+    }
+    .mtr-step p {
+      font-family: var(--font-body);
+      font-size: 14.5px;
+      line-height: 1.46;
+      color: var(--ink);
+      margin: 0;
+    }
+    /* text descends with the bars, so each column fills its space evenly */
+    .mtr-step:nth-child(1) p { font-size: 15.5px; }
+    .mtr-step:nth-child(2) p { font-size: 14.5px; }
+    .mtr-step:nth-child(3) p { font-size: 13.5px; }
+    .mtr-step .key { color: var(--ink-blue); }
+
+    /* The market gap as a tinted callout — the field's problem stated in tags,
+       then resolved. Same panel language as the cover's answer-highlight. */
+    .mtr-gap {
+      max-width: 90%;
+      margin: 1.8rem auto 0;
+      padding: 0.9rem 1.4rem 1.05rem;
+      background: rgba(20, 62, 99, 0.06);
+      border: 1px solid rgba(20, 62, 99, 0.28);
+      border-radius: 2px;
+    }
+    .mtr-gap-head {
+      font-family: var(--font-meta);
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: lowercase;
+      color: var(--ink-blue);
+      margin-bottom: 0.5rem;
+    }
+    .mtr-gap-lede {
+      font-family: var(--font-body);
+      font-size: 15.5px;
+      line-height: 1.48;
+      color: var(--ink);
+      margin: 0 0 0.7rem;
+    }
+    .mtr-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .mtr-tag {
+      font-family: var(--font-meta);
+      font-size: 12px;
+      color: var(--ink-blue);
+      background: var(--paper);
+      border: 1px solid rgba(20, 62, 99, 0.35);
+      border-radius: 2px;
+      padding: 0.24rem 0.55rem;
+    }
+    .mtr-tag .code { font-weight: 500; }
+    .mtr-gap-resolve {
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.48;
+      color: var(--ink);
+      margin: 0;
+    }
+    .mtr-gap-resolve strong { color: var(--ink-blue); font-weight: 500; }
+    .mtr-gap-resolve em { color: var(--meta); }
+    /* The billing-code fact as an inset white box — a left accent bar ties it to
+       the signal bars above; the code number is the accented focal point. */
+    .mtr-fact {
+      margin-top: 0.85rem;
+      padding: 0.7rem 0.95rem;
+      background: var(--paper);
+      border: 1px solid rgba(20, 62, 99, 0.28);
+      border-left: 3px solid var(--accent);
+      border-radius: 2px;
+    }
+    .mtr-fact p {
+      font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--ink);
+      margin: 0;
+    }
+    .mtr-fact strong { color: var(--ink-blue); font-weight: 500; }
+    .mtr-fact .code {
+      font-family: var(--font-meta);
+      font-weight: 500;
+      color: var(--accent);
+    }
+
+    /* Seam line into page 3 — italic ink-blue hinge, set off by a rule. */
+    .mtr-seam {
+      max-width: 80%;
+      margin: 1.5rem auto 0;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(20, 62, 99, 0.3);
+      font-family: var(--font-body);
+      font-style: italic;
+      font-size: 18px;
+      line-height: 1.5;
+      color: var(--ink-blue);
+      text-align: center;
+    }
+    .seam-line { display: block; }
+    .seam-line--a { text-align: left; }
+    .seam-line--b { text-align: right; margin-top: 0.55rem; }
+
+    /* ── Page 3: The Wellness Tier ─────────────────────────────
+       Register shifts from proof to reach. Quieter labels than page 2's
+       numbered ledger; the through-line is "being heard." */
+    .tier-head { text-align: center; }
+    .tier-lead {
+      max-width: 84%;
+      margin: 1.1rem auto 0;
+      font-family: var(--font-body);
+      font-size: 18.5px;
+      line-height: 1.5;
+      color: var(--ink);
+      text-align: center;
+    }
+    .tier-lead .key { color: var(--ink-blue); }
+
+    /* Mirror of page 2: there the bars narrow (heights descend, 01 tall → 03 short);
+       here they open (heights ascend, 01 short → 03 tall). Center-aligned so the
+       taper reads off the shared middle, and the font gradient is reversed from
+       page 2's to reinforce the opening. The two pages read as a matched pair. */
+    .tier-steps { align-items: center; margin-top: 1.7rem; }
+    .tier-steps .mtr-step:nth-child(1) p { font-size: 13.5px; }
+    .tier-steps .mtr-step:nth-child(2) p { font-size: 14.5px; }
+    .tier-steps .mtr-step:nth-child(3) p { font-size: 15.5px; }
+
+    /* Win-win-win capstone — the three beats resolved into one line. Ink-blue
+       label keeps the Venetian red reserved for the boundary flag just below. */
+    .tier-winwin {
+      max-width: 82%;
+      margin: 1.9rem auto 0;
+      text-align: center;
+    }
+    .tier-winwin-head {
+      font-family: var(--font-meta);
+      font-size: 16px;
+      letter-spacing: 0.22em;
+      text-transform: lowercase;
+      color: var(--ink-blue);
+      margin-bottom: 0.6rem;
+    }
+    .tier-winwin p {
+      font-family: var(--font-body);
+      font-size: 17px;
+      line-height: 1.5;
+      color: var(--ink);
+      margin: 0;
+    }
+    .tier-winwin .key { color: var(--ink-blue); }
+
+    /* ── Page 4: How It Gets Done ──────────────────────────────
+       Numbered beats again, but stacked as full-width rows — the middle beat
+       (the personal one) runs long, so three columns would break. The number +
+       red-bar motif is kept from pages 2-3 so the family resemblance holds. */
+    .build-steps {
+      margin-top: 1.7rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.15rem;
+    }
+    .build-step {
+      border-left: 3px solid var(--accent);
+      padding: 0.35rem 0 0.4rem 0.95rem;
+    }
+    .build-step-hd {
+      display: flex;
+      align-items: baseline;
+      gap: 0.55rem;
+      margin-bottom: 0.4rem;
+    }
+    .build-step-num {
+      font-family: var(--font-meta);
+      font-size: 19px;
+      font-weight: 500;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .build-step-label {
+      font-family: var(--font-meta);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-blue);
+    }
+    .build-step-sub { color: var(--meta); }
+    .build-step p {
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: 1.52;
+      color: var(--ink);
+      margin: 0;
+    }
+    .build-step .key { color: var(--ink-blue); }
+
+    /* Closing statement — loops back to page 1's "hear it too." The document's
+       final beat, so it sits centered and a touch larger, with an italic close. */
+    .build-close {
+      max-width: 88%;
+      margin: 1.9rem auto 0;
+      font-family: var(--font-body);
+      font-size: 17px;
+      line-height: 1.55;
+      color: var(--ink);
+      text-align: center;
+    }
+    .build-close .key { color: var(--ink-blue); font-style: italic; }
+
+    .tier-beats { margin-top: 1.6rem; }
+    .tier-beat {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 1.3rem;
+      padding: 0.85rem 0;
+      border-top: 1px solid rgba(20, 62, 99, 0.16);
+    }
+    .tier-beat:first-child { border-top: none; padding-top: 0; }
+    .tier-beat-label {
+      font-family: var(--font-meta);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--ink-blue);
+      line-height: 1.42;
+    }
+    .tier-beat-label .attr {
+      display: block;
+      margin-top: 0.35rem;
+      letter-spacing: 0.06em;
+      text-transform: none;
+      color: var(--meta);
+      font-size: 10.5px;
+    }
+    .tier-beat p {
+      font-family: var(--font-body);
+      font-size: 15.5px;
+      line-height: 1.5;
+      color: var(--ink);
+      margin: 0;
+    }
+    .tier-beat p .key { color: var(--ink-blue); }
+
+    /* Wellness posture — the claim-sharp reassurance. The one place the
+       Venetian-red accent earns its focal use on this page. */
+    .tier-posture {
+      margin-top: 1.6rem;
+      padding: 0.85rem 1.3rem 0.95rem;
+      background: rgba(184, 58, 54, 0.05);
+      border: 1px solid rgba(184, 58, 54, 0.3);
+      border-left: 3px solid var(--accent);
+      border-radius: 2px;
+    }
+    .tier-posture-head {
+      font-family: var(--font-meta);
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: lowercase;
+      color: var(--accent);
+      margin-bottom: 0.4rem;
+    }
+    .tier-posture p {
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: 1.48;
+      color: var(--ink);
+      margin: 0;
+    }
+    .tier-posture strong { font-weight: 500; color: var(--ink); }
+
+    /* Loneliness = context only, wellness-framed — a quiet closing aside. */
+    .tier-why {
+      max-width: 80%;
+      margin: 1.4rem auto 0;
+      font-family: var(--font-body);
+      font-style: italic;
+      font-size: 15px;
+      line-height: 1.45;
+      color: var(--meta);
+      text-align: center;
+    }
+
+    /* ── Page 4: The Close / The Ask ───────────────────────────
+       Decisive register. The Ask sits in a tinted panel that echoes the
+       cover's answer box — page 1 poses the question, page 4 answers with it. */
+    .close-lead {
+      max-width: 88%;
+      margin: 1.1rem auto 0;
+      font-family: var(--font-body);
+      font-size: 16.5px;
+      line-height: 1.5;
+      color: var(--ink);
+      text-align: center;
+    }
+    .close-lead .key { color: var(--ink-blue); }
+    .close-lead em { font-style: italic; color: var(--meta); }
+
+    /* The loop, drawn: my framework → her strategy → my validation. */
+    .loop {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      margin: 1.2rem auto 0;
+      font-family: var(--font-meta);
+      font-size: 12px;
+      letter-spacing: 0.03em;
+    }
+    .loop .node {
+      padding: 0.28rem 0.6rem;
+      border: 1px solid rgba(20, 62, 99, 0.3);
+      border-radius: 2px;
+      background: var(--paper);
+    }
+    .loop .mine { color: var(--ink-blue); border-color: rgba(20, 62, 99, 0.42); }
+    .loop .hers { color: var(--meta); }
+    .loop .arrow { color: var(--accent); font-size: 13px; }
+
+    /* Chu de-risker — already proven inside Merry. */
+    .derisk {
+      margin-top: 1.4rem;
+      padding: 0.8rem 1.2rem;
+      background: rgba(20, 62, 99, 0.06);
+      border: 1px solid rgba(20, 62, 99, 0.26);
+      border-radius: 2px;
+    }
+    .derisk-head {
+      font-family: var(--font-meta);
+      font-size: 10.5px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-blue);
+      margin-bottom: 0.35rem;
+    }
+    .derisk p {
+      font-family: var(--font-body);
+      font-size: 14.5px;
+      line-height: 1.48;
+      color: var(--ink);
+      margin: 0;
+    }
+
+    /* The Ask — the page's dominant element, in the cover's answer-panel skin. */
+    .ask-block {
+      margin-top: 1.5rem;
+      padding: 1rem 1.5rem 1.1rem;
+      background: rgba(20, 62, 99, 0.07);
+      border: 1px solid rgba(20, 62, 99, 0.34);
+      border-radius: 2px;
+      box-shadow: 0 3px 18px rgba(20, 62, 99, 0.09);
+    }
+    .ask-head {
+      font-family: var(--font-meta);
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: lowercase;
+      color: var(--ink-blue);
+      margin-bottom: 0.6rem;
+    }
+    .ask-row {
+      display: grid;
+      grid-template-columns: 1.6rem 1fr;
+      gap: 0.7rem;
+      align-items: baseline;
+      padding: 0.55rem 0;
+      border-top: 1px solid rgba(20, 62, 99, 0.16);
+    }
+    .ask-row:first-of-type { border-top: none; }
+    .ask-num {
+      font-family: var(--font-meta);
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--accent);
+      line-height: 1.3;
+    }
+    .ask-term b {
+      display: block;
+      font-family: var(--font-body);
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--ink-blue);
+      margin-bottom: 0.15rem;
+    }
+    .ask-term span {
+      font-family: var(--font-body);
+      font-size: 14.5px;
+      line-height: 1.46;
+      color: var(--ink);
+    }
+    .ask-note {
+      margin-top: 0.7rem;
+      font-family: var(--font-meta);
+      font-size: 11px;
+      color: var(--meta);
+      text-align: center;
+    }
+
+    /* Near-term milestone — one concrete, provable win. */
+    .milestone { margin-top: 1.4rem; text-align: center; }
+    .milestone-head {
+      display: block;
+      font-family: var(--font-meta);
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: lowercase;
+      color: var(--accent);
+      margin-bottom: 0.4rem;
+    }
+    .milestone p {
+      max-width: 84%;
+      margin: 0 auto;
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.45;
+      color: var(--ink);
+    }
+    .milestone .key { color: var(--ink-blue); }
+    .metronome {
+      position: absolute;
+      left: 50%;
+      top: -84px;                    /* nudged up so the heart clears the title text */
+      transform: translateX(-50%);
+      z-index: 0;
+      width: 320px;
+      height: auto;
+      opacity: 0.5;
+    }
+    .mtr-body {
+      fill: none;
+      stroke: var(--ink-blue);
+      stroke-width: 2;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+      opacity: 0.85;
+    }
+    .mtr-slot  { stroke: var(--ink-blue); stroke-width: 1; opacity: 0.4; stroke-dasharray: 2 5; }
+    .mtr-tick  { stroke: var(--ink-blue); stroke-width: 1; opacity: 0.35; }
+    .mtr-rod   { stroke: var(--ink-blue); stroke-width: 2; stroke-linecap: round; opacity: 0.9; }
+    .mtr-bob   { fill: var(--ink-blue); opacity: 0.9; }
+    .mtr-pivot { fill: var(--ink-blue); }
+
+    /* Heart as the pendulum's weight: the pulse that sets the beat. It swings
+       with the arm and pulses on its own faster clock. */
+    .mtr-heart {
+      fill: var(--ink-blue);
+      opacity: 0.9;
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: mtrHeart 1.1s ease-in-out infinite;
+    }
+    @keyframes mtrHeart {
+      0%, 100% { transform: scale(1); }
+      12%      { transform: scale(1.15); }
+      26%      { transform: scale(1); }
+    }
+
+    /* Brainwave (EEG) baseline the metronome stands on, scrolling leftward. */
+    .mtr-eeg {
+      fill: none;
+      stroke: var(--ink-blue);
+      stroke-width: 1.4;
+      opacity: 0.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      animation: mtrEeg 5s linear infinite;
+    }
+    @keyframes mtrEeg {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-100px); }
+    }
+
+    /* Swing at ~66 BPM: 1.8s per full left-right-left, the résumé's pendulum
+       grown into a full metronome. */
+    @keyframes mtrSwing {
+      0%, 100% { transform: rotate(-14deg); }
+      50%      { transform: rotate(14deg); }
+    }
+    .mtr-pendulum {
+      transform-origin: 150px 286px;
+      transform-box: view-box;
+      animation: mtrSwing 1.8s ease-in-out infinite;
+    }
+    @media print {
+      .mtr-pendulum { animation: none; transform: rotate(-9deg); }
+      .mtr-heart, .mtr-eeg { animation: none; }
+    }
+
+    /* The answer — the cover's register, but a declaration (roman), not a
+       question. The operative phrase takes ink-blue as an "ink moment." */
+    .answer-block { margin-top: 0.5rem; }
+    .answer-statement {
+      font-size: 27px;
+      font-weight: 400;
+      line-height: 1.28;
+      color: var(--ink);
+      text-align: center;
+      margin-bottom: 0.4rem;
+    }
+    .answer-statement .key { color: var(--ink-blue); }
+    .answer-statement--second {
+      font-size: 18px;      /* single line, centered */
+      text-align: center;
+      margin-bottom: 0;
+    }
+
+    /* The answer is the RESULT of the equation — a tinted, bordered panel so it
+       reads as the single most dominant, clearest element on the page. */
+    .answer-highlight {
+      margin-top: 0.3rem;
+      padding: 0.9rem 1.6rem 1rem;
+      background: rgba(20, 62, 99, 0.07);
+      border: 1px solid rgba(20, 62, 99, 0.34);
+      border-radius: 2px;
+      box-shadow: 0 3px 18px rgba(20, 62, 99, 0.09);   /* soft lift — the panel sits above the page */
+    }
+
+    /* Living ink "boil" — borrowed from the AudioVisualizerToolkit. A subtle
+       feTurbulence/feDisplacement warp whose seed is cycled at 7.5Hz ("on
+       fours"), so the glyph EDGES shimmer ~1px like hand-inked frames. Fast
+       enough to catch peripheral vision, but reads as ink, not jitter.
+       Interiors stay solid, so legibility is untouched. */
+    /* The smear is a texture layer BENEATH the crisp text. A duplicate of the
+       line (::before, via data-text) carries the moving ink filter and sits
+       behind the sharp, legible letterforms — wet ink bleeding under the
+       printed surface. The top text never moves; the wet ink lives below it. */
+    .inky { position: relative; isolation: isolate; }
+    .inky::before {
+      content: attr(data-text);
+      position: absolute;
+      left: 0; right: 0; top: 0;
+      z-index: -1;                 /* behind the element's own crisp text */
+      color: inherit;
+      filter: url(#ink-boil);
+      opacity: 0.6;
+      pointer-events: none;
+
+      /* A soft band travels left→right; the boiling ink is only revealed where
+         the band currently is, so the agitation cycles THROUGH the line rather
+         than firing everywhere at once. The band settles behind it. */
+      -webkit-mask-image: linear-gradient(100deg, transparent 34%, #000 46%, #000 54%, transparent 66%);
+              mask-image: linear-gradient(100deg, transparent 34%, #000 46%, #000 54%, transparent 66%);
+      -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+      -webkit-mask-size: 260% 100%;   mask-size: 260% 100%;
+      animation: inkSweep 4s linear infinite;
+    }
+    /* Stagger the three cover lines so the wave rolls down the block. */
+    .cover-statement--second.inky::before { animation-delay: -1.1s; }
+    .cover-question.inky::before          { animation-delay: -2.2s; }
+    .answer-statement--second.inky::before { animation-delay: -1.4s; }
+
+    @keyframes inkSweep {
+      0%   { -webkit-mask-position: 130% 0; mask-position: 130% 0; }
+      100% { -webkit-mask-position: -30% 0; mask-position: -30% 0; }
+    }
+
+    /* Clean type in the PDF — drop the moving underlayer entirely. */
+    @media print { .inky::before { display: none; } }
+
+    /* Italic ink-blue is reserved for questions / "ink" moments. */
+    .question {
+      font-style: italic;
+      font-size: 23px;
+      line-height: 1.3;
+      color: var(--ink-blue);
+    }
+
+    .lead {
+      font-size: 19px;
+      line-height: 1.5;
+      color: var(--ink);
+    }
+    .lead + .lead { margin-top: 0.9rem; }
+
+    .rule {
+      border: none;
+      border-top: 1px solid var(--ink-blue);
+      opacity: 0.3;
+      margin: 1.5rem 0;
+    }
+
+    /* ── Sections ───────────────────────────────────────────── */
+    .section { margin-bottom: 1.6rem; }
+
+    .section-header {
+      font-family: var(--font-meta);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: lowercase;
+      color: var(--ink-blue);
+      margin-bottom: 0.7rem;
+    }
+
+    .body-text { font-size: 16px; line-height: 1.5; color: var(--ink); }
+    .body-text + .body-text { margin-top: 0.7rem; }
+
+    .placeholder { font-style: italic; color: var(--meta); font-size: 16px; }
+
+    /* ── "Helps both" dual column — the therapist / the patient ─ */
+    .dual {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-top: 0.5rem;
+    }
+    .dual-col-header {
+      font-family: var(--font-meta);
+      font-size: 10.5px;
+      letter-spacing: 0.14em;
+      text-transform: lowercase;
+      color: var(--meta);
+      padding-bottom: 0.5rem;
+      margin-bottom: 0.7rem;
+      border-bottom: 1px solid rgba(20,62,99,0.25);
+    }
+    .dual-col p { font-size: 15px; line-height: 1.5; color: var(--ink); }
+
+    /* ── Opportunity items (page 3) ─────────────────────────── */
+    .opportunity {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 0 1.1rem;
+      margin-bottom: 1.5rem;
+    }
+    .opp-num {
+      font-family: var(--font-meta);
+      font-size: 20px;
+      color: var(--ink-blue);
+      line-height: 1.1;
+      opacity: 0.55;
+    }
+    .opp-name { font-size: 20px; font-weight: 500; color: var(--ink); margin-bottom: 0.2rem; }
+    .opp-what { font-size: 15.5px; line-height: 1.45; color: var(--ink); margin-bottom: 0.55rem; }
+    .opp-benefits { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+    .opp-benefit {
+      font-size: 13.5px;
+      line-height: 1.4;
+      color: var(--meta);
+      padding-left: 0.9rem;
+      border-left: 1px solid rgba(20,62,99,0.25);
+    }
+    .opp-benefit b {
+      display: block;
+      font-family: var(--font-meta);
+      font-weight: 500;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: lowercase;
+      color: var(--ink-blue);
+      margin-bottom: 0.2rem;
+    }
+
+    .note {
+      font-family: var(--font-meta);
+      font-size: 10.5px;
+      line-height: 1.5;
+      letter-spacing: 0.02em;
+      color: var(--accent);
+      opacity: 0.85;
+      margin-top: 0.5rem;
+    }
+
+    /* ── Hero ellipse labels (page 1) ───────────────────────── */
+    .focus-label {
+      font-family: var(--font-meta);
+      font-size: 13px;
+      letter-spacing: 0.1em;
+      fill: var(--ink-blue);
+      text-transform: lowercase;
+    }
+    .axis-label {
+      font-family: var(--font-body);
+      font-style: italic;
+      font-size: 17px;
+      fill: var(--ink-blue);
+    }
+
+    /* ── Print / PDF export ─────────────────────────────────── */
+    @media print {
+      * { animation: none !important; }
+      body { background: #fff; padding: 0; display: block; }
+      .page {
+        box-shadow: none;
+        width: 8.5in;
+        min-height: 11in;
+        margin: 0;
+        break-after: page;
+        page-break-after: always;
+      }
+      .page:last-child { break-after: auto; page-break-after: auto; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Living-ink filter. feTurbulence generates a smooth low-freq noise field;
+       feDisplacementMap warps the text by it. The field EVOLVES continuously
+       (SMIL palindrome on baseFrequency) so the glyph edges drift and flow like
+       wet ink — never snapping between fixed poses, which is what read as
+       glitchy. One octave keeps the bend coherent along whole strokes. -->
+  <svg class="ink-filter-defs" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+    <defs>
+      <filter id="ink-boil" x="-12%" y="-45%" width="124%" height="190%" color-interpolation-filters="sRGB">
+        <!-- Low-frequency evolving field: long wavelength = smooth, coherent
+             bends along whole strokes (not jagged). -->
+        <!-- Field re-seeded 7.5×/sec by JS ("on fours") — the original boil
+             cadence. Each seed is a fresh warp, so the ink redraws frame to
+             frame. Softened by the blurs and sitting under the crisp top layer,
+             the fast redraw reads as living ink, not the strobe it was when it
+             drove the visible text. -->
+        <feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="1" result="noise" stitchTiles="stitch" />
+        <!-- Soften the crisp vector edge FIRST, so what gets warped is already
+             a wet edge, not a hard line. -->
+        <feGaussianBlur in="SourceGraphic" stdDeviation="0.6" result="soft" />
+        <!-- Warp the softened ink so the motion reads as ink pulling/smearing. -->
+        <feDisplacementMap in="soft" in2="noise" scale="5.5" xChannelSelector="R" yChannelSelector="G" result="disp" />
+        <!-- Feather the displaced edge again — turns a moved line into a smear. -->
+        <feGaussianBlur in="disp" stdDeviation="0.6" />
+      </filter>
+    </defs>
+  </svg>
+
+  <!-- ═══════════════ PAGE 1 — COVER / THE QUESTION ═══════════════ -->
+  <div class="page" data-calm>
+    <div class="content">
+      <div class="meta meta-top">
+        <span>an opportunity brief</span>
+        <span>thomas meier · Hua-Yen</span>
+      </div>
+
+      <div class="hook">
+        <p class="cover-statement cover-statement--first inky" data-text="I have personally seen that music therapy works.">I have personally seen that music therapy works.</p>
+        <p class="cover-statement cover-statement--second inky" data-text="And I believe we all feel the benefits are real...">And I believe we all feel the benefits are real...</p>
+
+        <div class="hook-op" aria-hidden="true">+</div>
+
+        <p class="cover-question inky" data-text="How can Merry help everyone hear it too?">How can Merry help everyone hear it too?</p>
+
+        <div class="hook-op hook-op--eq" aria-hidden="true">=</div>
+
+        <!-- The answer — the highlighted, dominant result of the equation. -->
+        <div class="answer-block answer-highlight">
+          <p class="answer-statement inky" data-text="By turning our hardware into instrumental tools that define the work music therapists already do.">By turning our hardware into <span class="key">instrumental tools<br>that define the work</span> music therapists already do.</p>
+          <p class="answer-statement answer-statement--second inky" data-text="And delivering those results to their patients and our customers alike.">And delivering those results to their patients and <span class="key">our customers</span> alike.</p>
+        </div>
+      </div>
+
+      <hr class="rule" style="margin: 0.4rem 0 0.5rem;">
+
+      <div class="grounding">
+        <div class="grounding-grid">
+          <div class="ground-point ground-point--left">
+            <p class="ground-q">Who is this for?</p>
+            <p class="ground-a">Designed for music therapists, but <span class="key">available to all</span>. A tool they rely on is one consumers can trust, and the wellness reaches them directly.</p>
+          </div>
+          <div class="ground-point ground-point--center">
+            <p class="ground-q">Will it actually work?</p>
+            <p class="ground-a">Music therapy works based on the results a therapist can achieve through their senses. With modern technology, we can simply <span class="key">quantify and define</span> what NMT therapies like RAS (Rhythmic Auditory Stimulation) are already doing.</p>
+          </div>
+          <div class="ground-point ground-point--right">
+            <p class="ground-q">How does it work?</p>
+            <p class="ground-a">The hardware listens to the user and <span class="key">translates what it hears into a tempo matched to them</span>. Portable to a phone and earbuds, and sharper in a therapist's hands.</p>
+          </div>
+        </div>
+
+        <div class="grounding-why">
+          <p class="why-q">Why?</p>
+          <p class="why-a">We gain trust and new customers by <span class="key">serving a genuine need</span>. Music therapy is burgeoning, <span class="key">a quality long-term investment</span> that we can both modernize and make accessible to more people.</p>
+        </div>
+      </div>
+
+      <div class="meta meta-bottom">
+        <span>internal · merry electronics</span>
+        <span>01 / 04</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ PAGE 2 — A BIO-ADAPTIVE METRONOME ═══════════════ -->
+  <div class="page" data-calm>
+    <div class="content">
+      <div class="meta meta-top">
+        <span>a bio-adaptive metronome</span>
+        <span>02 / 04</span>
+      </div>
+
+      <div class="metronome-hero">
+        <h2 class="page-title">A Bio-Adaptive Metronome</h2>
+
+        <svg class="metronome" viewBox="0 0 300 330" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <clipPath id="mtr-eeg-win"><rect x="40" y="289" width="220" height="22" /></clipPath>
+          </defs>
+          <!-- brainwave the metronome stands on: an EEG trace as the baseline -->
+          <g clip-path="url(#mtr-eeg-win)">
+            <path class="mtr-eeg" d="M 0 300 L 8 297 L 16 304 L 26 295 L 36 302 L 46 298 L 56 305 L 66 296 L 76 302 L 86 298 L 100 300 L 108 297 L 116 304 L 126 295 L 136 302 L 146 298 L 156 305 L 166 296 L 176 302 L 186 298 L 200 300 L 208 297 L 216 304 L 226 295 L 236 302 L 246 298 L 256 305 L 266 296 L 276 302 L 286 298 L 300 300 L 308 297 L 316 304 L 326 295 L 336 302 L 346 298 L 356 305 L 360 296" />
+          </g>
+          <!-- metronome body: an open A-frame standing on the brainwave -->
+          <path class="mtr-body" d="M 72 300 L 126 74 L 174 74 L 228 300" />
+          <!-- tempo slot + scale ticks -->
+          <line class="mtr-slot" x1="150" y1="286" x2="150" y2="92" />
+          <line class="mtr-tick" x1="141" y1="122" x2="159" y2="122" />
+          <line class="mtr-tick" x1="141" y1="154" x2="159" y2="154" />
+          <line class="mtr-tick" x1="141" y1="186" x2="159" y2="186" />
+          <line class="mtr-tick" x1="141" y1="218" x2="159" y2="218" />
+          <line class="mtr-tick" x1="141" y1="250" x2="159" y2="250" />
+          <!-- swinging pendulum: rod + a heart as the weight (the pulse) -->
+          <g class="mtr-pendulum">
+            <line class="mtr-rod" x1="150" y1="286" x2="150" y2="55" />
+            <path class="mtr-heart" d="M 150 168 C 140 159 130 153 130 145 C 130 140 134 137 138 137 C 143 137 148 140 150 144 C 152 140 157 137 162 137 C 166 137 170 140 170 145 C 170 153 160 159 150 168 Z" />
+          </g>
+          <circle class="mtr-pivot" cx="150" cy="286" r="3.5" />
+        </svg>
+      </div>
+
+      <p class="mtr-thesis inky" data-text="The metronome is an essential tool used by every music therapist. We can help people keep better time by making a metronome that listens.">The metronome is an essential tool used by every music therapist.
+        We can help people keep better time by making <span class="key">a metronome that listens.</span></p>
+
+      <div class="mtr-steps">
+        <div class="mtr-step">
+          <div class="mtr-step-hd">
+            <span class="mtr-step-num">01</span>
+            <span class="mtr-step-label">It listens</span>
+          </div>
+          <p>Therapists rely on a metronome for a steady beat, but they use it as a reference and do
+            most of the work <span class="key">by ear</span>, adjusting the tempo to the patient in
+            real time. Our hardware closes the gap between an outdated tool and what the work actually
+            needs.</p>
+        </div>
+        <div class="mtr-step">
+          <div class="mtr-step-hd">
+            <span class="mtr-step-num">02</span>
+            <span class="mtr-step-label">It measures</span>
+          </div>
+          <p>Using Merry's hardware, it senses the patient in real time: heart rate, step rate,
+            speech cadence, and EEG-derived state. That is the read a therapist makes
+            <span class="key">by feel</span>, now captured as signal (RTD).</p>
+        </div>
+        <div class="mtr-step">
+          <div class="mtr-step-hd">
+            <span class="mtr-step-num">03</span>
+            <span class="mtr-step-label">It defines</span>
+          </div>
+          <p>The therapist's judgment becomes an <span class="key">objective, repeatable measure</span>.
+            The results come back clear and defined, with our hardware right in the middle of it.</p>
+        </div>
+      </div>
+
+      <div class="mtr-gap">
+        <div class="mtr-gap-head">how we can help</div>
+        <p class="mtr-gap-lede">Music therapy is growing across many markets, and we have a rare
+          chance to help shape it early. Here is where we come in.</p>
+        <p class="mtr-gap-resolve">Without measurable results there is no billing code, no clear
+          provider status, and the field leans on philanthropy to survive. Our hardware gives the
+          field <strong>its first objective, per-session measure</strong>, and measurement is what a
+          billing code is built on. That is the path from unpaid work to a reimbursable service, and a
+          market that does not exist yet.</p>
+
+        <div class="mtr-fact">
+          <p><span class="code">97530</span>. Today a therapist bills under a borrowed code, a
+            generic "therapeutic activities" line, because music therapy has none of its own. A
+            defined, measurable service is how the field earns a code that fits, and an earned code is
+            a direct line to reimbursement. <strong>The absence is the opportunity.</strong></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="meta meta-bottom">
+      <span>thomas meier · Hua-Yen · 2026</span>
+      <span>merry · nmt</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════ PAGE 3 — THE WELLNESS TIER ═══════════════ -->
+  <div class="page">
+    <div class="content">
+      <div class="meta meta-top">
+        <span>the wellness tier</span>
+        <span>03 / 04</span>
+      </div>
+
+      <div class="tier-head">
+        <h2 class="page-title">If it works for real music therapists, it works for you too.</h2>
+        <p class="page-subtitle">A wellness tool, available to everyone.</p>
+      </div>
+
+      <div class="mtr-steps tier-steps">
+        <div class="mtr-step">
+          <div class="mtr-step-hd">
+            <span class="mtr-step-num">01</span>
+            <span class="mtr-step-label">For the therapist</span>
+          </div>
+          <p>It never replaces them. It <span class="key">sharpens their work</span> and gives them
+            results they can show.</p>
+        </div>
+        <div class="mtr-step">
+          <div class="mtr-step-hd">
+            <span class="mtr-step-num">02</span>
+            <span class="mtr-step-label">For the patient</span>
+          </div>
+          <p>Care reaches <span class="key">past the clinic</span>. What worked in the room keeps
+            working at home, and opens the door to teletherapy.</p>
+        </div>
+        <div class="mtr-step">
+          <div class="mtr-step-hd">
+            <span class="mtr-step-num">03</span>
+            <span class="mtr-step-label">For everyone else</span>
+          </div>
+          <p>It introduces people to music therapy who would never have found it, and brings them
+            <span class="key">back the other way</span>, into the practice, and into a product they
+            keep.</p>
+        </div>
+      </div>
+
+      <div class="tier-winwin">
+        <div class="tier-winwin-head">win - win - win</div>
+        <p class="inky" data-text="We help music therapy grow, put our hardware in the hands of people who need it, and deliver the wellness of music therapy directly to the consumer.">We help <span class="key">music therapy grow</span>, put our hardware in the hands of people
+          who need it, and deliver <span class="key">the wellness of music therapy</span> directly to
+          the consumer.</p>
+      </div>
+
+      <div class="tier-posture">
+        <div class="tier-posture-head">clearly</div>
+        <p><strong>A wellness tool, not a medical device.</strong> It supports care and extends it. It
+          never diagnoses or treats. That is exactly what keeps it in everyone's hands.</p>
+      </div>
+    </div>
+
+    <div class="meta meta-bottom">
+      <span>thomas meier · Hua-Yen · 2026</span>
+      <span>merry · wellness</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════ PAGE 4 — THE CLOSE / THE ASK ═══════════════ -->
+  <div class="page">
+    <div class="content">
+      <div class="meta meta-top">
+        <span>how it gets done</span>
+        <span>04 / 04</span>
+      </div>
+
+      <div class="tier-head">
+        <h2 class="page-title">How it gets Done.</h2>
+        <p class="page-subtitle">Here's how the work reaches the people who need it, and who does what.</p>
+      </div>
+
+      <div class="build-steps">
+        <div class="build-step">
+          <div class="build-step-hd">
+            <span class="build-step-num">01</span>
+            <span class="build-step-label">Tuning the instrument</span>
+          </div>
+          <p>Merry's hardware, Peter's direction, Bream's design, my methods. Careful sound
+            design throughout. We build it together by <span class="key">listening to one
+            another.</span></p>
+        </div>
+        <div class="build-step">
+          <div class="build-step-hd">
+            <span class="build-step-num">02</span>
+            <span class="build-step-label">Seeking feedback</span>
+          </div>
+          <p>We build trust through <span class="key">real relationships</span>, like the one I've
+            made with my local clinic through volunteering and observation. This would be a good place
+            to start.</p>
+        </div>
+        <div class="build-step">
+          <div class="build-step-hd">
+            <span class="build-step-num">03</span>
+            <span class="build-step-label">Finishing what we start <span class="build-step-sub">· the resolution</span></span>
+          </div>
+          <p>This is where we go clinic to clinic, in person, demonstrating the product and
+            documenting the results. I want to be the one who takes it <span class="key">directly to
+            the people who need it.</span> I have the sales and performance experience to do it.</p>
+        </div>
+      </div>
+
+      <p class="build-close inky" data-text="The team makes it real, I help build it and carry it home, and the results speak for themselves. This is how we deliver excellent sound where it can do the most good, and help more people be heard.">The team makes it real, I help build it and carry it home, and the
+        results speak for themselves. This is how we deliver excellent sound where it can do the most
+        good,<br><span class="key">and help more people be heard.</span></p>
+    </div>
+
+    <div class="meta meta-bottom">
+      <span>thomas meier · Hua-Yen · 2026</span>
+      <span>merry · delivery</span>
+    </div>
+  </div>
+
+  <script>
+    // ── Living background, ported from the résumé ─────────────────────────
+    // Each .page sheet gets its own grid + ripples + dual roaming spotlights.
+    // The grid and ripples are drawn behind a luminance mask made of two
+    // moving radial gradients (the "spotlights"), so geometry is only visible
+    // where a spotlight currently falls. Faithful to the résumé; adapted to
+    // the warm-paper palette and generalized to run once per sheet.
+    (function () {
+      const svgNS = 'http://www.w3.org/2000/svg';
+      const W = 816, H = 1056, SPACING = 32;
+      const PHI = 1.6180339887;
+
+      const RIPPLE_COUNT   = 6;
+      const RIPPLE_LIFE    = 30;          // glacial — a full unfurl takes half a minute
+      const RIPPLE_MAX_RX  = 240;
+      const RIPPLE_ASPECT  = 0.55;
+      const SWEEP_FRACTION = 0.78;
+      const ANGLE_SNAP     = Math.PI / 4; // 45° quantization aligns spines with grid axes
+      const SAMPLE_COUNT   = 10;
+      const SNAP_RANGE     = SPACING * 0.5;
+      const START_DELAY    = 1200;
+
+      // Spotlight A — Lissajous with incommensurable frequencies
+      const A = { bx: 408, by: 525, ax: 300, ay: 400, fx: 0.029,  fy: 0.0205, ph: 1.2 };
+      // Spotlight B — different center bias, frequencies, phase → never syncs with A
+      const B = { bx: 408, by: 540, ax: 280, ay: 380, fx: 0.023,  fy: 0.031,  ph: 2.7 };
+
+      function initLivingGrid(page, idx) {
+        const gradA = 'spot-a-' + idx, gradB = 'spot-b-' + idx, maskId = 'spot-mask-' + idx;
+
+        // insertAdjacentHTML on the (HTML) .page parses the <svg> in foreign-content
+        // mode, so camelCase SVG attributes (gradientUnits, viewBox…) survive intact.
+        page.insertAdjacentHTML('afterbegin',
+          '<svg class="geometry-bg" viewBox="0 0 ' + W + ' ' + H + '" ' +
+              'preserveAspectRatio="xMidYMid slice" aria-hidden="true">' +
+            '<defs>' +
+              '<radialGradient id="' + gradA + '" gradientUnits="userSpaceOnUse" cx="408" cy="528" r="220">' +
+                '<stop offset="0%" stop-color="white" stop-opacity="1"/>' +
+                '<stop offset="55%" stop-color="white" stop-opacity="0.75"/>' +
+                '<stop offset="100%" stop-color="white" stop-opacity="0"/>' +
+              '</radialGradient>' +
+              '<radialGradient id="' + gradB + '" gradientUnits="userSpaceOnUse" cx="200" cy="300" r="180">' +
+                '<stop offset="0%" stop-color="white" stop-opacity="1"/>' +
+                '<stop offset="55%" stop-color="white" stop-opacity="0.75"/>' +
+                '<stop offset="100%" stop-color="white" stop-opacity="0"/>' +
+              '</radialGradient>' +
+              '<mask id="' + maskId + '" maskUnits="userSpaceOnUse" x="0" y="0" width="' + W + '" height="' + H + '">' +
+                '<rect width="' + W + '" height="' + H + '" fill="url(#' + gradA + ')"/>' +
+                '<rect width="' + W + '" height="' + H + '" fill="url(#' + gradB + ')"/>' +
+              '</mask>' +
+            '</defs>' +
+            '<g mask="url(#' + maskId + ')">' +
+              '<g class="grid-group"></g>' +
+              '<g class="ripples-group"></g>' +
+            '</g>' +
+          '</svg>');
+
+        const gridGroup    = page.querySelector('.geometry-bg .grid-group');
+        const ripplesGroup = page.querySelector('.geometry-bg .ripples-group');
+        const spotA = page.querySelector('#' + gradA);
+        const spotB = page.querySelector('#' + gradB);
+
+        // Grid — subtle organic opacity variation per line
+        for (let x = SPACING; x < W; x += SPACING) appendLine(x, 0, x, H);
+        for (let y = SPACING; y < H; y += SPACING) appendLine(0, y, W, y);
+        function appendLine(x1, y1, x2, y2) {
+          const l = document.createElementNS(svgNS, 'line');
+          l.setAttribute('x1', x1); l.setAttribute('y1', y1);
+          l.setAttribute('x2', x2); l.setAttribute('y2', y2);
+          l.setAttribute('class', 'grid-line');
+          l.style.opacity = 0.4 + Math.random() * 0.25;
+          gridGroup.appendChild(l);
+        }
+
+        // Ripples — skipped on calm (hook) pages so nothing crosses the hero text.
+        const ripples = [], births = [], startAngles = [], offsets = [], lastAges = [];
+        const N = page.hasAttribute('data-calm') ? 0 : RIPPLE_COUNT;
+        for (let i = 0; i < N; i++) {
+          const p = document.createElementNS(svgNS, 'path');
+          p.setAttribute('class', 'ripple-anim');
+          ripplesGroup.appendChild(p);
+          ripples.push(p);
+          births.push({ x: 408, y: 528 });
+          startAngles.push((i / RIPPLE_COUNT) * 2 * Math.PI);
+          offsets.push((i * RIPPLE_LIFE / PHI) % RIPPLE_LIFE);  // golden-ratio aperiodic phasing
+          lastAges.push(0);
+        }
+
+        // Per-sheet seed desyncs the four pages so they never move in lockstep
+        const SEED = idx * 4.2;
+        let startTime = null;
+
+        function tick(ts) {
+          if (startTime === null) startTime = ts;
+          const t = (ts - startTime) / 1000 + SEED;
+
+          const cx  = A.bx + A.ax * Math.sin(t * A.fx * 2 * Math.PI);
+          const cy  = A.by + A.ay * Math.sin(t * A.fy * 2 * Math.PI + A.ph);
+          const cx2 = B.bx + B.ax * Math.sin(t * B.fx * 2 * Math.PI);
+          const cy2 = B.by + B.ay * Math.sin(t * B.fy * 2 * Math.PI + B.ph);
+          spotA.setAttribute('cx', cx); spotA.setAttribute('cy', cy);
+          spotB.setAttribute('cx', cx2); spotB.setAttribute('cy', cy2);
+
+          let totalEnergy = 0;
+          for (let i = 0; i < ripples.length; i++) {
+            const age = (t + offsets[i]) % RIPPLE_LIFE;
+            const progress = age / RIPPLE_LIFE;
+
+            if (age < lastAges[i]) {                 // respawn — born at a spotlight
+              if (i % 2 === 0) { births[i].x = cx;  births[i].y = cy;  }
+              else             { births[i].x = cx2; births[i].y = cy2; }
+            }
+            lastAges[i] = age;
+
+            const birth = births[i];
+            const rx = 8 + progress * RIPPLE_MAX_RX;
+            const ry = rx * RIPPLE_ASPECT;
+            const spineAngle = Math.round(startAngles[i] / ANGLE_SNAP) * ANGLE_SNAP;
+            const halfSweep = progress * (Math.PI * 2 * SWEEP_FRACTION) / 2;
+            const startAngle = spineAngle - halfSweep;
+            const endAngle   = spineAngle + halfSweep;
+
+            const anchors = [];
+            for (let s = 0; s <= SAMPLE_COUNT; s++) {
+              const a = startAngle + (endAngle - startAngle) * (s / SAMPLE_COUNT);
+              const rawX = birth.x + rx * Math.cos(a);
+              const rawY = birth.y + ry * Math.sin(a);
+              const gridX = Math.round(rawX / SPACING) * SPACING;
+              const gridY = Math.round(rawY / SPACING) * SPACING;
+              const dx = rawX - gridX, dy = rawY - gridY;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              let pull = 0;
+              if (dist < SNAP_RANGE) { const tt = 1 - dist / SNAP_RANGE; pull = tt * tt * (3 - 2 * tt); }
+              anchors.push({ x: rawX + (gridX - rawX) * pull, y: rawY + (gridY - rawY) * pull });
+            }
+
+            let d = 'M ' + anchors[0].x.toFixed(2) + ' ' + anchors[0].y.toFixed(2);
+            for (let k = 1; k < anchors.length - 1; k++) {
+              const c = anchors[k], n = anchors[k + 1];
+              d += ' Q ' + c.x.toFixed(2) + ' ' + c.y.toFixed(2) + ' ' +
+                   ((c.x + n.x) / 2).toFixed(2) + ' ' + ((c.y + n.y) / 2).toFixed(2);
+            }
+            const lc = anchors[anchors.length - 2], fp = anchors[anchors.length - 1];
+            d += ' Q ' + lc.x.toFixed(2) + ' ' + lc.y.toFixed(2) + ' ' + fp.x.toFixed(2) + ' ' + fp.y.toFixed(2);
+            ripples[i].setAttribute('d', d);
+            ripples[i].style.opacity = Math.sin(progress * Math.PI) * 0.95;
+            totalEnergy += Math.sin(progress * Math.PI);
+          }
+
+          const avg = ripples.length ? totalEnergy / ripples.length : 0;
+          spotA.setAttribute('r', 200 + avg * 60);
+          spotB.setAttribute('r', 165 + avg * 50);
+          requestAnimationFrame(tick);
+        }
+
+        setTimeout(() => requestAnimationFrame(tick), START_DELAY);
+      }
+
+      document.querySelectorAll('.page').forEach(initLivingGrid);
+
+      // ── Grid-magnetized ellipse — the résumé's soft-snap, applied to the
+      // hero diagram. Sample the ellipse, pull each point toward the nearest
+      // grid intersection (smoothstep within SNAP_RANGE), then draw a smooth
+      // closed curve through the snapped points. The ellipse locks onto the
+      // graph paper instead of floating over it. ──
+      function magnetizedEllipsePath(cx, cy, rx, ry, samples) {
+        const pts = [];
+        for (let s = 0; s < samples; s++) {
+          const a = (s / samples) * 2 * Math.PI;
+          const rawX = cx + rx * Math.cos(a);
+          const rawY = cy + ry * Math.sin(a);
+          const gx = Math.round(rawX / SPACING) * SPACING;
+          const gy = Math.round(rawY / SPACING) * SPACING;
+          const dist = Math.hypot(rawX - gx, rawY - gy);
+          let pull = 0;
+          if (dist < SNAP_RANGE) { const t = 1 - dist / SNAP_RANGE; pull = t * t * (3 - 2 * t); }
+          pts.push({ x: rawX + (gx - rawX) * pull, y: rawY + (gy - rawY) * pull });
+        }
+        // Closed smooth path: quadratic Beziers through midpoints, control
+        // points on the snapped samples — same construction as the ripples.
+        const n = pts.length;
+        let d = 'M ' + ((pts[n - 1].x + pts[0].x) / 2).toFixed(2) + ' ' +
+                       ((pts[n - 1].y + pts[0].y) / 2).toFixed(2);
+        for (let i = 0; i < n; i++) {
+          const c = pts[i], nx = pts[(i + 1) % n];
+          d += ' Q ' + c.x.toFixed(2) + ' ' + c.y.toFixed(2) + ' ' +
+               ((c.x + nx.x) / 2).toFixed(2) + ' ' + ((c.y + nx.y) / 2).toFixed(2);
+        }
+        return d + ' Z';
+      }
+
+      // ── Ink boil driver — original 7.5Hz ("on fours") cadence ────────────
+      // Re-seed the turbulence 7.5×/sec: each seed is a fresh warp pose, so the
+      // beneath-text ink redraws frame to frame like hand-inked animation. Now
+      // that it's a soft layer under crisp type, the fast redraw reads as
+      // living ink rather than the strobe it was on the visible text. Held
+      // still for anyone who prefers reduced motion.
+      (function () {
+        const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const turb = document.querySelector('#ink-boil feTurbulence');
+        if (reduce || !turb) return;
+        const seeds = [1, 2, 3, 4, 5, 6, 7, 8];
+        let i = 0;
+        setInterval(() => { i = (i + 1) % seeds.length; turb.setAttribute('seed', seeds[i]); }, 1000 / 7.5);
+      })();
+
+      document.querySelectorAll('.hero-diagram').forEach((svg) => {
+        const cx = +svg.dataset.heroCx, cy = +svg.dataset.heroCy;
+        const rx = +svg.dataset.heroRx, ry = +svg.dataset.heroRy;
+        const primary = svg.querySelector('.hero-ellipse-primary');
+        const ghost   = svg.querySelector('.hero-ellipse-ghost');
+        if (primary) primary.setAttribute('d', magnetizedEllipsePath(cx, cy, rx, ry, 72));
+        if (ghost)   ghost.setAttribute('d',   magnetizedEllipsePath(cx, cy, rx + 60, ry + 30, 80));
+      });
+    })();
+  </script>
+
+</body>
+</html>
