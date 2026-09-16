@@ -42,7 +42,7 @@
             background: #111;
             display: flex; align-items: center; justify-content: center;
             font-size: 48px;
-            background-image: url('./assets/images/covers/TOWO ALBUM COVER.jpg');
+            background-image: url('./assets/images/web/towo-cover.webp');
             background-position: center;
             border-radius: 4px;
             overflow: hidden;
@@ -57,7 +57,7 @@
             position: absolute;
             top: -60%; left: -60%;
             width: 220%; height: 220%;
-            background-image: url('./assets/images/covers/TOWO ALBUM COVER.jpg');
+            background-image: url('./assets/images/web/towo-cover.webp');
             background-size: cover;
             background-position: center;
             z-index: 1;
@@ -208,7 +208,7 @@
            blood drip so the billboard's backsplash can occlude the line. */
         .title-slot {
             position: relative;
-            height: 35px;
+            height: 60px;
             margin-bottom: 25px;
             z-index: 5;
         }
@@ -321,6 +321,16 @@
         }
 
         /* Billboard — "currently releasing" marquee overlaid on the title slot */
+        .billboard-hand {
+            position: absolute;
+            top: 0; bottom: 0; left: 0; right: 0;
+            margin: auto;
+            width: 100%; max-width: 320px; height: 100%;
+            object-fit: contain;
+            display: block;
+            pointer-events: none;
+        }
+
         .billboard {
             position: absolute;
             inset: 0;
@@ -475,6 +485,28 @@
             display: flex; flex-direction: column; gap: 8px;
             max-width: 320px; margin: 0 auto;
         }
+        /* Streaming above, social below. A breath rather than a heading: the split
+           is felt without adding another line of type to a page that is mostly type. */
+        .link-item.social-start { margin-top: 18px; }
+        /* quiet enough to read as an instruction rather than a heading */
+        .link-label {
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.34);
+            text-align: center;
+            padding-bottom: 2px;
+            opacity: 0;
+            transform: translateY(12px);
+            transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+        }
+        .link-label.follow { margin-top: 18px; }
+        .link-label.reveal { opacity: 1; transform: none; }
+        /* Tucked, not deleted — tapping the name brings them back. */
+        .link-item.tucked { display: none; }
+        .link-item.tucked.found { display: flex; }
+        .profile-name { cursor: default; }
         .link-item {
             background: rgba(255,255,255,0.03);
             border: 1px solid #333;
@@ -767,6 +799,7 @@
         /* Below BeReal (alternating B / T / B / T) */
         .link-item.instagram .lyric-whisper { right: 50px; bottom: 13px; text-align: right; }  /* text-left link  -> whisper RB */
         .link-item.youtube .lyric-whisper   { left:  50px; top:    13px; text-align: left;  }  /* text-right link -> whisper LT */
+        .link-item.tiktok .lyric-whisper    { left:  50px; bottom: 13px; text-align: left;  }  /* text-right link -> whisper LB */
         .link-item.facebook .lyric-whisper  { right: 50px; bottom: 13px; text-align: right; }  /* text-left link  -> whisper RB */
         .link-item.x-social .lyric-whisper  { left:  50px; top:    13px; text-align: left;  }  /* text-right link -> whisper LT */
 
@@ -848,36 +881,13 @@
             100% { opacity: 0; transform: translateY(-3px); filter: blur(1.8px); }
         }
 
+        /* Harmonic space. Not decoration — the tuning lattice from "Chords You
+           Haven't Heard Before", drawn to a single canvas rather than a few hundred
+           positioned divs. */
         .background-lattice {
             position: fixed; top: 0; left: 0;
             width: 100vw; height: 100vh;
-            pointer-events: none; z-index: 1; opacity: 0.3;
-        }
-        .lattice-node {
-            position: absolute;
-            background: radial-gradient(circle,rgba(255,255,255,0.8) 0%,rgba(255,255,255,0.5) 30%,rgba(255,255,255,0.1) 70%,rgba(255,255,255,0) 100%);
-            border-radius: 50%; width: 3px; height: 3px;
-            box-shadow: 0 0 4px rgba(255,255,255,0.3);
-            animation: nodePulse 30s ease-in-out infinite;
-        }
-        @keyframes nodePulse {
-            0%,100%{opacity:0;transform:scale(0.3);}
-            25%{opacity:0.6;transform:scale(1);}
-            50%{opacity:0.8;transform:scale(1.2);}
-            75%{opacity:0.4;transform:scale(0.8);}
-        }
-        .lattice-connection {
-            position: absolute;
-            background: linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.2) 50%,rgba(255,255,255,0) 100%);
-            height: 1px; transform-origin: left center;
-            animation: connectionFlow 40s ease-in-out infinite;
-            box-shadow: 0 0 2px rgba(255,255,255,0.1);
-        }
-        @keyframes connectionFlow {
-            0%,100%{opacity:0;transform:scaleX(0);}
-            25%{opacity:0.3;transform:scaleX(0.6);}
-            50%{opacity:0.5;transform:scaleX(1);}
-            75%{opacity:0.2;transform:scaleX(0.4);}
+            pointer-events: none; z-index: 1; opacity: 0.85;
         }
         .footer {
             margin-top: 50px;
@@ -894,7 +904,7 @@
 
         /* Experiments — cool "research lab" section below the music links */
         .experiments-section {
-            margin: 55px auto 10px;
+            margin: 26px auto 10px;
             max-width: 420px;
             padding: 0 10px;
             opacity: 0;
@@ -1116,72 +1126,63 @@
                      burn-video transition between swaps. Order is intentional:
                      covers first, then behind-the-scenes shots. -->
                 <div class="viewport-slide" data-slide-label="sheik"
-                     style="background-image: url('./assets/images/covers/sheiks_theme_FINAL_9MB.jpg');"></div>
+                     style="background-image: url('./assets/images/web/sheiks-theme.webp');"></div>
                 <div class="viewport-slide" data-slide-label="towo-inst"
-                     style="background-image: url('./assets/images/covers/TOWO%5BINST%5D%20Cover.png');"></div>
+                     style="background-image: url('./assets/images/web/towo-inst-cover.webp');"></div>
                 <div class="viewport-slide" data-slide-label="tl1"
-                     style="background-image: url('./assets/images/behind-the-scenes/TL1.jpg');"></div>
+                     style="background-image: url('./assets/images/web/tl1.webp');"></div>
                 <div class="viewport-slide" data-slide-label="tl2"
-                     style="background-image: url('./assets/images/behind-the-scenes/TL2.jpg');"></div>
+                     style="background-image: url('./assets/images/web/tl2.webp');"></div>
                 <div class="viewport-slide" data-slide-label="tl3"
-                     style="background-image: url('./assets/images/behind-the-scenes/TL3.jpg');"></div>
+                     style="background-image: url('./assets/images/web/tl3.webp');"></div>
 
                 <!-- Burn animation plays as the visual transition between covers -->
                 <video class="viewport-transition" id="viewportBurn"
                        muted playsinline preload="auto">
-                    <source src="assets/video/transitions/TOWO_burn_animation.mp4" type="video/mp4">
+                    <source src="assets/video/web/towo-burn.mp4" type="video/mp4">
                 </video>
 
                 <!-- Sheik's Song promo — plays once as part of the opening sequence -->
                 <video class="viewport-feature" id="viewportSheikPromo"
                        muted playsinline preload="auto">
-                    <source src="assets/video/promo/SheiksSong-Promo.mp4" type="video/mp4">
+                    <source src="assets/video/web/sheiks-promo.mp4" type="video/mp4">
                 </video>
 
                 <!-- Occasional feature videos for lingering viewers — rotation cycles
                      through the full pool so repeat visitors see different content. -->
                 <video class="viewport-feature" id="viewportFeature"
                        muted playsinline preload="metadata">
-                    <source src="assets/video/promo/TOWO-Promo.mp4" type="video/mp4">
+                    <source src="assets/video/web/towo-promo.mp4" type="video/mp4">
                 </video>
                 <video class="viewport-feature" id="viewportFeatureCryptic"
                        muted playsinline preload="metadata">
-                    <source src="assets/video/promo/Cryptic-Cut.mp4" type="video/mp4">
+                    <source src="assets/video/web/cryptic-cut.mp4" type="video/mp4">
                 </video>
                 <video class="viewport-feature" id="viewportFeatureSheikV4"
                        muted playsinline preload="metadata">
-                    <source src="assets/video/promo/SheiksSong-Promo-v4.mp4" type="video/mp4">
+                    <source src="assets/video/web/sheiks-promo-v4.mp4" type="video/mp4">
                 </video>
                 <video class="viewport-feature" id="viewportFeatureSheikSquare"
                        muted playsinline preload="metadata">
-                    <source src="assets/video/promo/SheiksSong-Promo-Square.mp4" type="video/mp4">
+                    <source src="assets/video/web/sheiks-promo-square.mp4" type="video/mp4">
                 </video>
             </div>
             <h1 class="profile-name">Thomas LeRoy Meier</h1>
             <div class="blood-drip"></div>
             <div class="title-slot">
-                <div class="album-title">
-                    <span class="album-word">
-                        <span class="letter">T</span><span class="letter">h</span><span class="letter">e</span>
-                    </span>
-                    <span class="album-word">
-                        <span class="letter">O</span><span class="letter">n</span><span class="letter">l</span><span class="letter">y</span>
-                    </span>
-                    <span class="album-word">
-                        <span class="letter">W</span><span class="letter">a</span><span class="letter">y</span>
-                    </span>
-                    <span class="album-word crossed-out">
-                        <span class="letter">O</span><span class="letter">u</span><span class="letter">t</span>
-                    </span>
-                </div>
                 <div class="billboard" aria-live="polite" role="button" tabindex="0" aria-label="Jump to links">
-                    <span class="billboard-message flavor-sheik"     data-index="0">SHEIK'S SONG&emsp;STREAMING NOW</span>
-                    <span class="billboard-message flavor-towo-inst" data-index="1">TOWO INSTRUMENTALS&emsp;OUT NOW</span>
-                    <span class="billboard-message flavor-towo"      data-index="2">THE ONLY WAY OUT&emsp;DEBUT ALBUM</span>
+                    <!-- Handwriting, written in My Pen on the Banner canvas. It writes
+                         itself once and holds; the still is the poster, so the slot is
+                         never empty and a blocked or reduced-motion visitor gets the
+                         finished line rather than nothing. -->
+                    <video class="billboard-hand" id="handA" muted playsinline preload="none"></video>
+                    <video class="billboard-hand" id="handB" muted playsinline preload="none"></video>
                 </div>
             </div>
         </div>
         <div class="links-container">
+            <div class="link-label">LISTEN</div>
+
             <a href="https://open.spotify.com/artist/3gw9hVeKJNOdl1gm26URuY" class="link-item spotify left" target="_blank" style="padding-left: 28px;">
                 <span>SPOTIFY</span>
                 <div class="lyric-whisper"></div>
@@ -1200,20 +1201,12 @@
                 <div class="link-constellation"></div>
             </a>
 
-            <a href="https://buy.stripe.com/eVq6oHfPPblCcCOdtYcbC02" class="link-item physical-copy" target="_blank">
-                <span>Physical Handmade Copy (TOWO)</span>
-            </a>
+            <div class="link-label follow">FOLLOW</div>
 
             <a href="http://bere.al/heliotropic" class="link-item bereal center" target="_blank" style="letter-spacing: 9px; padding-left: 28px;">
                 <span>BeReal</span>
                 <div class="lyric-whisper bereal-left"></div>
                 <div class="lyric-whisper bereal-right"></div>
-                <div class="link-constellation"></div>
-            </a>
-
-            <a href="https://www.instagram.com/tlmeier" class="link-item instagram left" target="_blank" style="padding-right: 28px;">
-                <span>INSTAGRAM</span>
-                <div class="lyric-whisper"></div>
                 <div class="link-constellation"></div>
             </a>
 
@@ -1223,13 +1216,25 @@
                 <div class="link-constellation"></div>
             </a>
 
-            <a href="https://www.facebook.com/tlmeier/" class="link-item facebook left" target="_blank" style="padding-right: 28px;">
+            <a href="https://www.instagram.com/tlmeier" class="link-item instagram left" target="_blank" style="padding-right: 28px;">
+                <span>INSTAGRAM</span>
+                <div class="lyric-whisper"></div>
+                <div class="link-constellation"></div>
+            </a>
+
+            <a href="https://www.tiktok.com/@tlmeier" class="link-item tiktok right" target="_blank" style="padding-left: 28px;">
+                <span>TIKTOK</span>
+                <div class="lyric-whisper"></div>
+                <div class="link-constellation"></div>
+            </a>
+
+            <a href="https://www.facebook.com/tlmeier/" class="link-item facebook tucked left" target="_blank" style="padding-right: 28px;">
                 <span>FACEBOOK</span>
                 <div class="lyric-whisper"></div>
                 <div class="link-constellation"></div>
             </a>
 
-            <a href="https://x.com/ISeeYouInMyEye" class="link-item x-social right" target="_blank" style="padding-left: 28px;">
+            <a href="https://x.com/ISeeYouInMyEye" class="link-item x-social tucked right" target="_blank" style="padding-left: 28px;">
                 <span>X</span>
                 <div class="lyric-whisper"></div>
                 <div class="link-constellation"></div>
@@ -1237,16 +1242,8 @@
         </div>
         
         <section class="experiments-section">
-            <h2 class="experiments-title">Experiments</h2>
+            <h2 class="experiments-title">Resources</h2>
             <div class="experiment-list">
-                <a href="./HarmonicPolarity/" class="experiment-item">
-                    <span class="exp-name">Harmonic Polarity</span>
-                    <span class="exp-desc">original equation for determining otonal vs. utonal origin of a ratio</span>
-                </a>
-                <a href="./MetabolicHarmony/" class="experiment-item">
-                    <span class="exp-name">Metabolic Harmony</span>
-                    <span class="exp-desc">gut microbiome sonification</span>
-                </a>
                 <a href="./Tuner/" class="experiment-item">
                     <span class="exp-name">JI Pitch Ruler</span>
                     <span class="exp-desc">xenharmonic tuner</span>
@@ -1254,6 +1251,14 @@
                 <a href="./seeg-sonification/" class="experiment-item">
                     <span class="exp-name">sEEG Sonification Toolkit</span>
                     <span class="exp-desc">translating brain electrode signals into sound</span>
+                </a>
+                <a href="./HarmonicPolarity/" class="experiment-item">
+                    <span class="exp-name">Harmonic Polarity</span>
+                    <span class="exp-desc">original equation for determining otonal vs. utonal origin of a ratio</span>
+                </a>
+                <a href="./MetabolicHarmony/" class="experiment-item">
+                    <span class="exp-name">Metabolic Harmony</span>
+                    <span class="exp-desc">gut microbiome sonification</span>
                 </a>
             </div>
         </section>
@@ -1266,7 +1271,7 @@
         
         <div class="background-cover"></div>
         <div class="spotlight-mask" id="spotlight"></div>
-        <div class="background-lattice" id="backgroundLattice"></div>
+        <canvas class="background-lattice" id="backgroundLattice" aria-hidden="true"></canvas>
     </div>
 
     <!-- Mobile-only scroll affordance: fades in after intro, dismisses on first scroll -->
@@ -1283,73 +1288,142 @@ let isDucking = false;
 
 const fundamental = 123.47; // B2 drone
 
-function createCloudTone(frequency, baseGain, breathRate, breathDepth, fadeInTime, sustainTime, fadeOutTime, startDelay) {
-    const ct = audioContext.currentTime;
-    
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
+// ── THE BRIDGE OF "PEACE OF MIND", IN TUNE ───────────────────────
+// These are the chords from the reel, not an approximation of them:
+// thirteen groups of just ratios over the B2 fundamental, running up
+// through the 13-limit. They play in order, one chord at a time and
+// slow enough to sit under everything else, and every voice lights its
+// own node in the lattice behind the page as it comes in.
+//
+// Voicing is the one liberty taken. Each ratio is octave-reduced and
+// then alternate voices are lifted an octave, because seven pitches
+// inside one octave at this density turn to mud on a phone speaker.
+const POM_CHORDS = [
+    [[21,16],[7,4],[13,8],[16,11],[9,8],[11,12],[3,2]],
+    [[11,9],[7,4],[13,9],[11,8],[13,11],[11,12],[13,10]],
+    [[8,7],[11,6],[14,9],[16,11],[11,9],[33,32],[11,9]],
+    [[11,8],[11,5],[11,6],[11,7],[13,10],[64,33],[21,20]],
+    [[33,32],[13,11]],
+    [[16,11],[7,6],[11,6],[3,2],[5,4],[7,4]],
+    [[16,11],[8,7],[11,6],[11,7],[4,3],[5,3]],
+    [[11,6],[11,8],[22,21],[5,3],[4,3],[13,8]],
+    [[99,50],[11,8],[33,32],[7,4],[4,3],[11,7]],
+    [[3,2]],
+    [[1,1],[4,3],[21,20],[16,11],[11,8],[15,8],[3,2]],
+    [[1,1],[11,8],[8,5],[3,2],[4,3],[8,7],[16,11]],
+    [[5,4],[7,4],[3,2],[1,1],[1,1]]
+];
+// the pad: warm, low, and slow enough that you never catch it arriving
+// the pad: low and warm. A triangle has just enough harmonic above the fundamental
+// to sound like an instrument rather than a test tone, and the filter takes the top
+// off it again so what is left is body.
+const POM_PAD_GAIN = 0.075, POM_PAD_RISE = 7, POM_PAD_FALL = 15;
+// the glimmers: four octaves up, brief, quiet, well apart
+// the glimmers: barely there. Long enough in and out that they never ping — they
+// arrive the way a star comes out, which is to say you do not catch it happening.
+const POM_GLIM_GAIN = 0.026, POM_GLIM_RISE = 3, POM_GLIM_FALL = 12, POM_GLIM_GAP = 3.4;
+// how much every voice sways, as a fraction of its own level
+const POM_SWAY = 0.22;
+let pomIdx = 0;
+
+// One voice of the chord, as a sine with a little slow drift so nothing sits
+// perfectly still. Returns when it ends.
+function pomVoice(freq, at, peak, rise, fall, drift, type, dest) {
+    const osc = audioContext.createOscillator();
+    const g = audioContext.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, at);
+
     const lfo = audioContext.createOscillator();
-    const lfoGain = audioContext.createGain();
-    
+    const lg = audioContext.createGain();
     lfo.type = 'sine';
-    lfo.frequency.setValueAtTime(breathRate, ct);
-    lfoGain.gain.setValueAtTime(baseGain * breathDepth, ct);
-    
-    lfo.connect(lfoGain);
-    lfoGain.connect(gainNode.gain);
-    oscillator.connect(gainNode);
-    gainNode.connect(masterGain);
-    
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(frequency, ct);
-    
-    gainNode.gain.setValueAtTime(0, ct + startDelay);
-    gainNode.gain.linearRampToValueAtTime(baseGain, ct + startDelay + fadeInTime);
-    gainNode.gain.setValueAtTime(baseGain, ct + startDelay + fadeInTime + sustainTime);
-    gainNode.gain.linearRampToValueAtTime(0, ct + startDelay + fadeInTime + sustainTime + fadeOutTime);
-    
-    oscillator.start(ct + startDelay);
-    lfo.start(ct + startDelay);
-    
-    const totalTime = startDelay + fadeInTime + sustainTime + fadeOutTime;
-    oscillator.stop(ct + totalTime + 1);
-    lfo.stop(ct + totalTime + 1);
-    
-    activeTones.push({ 
-        osc: oscillator, 
-        lfo: lfo,
-        endTime: ct + totalTime
-    });
-    
-    return totalTime;
+    lfo.frequency.setValueAtTime(drift, at);
+    lg.gain.setValueAtTime(freq * 0.0007, at);
+    lfo.connect(lg); lg.connect(osc.frequency);
+
+    // Sway. A slow sine added onto the scheduled envelope, on its own rate per
+    // voice, so the whole thing breathes without any two voices breathing together.
+    const sway = audioContext.createOscillator();
+    const sg = audioContext.createGain();
+    sway.type = 'sine';
+    sway.frequency.setValueAtTime(0.028 + drift * 0.25, at);
+    sg.gain.setValueAtTime(peak * POM_SWAY, at);
+    sway.connect(sg); sg.connect(g.gain);
+
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.linearRampToValueAtTime(peak, at + rise);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + rise + fall);
+
+    osc.connect(g); g.connect(dest || masterGain);
+    const end = at + rise + fall;
+    osc.start(at); lfo.start(at); sway.start(at);
+    osc.stop(end + 0.3); lfo.stop(end + 0.3); sway.stop(end + 0.3);
+    activeTones.push({ osc: osc, lfo: lfo, endTime: end });
+    return end;
 }
 
-function createToneCycle(toneConfig) {
-    const { frequency, baseGain, breathRate, breathDepth, timing } = toneConfig;
-    
-    function scheduleTone() {
-        if (!audioInitialized) return;
-        
-        const fadeIn = timing.fadeIn + Math.random() * 5;
-        const sustain = timing.sustain + Math.random() * 10;
-        const fadeOut = timing.fadeOut + Math.random() * 5;
-        const pause = timing.pause + Math.random() * 15;
-        
-        const totalTime = createCloudTone(
-            frequency,
-            baseGain,
-            breathRate + (Math.random() - 0.5) * 0.02,
-            breathDepth,
-            fadeIn,
-            sustain,
-            fadeOut,
-            0
-        );
-        
-        setTimeout(() => scheduleTone(), (totalTime + pause) * 1000);
+// One gentle low-pass for every pad voice: the triangle gives it body, this takes
+// the glare back off. Built once, then reused.
+let pomWarmBus = null;
+function pomWarm() {
+    if (!pomWarmBus) {
+        pomWarmBus = audioContext.createBiquadFilter();
+        pomWarmBus.type = 'lowpass';
+        pomWarmBus.frequency.setValueAtTime(620, audioContext.currentTime);
+        pomWarmBus.Q.setValueAtTime(0.4, audioContext.currentTime);
+        pomWarmBus.connect(masterGain);
     }
-    
-    setTimeout(() => scheduleTone(), timing.initialDelay * 1000);
+    return pomWarmBus;
+}
+
+function pomPlayChord() {
+    if (!audioInitialized || !audioContext) return;
+    const ct = audioContext.currentTime;
+    activeTones = activeTones.filter(function (t) { return t.endTime > ct; });
+
+    const chord = POM_CHORDS[pomIdx % POM_CHORDS.length];
+    pomIdx++;
+
+    // Octave-reduce first, then sort, so "lowest" means lowest in pitch class and
+    // the split between the two layers is musical rather than whatever order the
+    // ratios happened to be written in.
+    const voices = chord.map(function (r) {
+        let v = r[0] / r[1];
+        while (v >= 2) v /= 2;
+        while (v < 1) v *= 2;
+        return { n: r[0], d: r[1], v: v };
+    }).sort(function (a, b) { return a.v - b.v; });
+
+    // THE PAD — the lowest few, warm and sustained. This is the floor of the thing:
+    // slow enough in and out that you never hear it start, low enough to sit under
+    // the page rather than in front of it.
+    const padN = Math.min(3, voices.length);
+    let last = 0;
+    for (let i = 0; i < padN; i++) {
+        const w = voices[i];
+        const end = pomVoice(fundamental * 2 * w.v, ct + i * 0.9,
+                             POM_PAD_GAIN / Math.sqrt(padN),
+                             POM_PAD_RISE, POM_PAD_FALL, 0.045 + i * 0.011,
+                             'triangle', pomWarm());
+        if (end > last) last = end;
+        setTimeout(function () { hsSound(w.n, w.d); }, (i * 0.9 + POM_PAD_RISE * 0.5) * 1000);
+    }
+
+    // THE GLIMMERS — everything above, four octaves up, arriving one at a time and
+    // falling away. Short, quiet and far apart: these are the lights coming on, and
+    // they are what the stars in the lattice are lit by.
+    for (let i = padN; i < voices.length; i++) {
+        const w = voices[i];
+        const at = ct + POM_PAD_RISE * 0.6 + (i - padN) * POM_GLIM_GAP;
+        const end = pomVoice(fundamental * 8 * w.v, at,
+                             POM_GLIM_GAIN, POM_GLIM_RISE, POM_GLIM_FALL,
+                             0.08 + i * 0.013);
+        if (end > last) last = end;
+        setTimeout(function () { hsSound(w.n, w.d); }, (at - ct + POM_GLIM_RISE) * 1000);
+    }
+
+    // the next chord rises under the tail of this one
+    setTimeout(pomPlayChord, Math.max(11000, (last - ct) * 0.52 * 1000));
 }
 
 function initAudioSystem() {
@@ -1359,7 +1433,7 @@ function initAudioSystem() {
     if (!audioInitialized) {
         masterGain = audioContext.createGain();
         masterGain.connect(audioContext.destination);
-        masterGain.gain.setValueAtTime(0.3, audioContext.currentTime);
+        masterGain.gain.setValueAtTime(0.42, audioContext.currentTime);
 
         // Create ethereal volume fluctuations for the drone
         const etherealLFO = audioContext.createOscillator();
@@ -1374,80 +1448,12 @@ function initAudioSystem() {
         
         etherealLFO.start(audioContext.currentTime);
 
-        createBreathingTone(fundamental, 0.08, 0.15, 0.3, 0);
+        createBreathingTone(fundamental, 0.032, 0.15, 0.3, 0);
 
-        createToneCycle({
-            frequency: fundamental * 3/2,
-            baseGain: 0.05,
-            breathRate: 0.13,
-            breathDepth: 0.25,
-            timing: {
-                fadeIn: 8,
-                sustain: 15,
-                fadeOut: 8,
-                pause: 10,
-                initialDelay: 5
-            }
-        });
-
-        createToneCycle({
-            frequency: fundamental * 5/4 * 4,
-            baseGain: 0.04,
-            breathRate: 0.14,
-            breathDepth: 0.2,
-            timing: {
-                fadeIn: 10,
-                sustain: 20,
-                fadeOut: 10,
-                pause: 15,
-                initialDelay: 8
-            }
-        });
-
-        createToneCycle({
-            frequency: fundamental * 15/8,
-            baseGain: 0.03,
-            breathRate: 0.17,
-            breathDepth: 0.2,
-            timing: {
-                fadeIn: 12,
-                sustain: 18,
-                fadeOut: 12,
-                pause: 20,
-                initialDelay: 15
-            }
-        });
-
-        createToneCycle({
-            frequency: fundamental * 7/5 * 2,
-            baseGain: 0.025,
-            breathRate: 0.11,
-            breathDepth: 0.15,
-            timing: {
-                fadeIn: 15,
-                sustain: 12,
-                fadeOut: 15,
-                pause: 25,
-                initialDelay: 20
-            }
-        });
-
-        createToneCycle({
-            frequency: fundamental * 7/4 * 2,
-            baseGain: 0.015,
-            breathRate: 0.19,
-            breathDepth: 0.1,
-            timing: {
-                fadeIn: 18,
-                sustain: 10,
-                fadeOut: 18,
-                pause: 30,
-                initialDelay: 30
-            }
-        });
+        setTimeout(pomPlayChord, 1200);
 
         audioInitialized = true;
-        console.log('Cloud-like harmonic soundscape initialized');
+        console.log('Peace of Mind bridge chords, 13-limit just intonation');
     }
 }
 
@@ -1478,97 +1484,262 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
     lfo.start(ct + startDelay);
 }
 
-        let latticeNodes = [];
-        let latticeConnections = [];
-        let isBuilding = true;
-        
-        function generateDynamicLattice() {
-            const container = document.getElementById('backgroundLattice');
-            if (isBuilding) buildLattice(container);
-            else dissipateCurrentLattice();
-            isBuilding = !isBuilding;
+        // ── HARMONIC SPACE ───────────────────────────────────────────────
+        // The background is the tuning lattice from "Chords You Haven't Heard
+        // Before". Every node is a just interval: a point in five-dimensional
+        // harmonic space over the primes 3·5·7·11·13, projected to the screen
+        // through the same pentagonal star of axes the chord reels use —
+        // 3 east, 5 north-east, 7 north-west, 11 south-east, 13 south-west.
+        //
+        // Size and brightness follow prime limit, so the further a pitch sits
+        // from familiar tuning the more it glows: a 3-limit fifth is a speck,
+        // a 13th partial is a star. The audio plays the bridge chords of Peace
+        // of Mind in this same tuning and lights the node of every ratio it
+        // sounds, so the thing you hear and the thing you see are one object.
+        const HS_PRIMES = [3, 5, 7, 11, 13];
+        const HS_AXES   = [[207, 0], [92, -284], [-242, -176], [90, 276], [-235, 171]];
+        const HS_DOT    = { 1: 2.6, 3: 2.6, 5: 3.6, 7: 4.8, 11: 6.2, 13: 7.6 };
+        const HS_L1MAX  = 5;
+        const HS_RANGE  = [3, 2, 2, 2, 2];
+
+        let hsNodes = [], hsEdges = [], hsIndex = {}, hsRAF = null, hsCanvas = null, hsCtx = null;
+
+        // The lattice ducks under the content the way the audio ducks under a video:
+        // it is a background, and the moment it competes with a link it stops being
+        // one. Measured from the column the page actually occupies rather than a
+        // guessed centre band, with a soft edge so there is no visible seam.
+        let hsDuck = null;
+        function hsMeasureDuck() {
+            const parts = ['.profile-image', '.profile-name', '.title-slot', '.links-container']
+                .map(function (s) { return document.querySelector(s); })
+                .filter(Boolean)
+                .map(function (e) { return e.getBoundingClientRect(); })
+                .filter(function (r) { return r.width > 0 && r.height > 0; });
+            if (!parts.length) { hsDuck = null; return; }
+            hsDuck = {
+                x0: Math.min.apply(null, parts.map(function (r) { return r.left; })),
+                x1: Math.max.apply(null, parts.map(function (r) { return r.right; })),
+                y0: Math.min.apply(null, parts.map(function (r) { return r.top; })),
+                y1: Math.max.apply(null, parts.map(function (r) { return r.bottom; })),
+                feather: 130
+            };
         }
-        
-        function buildLattice(container) {
-            const width = window.innerWidth;
-            const height = window.innerHeight;
-            const centerX = width / 2;
-            const spacing = 120;
-            latticeNodes = [];
-            latticeConnections = [];
-            
-            for (let x = spacing; x < width - spacing; x += spacing) {
-                for (let y = spacing; y < height - spacing; y += spacing) {
-                    if (Math.abs(x - centerX) < 300 && y > height * 0.2 && y < height * 0.8) continue;
-                    if (Math.random() < 0.7) {
-                        const offsetX = (Math.random() - 0.5) * 60;
-                        const offsetY = (Math.random() - 0.5) * 60;
-                        const node = document.createElement('div');
-                        node.className = 'lattice-node';
-                        node.style.left = (x + offsetX) + 'px';
-                        node.style.top = (y + offsetY) + 'px';
-                        node.style.animationDelay = (Math.random() * 30) + 's';
-                        node.style.opacity = '0';
-                        setTimeout(() => {
-                            if (node.parentNode) {
-                                node.style.transition = 'opacity 8s ease-in-out';
-                                node.style.opacity = '1';
-                            }
-                        }, Math.random() * 5000);
-                        container.appendChild(node);
-                        latticeNodes.push({ element: node, x: x + offsetX, y: y + offsetY });
-                    }
-                }
+        // 1 out in the open, falling to DEPTH directly behind a link. Fades on both
+        // axes, so the lattice thins as it approaches the stack instead of stopping
+        // at an edge you can see.
+        function hsAtten(x, y) {
+            if (!hsDuck) return 1;
+            const f = hsDuck.feather;
+            const inx = Math.min(x - (hsDuck.x0 - f), (hsDuck.x1 + f) - x);
+            const iny = Math.min(y - (hsDuck.y0 - f), (hsDuck.y1 + f) - y);
+            if (inx <= 0 || iny <= 0) return 1;
+            const t = Math.min(1, inx / f) * Math.min(1, iny / f);
+            // On a wide screen the content is a column and the stars frame it, so the
+            // duck can be almost total. On a phone the content IS the screen — there is
+            // no outside to frame — so it eases off, or the sky would simply be gone.
+            const cover = (hsDuck.x1 - hsDuck.x0) / Math.max(1, window.innerWidth);
+            const depth = 0.94 - 0.42 * Math.max(0, cover - 0.55);
+            return 1 - depth * t;
+        }
+        const hsSprite = {};
+
+        function hsMakeSprites() {
+            for (const lim of [1, 3, 5, 7, 11, 13]) {
+                const r = Math.ceil(HS_DOT[lim] * 9);
+                const s = document.createElement('canvas');
+                s.width = s.height = r * 2;
+                const g = s.getContext('2d');
+                const grd = g.createRadialGradient(r, r, 0, r, r, r);
+                grd.addColorStop(0,    'rgba(255,255,255,1)');
+                grd.addColorStop(0.07, 'rgba(255,255,255,0.95)');
+                grd.addColorStop(0.16, 'rgba(255,255,255,0.45)');
+                grd.addColorStop(0.34, 'rgba(255,255,255,0.13)');
+                grd.addColorStop(1,    'rgba(255,255,255,0)');
+                g.fillStyle = grd;
+                g.fillRect(0, 0, s.width, s.height);
+                hsSprite[lim] = s;
             }
-            setTimeout(() => connectNodes(container), 3000);
         }
-        
-        function connectNodes(container) {
-            latticeNodes.forEach((node, i) => {
-                latticeNodes.slice(i + 1).forEach((otherNode) => {
-                    const distance = Math.sqrt(
-                        Math.pow(node.x - otherNode.x, 2) +
-                        Math.pow(node.y - otherNode.y, 2)
-                    );
-                    if (distance < 180 && Math.random() < 0.4) {
-                        const dx = otherNode.x - node.x;
-                        const dy = otherNode.y - node.y;
-                        const length = Math.sqrt(dx * dx + dy * dy);
-                        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-                        const line = document.createElement('div');
-                        line.className = 'lattice-connection';
-                        line.style.left = node.x + 'px';
-                        line.style.top = node.y + 'px';
-                        line.style.width = length + 'px';
-                        line.style.transform = `rotate(${angle}deg)`;
-                        line.style.animationDelay = Math.random() * 40 + 's';
-                        line.style.opacity = '0';
-                        setTimeout(() => {
-                            if (line.parentNode) {
-                                line.style.transition = 'opacity 6s ease-in-out';
-                                line.style.opacity = '1';
-                            }
-                        }, Math.random() * 8000);
-                        container.appendChild(line);
-                        latticeConnections.push(line);
-                    }
-                });
-            });
+
+        // A ratio's coordinates in harmonic space. Octaves carry no harmonic
+        // information here, so the 2s divide out and what is left is the
+        // exponent of each odd prime. Anything past the 13-limit has no node.
+        function hsVectorOf(n, d) {
+            let num = n, den = d;
+            while (num % 2 === 0) num /= 2;
+            while (den % 2 === 0) den /= 2;
+            const E = [0, 0, 0, 0, 0];
+            for (let i = 0; i < 5; i++) {
+                const p = HS_PRIMES[i];
+                while (num % p === 0) { num /= p; E[i]++; }
+                while (den % p === 0) { den /= p; E[i]--; }
+            }
+            return (num === 1 && den === 1) ? E : null;
         }
-        
-        function dissipateCurrentLattice() {
-            [...latticeNodes, ...latticeConnections].forEach(item => {
-                const element = item.element || item;
-                if (element && element.parentNode) {
-                    element.style.transition = 'opacity 12s ease-in-out';
-                    element.style.opacity = '0';
-                    setTimeout(() => {
-                        if (element.parentNode) element.remove();
-                    }, 12000);
+        function hsLimitOf(E) { for (let i = 4; i >= 0; i--) if (E[i]) return HS_PRIMES[i]; return 1; }
+
+        function hsBuild() {
+            const w = window.innerWidth, h = window.innerHeight;
+            // the star was drawn for a 1080px frame; open it out to fill the page
+            const s = Math.max(w, h) / 1080 * 2.6;
+            const ox = w / 2, oy = h * 0.46;
+            // anything that could swing into frame at any angle, plus the drift
+            const reach = Math.hypot(w, h) * 0.62 + 140;
+            let a0 = 20260916;
+            const rnd = function () {
+                a0 |= 0; a0 = a0 + 0x6D2B79F5 | 0;
+                let t = Math.imul(a0 ^ a0 >>> 15, 1 | a0);
+                t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+                return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            };
+            const all = [];
+            for (let a = -HS_RANGE[0]; a <= HS_RANGE[0]; a++)
+            for (let b = -HS_RANGE[1]; b <= HS_RANGE[1]; b++)
+            for (let c = -HS_RANGE[2]; c <= HS_RANGE[2]; c++)
+            for (let d = -HS_RANGE[3]; d <= HS_RANGE[3]; d++)
+            for (let e = -HS_RANGE[4]; e <= HS_RANGE[4]; e++) {
+                const E = [a, b, c, d, e];
+                const l1 = Math.abs(a) + Math.abs(b) + Math.abs(c) + Math.abs(d) + Math.abs(e);
+                if (l1 > HS_L1MAX) continue;
+                let x = 0, y = 0;
+                for (let p = 0; p < 5; p++) { x += HS_AXES[p][0] * s * E[p]; y += HS_AXES[p][1] * s * E[p]; }
+                if (x * x + y * y > reach * reach) continue;
+                all.push({ E: E, key: E.join(','), x: ox + x, y: oy + y, glow: 0, l1: l1,
+                           jx: (rnd() - 0.5) * 30, jy: (rnd() - 0.5) * 30,
+                           lim: hsLimitOf(E), phase: rnd() * Math.PI * 2, rank: rnd(),
+                           tw1: rnd() * Math.PI * 2, tw2: rnd() * Math.PI * 2,
+                           twr: 0.7 + rnd() * 0.6 });
+            }
+            // thin near-coincident projections — the simplest interval wins the spot
+            all.sort(function (p, q) { return (p.l1 - q.l1) || (p.rank - q.rank); });
+            hsNodes = [];
+            for (let i = 0; i < all.length; i++) {
+                const nd = all[i];
+                let ok = true;
+                for (let k = 0; k < hsNodes.length; k++) {
+                    const dx = nd.x - hsNodes[k].x, dy = nd.y - hsNodes[k].y;
+                    if (dx * dx + dy * dy < 34 * 34) { ok = false; break; }
+                }
+                if (ok) hsNodes.push(nd);
+            }
+            hsIndex = {};
+            hsNodes.forEach(function (nd, i) { hsIndex[nd.key] = i; });
+            hsMeasureDuck();
+            // the heavy lead: an edge wherever two nodes are one prime step apart
+            hsEdges = [];
+            hsNodes.forEach(function (nd, i) {
+                for (let p = 0; p < 5; p++) {
+                    const E2 = nd.E.slice(); E2[p]++;
+                    const j = hsIndex[E2.join(',')];
+                    if (j !== undefined) hsEdges.push([i, j, HS_PRIMES[p]]);
                 }
             });
-            latticeNodes = [];
-            latticeConnections = [];
+        }
+
+        // Harmonic space does not move; the view of it does. The projection turns
+        // slowly about the origin, so the same lattice is seen from a changing angle:
+        // stars sweep, the prime axes swing round, and points drift in and out of
+        // frame. One turn takes four minutes — slow enough that you notice it has
+        // changed rather than watch it changing. The origin drifts on its own clock
+        // so the two never settle into an obvious cycle.
+        const HS_TURN_MS = 900000;
+        function hsProject(t) {
+            const w = window.innerWidth, h = window.innerHeight;
+            const s = Math.max(w, h) / 1080 * 2.6;
+            const rot = (t / HS_TURN_MS) * Math.PI * 2;
+            const cs = Math.cos(rot), sn = Math.sin(rot);
+            const ax = [];
+            for (let p = 0; p < 5; p++) {
+                const X = HS_AXES[p][0] * s, Y = HS_AXES[p][1] * s;
+                ax.push([X * cs - Y * sn, X * sn + Y * cs]);
+            }
+            const ox = w / 2 + Math.sin(t / 165000) * w * 0.06;
+            const oy = h * 0.46 + Math.cos(t / 211000) * h * 0.05;
+            for (let i = 0; i < hsNodes.length; i++) {
+                const nd = hsNodes[i];
+                let x = ox, y = oy;
+                for (let p = 0; p < 5; p++) { x += ax[p][0] * nd.E[p]; y += ax[p][1] * nd.E[p]; }
+                nd.x = x + nd.jx; nd.y = y + nd.jy;
+            }
+        }
+
+        function hsDraw(t) {
+            const w = window.innerWidth, h = window.innerHeight;
+            hsProject(t);
+            hsCtx.clearRect(0, 0, w, h);
+            hsCtx.lineWidth = 0.6;
+            for (let k = 0; k < hsEdges.length; k++) {
+                const a = hsNodes[hsEdges[k][0]], b = hsNodes[hsEdges[k][1]], p = hsEdges[k][2];
+                const breath = 0.5 + 0.5 * Math.sin(t / 9000 + a.phase);
+                if ((a.x < -80 && b.x < -80) || (a.x > w + 80 && b.x > w + 80) ||
+                    (a.y < -80 && b.y < -80) || (a.y > h + 80 && b.y > h + 80)) continue;
+                const att = hsAtten((a.x + b.x) / 2, (a.y + b.y) / 2);
+                const alpha = ((0.030 + 0.030 * breath) * (p <= 5 ? 1 : 0.55)) * att
+                            + Math.max(a.glow, b.glow) * 0.5 * att;
+                if (alpha < 0.012) continue;
+                hsCtx.strokeStyle = 'rgba(255,255,255,' + alpha.toFixed(3) + ')';
+                hsCtx.beginPath(); hsCtx.moveTo(a.x, a.y); hsCtx.lineTo(b.x, b.y); hsCtx.stroke();
+            }
+            for (let i = 0; i < hsNodes.length; i++) {
+                const nd = hsNodes[i];
+                if (nd.x < -80 || nd.x > w + 80 || nd.y < -80 || nd.y > h + 80) {
+                    if (nd.glow > 0.001) nd.glow *= 0.9985; else nd.glow = 0;
+                    continue;
+                }
+                const breath = 0.5 + 0.5 * Math.sin(t / 7000 + nd.phase);
+                // Scintillation. Two incommensurate sines multiplied never repeat, so
+                // the flicker stays irregular the way real seeing does — a star does
+                // not pulse on a clock. Held off the sounding glow, which must read as
+                // a note arriving rather than as more weather.
+                const tw = 0.55 + 0.45 * Math.sin(t / (820 * nd.twr) + nd.tw1)
+                                       * Math.sin(t / (1730 * nd.twr) + nd.tw2);
+                const att = hsAtten(nd.x, nd.y);
+                const r = HS_DOT[nd.lim] * (0.8 + 0.2 * breath) * (1 + nd.glow * 2.2) * 2.4;
+                const a = Math.min(1, ((0.30 + 0.34 * breath) * (0.4 + nd.lim / 24) * tw) * att
+                                      + nd.glow * 0.8 * att);
+                const sp = hsSprite[nd.lim];
+                hsCtx.globalAlpha = a;
+                hsCtx.drawImage(sp, nd.x - r, nd.y - r, r * 2, r * 2);
+                if (nd.glow > 0.001) nd.glow *= 0.9985; else nd.glow = 0;
+            }
+            hsCtx.globalAlpha = 1;
+        }
+
+        function hsFrame(t) { hsDraw(t); hsRAF = requestAnimationFrame(hsFrame); }
+
+        function hsFit() {
+            if (!hsCanvas || !hsCtx) return;
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const w = window.innerWidth, h = window.innerHeight;
+            hsCanvas.width = Math.round(w * dpr);
+            hsCanvas.height = Math.round(h * dpr);
+            hsCanvas.style.width = w + 'px';
+            hsCanvas.style.height = h + 'px';
+            hsCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            if (!hsSprite[3]) hsMakeSprites();
+            hsBuild();
+        }
+
+        // light the node a ratio occupies — the audio calls this as it sounds one
+        function hsSound(n, d) {
+            const E = hsVectorOf(n, d);
+            if (!E) return;
+            const i = hsIndex[E.join(',')];
+            if (i !== undefined) hsNodes[i].glow = 1;
+        }
+
+        function generateDynamicLattice() {
+            hsCanvas = document.getElementById('backgroundLattice');
+            if (!hsCanvas || hsRAF) return;
+            hsCtx = hsCanvas.getContext('2d');
+            hsFit();
+            // reduced motion gets the lattice, just not the breathing
+            if (matchMedia('(prefers-reduced-motion: reduce)').matches) { hsDraw(0); return; }
+            hsRAF = requestAnimationFrame(hsFrame);
+            // the stack is not at its final size until the links have revealed and
+            // the handwriting slot has settled, and it moves again on scroll
+            [1000, 4000, 8000].forEach(function (ms) { setTimeout(hsMeasureDuck, ms); });
+            window.addEventListener('scroll', hsMeasureDuck, { passive: true });
         }
 
         function createLinkConstellations() {
@@ -1644,91 +1815,72 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             // Start the cover intro animation immediately
             // profileImage.classList.add('intro-reveal');
             
-            albumWords.forEach(word => {
-                const letters = word.querySelectorAll('.letter');
-                letters.forEach(letter => {
-                    const randomY = (Math.random() - 0.5) * 4;
-                    letter.style.setProperty('--random-y', `${randomY}px`);
-                });
-            });
+            // The page used to open on the album title animating in letter by letter,
+            // ending with the red strike through "Out", which then cued the drip. The
+            // title text is gone; the red line is cued on its own now, because it is the
+            // mark in its own right rather than the punchline of a title.
+            // HANDWRITING. Two pieces written in My Pen on the Banner canvas. The ink
+            // arrives and leaves inside the video itself — My Pen's own aging, with
+            // departOrder 'rolling', so each marking starts to go the same interval after
+            // it was made. The line therefore clears in the order and rhythm it was
+            // written: the opening words lift first and the tail is still there.
+            //
+            // nextAt is where the following piece starts writing, in seconds into this
+            // one. Measured, not guessed: sampling the left third of each render, it is
+            // clear by 9.3s (constant) and 7.0s (mandarin) — starting earlier than that was
+            // tried and the two collide in the middle, because the right-hand end is still
+            // fully inked until 12s. So: the new line starts as the left finishes clearing,
+            // and the old tail is still leaving on the right while it writes.
+            // Nothing fades in CSS; the two just overlap, and each is transparent
+            // wherever it has no ink.
+            const HANDWRITING = [
+                { file: 'bb-constant', nextAt: 9.4, alt: 'Music has been the only constant in my life.' },
+                { file: 'bb-mandarin', nextAt: 7.1, alt: '我不得不作曲 — I have no choice but to compose' },
+            ];
 
-            const wordHeights = ['12px', '-8px', '15px', '-6px'];
-            albumWords.forEach((word, index) => {
-                word.style.setProperty('--word-flash-y', wordHeights[index]);
-            });
+            function handTakeTurn(els, i) {
+                const el = els[i];
+                if (!el) return;
+                el.currentTime = 0;
+                el.play().catch(function () {});
+                setTimeout(function () {
+                    handTakeTurn(els, (i + 1) % els.length);
+                }, HANDWRITING[i].nextAt * 1000);
+            }
 
-            // Wait longer before starting the album title animation
-            setTimeout(() => {
-                let wordIndex = 0;
-                const wordInterval = setInterval(() => {
-                if (wordIndex < albumWords.length) {
-                    const word = albumWords[wordIndex];
-                    
-                    word.style.transform = `translateY(${wordHeights[wordIndex]})`;
-                    word.classList.add('flash-word');
-                    
-                    word.querySelectorAll('.letter').forEach(letter => {
-                        letter.classList.add('flash');
-                    });
-                    
-                    setTimeout(() => {
-                        word.style.transition = 'opacity 0.15s ease-out';
-                        word.style.opacity = '0';
-                        word.style.filter = 'none';
-                        word.style.textShadow = 'none';
-                        word.style.animation = 'none';
-                    }, 350);
-                    
-                    wordIndex++;
-                } else {
-                    clearInterval(wordInterval);
-                    
-                    setTimeout(() => {
-                        albumWords.forEach((word, index) => {
-                            word.style.transform = 'translateY(0)';
-                            word.style.transition = 'none';
-                            word.style.opacity = '1';
-                            
-                            setTimeout(() => {
-                                word.style.filter = 'brightness(2.5)';
-                                word.style.textShadow = '0 0 20px rgba(255,255,255,0.9)';
-                                word.style.transform = 'scale(1.05)';
-                                
-                                setTimeout(() => {
-                                    word.style.filter = 'none';
-                                    word.style.textShadow = 'none';
-                                    word.style.transform = 'scale(1)';
-                                }, 150);
-                            }, index * 20);
-                        });
-                        
-                        setTimeout(() => {
-                            albumTitle.classList.add('final-reveal');
-                            
-                            setTimeout(() => {
-                                const lastWord = document.querySelector('.album-word.crossed-out');
-                                if (lastWord) {
-                                    lastWord.classList.add('show-cross');
-                                }
-                                
-                                setTimeout(() => {
-                                    startBloodDrip();
-                                }, 200);
-                            }, 150);
-                        }, 200);
-                    }, 580);
-                }
-                            }, 300);
-            }, 888); // Wait 0.888 seconds before starting album title animation
+            // OPENING PACE. This page is usually reached by someone tapping a link in
+            // a bio, and the first thing they want is Spotify — so the sequence is a
+            // toll on every visit. These four numbers are the whole toll; nothing else
+            // gates a click. Raise them for more ceremony, lower them to convert harder.
+            //
+            // Measured in a browser, time from page load until fully opaque:
+            //
+            //     PACE   Spotify   last link
+            //     1.00     2.40s       5.64s   <- as it was
+            //     0.75     2.00s       4.43s
+            //     0.60     1.67s       3.62s   <- here
+            //     0.45     1.52s       2.98s
+            //
+            // There is a floor: the revealLink animation itself runs 0.8s, so no PACE
+            // gets Spotify under about a second. Shorten that animation if you need more.
+            const PACE          = 0.6;
+            const DRIP_START_MS = 1100 * PACE;   // beat before the line starts drawing
+            const DRIP_MS       = 3700 * PACE;   // how long the line takes to descend
+            const LINK_LEAD_MS  =  500 * PACE;   // line gets a head start on the links
+            const HANDOFF_MS    = 1200 * PACE;   // title slot hands over to the billboard
+
+            setTimeout(startBloodDrip, DRIP_START_MS);
 
             function startBloodDrip() {
                 const bloodDrip = document.querySelector('.blood-drip');
 
-                // Drip geometry — tuned so the line reaches through the full 9-link stack
-                // (buttons are 44px min-height with 12px vertical padding; handmade-copy
-                // adds 28px section margin; drip extends to just under the X link).
-                const DRIP_DURATION_MS = 3700;
-                const DRIP_HEIGHT_PX = 590;
+                // Drip geometry — the line ends just under the last link. Measured, not
+                // guessed: with the 8 links now in the stack the last one bottoms out
+                // 501px below the top of the drip. It was 590 when the handmade-copy
+                // button was still there (taller, two lines, plus a 28px section
+                // margin), which left the line hanging 89px past the end.
+                const DRIP_DURATION_MS = DRIP_MS;
+                const DRIP_HEIGHT_PX = 548;
 
                 // Start the cover zoom-out during blood drip
                 profileImage.classList.add('slide-to-normal');
@@ -1743,9 +1895,9 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                 // so we get into the "current releases" state quickly. The drip continues at
                 // full opacity underneath; the billboard's dark backsplash + higher stacking
                 // conceal the line where it would otherwise bisect the announcement text.
-                setTimeout(startBillboardHandoff, 1200);
+                setTimeout(startBillboardHandoff, HANDOFF_MS);
 
-                const links = document.querySelectorAll('.link-item');
+                const links = document.querySelectorAll('.link-item, .link-label');
                 const revealDelay = DRIP_DURATION_MS / links.length;
 
                 links.forEach((link, index) => {
@@ -1755,14 +1907,14 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                         if (index === links.length - 1) {
                             setTimeout(() => {
                                 document.querySelector('.footer').classList.add('reveal-footer');
-                            }, 1400);
+                            }, 1400 * PACE);
 
                             setTimeout(() => {
                                 const exp = document.querySelector('.experiments-section');
                                 if (exp) exp.classList.add('reveal-experiments');
-                            }, 1900);
+                            }, 1900 * PACE);
                         }
-                    }, 500 + (revealDelay * index));
+                    }, LINK_LEAD_MS + (revealDelay * index));
                 });
             }
 
@@ -1789,9 +1941,35 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
 
                 // Slight overlap so the crossfade registers as one movement.
                 setTimeout(() => {
-                    if (!billboard || !messages.length) return;
+                    if (!billboard) return;
                     billboard.classList.add('active');
 
+                    // The handwriting starts as the slot arrives. preload="none" keeps both
+                    // files off the critical path: they are fetched here, after the links are
+                    // already in. Reduced motion gets the finished line as a still rather than
+                    // a cycle that never settles.
+                    const handEls = [document.getElementById('handA'), document.getElementById('handB')];
+                    if (handEls[0] && handEls[1]) {
+                        HANDWRITING.forEach(function (piece, i) {
+                            const v = handEls[i];
+                            v.setAttribute('aria-label', piece.alt);
+                            [['video/webm', 'webm'], ['video/mp4', 'mp4']].forEach(function (pair) {
+                                const s = document.createElement('source');
+                                s.type = pair[0];
+                                s.src = 'assets/video/web/' + piece.file + '.' + pair[1];
+                                v.appendChild(s);
+                            });
+                            v.load();
+                        });
+                        if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                            handEls[0].poster = 'assets/images/web/' + HANDWRITING[0].file + '.webp';
+                        } else {
+                            handTakeTurn(handEls, 0);
+                        }
+                    }
+
+                    // Text announcements still work if any are put back in the slot.
+                    if (!messages.length) return;
                     let idx = 0;
                     messages[idx].classList.add('visible');
 
@@ -1887,10 +2065,11 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                 document.querySelector('.link-item.bandcamp .lyric-whisper'),       // 2
                 document.querySelector('.link-item.bereal .lyric-whisper.bereal-left'),  // 3
                 document.querySelector('.link-item.bereal .lyric-whisper.bereal-right'), // 4
-                document.querySelector('.link-item.instagram .lyric-whisper'),      // 5
-                document.querySelector('.link-item.youtube .lyric-whisper'),        // 6
-                document.querySelector('.link-item.facebook .lyric-whisper'),       // 7
-                document.querySelector('.link-item.x-social .lyric-whisper')        // 8
+                document.querySelector('.link-item.youtube .lyric-whisper'),        // 5
+                document.querySelector('.link-item.instagram .lyric-whisper'),      // 6
+                document.querySelector('.link-item.tiktok .lyric-whisper'),         // 7
+                document.querySelector('.link-item.facebook .lyric-whisper'),       // 8
+                document.querySelector('.link-item.x-social .lyric-whisper')        // 9
             ];
 
             function createCrypticWord(word, flavor = 'towo') {
@@ -2038,7 +2217,6 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             startLyricCycle();
             createLinkConstellations();
             generateDynamicLattice();
-            setInterval(generateDynamicLattice, 45000);
 
             // Mobile scroll-affordance: show the "experiments" hint after the intro
             // settles, dismiss it on first meaningful scroll.
@@ -2080,11 +2258,27 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
                 setTimeout(moveSpotlight, 5000);
             }
             
+            let hsResizeT;
             window.addEventListener('resize', () => {
-                document.getElementById('backgroundLattice').innerHTML = '';
-                generateDynamicLattice();
+                clearTimeout(hsResizeT);
+                hsResizeT = setTimeout(hsFit, 200);
             });
             
+            // Facebook and X are tucked rather than deleted. Tapping the name brings
+            // them back — they reveal with the same animation as the rest, so it reads
+            // as the stack finishing rather than a panel opening.
+            const nameEl = document.querySelector('.profile-name');
+            if (nameEl) {
+                nameEl.addEventListener('click', function () {
+                    const tucked = document.querySelectorAll('.link-item.tucked');
+                    if (!tucked.length || tucked[0].classList.contains('found')) return;
+                    tucked.forEach(function (el, i) {
+                        el.classList.add('found');
+                        setTimeout(function () { el.classList.add('reveal'); }, 60 + i * 140);
+                    });
+                });
+            }
+
             function start() { initAudioSystem(); }
             document.addEventListener('click', start, { once: true });
             document.addEventListener('keydown', start, { once: true });
@@ -2125,9 +2319,9 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
         // Cryptic image flashing system
         function startCrypticFlashing() {
             const flashImages = [
-                'assets/images/promo/FlashPromo1.jpg',
-                'assets/images/promo/FlashPromo2.jpg',
-                'assets/images/promo/FlashPromo3.jpg'
+                'assets/images/web/flash1.webp',
+                'assets/images/web/flash2.webp',
+                'assets/images/web/flash3.webp'
             ];
             
             const flashElements = [
