@@ -1827,15 +1827,21 @@ function createBreathingTone(frequency, baseGain, breathRate, breathDepth, start
             //
             // nextAt is where the following piece starts writing, in seconds into this
             // one. Measured, not guessed: sampling the left third of each render, it is
-            // clear by 9.3s (constant) and 7.0s (mandarin) — starting earlier than that was
-            // tried and the two collide in the middle, because the right-hand end is still
-            // fully inked until 12s. So: the new line starts as the left finishes clearing,
-            // and the old tail is still leaving on the right while it writes.
+            // clear by 10.07s (constant) and 7.57s (mandarin) — starting earlier than that
+            // was tried and the two collide in the middle, because the right-hand end is
+            // still fully inked until 12s. So: the new line starts as the left finishes
+            // clearing, and the old tail is still leaving on the right while it writes.
             // Nothing fades in CSS; the two just overlap, and each is transparent
             // wherever it has no ink.
+            //
+            // ⚠ THESE TWO NUMBERS BELONG TO THE RENDERS. Rebuilding the videos moves the
+            // clearing, so tools/build-handwriting.py prints the nextAt it just produced
+            // and these have to follow it, or the pieces overlap or leave a gap.
+            // 2026-09-22 rebuild: clearing moved +0.24s on both, so 9.4→9.6 and 7.1→7.3,
+            // each keeping its own lead on its clear time (0.43s and 0.23s).
             const HANDWRITING = [
-                { file: 'bb-constant', nextAt: 9.4, alt: 'Music has been the only constant in my life.' },
-                { file: 'bb-mandarin', nextAt: 7.1, alt: '我不得不作曲 — I have no choice but to compose' },
+                { file: 'bb-constant', nextAt: 9.6, alt: 'Music has been the only constant in my life.' },
+                { file: 'bb-mandarin', nextAt: 7.3, alt: '我不得不作曲 — I have no choice but to compose' },
             ];
 
             function handTakeTurn(els, i) {
