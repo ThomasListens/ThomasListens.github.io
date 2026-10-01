@@ -2,6 +2,11 @@
 # Preserved on disk under media-archive/ but never committed.
 media-archive/
 
+# Merry: source doc for Merry/summary/ — has proposal-specific notes that stay
+# off the public site. Partner proposal drafts are never committed either.
+Merry/EEG & Auditory Neuroscience Work Summary.md
+Merry/*Proposal*
+
 # OS / editor / tooling cruft
 .DS_Store
 Thumbs.db

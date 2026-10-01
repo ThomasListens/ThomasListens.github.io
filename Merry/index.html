@@ -414,6 +414,23 @@
       opacity: 1;
     }
 
+    /* ── Link out to the full EEG work summary (Merry/summary/) ─────────── */
+    .summary-link {
+      margin-top: 1.75rem;
+      text-align: center;
+      font-family: 'Geist Mono', monospace;
+      font-weight: 500;
+      font-size: 11.5px;
+      letter-spacing: 0.04em;
+    }
+    .summary-link a.project-link {
+      color: var(--navy);
+      text-decoration: none;
+      border-bottom: 1px solid var(--grid);
+      transition: border-color 0.25s ease;
+    }
+    .summary-link a.project-link:hover { border-bottom-color: var(--navy); }
+
     /* ── Resume section: professional CV close ─────────────────────────── */
     .resume-block {
       max-width: 720px;
@@ -890,6 +907,14 @@
       </div>
       <div class="pyramid">
         <div class="col">
+          <div class="qual">innovative</div>
+          <div class="act-stack">
+            <span class="han-backdrop">研究者</span>
+            <span class="act">Researcher</span>
+          </div>
+        </div>
+        <div class="sep">·</div>
+        <div class="col">
           <div class="qual">active</div>
           <div class="act-stack">
             <span class="han-backdrop">聆聽者</span>
@@ -902,14 +927,6 @@
           <div class="act-stack">
             <span class="han-backdrop">作曲家</span>
             <span class="act">Composer</span>
-          </div>
-        </div>
-        <div class="sep">·</div>
-        <div class="col">
-          <div class="qual">innovative</div>
-          <div class="act-stack">
-            <span class="han-backdrop">研究者</span>
-            <span class="act">Researcher</span>
           </div>
         </div>
         <div class="sep">·</div>
@@ -1039,7 +1056,7 @@
           </svg>
         </div>
         <div class="evidence-text">
-          <div class="claim">Inventing a framework for human tempo <span class="claim-qualifier">(provisional patent in preparation)</span>.</div>
+          <div class="claim">Inventing a framework for human tempo <span class="claim-qualifier">(provisional patent filed)</span>.</div>
           <div class="proof">
             <span class="project-name">Relative Tempo Derivation (RTD)</span> &mdash; biomarker-to-tempo mapping rooted in just-intonation ratios.
           </div>
@@ -1056,7 +1073,7 @@
             <rect x="35" y="22" width="70" height="46"
                   stroke="var(--navy)" stroke-width="1" fill="none"
                   stroke-dasharray="2.5 2.5" opacity="0.75" />
-            <!-- Patent Pending: artwork carries the aspiration of the framework's IP status -->
+            <!-- Patent Pending: provisional filed -->
             <text x="70" y="43" style="font-family:'Geist Mono',monospace; font-size:9px; font-weight:600; fill:var(--navy); text-anchor:middle; letter-spacing:0.15em; text-transform:uppercase">Patent</text>
             <text x="70" y="55" style="font-family:'Geist Mono',monospace; font-size:9px; font-weight:600; fill:var(--navy); text-anchor:middle; letter-spacing:0.15em; text-transform:uppercase">Pending</text>
           </svg>
@@ -1086,7 +1103,7 @@
           </svg>
         </a>
         <div class="evidence-text">
-          <div class="claim">Composer exploring new ways of using harmony.</div>
+          <div class="claim">Researcher and composer exploring new ways of using harmony.</div>
           <div class="proof">
             <a class="project-link project-name" href="https://thomaslistens.github.io/MetabolicHarmony/" target="_blank" rel="noopener">Metabolic Harmony</a> &mdash; an interactive web sonification that lets you hear the gut microbiome. 350 metabolic pathways rendered as harmonic ratios across 4,869 samples, with built-in comparison between healthy reference and Multiple Sclerosis states &mdash; built to make complex pathway data audible, and accessible to researchers and patients alike.
           </div>
@@ -1157,6 +1174,10 @@
           </svg>
         </a>
       </div>
+
+      <div class="summary-link">
+        <a class="project-link" href="summary/">EEG &amp; Auditory Neuroscience Work Summary &rarr;</a>
+      </div>
     </div>
 
     <hr class="rule rule-bottom" style="margin-top: 1rem;">
@@ -1164,7 +1185,17 @@
     <div class="resume-block">
 
       <div class="resume-section">
-        <div class="resume-section-header">Composition, Coaching &amp; Production</div>
+        <div class="resume-section-header">Research, Composition &amp; Coaching</div>
+
+        <div class="resume-entry">
+          <div class="resume-entry-header">
+            <div class="resume-role">Independent Researcher &amp; Composer</div>
+            <div class="resume-meta">Lifelong Practice</div>
+          </div>
+          <div class="resume-detail">
+            Self-directed research and creative practice. Original frameworks in data sonification methodology, harmonic theory, and audio tools. Collaborates across disciplines, managing creative input from multiple contributors to produce cohesive final work. Independently releases musical projects.
+          </div>
+        </div>
 
         <div class="resume-entry">
           <div class="resume-entry-header">
@@ -1173,16 +1204,6 @@
           </div>
           <div class="resume-detail">
             Six Arizona state championships with Casa Grande HS (2015&ndash;2020). Wrote and arranged original competitive percussion scores; integrated live sound &mdash; microphones, synths, samplers, mixing &mdash; for full production value. Private percussion instruction. Performer and section contributor with ASU World Drumline and The Academy Drum &amp; Bugle Corps.
-          </div>
-        </div>
-
-        <div class="resume-entry">
-          <div class="resume-entry-header">
-            <div class="resume-role">Independent Composer &amp; Arranger</div>
-            <div class="resume-meta">Lifelong Practice</div>
-          </div>
-          <div class="resume-detail">
-            Self-directed creative and research practice. Original frameworks in harmonic theory, data sonification methodology, and audio tools. Collaborates across disciplines, managing creative input from multiple contributors to produce cohesive final work. Independently releases musical projects.
           </div>
         </div>
       </div>
@@ -1236,6 +1257,16 @@
 
         <div class="resume-entry">
           <div class="resume-entry-header">
+            <div class="resume-role">Administrative Assistant</div>
+            <div class="resume-meta">ASU Engineering Technical Services &middot; 2013&ndash;2017</div>
+          </div>
+          <div class="resume-detail">
+            Front desk and administrative support for the office that supports research operations for ASU engineering faculty and staff.
+          </div>
+        </div>
+
+        <div class="resume-entry">
+          <div class="resume-entry-header">
             <div class="resume-role">Barback</div>
             <div class="resume-meta">Local bar &middot; Phoenix, AZ</div>
           </div>
@@ -1251,19 +1282,17 @@
           <div class="resume-reference">
             <span class="ref-name">Leanna Moore</span>
             <span class="ref-role">Education Director, NMTSA</span>
-            <span class="ref-contact">lmoore@nmtsa.org</span>
+            <span class="ref-contact">Contact available on request</span>
           </div>
           <div class="resume-reference">
             <span class="ref-name">Emily Heller</span>
             <span class="ref-role">Owner, Bene Vivendo</span>
-            <span class="ref-contact">emily.bene.vivendo.arizona@gmail.com</span>
-            <span class="ref-contact">602-573-5878</span>
+            <span class="ref-contact">Contact available on request</span>
           </div>
           <div class="resume-reference">
             <span class="ref-name">Matt Geres</span>
             <span class="ref-role">Coordinator, Casa Grande HS</span>
-            <span class="ref-contact">mattgeres@gmail.com</span>
-            <span class="ref-contact">520-280-7212</span>
+            <span class="ref-contact">Contact available on request</span>
           </div>
         </div>
 

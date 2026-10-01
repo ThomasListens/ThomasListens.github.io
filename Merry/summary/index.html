@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>EEG &amp; Auditory Neuroscience Work Summary · Thomas LeRoy Meier</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    @page { size: 8.5in 11in; margin: 0.6in; }
+
+    /* Same palette and type as the résumé (../index.html) so the two read as one set. */
+    :root {
+      --navy: #1E6BB0;
+      --grid: #D8E8F4;
+      --bg:   #ffffff;
+      --ink:  #1a1a1a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--navy);
+      font-family: 'Geist Mono', monospace;
+      -webkit-font-smoothing: antialiased;
+      padding: 3rem 1.25rem 2rem;
+    }
+
+    .doc {
+      width: 100%;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    a {
+      color: var(--navy);
+      text-decoration: none;
+      border-bottom: 1px solid var(--grid);
+      transition: border-color 0.25s ease;
+      overflow-wrap: anywhere;
+    }
+    a:hover { border-bottom-color: var(--navy); }
+
+    .rule {
+      border: none;
+      border-top: 1px solid var(--grid);
+      margin: 0;
+    }
+
+    /* ── Top / bottom nav back to the résumé ─────────────────── */
+    .nav {
+      font-size: 10.5px;
+      letter-spacing: 0.04em;
+      padding: 0.75rem 0;
+    }
+
+    /* ── Title block ─────────────────────────────────────────── */
+    .title-block {
+      padding: 1.75rem 0;
+      text-align: center;
+    }
+    .name {
+      font-weight: 400;
+      font-size: 13px;
+      letter-spacing: 0.6em;
+      margin-bottom: 1.1rem;
+    }
+    h1 {
+      font-weight: 600;
+      font-size: 22px;
+      line-height: 1.3;
+      margin-bottom: 0.9rem;
+    }
+    .byline {
+      font-size: 10.5px;
+      line-height: 1.7;
+      opacity: 0.75;
+      letter-spacing: 0.04em;
+    }
+    .byline .sep { opacity: 0.5; padding: 0 0.6em; }
+
+    /* ── Sections ────────────────────────────────────────────── */
+    section { padding: 1.6rem 0 0.2rem; }
+
+    .section-num {
+      font-weight: 600;
+      font-size: 9.5px;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      opacity: 0.55;
+      margin-bottom: 0.3rem;
+    }
+    h2 {
+      font-weight: 600;
+      font-size: 14px;
+      line-height: 1.45;
+      padding-bottom: 0.45rem;
+      margin-bottom: 0.8rem;
+      border-bottom: 1px solid var(--grid);
+    }
+    h2 .when {
+      font-weight: 400;
+      font-size: 11px;
+      opacity: 0.65;
+      white-space: nowrap;
+    }
+
+    p, li {
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: var(--ink);
+    }
+    p + p, p + ul, ul + p { margin-top: 0.7rem; }
+
+    .status {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--navy);
+      letter-spacing: 0.02em;
+    }
+
+    ul {
+      list-style: none;
+      padding-left: 1.1rem;
+      border-left: 1px solid var(--grid);
+    }
+    li + li { margin-top: 0.45rem; }
+    li b, p b {
+      font-weight: 600;
+      color: var(--navy);
+    }
+    .quote { font-style: italic; }
+
+    /* ── Media: a muted looping preview that swaps to the full video on click ── */
+    figure { margin: 1rem 0 0.4rem; }
+    .clip {
+      position: relative;
+      display: block;
+      border: 1px solid var(--grid);
+      background: #0b0d10;
+      cursor: pointer;
+      line-height: 0;
+    }
+    .clip video, figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    figure img { border: 1px solid var(--grid); }
+    .clip-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+    .fig-square { flex: 0 1 360px; }
+    .fig-tall { flex: 0 1 203px; }
+    .thumbs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.6rem;
+    }
+    .thumbs a { border: none; line-height: 0; }
+    .closing {
+      margin-top: 2rem;
+      text-align: center;
+      font-style: italic;
+      color: var(--navy);
+    }
+    .credit {
+      font-size: 10px;
+      line-height: 1.6;
+      color: var(--navy);
+      opacity: 0.75;
+    }
+    .play {
+      position: absolute;
+      left: 0.6rem;
+      bottom: 0.6rem;
+      padding: 0.35rem 0.6rem;
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--navy);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      line-height: 1.2;
+    }
+    .clip.playing { cursor: default; }
+    .lane-box {
+      position: relative;
+      border: 1px solid var(--grid);
+      background: var(--bg);
+      line-height: 0;
+    }
+    .lane-box canvas { display: block; width: 100%; height: auto; cursor: pointer; }
+    .lane-play {
+      position: static;
+      display: block;
+      margin: 0 0.6rem 0.6rem;
+      border: 1px solid var(--grid);
+      font-family: inherit;
+      cursor: pointer;
+    }
+    h3 {
+      font-weight: 600;
+      font-size: 9.5px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--navy);
+      margin: 1.3rem 0 0.5rem;
+    }
+    .formula {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--navy);
+      margin-bottom: 0.7rem;
+    }
+    .clip.playing .play { display: none; }
+    figcaption {
+      margin-top: 0.45rem;
+      font-size: 10px;
+      line-height: 1.6;
+      color: var(--navy);
+      opacity: 0.75;
+    }
+
+    @media screen and (max-width: 520px) {
+      body { padding: 1.5rem 1rem 1.5rem; }
+      .name { font-size: 10.5px; letter-spacing: 0.4em; }
+      h1 { font-size: 18px; }
+      h2 .when { white-space: normal; }
+      .byline .sep { display: none; }
+      .byline span { display: block; }
+    }
+
+    @media print {
+      body { padding: 0; }
+      .nav, .play { display: none; }
+      section { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <div class="nav"><a href="../">&larr; R&eacute;sum&eacute;</a></div>
+    <hr class="rule">
+
+    <div class="title-block">
+      <div class="name">Thomas LeRoy Meier</div>
+      <h1>EEG &amp; Auditory Neuroscience Work Summary</h1>
+      <div class="byline">
+        <span>October 1, 2026</span><span class="sep">&middot;</span><span>meier.thomas@gmail.com</span><span class="sep">&middot;</span><span><a href="../">thomaslistens.github.io/Merry</a></span>
+      </div>
+    </div>
+
+    <hr class="rule">
+
+    <section>
+      <div class="section-num">01</div>
+      <h2>sEEG Sonification Toolkit <span class="when">&middot; v8.3, 2026</span></h2>
+      <p>A browser-based synthesizer that translates EEG into navigable sound. No dependencies; runs on standard hardware.</p>
+      <figure class="lane" id="lane">
+        <div class="lane-box">
+          <canvas id="lane-canvas" width="1440" height="540" aria-label="Six channels of intracranial EEG drawn as stacked traces, each labelled with its pitch ratio, with a playhead."></canvas>
+          <button class="play lane-play" id="lane-play" type="button">&#9654; Hear these six channels &middot; 0:30</button>
+        </div>
+        <audio id="lane-audio" src="media/seeg-lane.m4a" preload="none"></audio>
+        <figcaption>Six lanes of EEG being synthesized, one voice each. Depth electrodes in the left and right hippocampus (HUP114) across a seizure onset, each contact pair tuned to a just-intonation ratio above 130 Hz and rendered by the toolkit&rsquo;s own export. Activity rises on the right first, then the left, and the chord fills in the same order.</figcaption>
+      </figure>
+      <ul>
+        <li><b>Input:</b> native EDF/EDF+ parser with automatic channel classification (sEEG shafts, scalp 10-20/10-10, auxiliary/physiological).</li>
+        <li><b>Preprocessing:</b> DC removal, 50/60 Hz notch filtering, bipolar or common-average re-referencing.</li>
+        <li><b>Feature extraction:</b> 21 features per channel &mdash; multi-scale RMS, Hilbert envelope, band power (&delta;&ndash;high &gamma;) with automatic dominant-band weighting, spectral centroid, Hjorth mobility and complexity, permutation entropy, line length, spectral flux, and spike detection.</li>
+        <li><b>Synthesis:</b> features drive an additive/FM engine, so changes in brain state are heard as changes in loudness, timbre, and transients.</li>
+        <li><b>Export:</b> audio, automation envelopes (CSV), and wavetables.</li>
+        <li><b>Demo data:</b> HUP intracranial EEG dataset (epilepsy monitoring).</li>
+        <li><b>Validation:</b> independently reviewed by Teunis van Beelen, creator of EDFbrowser &mdash; <span class="quote">&ldquo;impressive and very interesting.&rdquo;</span></li>
+        <li><b>Live:</b> <a href="https://thomaslistens.github.io/seeg-sonification/" target="_blank" rel="noopener">thomaslistens.github.io/seeg-sonification</a></li>
+        <li><b>Code:</b> <a href="https://github.com/ThomasListens/ThomasListens.github.io/tree/main/seeg-sonification" target="_blank" rel="noopener">github.com/ThomasListens/ThomasListens.github.io/tree/main/seeg-sonification</a></li>
+      </ul>
+    </section>
+
+    <section>
+      <div class="section-num">02</div>
+      <h2>Relative Tempo Derivation (RTD) <span class="when">&middot; 2026</span></h2>
+      <p class="status">Provisional patent filed.</p>
+      <p>RTD is a method for estimating a person&rsquo;s temporal state from the ratios between their physiological rhythms (heart rate, cadence, alpha frequency), each normalised to a personal baseline, and expressing it as a single tempo.</p>
+      <p>Timing is everything, and everyone moves to their own beat. The body keeps many clocks; RTD measures three of them, physiological and EEG together, and composes one tempo:</p>
+      <p class="formula">Tempo = HR &times; m &times; &mu;</p>
+      <ul>
+        <li><b>HR:</b> the pulse, the base clock.</li>
+        <li><b>m:</b> how step rate couples to heart rate, bounded by just-intonation intervals: 4/3 at rest, 3/2 in sync, toward 3/1 at a run.</li>
+        <li><b>&mu;:</b> the EEG term. Individual alpha frequency against the person&rsquo;s own baseline.</li>
+      </ul>
+      <p>The tempo is one output. Underneath it is a way to read a person&rsquo;s state from a wearable:</p>
+      <ul>
+        <li><b>Personal baseline:</b> every signal is compared with the wearer&rsquo;s own baseline, not a population norm, so a change means a change in that person.</li>
+        <li><b>Several signals, one reading:</b> pulse, HRV, motion and EEG are read together. When a live signal drops out, the estimate falls back to a prior instead of failing.</li>
+        <li><b>Cold start:</b> before any sensor data exists, each value starts from an estimate built on age, sex, height and weight. Measured signal replaces it within minutes.</li>
+      </ul>
+
+      <figure>
+        <a class="clip" href="media/rtd-in-action.mp4" data-full="media/rtd-in-action.mp4">
+          <video src="media/rtd-preview.mp4" poster="media/rtd-poster.jpg" autoplay muted loop playsinline></video>
+          <span class="play">&#9654; Play the demo &middot; 0:44, with sound</span>
+        </a>
+        <figcaption>RTD running on a recorded session. The click you hear is what this person&rsquo;s time sounds like.</figcaption>
+      </figure>
+
+      <p>Demonstrated on the MoBI dataset (IEEE DataPort): synchronized EEG, IMU, and pulse recorded during walking.</p>
+      <ul>
+        <li><b>Pipeline:</b> ASR artifact cleaning and ICA (64 channels, 22 components rejected); HR and HRV (RMSSD) from pulse; cadence from waist IMU; per-band center-of-gravity frequencies, z-scored against session baseline.</li>
+        <li><b>State detection:</b> identified a multimodal state change at approximately minute 20 &mdash; HR drop, HRV rise, alpha slowing to &minus;2&sigma;, theta dip &mdash; that no single signal showed clearly on its own.</li>
+        <li><b>Output:</b> runs end-to-end with a live signal dashboard and real-time tempo output.</li>
+      </ul>
+
+      <figure>
+        <div class="thumbs">
+          <a href="https://thomaslistens.github.io/rtd/#2" target="_blank" rel="noopener"><img src="media/deck-2.jpg" alt="Deck slide: Timing is everything, and everyone moves to their own beat." loading="lazy"></a>
+          <a href="https://thomaslistens.github.io/rtd/#4" target="_blank" rel="noopener"><img src="media/deck-4.jpg" alt="Deck slide: Relative Tempo Derivation meets you where you are by deriving a musical tempo defined by your temporal experience." loading="lazy"></a>
+          <a href="https://thomaslistens.github.io/rtd/#9" target="_blank" rel="noopener"><img src="media/deck-9.jpg" alt="Deck slide: tempo derived from heart rate, cadence and alpha frequency. What is your tempo?" loading="lazy"></a>
+        </div>
+        <figcaption>The theory and its sources are in the deck (14 slides, interactive, with sound): <a href="https://thomaslistens.github.io/rtd/" target="_blank" rel="noopener">thomaslistens.github.io/rtd</a></figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="section-num">03</div>
+      <h2>Auditory Nerve Phase-Locking Analysis <span class="when">&middot; 2025</span></h2>
+      <p>Analyzed single-fiber auditory nerve recordings from cats (Peterson &amp; Heil, 2020): responses to calibrated 1.2&ndash;1.3 kHz tones across 17 sound levels.</p>
+      <ul>
+        <li>Built Python visualizations of phase locking and synaptic delay.</li>
+        <li>Built a sonification rendering neural spikes as audio aligned to the stimulus cycle.</li>
+      </ul>
+
+      <figure>
+        <a class="clip" href="media/anf-phase-locking.mp4" data-full="media/anf-phase-locking.mp4">
+          <video src="media/anf-preview.mp4" poster="media/anf-poster.jpg" autoplay muted loop playsinline></video>
+          <span class="play">&#9654; Play the full video &middot; 0:38, with sound</span>
+        </a>
+        <figcaption>Each dot is one nerve firing, placed at its phase within the stimulus cycle. As the tone gets louder, the firing locks to the wave. Data: Peterson &amp; Heil (2020).</figcaption>
+      </figure>
+      <p>This work examined how the auditory system encodes sound across intensity levels, and was the starting point for the sonification work above.</p>
+    </section>
+
+    <section>
+      <div class="section-num">04</div>
+      <h2>Close Your Eyes (一片心安) &mdash; EEG-Driven Composition and Film <span class="when">&middot; released Sept 2026</span></h2>
+      <p>Not just a lullaby, but a composition: the music and the visuals both integrate sleep EEG directly from my synthesizer. Deep-sleep recordings from OpenNeuro (ds004902, ds004551) run through the sEEG engine, where delta-band dynamics automate the just-intonation harmony and the same signal moves the image.</p>
+      <p>Completed and commercially released in English and Mandarin &mdash; EEG taken from a technical pipeline to a finished product.</p>
+
+      <div class="clip-row">
+        <figure class="fig-square">
+          <a class="clip" href="media/cye-excerpt.mp4" data-full="media/cye-excerpt.mp4">
+            <video src="media/cye-preview.mp4" poster="media/cye-poster.jpg" autoplay muted loop playsinline></video>
+            <span class="play">&#9654; Play an excerpt &middot; 0:34, Mandarin</span>
+          </a>
+          <figcaption>From the film. The image is a real human eye, navigated by the audio.</figcaption>
+        </figure>
+        <figure class="fig-tall">
+          <a class="clip" href="media/cye-chords-reel.mp4" data-full="media/cye-chords-reel.mp4">
+            <video src="media/cye-chords-preview.mp4" poster="media/cye-chords-poster.jpg" autoplay muted loop playsinline></video>
+            <span class="play">&#9654; Play &middot; 0:30</span>
+          </a>
+          <figcaption><span class="quote">&ldquo;These chords were just a dream at one point, but you can listen to them now.&rdquo;</span> <a href="https://www.instagram.com/reel/DdnLMRLBh_R/" target="_blank" rel="noopener">Live on Instagram</a>: 5,000+ likes.</figcaption>
+        </figure>
+      </div>
+      <p class="credit">Eye: Human Organ Atlas, LADAF-2024-38, imaged at the ESRF. CC BY 4.0. DOI <a href="https://doi.org/10.15151/ESRF-DC-2378105388" target="_blank" rel="noopener">10.15151/ESRF-DC-2378105388</a> and <a href="https://doi.org/10.15151/ESRF-DC-2378105372" target="_blank" rel="noopener">10.15151/ESRF-DC-2378105372</a>.</p>
+    </section>
+
+    <section>
+      <div class="section-num">05</div>
+      <h2>Clinical Exposure</h2>
+      <p>Volunteer observer at Neurologic Music Therapy Services of Arizona (2025&ndash;present). I have personally seen that music therapy works: rhythmic auditory stimulation in stroke gait rehabilitation is sound used to change a person&rsquo;s physiological state.</p>
+    </section>
+
+    <p class="closing">Thank you for listening.</p>
+
+    <hr class="rule" style="margin-top: 1.75rem;">
+    <div class="nav"><a href="../">&larr; R&eacute;sum&eacute;</a></div>
+  </div>
+  <script>
+    // sEEG lanes: draw each channel's trace, sweep a playhead in time with the recording.
+    (function () {
+      var canvas = document.getElementById("lane-canvas");
+      var audio = document.getElementById("lane-audio");
+      var btn = document.getElementById("lane-play");
+      if (!canvas || !audio) return;
+      var ctx = canvas.getContext("2d"), W = canvas.width, H = canvas.height;
+      var css = getComputedStyle(document.documentElement);
+      var NAVY = css.getPropertyValue("--navy").trim(), GRID = css.getPropertyValue("--grid").trim();
+      var LABEL_W = 150, PLOT_W = W - LABEL_W;
+      var lanes = null, seconds = 30, idle = btn.innerHTML;
+
+      function draw() {
+        var frac = audio.duration ? audio.currentTime / audio.duration : 0;
+        var px = Math.round(frac * PLOT_W);
+        ctx.clearRect(0, 0, W, H);
+        ctx.strokeStyle = GRID; ctx.lineWidth = 1; ctx.globalAlpha = 1;
+        for (var s = 5; s < seconds; s += 5) {
+          var gx = LABEL_W + Math.round(s / seconds * PLOT_W) + 0.5;
+          ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
+        }
+        if (!lanes) return;
+        var laneH = H / lanes.length;
+        ctx.font = "500 22px 'Geist Mono', monospace";
+        ctx.textBaseline = "middle";
+        for (var k = 0; k < lanes.length; k++) {
+          var mid = laneH * (k + 0.5), cols = lanes[k].cols;
+          ctx.globalAlpha = 0.9; ctx.fillStyle = NAVY;
+          ctx.fillText(lanes[k].ratio, 16, mid);
+          ctx.globalAlpha = 0.5;
+          ctx.fillText(lanes[k].hz + " Hz", 62, mid);
+          ctx.strokeStyle = NAVY; ctx.lineWidth = 1.5;
+          for (var x = 0; x < PLOT_W; x++) {
+            ctx.globalAlpha = x <= px || frac === 0 ? 0.9 : 0.3;
+            ctx.beginPath();
+            ctx.moveTo(LABEL_W + x + 0.5, mid + cols[x][0]);
+            ctx.lineTo(LABEL_W + x + 0.5, mid + cols[x][1] + 1);
+            ctx.stroke();
+          }
+        }
+        ctx.globalAlpha = 1;
+        if (frac > 0) { ctx.fillStyle = NAVY; ctx.fillRect(LABEL_W + px, 0, 2, H); }
+      }
+      function loop() { draw(); if (!audio.paused) requestAnimationFrame(loop); }
+
+      fetch("media/seeg-lane.json").then(function (r) { return r.json(); }).then(function (j) {
+        seconds = j.seconds;
+        var peak = 0, laneH = H / j.channels.length;
+        j.channels.forEach(function (c) {
+          for (var i = 0; i < c.data.length; i++) peak = Math.max(peak, Math.abs(c.data[i]));
+        });
+        // One shared scale, so the lanes can be compared; loud passages may overlap neighbours.
+        var scale = (laneH * 0.9) / peak;
+        lanes = j.channels.map(function (c) {
+          var d = c.data, cols = [];
+          for (var x = 0; x < PLOT_W; x++) {
+            var a = Math.floor(x / PLOT_W * d.length), b = Math.max(a + 1, Math.floor((x + 1) / PLOT_W * d.length));
+            var lo = Infinity, hi = -Infinity;
+            for (var i = a; i < b; i++) { if (d[i] < lo) lo = d[i]; if (d[i] > hi) hi = d[i]; }
+            cols.push([-hi * scale, -lo * scale]);
+          }
+          return { ratio: c.ratio, hz: c.hz, cols: cols };
+        });
+        draw();
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+      }).catch(function () {});
+
+      function toggle() { if (audio.paused) audio.play(); else audio.pause(); }
+      btn.addEventListener("click", toggle);
+      canvas.addEventListener("click", toggle);
+      audio.addEventListener("play", function () { btn.innerHTML = "&#10073;&#10073; Pause"; loop(); });
+      audio.addEventListener("pause", function () { btn.innerHTML = idle; draw(); });
+      audio.addEventListener("ended", function () { audio.currentTime = 0; draw(); });
+    })();
+
+    // Click a preview loop to swap in the full video, with sound and controls.
+    document.querySelectorAll(".clip").forEach(function (clip) {
+      clip.addEventListener("click", function (e) {
+        if (clip.classList.contains("playing")) return;
+        e.preventDefault();
+        clip.removeAttribute("href");
+        var v = clip.querySelector("video");
+        v.loop = false;
+        v.muted = false;
+        v.controls = true;
+        v.src = clip.dataset.full;
+        clip.classList.add("playing");
+        v.play();
+      });
+    });
+  </script>
+</body>
+</html>
