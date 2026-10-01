@@ -2276,6 +2276,11 @@
           <input type="range" id="responsiveness" min="1" max="20" value="6">
           <span id="respVal">6</span>
         </div>
+
+        <div class="checkbox-row" style="margin-top: 8px;">
+          <input type="checkbox" id="lowLatency">
+          <label for="lowLatency">Low latency (snap to pitch)</label>
+        </div>
       </div>
       
       <div class="control-section">
@@ -2716,6 +2721,7 @@
       rulerX: 0.95,
       smoothing: 8,
       responsiveness: 6,
+      lowLatency: false,
       octaveWrap: true,
       showIndicatorHz: true,
       showIndicatorDeviation: true,
@@ -3595,20 +3601,19 @@
     // cache, resized only when fftSize changes.
     let yinScratch = null;
 
-    function yinDetect(buffer, sampleRate) {
+    // Low-latency integration window (samples). The analyser buffer is
+    // oldest-sample-first, and the default path integrates from index 0,
+    // so at fftSize=4096 the newest ~26 ms of audio is never looked at
+    // and a note change takes ~80 ms to register. In low-latency mode
+    // each tau instead integrates the NEWEST win + tau samples, with a
+    // 1024-sample window (what record mode already runs at) — a note
+    // change registers in ~23 ms, at record-mode jitter levels.
+    const YIN_LOW_LATENCY_WINDOW = 1024;
+
+    function yinDetect(buffer, sampleRate, lowLatency) {
       const threshold = 0.15;
       const bufferSize = buffer.length;
       const halfBuffer = Math.floor(bufferSize / 2);
-
-      let rms = 0;
-      for (let i = 0; i < bufferSize; i++) rms += buffer[i] * buffer[i];
-      rms = Math.sqrt(rms / bufferSize);
-      if (rms < 0.005) return { freq: -1, probability: 0 };
-
-      if (!yinScratch || yinScratch.length !== halfBuffer) {
-        yinScratch = new Float32Array(halfBuffer);
-      }
-      const yinBuffer = yinScratch;
 
       // Bound the outer YIN loop at the lowest expected fundamental.
       // Skipping tau > tauMaxSearch saves CPU proportional to how much
@@ -3620,12 +3625,33 @@
       const tauMinSearch = Math.max(2, Math.floor(sampleRate / YIN_MAX_FREQ_HZ));
       const tauMaxSearch = Math.min(halfBuffer - 1, Math.ceil(sampleRate / YIN_MIN_FREQ_HZ));
 
+      const win = lowLatency
+        ? Math.min(YIN_LOW_LATENCY_WINDOW, bufferSize - tauMaxSearch)
+        : halfBuffer;
+
+      // Silence gate over the samples YIN will actually read, so an
+      // onset isn't held back by the stale front of the buffer.
+      const rmsStart = lowLatency ? bufferSize - win - tauMaxSearch : 0;
+      let rms = 0;
+      for (let i = rmsStart; i < bufferSize; i++) rms += buffer[i] * buffer[i];
+      rms = Math.sqrt(rms / (bufferSize - rmsStart));
+      if (rms < 0.005) return { freq: -1, probability: 0 };
+
+      if (!yinScratch || yinScratch.length !== halfBuffer) {
+        yinScratch = new Float32Array(halfBuffer);
+      }
+      const yinBuffer = yinScratch;
+
       let runningSum = 0;
       yinBuffer[0] = 1;
 
       for (let tau = 1; tau <= tauMaxSearch; tau++) {
         let diff = 0;
-        for (let i = 0; i < halfBuffer; i++) {
+        // Default: integrate from the front of the buffer. Low latency:
+        // end the window at the newest sample for this tau.
+        const start = lowLatency ? bufferSize - win - tau : 0;
+        const end = start + win;
+        for (let i = start; i < end; i++) {
           const delta = buffer[i] - buffer[i + tau];
           diff += delta * delta;
         }
@@ -6065,8 +6091,12 @@
         ctx.globalAlpha *= pitchMix;
         const targetY = centsToY(displayCents);
         
+        // Low latency drops this visual lerp (~60 ms of lag at 0.25).
+        // Record mode keeps a light one: detection runs every other
+        // frame there, so the lerp fills in the skipped frames.
+        const indicatorLerp = config.lowLatency ? (recordMode ? 0.6 : 1) : 0.25;
         if (indicatorY === null) indicatorY = targetY;
-        else indicatorY += (targetY - indicatorY) * 0.25;
+        else indicatorY += (targetY - indicatorY) * indicatorLerp;
         
         const y = indicatorY;
         
@@ -6353,7 +6383,7 @@
           }
           analyser.getFloatTimeDomainData(pitchBuffer);
 
-          const result = yinDetect(pitchBuffer, audioContext.sampleRate);
+          const result = yinDetect(pitchBuffer, audioContext.sampleRate, config.lowLatency);
 
           // Confidence gate: below the floor we treat the frame as "not
           // sure" and don't touch the smoothed pitch - the previous valid
@@ -6372,9 +6402,19 @@
             // (suppresses jumpy frames). Multiplicative modifier preserves
             // the user's slider preferences as the baseline.
             if (result.probability >= PITCH_PROB_HIGH) {
-              alpha = Math.min(0.5, alpha * 2.2);   // ~0.4 at default sliders
+              // Low latency lifts the 0.5 cap so Speed can reach 1 (raw).
+              alpha = Math.min(config.lowLatency ? 1 : 0.5, alpha * 2.2);   // ~0.4 at default sliders
             } else {
               alpha = Math.max(0.04, alpha * 0.5);  // ~0.09 at default sliders
+            }
+            // Low latency: a confident reading that has moved further
+            // than detector jitter is a real pitch move, so pass it
+            // straight through — the sliders then only steady a held
+            // note. Ramps from slider alpha at 10¢ to no smoothing at
+            // 40¢, which also keeps vibrato from lagging.
+            if (config.lowLatency && smoothedCents !== null && result.probability >= PITCH_PROB_HIGH) {
+              const jump = Math.abs(rawCents - smoothedCents);
+              alpha += (1 - alpha) * Math.min(1, Math.max(0, (jump - 10) / 30));
             }
 
             if (smoothedFreq === null) {
@@ -10778,6 +10818,7 @@
         rulerPosition: document.getElementById('rulerPosition').value,
         smoothing: document.getElementById('smoothing').value,
         responsiveness: document.getElementById('responsiveness').value,
+        lowLatency: document.getElementById('lowLatency').checked,
         showIndicatorHz: document.getElementById('showIndicatorHz').checked,
         showIndicatorDeviation: document.getElementById('showIndicatorDeviation').checked,
         showIndicatorRatio: document.getElementById('showIndicatorRatio').checked,
@@ -10836,6 +10877,7 @@
         document.getElementById('rulerPosition').value = session.rulerPosition || (DEFAULTS.rulerX * 100);
         document.getElementById('smoothing').value = session.smoothing || DEFAULTS.smoothing;
         document.getElementById('responsiveness').value = session.responsiveness || DEFAULTS.responsiveness;
+        document.getElementById('lowLatency').checked = session.lowLatency ?? DEFAULTS.lowLatency;
         document.getElementById('showIndicatorHz').checked = session.showIndicatorHz ?? DEFAULTS.showIndicatorHz;
         document.getElementById('showIndicatorDeviation').checked = session.showIndicatorDeviation ?? DEFAULTS.showIndicatorDeviation;
         document.getElementById('showIndicatorRatio').checked = session.showIndicatorRatio ?? DEFAULTS.showIndicatorRatio;
@@ -10912,6 +10954,7 @@
       document.getElementById('rulerPosition').value = DEFAULTS.rulerX * 100;
       document.getElementById('smoothing').value = DEFAULTS.smoothing;
       document.getElementById('responsiveness').value = DEFAULTS.responsiveness;
+      document.getElementById('lowLatency').checked = DEFAULTS.lowLatency;
       document.getElementById('showIndicatorHz').checked = DEFAULTS.showIndicatorHz;
       document.getElementById('showIndicatorDeviation').checked = DEFAULTS.showIndicatorDeviation;
       document.getElementById('showIndicatorRatio').checked = DEFAULTS.showIndicatorRatio;
@@ -10964,6 +11007,7 @@
       config.rulerX = document.getElementById('rulerPosition').value / 100;
       config.smoothing = parseInt(document.getElementById('smoothing').value);
       config.responsiveness = parseInt(document.getElementById('responsiveness').value);
+      config.lowLatency = document.getElementById('lowLatency').checked;
       config.showIndicatorHz = document.getElementById('showIndicatorHz').checked;
       config.showIndicatorDeviation = document.getElementById('showIndicatorDeviation').checked;
       config.showIndicatorRatio = document.getElementById('showIndicatorRatio').checked;
@@ -11087,6 +11131,7 @@
       document.getElementById('rulerPosition').addEventListener('input', updateConfig);
       document.getElementById('smoothing').addEventListener('input', updateConfig);
       document.getElementById('responsiveness').addEventListener('input', updateConfig);
+      document.getElementById('lowLatency').addEventListener('change', updateConfig);
       document.getElementById('showIndicatorHz').addEventListener('change', updateConfig);
       document.getElementById('showIndicatorDeviation').addEventListener('change', updateConfig);
       document.getElementById('showIndicatorRatio').addEventListener('change', updateConfig);
@@ -12101,7 +12146,7 @@
         clearTimeout(saveTimeout);
         saveTimeout = setTimeout(saveSession, 500);
       }
-      const autoSaveTriggers = ['ratios', 'refFreq', 'showCents', 'showHz', 'showGhost', 'octaveWrap', 'show12EDO', 'edoOffset', 'rulerPosition', 'smoothing', 'responsiveness', 'showIndicatorHz', 'showIndicatorDeviation', 'showIndicatorRatio'];
+      const autoSaveTriggers = ['ratios', 'refFreq', 'showCents', 'showHz', 'showGhost', 'octaveWrap', 'show12EDO', 'edoOffset', 'rulerPosition', 'smoothing', 'responsiveness', 'lowLatency', 'showIndicatorHz', 'showIndicatorDeviation', 'showIndicatorRatio'];
       autoSaveTriggers.forEach(id => {
         document.getElementById(id).addEventListener('change', scheduleSave);
       });
