@@ -240,8 +240,14 @@
 
     @media print {
       body { padding: 0; }
-      .nav, .play { display: none; }
-      section { break-inside: avoid; }
+      .nav, .play, .doc > .rule:last-of-type { display: none; }
+      .title-block { padding: 0.5rem 0 1rem; }
+      section { padding-top: 1.1rem; }
+      figure, li, .clip-row { break-inside: avoid; }
+      h2, .formula { break-after: avoid; }
+      figure:not(.fig-square):not(.fig-tall) { max-width: 78%; }
+      .fig-square { flex-basis: 250px; }
+      .fig-tall { flex-basis: 141px; }
     }
   </style>
 </head>

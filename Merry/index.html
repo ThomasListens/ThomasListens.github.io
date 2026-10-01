@@ -862,9 +862,12 @@
       }
     }
 
+    /* Print: scaled so the whole resume fits one US Letter page. */
     @media print {
       * { animation: none !important; }
-      body { padding: 4rem 2rem; }
+      html { zoom: 0.70; }
+      html, body { min-height: 0; }
+      body { padding: 2.5rem 2rem 0; }
     }
   </style>
 </head>
