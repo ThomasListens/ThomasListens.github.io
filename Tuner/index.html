@@ -1007,6 +1007,44 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    /* ====================================================================
+       Dock groups + accidental-touch guard (2026-10-12).
+       The dock had grown to ~30 sliders in one scrolling list, so scrolling
+       it with a thumb kept moving settings. Two changes:
+         1. Rows are gathered under headers that open and close (JS:
+            setupDockGroups). Headers and rows stay DIRECT children of
+            #recordOverlay, so the settings-hidden rule
+            (#recordOverlay > :not(.record-essential)) still hides them all.
+         2. A slider in the dock only answers a sideways drag (JS:
+            setupDockTouchGuard). touch-action: pan-y hands a vertical swipe
+            that starts on a slider back to the dock's own scrolling.
+       ==================================================================== */
+    #recordOverlay > .dock-group-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      box-sizing: border-box;
+      margin: 6px 0 2px;
+      padding: 9px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(255, 255, 255, 0.82);
+      font-family: inherit;
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      cursor: pointer;
+      flex-shrink: 0;
+      touch-action: manipulation;
+    }
+    #recordOverlay > .dock-group-head::after { content: '+'; font-size: 15px; letter-spacing: 0; opacity: 0.7; }
+    #recordOverlay > .dock-group-head.open { background: rgba(255, 255, 255, 0.12); color: #fff; }
+    #recordOverlay > .dock-group-head.open::after { content: '\2212'; }
+    #recordOverlay > .dock-collapsed { display: none !important; }
+    #recordOverlay input[type="range"] { touch-action: pan-y; }
+
     #recordOverlay .studio-divider {
       border-top: 1px solid rgba(255,255,255,0.08);
       margin: 4px auto 0;
@@ -1344,7 +1382,11 @@
       right: auto;
       top: auto;
       max-width: calc(100% - 24px);  /* unified strip: FILT + VOL + button row */
-      z-index: 200;
+      /* Above the dock (z 200), like the other floating controls. At 200
+         it tied with the dock, which comes later in the page and so won:
+         a touch on FILT / VOL / MIX landed on whichever dock slider had
+         scrolled underneath and moved that instead (2026-10-12). */
+      z-index: 255;
       flex-direction: column;
       align-items: center;
       gap: 10px;
@@ -1874,6 +1916,18 @@
       text-align: center;
       padding: 6px 0;
     }
+    /* The reel map and the place arrows (2026-10-13). */
+    #layerVolumePanel .lv-maprow { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+    #layerVolumePanel .lv-map { border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 3px; flex-shrink: 0; }
+    #layerVolumePanel .lv-maphint { font-size: 10px; line-height: 1.35; color: rgba(255, 255, 255, 0.6); }
+    #layerVolumePanel .lv-move { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; flex-shrink: 0; }
+    #layerVolumePanel .lv-move button {
+      width: 26px; height: 26px; padding: 0; border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.06);
+      color: #dcebff; font-size: 11px; line-height: 1; cursor: pointer; touch-action: manipulation;
+    }
+    #layerVolumePanel .lv-move button:disabled { opacity: 0.25; cursor: default; }
+    #layerVolumePanel .lv-slot { min-width: 14px; text-align: center; font-size: 11px; color: #cfe6ff; }
     #layerVolumePanel .lv-foot {
       margin-top: 6px;
       padding-top: 8px;
@@ -4329,6 +4383,16 @@
           updateVoiceProcNote();
           updateVoiceReverbControlsVisibility();
           startMeterLoop();
+          // ...unless record mode is ALREADY on. Entering record mode does
+          // not start the mic, so on a fresh page the usual order is:
+          // enter record mode (no micProcessing yet, so enterRecordMode's
+          // applyVoiceFX is skipped), then press record (which lands here).
+          // Without this the chain was never built for that first take:
+          // the "v" chip showed reverb on, but the recording was dry, with
+          // no low cut, compression or de-ess either, until some FX toggle
+          // happened to rebuild it. (Thomas hit it on a 4:5 take, 2026-10-12;
+          // the shape was a coincidence.)
+          if (recordMode) applyVoiceFX({ smooth: false });
         }
       }
       if (!tanpuraNodes) {
@@ -8141,127 +8205,93 @@
     // the last row, so cells stay gap-free and the encoder still sees
     // a clean 8/16-aligned frame.
     //
-    // Layout family — kept simple on purpose; cells letterbox the
-    // source (see drawFrame's contain-fit block) instead of cropping,
-    // so cell shape never costs Thomas any recorded content:
+    // Layout family (2026-10-13, picked by Thomas from a sheet of mockups:
+    // "The proposed sheet looks great!!"). A take is never cropped: each
+    // cell letterboxes its source (see drawFrame's contain-fit block). So
+    // the layouts are built from cells that have the FRAME'S OWN SHAPE,
+    // which is the shape the takes are recorded in, and a take then fills
+    // its cell with no bars at all. The old family (full-width rows, 2-wide
+    // grids) put portrait takes in landscape cells and left a third to a
+    // half of the frame black.
+    //
+    // Slot 1 is the largest cell. By default it holds the newest take;
+    // the Layers panel lets Thomas put any take in any slot (stackSlotOrder).
     //   n=1 → full frame
-    //   n=2 → 2 stacked rows, full-width
-    //   n=3 → 3 stacked rows, full-width
-    //   n=4 → 2×2 grid
-    //   n=5 → 1 full-width row (most-recent) + 2×2 grid below
-    //   n=6 → 3×2 grid (3 rows × 2 cols)
-    //   n=7 → 4×2 grid with bottom-right cell empty (canvas black)
-    //   n=8 → 4×2 grid (4 rows × 2 cols)
+    //   n=2 → side by side, a band across the middle           (50% of the frame)
+    //   n=3 → one large (2/3 wide) + two stacked beside it      (67%)
+    //   n=4 → 2×2 grid                                          (100%)
+    //   n=5 → a row of two over a row of three                  (83%)
+    //   n=6 → one large + two beside it + a row of three below  (100%)
+    //   n=7 → the same with a row of four below                 (92%)
+    //   n=8 → the same with a row of five below                 (87%)
+    // What is left over is split evenly above and below the block.
     function getStackCells(n, dimsOverride) {
       const dims = dimsOverride || ASPECT_DIMS[recordAspect] || ASPECT_DIMS['9:16'];
       const W = dims[0], H = dims[1];
-      const h2 = Math.floor(H / 2);
-      const h3 = Math.floor(H / 3);
-      const h4 = Math.floor(H / 4);
-      const w2 = Math.floor(W / 2);
-      if (n <= 1) {
-        return { cells: [{ x: 0, y: 0, w: W, h: H }], outputW: W, outputH: H };
-      }
-      if (n === 2) {
-        // 2 rows, full width — most recent on top.
-        return {
-          cells: [
-            { x: 0, y: 0,  w: W, h: h2 },
-            { x: 0, y: h2, w: W, h: H - h2 },
-          ],
-          outputW: W, outputH: H,
-        };
-      }
-      if (n === 3) {
-        // 3 rows, full width.
-        return {
-          cells: [
-            { x: 0, y: 0,      w: W, h: h3 },
-            { x: 0, y: h3,     w: W, h: h3 },
-            { x: 0, y: h3 * 2, w: W, h: H - h3 * 2 },
-          ],
-          outputW: W, outputH: H,
-        };
-      }
-      if (n === 4) {
-        // 2x2 grid — most recent top-left, fills row-major.
-        return {
-          cells: [
-            { x: 0,  y: 0,  w: w2,     h: h2 },
-            { x: w2, y: 0,  w: W - w2, h: h2 },
-            { x: 0,  y: h2, w: w2,     h: H - h2 },
-            { x: w2, y: h2, w: W - w2, h: H - h2 },
-          ],
-          outputW: W, outputH: H,
-        };
-      }
-      if (n === 5) {
-        // Top row full-width (most recent), then 2x2 grid below.
-        return {
-          cells: [
-            { x: 0,  y: 0,      w: W,      h: h3 },
-            { x: 0,  y: h3,     w: w2,     h: h3 },
-            { x: w2, y: h3,     w: W - w2, h: h3 },
-            { x: 0,  y: h3 * 2, w: w2,     h: H - h3 * 2 },
-            { x: w2, y: h3 * 2, w: W - w2, h: H - h3 * 2 },
-          ],
-          outputW: W, outputH: H,
-        };
-      }
-      if (n === 6) {
-        // 3 rows x 2 cols.
-        return {
-          cells: [
-            { x: 0,  y: 0,      w: w2,     h: h3 },
-            { x: w2, y: 0,      w: W - w2, h: h3 },
-            { x: 0,  y: h3,     w: w2,     h: h3 },
-            { x: w2, y: h3,     w: W - w2, h: h3 },
-            { x: 0,  y: h3 * 2, w: w2,     h: H - h3 * 2 },
-            { x: w2, y: h3 * 2, w: W - w2, h: H - h3 * 2 },
-          ],
-          outputW: W, outputH: H,
-        };
-      }
-      if (n === 7) {
-        // 4 rows x 2 cols with the bottom-right cell left empty.
-        // Same grid pattern as n=6 (3x2) and n=8 (4x2) so the eye
-        // reads one consistent layout family across 6/7/8 stacks
-        // (each row is a cell-pair, most-recent top-left). The empty
-        // bottom-right tile is just the canvas's black background —
-        // no per-cell render, the for-loop stops at videoEls.length.
-        return {
-          cells: [
-            { x: 0,  y: 0,      w: w2,     h: h4 },
-            { x: w2, y: 0,      w: W - w2, h: h4 },
-            { x: 0,  y: h4,     w: w2,     h: h4 },
-            { x: w2, y: h4,     w: W - w2, h: h4 },
-            { x: 0,  y: h4 * 2, w: w2,     h: h4 },
-            { x: w2, y: h4 * 2, w: W - w2, h: h4 },
-            { x: 0,  y: h4 * 3, w: w2,     h: H - h4 * 3 },
-            // [w2, h4*3] - [W, H] intentionally empty
-          ],
-          outputW: W, outputH: H,
-        };
-      }
-      if (n === 8) {
-        // 4 rows x 2 cols.
-        return {
-          cells: [
-            { x: 0,  y: 0,      w: w2,     h: h4 },
-            { x: w2, y: 0,      w: W - w2, h: h4 },
-            { x: 0,  y: h4,     w: w2,     h: h4 },
-            { x: w2, y: h4,     w: W - w2, h: h4 },
-            { x: 0,  y: h4 * 2, w: w2,     h: h4 },
-            { x: w2, y: h4 * 2, w: W - w2, h: h4 },
-            { x: 0,  y: h4 * 3, w: w2,     h: H - h4 * 3 },
-            { x: w2, y: h4 * 3, w: W - w2, h: H - h4 * 3 },
-          ],
-          outputW: W, outputH: H,
-        };
-      }
-      // n > 8 — should never happen given HARMONY_STACK_MAX === 8, but
-      // fall back to the n=8 layout on the most recent 8 takes.
-      return getStackCells(8);
+      n = Math.max(1, Math.min(8, n | 0));
+      // Cells are described in fractions of the frame and snapped to whole
+      // pixels by their EDGES, so neighbours share an edge exactly: no gap
+      // and no overlap at any output size.
+      const cell = (x0, y0, x1, y1) => {
+        const X0 = Math.round(x0 * W), Y0 = Math.round(y0 * H);
+        return { x: X0, y: Y0, w: Math.round(x1 * W) - X0, h: Math.round(y1 * H) - Y0 };
+      };
+      // A row of c takes across the full width is 1/c of the frame's height
+      // when each take has the frame's shape.
+      const rowsOf = (counts) => {
+        const total = counts.reduce((s, c) => s + 1 / c, 0);
+        let y = (1 - total) / 2;
+        const out = [];
+        for (const c of counts) {
+          for (let i = 0; i < c; i++) out.push(cell(i / c, y, (i + 1) / c, y + 1 / c));
+          y += 1 / c;
+        }
+        return out;
+      };
+      // The large take is 2/3 of the width (so 2/3 of the height); the two
+      // beside it are 1/3 each, stacked; `below` more share a row beneath.
+      const heroOf = (below) => {
+        const total = 2 / 3 + (below ? 1 / below : 0);
+        const y = (1 - total) / 2;
+        const out = [
+          cell(0, y, 2 / 3, y + 2 / 3),
+          cell(2 / 3, y, 1, y + 1 / 3),
+          cell(2 / 3, y + 1 / 3, 1, y + 2 / 3),
+        ];
+        for (let i = 0; i < below; i++) out.push(cell(i / below, y + 2 / 3, (i + 1) / below, y + 2 / 3 + 1 / below));
+        return out;
+      };
+      const cells =
+        n === 1 ? [cell(0, 0, 1, 1)] :
+        n === 2 ? rowsOf([2]) :
+        n === 3 ? heroOf(0) :
+        n === 4 ? rowsOf([2, 2]) :
+        n === 5 ? rowsOf([2, 3]) :
+        heroOf(n - 3);
+      return { cells, outputW: W, outputH: H };
+    }
+
+    // Which take goes in which slot of the layout. Returns the stack's
+    // video layers in slot order (slot 1 first). A layer Thomas has placed
+    // carries `slot` (a rank); layers he has not placed come first, newest
+    // first, so a fresh take lands in the large slot and the ones he
+    // arranged keep their order behind it. Audio-only layers have no cell
+    // and are not in the list.
+    function stackSlotOrder() {
+      const vids = harmonyStack.filter(l => l && !l.audioOnly);
+      const placed = l => typeof l.slot === 'number' && isFinite(l.slot);
+      const fresh = vids.filter(l => !placed(l)).reverse();
+      const set = vids.filter(placed).sort((a, b) => a.slot - b.slot);
+      return fresh.concat(set);
+    }
+    // Move a take one slot earlier (-1) or later (+1), and pin the whole
+    // arrangement as it now stands.
+    function moveStackSlot(layer, dir) {
+      const order = stackSlotOrder();
+      const i = order.indexOf(layer), j = i + dir;
+      if (i < 0 || j < 0 || j >= order.length) return;
+      order[i] = order[j]; order[j] = layer;
+      order.forEach((l, k) => { l.slot = k; });
     }
 
     // Guard so a second tap on Export reel doesn't kick off a parallel
@@ -8321,7 +8351,8 @@
       const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const outName = 'reel-stacked-' + ts + '.mp4';
 
-      // Reverse so cells[0] = most recent (harmonyStack is oldest-first).
+      // Newest first (harmonyStack is oldest-first). Which cell each video
+      // layer gets is decided below, by videoLayerIdx.
       const ordered = harmonyStack.slice().reverse();
 
       // Split out the video-bearing layers: only these get cells in the
@@ -8329,10 +8360,9 @@
       // layers stay in `ordered` and contribute to the audio mix loop
       // below — they do NOT add cells or change the video composite.
       // videoLayerIdx[k] = index into `ordered` for the k-th video cell.
-      const videoLayerIdx = [];
-      for (let i = 0; i < ordered.length; i++) {
-        if (!ordered[i].audioOnly) videoLayerIdx.push(i);
-      }
+      // The cells are filled in slot order: by default newest first, or
+      // as arranged in the Layers panel (stackSlotOrder).
+      const videoLayerIdx = stackSlotOrder().map(l => ordered.indexOf(l)).filter(i => i >= 0);
       const nVideo = videoLayerIdx.length;
 
       // No n=1 fast path: even a single take must be upscaled to IG
@@ -9866,6 +9896,39 @@
         panel.appendChild(empty);
         return;
       }
+      // A small map of the reel as it will export: each cell carries the
+      // number of the layer that sits in it, so "L3 in the big slot" can
+      // be seen before exporting. Redrawn whenever a layer is moved.
+      const slots = stackSlotOrder();
+      if (slots.length > 1) {
+        const dims = IG_OUTPUT_DIMS[recordAspect] || IG_OUTPUT_DIMS['9:16'];
+        const lay = getStackCells(slots.length, dims);
+        const mapH = 150, k = mapH / dims[1];
+        const map = document.createElement('canvas');
+        map.className = 'lv-map';
+        map.width = Math.round(dims[0] * k * 2); map.height = mapH * 2;      // 2x for a sharp small picture
+        map.style.width = Math.round(dims[0] * k) + 'px'; map.style.height = mapH + 'px';
+        const mc = map.getContext('2d');
+        mc.fillStyle = '#000'; mc.fillRect(0, 0, map.width, map.height);
+        mc.textAlign = 'center'; mc.textBaseline = 'middle';
+        lay.cells.forEach((c, s) => {
+          const layer = slots[s]; if (!layer) return;
+          const x = c.x * k * 2, y = c.y * k * 2, w = c.w * k * 2, h = c.h * k * 2;
+          mc.fillStyle = s === 0 ? '#3b6ea8' : '#27425f';
+          mc.fillRect(x + 1.5, y + 1.5, w - 3, h - 3);
+          mc.fillStyle = '#eaf3ff';
+          mc.font = '600 ' + Math.max(16, Math.min(w, h) * 0.34) + 'px system-ui, sans-serif';
+          mc.fillText('L' + (harmonyStack.indexOf(layer) + 1), x + w / 2, y + h / 2);
+        });
+        const mapRow = document.createElement('div');
+        mapRow.className = 'lv-maprow';
+        const hint = document.createElement('div');
+        hint.className = 'lv-maphint';
+        hint.textContent = 'Where each layer sits in the reel. Use the arrows on a layer to move it to another place.';
+        mapRow.appendChild(map);
+        mapRow.appendChild(hint);
+        panel.appendChild(mapRow);
+      }
       rows.forEach((layer, visIdx) => {
         // origIdx maps the visual (reversed) index back to harmonyStack
         // for the user-facing layer number. Layer 1 = oldest, layer N =
@@ -9922,11 +9985,34 @@
         row.appendChild(labelCol);
         row.appendChild(slider);
         row.appendChild(readout);
+        // Place in the reel: which slot this layer is in, and arrows to
+        // move it one slot earlier or later. Only layers with video have
+        // a place.
+        if (!layer.audioOnly && slots.length > 1) {
+          const at = slots.indexOf(layer);
+          const mv = document.createElement('span');
+          mv.className = 'lv-move';
+          const mk = (glyph, dir, title) => {
+            const bt = document.createElement('button');
+            bt.type = 'button'; bt.textContent = glyph; bt.title = title; bt.setAttribute('aria-label', title);
+            bt.disabled = at + dir < 0 || at + dir >= slots.length;
+            bt.addEventListener('click', () => { moveStackSlot(layer, dir); renderLayerVolumePanel(); });
+            return bt;
+          };
+          const where = document.createElement('span');
+          where.className = 'lv-slot';
+          where.textContent = String(at + 1);
+          where.title = 'Place ' + (at + 1) + ' of ' + slots.length + ' (1 is the largest)';
+          mv.appendChild(mk('\u25C0', -1, 'Move to an earlier place'));
+          mv.appendChild(where);
+          mv.appendChild(mk('\u25B6', 1, 'Move to a later place'));
+          row.appendChild(mv);
+        }
         panel.appendChild(row);
       });
       const foot = document.createElement('div');
       foot.className = 'lv-foot';
-      foot.textContent = 'Volume applies live to the monitor during recording and to each layer in the exported reel.';
+      foot.textContent = 'Volume applies live to the monitor during recording and to each layer in the exported reel. The arrows set where a layer sits in the reel; place 1 is the largest.';
       panel.appendChild(foot);
     }
 
@@ -12162,9 +12248,106 @@
         if (recordMode) scheduleSave();
       });
 
+      setupDockGroups(recordOverlay);
+      setupDockTouchGuard(recordOverlay);
+
       updateConfig();
     }
-    
+
+    // -------- Dock groups --------
+    // Gathers the record dock's rows under headers that open and close, so
+    // the dock is a short list of names instead of thirty live sliders.
+    // Nothing is moved or wrapped: a header is inserted before a group's
+    // first row and the group's rows get .dock-collapsed while it is shut.
+    // Each group is named by the id of a control in its first row and one
+    // in its last; every direct child of the dock between them belongs.
+    // All groups start shut; which are open is remembered
+    // (tuner.dockGroups). The aspect buttons and the record row are in no
+    // group and always show.
+    function setupDockGroups(dock) {
+      const GROUPS = [
+        ['framing', 'Framing',     'zoomSlider',        'featherWidthSlider'],
+        ['picture', 'Picture',     'brightSlider',      'bwToneSlider'],
+        ['ruler',   'Ruler',       'trailSlider',       'rulerPanSlider'],
+        ['label',   'Ratio label', 'ratioLabelToggle',  'ratioSizeSlider'],
+        ['capture', 'Capture',     'recResSelect',      'fxAutoSinesToggle'],
+        ['sound',   'Sound',       'autoSineVolume',    'dockVoiceReverbTail'],
+        ['sync',    'Sync',        'btHeadphonesOn',    'btLatencySlider'],
+        ['reel',    'Reel',        'reelLengthMode',    'loadTakeBtn'],
+      ];
+      let open = {};
+      try { open = JSON.parse(localStorage.getItem('tuner.dockGroups') || '{}') || {}; } catch (_) {}
+      const rowOf = id => {
+        let el = document.getElementById(id);
+        while (el && el.parentElement !== dock) el = el.parentElement;
+        return el;
+      };
+      for (const [key, title, firstId, lastId] of GROUPS) {
+        const first = rowOf(firstId), last = rowOf(lastId);
+        if (!first || !last) continue;
+        const rows = [];
+        for (let el = first; el; el = el.nextElementSibling) { rows.push(el); if (el === last) break; }
+        if (rows[rows.length - 1] !== last) continue;      // out of order in the page: leave this group alone
+        const head = document.createElement('button');
+        head.type = 'button';
+        head.className = 'dock-group-head';
+        head.textContent = title;
+        dock.insertBefore(head, first);
+        const apply = () => {
+          head.classList.toggle('open', !!open[key]);
+          head.setAttribute('aria-expanded', open[key] ? 'true' : 'false');
+          for (const r of rows) r.classList.toggle('dock-collapsed', !open[key]);
+        };
+        head.addEventListener('click', () => {
+          open[key] = !open[key];
+          try { localStorage.setItem('tuner.dockGroups', JSON.stringify(open)); } catch (_) {}
+          apply();
+        });
+        apply();
+      }
+    }
+
+    // -------- Accidental-touch guard --------
+    // On a touch screen a slider in the dock changes only when the finger
+    // drags it sideways. A tap on its track, or a touch that turns out to
+    // be a scroll, leaves the value where it was. (A range input jumps to
+    // the finger the moment it is touched, which is how scrolling the dock
+    // kept moving settings.) Until the drag is known to be sideways the
+    // slider is held at its starting value and its 'input' events are
+    // stopped here, in the capture phase, before any setting sees them.
+    // A mouse is precise and is left alone.
+    function setupDockTouchGuard(dock) {
+      const SLOP = 10;              // px of sideways travel that counts as meaning it
+      let g = null;                 // the touch in progress on a slider
+      const hold = () => { if (g && g.el.value !== g.v) g.el.value = g.v; };
+      dock.addEventListener('pointerdown', (e) => {
+        const el = e.target.closest && e.target.closest('input[type="range"]');
+        if (!el || e.pointerType === 'mouse') { g = null; return; }
+        g = { el, v: el.value, x: e.clientX, y: e.clientY, id: e.pointerId, ok: false };
+      }, true);
+      dock.addEventListener('pointermove', (e) => {
+        if (!g || g.ok || e.pointerId !== g.id) return;
+        const dx = Math.abs(e.clientX - g.x), dy = Math.abs(e.clientY - g.y);
+        if (dx >= SLOP && dx > dy * 1.5) g.ok = true;      // a deliberate sideways drag: let the slider go
+      }, true);
+      const stop = (e) => {
+        if (!g || g.ok || e.target !== g.el) return;
+        e.stopImmediatePropagation();
+        hold();
+      };
+      dock.addEventListener('input', stop, true);
+      dock.addEventListener('change', stop, true);
+      const end = (e) => {
+        if (!g || e.pointerId !== g.id) return;
+        if (!g.ok) hold();
+        // the browser may still deliver a last input/change for this touch
+        const done = g;
+        setTimeout(() => { if (g === done) g = null; }, 60);
+      };
+      dock.addEventListener('pointerup', end, true);
+      dock.addEventListener('pointercancel', end, true);
+    }
+
     init();
   </script>
 </body>
