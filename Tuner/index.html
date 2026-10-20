@@ -2749,9 +2749,9 @@
          fresh reel can be stacked on top of an earlier take. Gated behind
          the studio reveal like the other settings rows (non-essential). -->
     <div class="aspect-row">
-      <button class="aspect-btn" id="loadTakeBtn" style="max-width: none;" title="Load a previous take (MP4) from disk as a harmony layer">+ Load take</button>
+      <button class="aspect-btn" id="loadTakeBtn" style="max-width: none;" title="Load a previous take (MP4) as a harmony layer, or an audio file (WAV, M4A, MP3) as an audio-only backing track to record over">+ Load take</button>
     </div>
-    <input type="file" id="loadTakeFile" accept="video/*" style="display:none">
+    <input type="file" id="loadTakeFile" accept="video/*,audio/*" style="display:none">
 
     <div class="record-row record-essential">
       <button type="button" id="audioOnlyBtn" title="Audio-only take — overdub vocal without video. Mixes into the final reel over the existing composite, no new cell." aria-label="Toggle audio-only recording" aria-pressed="false">AUD</button>
@@ -9667,6 +9667,9 @@
     // nearest matching aspect (least surprising — the take fills its
     // cell the way it was filmed). bakeDownDelayMs 0: a previously
     // recorded MP4 already has the voice where it lies, no front-trim.
+    // An audio file (a beat, a backing track) loads as an audio-only layer
+    // instead: no video cell and no aspect change, but it plays under every
+    // take recorded after it and is mixed into the exported reel.
     async function loadTakeFromFile(file) {
       if (!file) return;
       if (harmonyStack.length >= HARMONY_STACK_MAX) {
@@ -9674,11 +9677,13 @@
         setTimeout(hideRemuxIndicator, 3000);
         return;
       }
+      const isAudio = (file.type || '').startsWith('audio/') ||
+        /\.(wav|m4a|mp3|aac|flac|ogg|opus|aif|aiff)$/i.test(file.name || '');
       try {
-        showRemuxIndicator('Loading take…');
+        showRemuxIndicator(isAudio ? 'Loading backing track…' : 'Loading take…');
         // Auto-match reel aspect to the loaded file. Best-effort: if the
         // probe fails we just push and let the composite math handle it.
-        try {
+        if (!isAudio) try {
           const dims = await probeVideoAspect(file);
           if (dims && dims.w && dims.h) {
             const r = dims.w / dims.h;
@@ -9696,14 +9701,16 @@
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
         harmonyStack.push({
           audioBuffer,
-          videoBlob: file,
-          audioOnly: false,
+          videoBlob: isAudio ? null : file,
+          audioOnly: isAudio,
           durationSec: audioBuffer.duration,
           gain: 1.0,
           bakeDownDelayMs: 0,
         });
         updateStackIndicator();
-        showRemuxIndicator('Layer ' + harmonyStack.length + ' loaded from file');
+        showRemuxIndicator(isAudio
+          ? ('Backing track loaded (audio layer ' + harmonyStack.length + ')')
+          : ('Layer ' + harmonyStack.length + ' loaded from file'));
         setTimeout(hideRemuxIndicator, 1500);
       } catch (err) {
         console.warn('[stack] load-from-file failed:', err);
