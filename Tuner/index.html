@@ -2751,7 +2751,7 @@
     <div class="aspect-row">
       <button class="aspect-btn" id="loadTakeBtn" style="max-width: none;" title="Load a previous take (MP4) as a harmony layer, or an audio file (WAV, M4A, MP3) as an audio-only backing track to record over">+ Load take</button>
     </div>
-    <input type="file" id="loadTakeFile" accept="video/*,audio/*" style="display:none">
+    <input type="file" id="loadTakeFile" accept="video/*,audio/*" multiple style="display:none">
 
     <div class="record-row record-essential">
       <button type="button" id="audioOnlyBtn" title="Audio-only take — overdub vocal without video. Mixes into the final reel over the existing composite, no new cell." aria-label="Toggle audio-only recording" aria-pressed="false">AUD</button>
@@ -2947,11 +2947,12 @@
     //                      Persisted under tuner.btLatencyMs (BT slot),
     //                      tuner.btLatencyMsNoBt (non-BT slot), and
     //                      tuner.btHeadphonesOn (which slot is active).
-    // HARMONY_STACK_MAX:   cap on stacked layers — ~8 × 30s × stereo × 48kHz
-    //                      × 4 bytes ≈ 92 MB, comfortable on Pixel-class
-    //                      devices. Each layer also costs one
-    //                      BufferSourceNode + DelayNode, both cheap.
-    const HARMONY_STACK_MAX = 8;
+    // HARMONY_STACK_MAX:   cap on stacked layers. Raised from 8 to 16 so six parts
+    //                      can each be doubled with an audio-only take, plus the
+    //                      beat (13 layers). ~16 × 30s × stereo × 48kHz × 4 bytes
+    //                      ≈ 184 MB of decoded audio; fine on current phones.
+    //                      Each layer also costs one BufferSourceNode + DelayNode.
+    const HARMONY_STACK_MAX = 16;
     const harmonyStack = [];
     let lastRecordedBlob = null;
     // Reel export — the composed Blob is parked here after
@@ -9305,16 +9306,21 @@
         const recordedBlob = new Blob(chunks, { type });
 
         // Audio-only take: skip the FFmpeg faststart remux (the audio
-        // file never ships to IG — only the final composite reel does),
-        // skip the auto-download (no per-take artifact is needed for an
-        // overdub layer; saving them all would pollute Downloads), and
-        // route straight into lastRecordedBlob so "+ layer" can decode
-        // it on the next tap.
+        // file never ships to IG — only the final composite reel does)
+        // and route straight into lastRecordedBlob so "+ layer" can decode
+        // it on the next tap. It IS saved to Downloads (harmony-audio-…),
+        // like video takes: the stack lives only in memory, so without a
+        // file a reload loses the take. "Load take" can bring it back.
         if (audioOnly) {
           _lastRecordedWasAudioOnly = true;
           lastRecordedBlob = recordedBlob;
+          try {
+            const ats = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const aext = /mp4|aac/.test(type) ? 'm4a' : (/ogg/.test(type) ? 'ogg' : 'webm');
+            downloadBlob(recordedBlob, 'harmony-audio-' + ats + '.' + aext);
+          } catch (e) { console.warn('[record] audio take save failed:', e); }
           try { updateStackIndicator(); } catch (_) {}
-          showRemuxIndicator('Audio take captured — tap + layer', { });
+          showRemuxIndicator('Audio take saved — tap + layer', { });
           setTimeout(hideRemuxIndicator, 3500);
           recordedChunks = [];
           return;
@@ -9678,6 +9684,7 @@
         return;
       }
       const isAudio = (file.type || '').startsWith('audio/') ||
+        /^harmony-audio-/i.test(file.name || '') ||
         /\.(wav|m4a|mp3|aac|flac|ogg|opus|aif|aiff)$/i.test(file.name || '');
       try {
         showRemuxIndicator(isAudio ? 'Loading backing track…' : 'Loading take…');
@@ -11953,10 +11960,14 @@
       const loadTakeFile = document.getElementById('loadTakeFile');
       if (loadTakeBtn && loadTakeFile) {
         loadTakeBtn.addEventListener('click', () => loadTakeFile.click());
-        loadTakeFile.addEventListener('change', (e) => {
-          const f = e.target.files && e.target.files[0];
-          if (f) loadTakeFromFile(f);
+        // Several files can be picked at once (rebuilding a stack from
+        // Downloads). They load one after another in name order, which for
+        // the app's own harmony-<timestamp> files is the order they were
+        // recorded in.
+        loadTakeFile.addEventListener('change', async (e) => {
+          const files = Array.from((e.target.files) || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
           e.target.value = '';
+          for (const f of files) await loadTakeFromFile(f);
         });
       }
       // Audio-only toggle — restore from localStorage, then wire the
