@@ -9706,14 +9706,31 @@
         getAudioContext();
         const arrayBuffer = await file.arrayBuffer();
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
-        harmonyStack.push({
+        // A take this app recorded over the stack (harmony-… / harmony-audio-…)
+        // starts with the headphone round-trip as silence; the in-app layer
+        // carried that as bakeDownDelayMs, but the saved file doesn't. For
+        // these, bakeDownDelayMs FOLLOWS the current latency setting (a live
+        // getter), the same value new takes are recorded with, so a reloaded
+        // take lines up with the beat, and nudging the latency slider moves
+        // it if it ever sounds off. Other files (a beat, an outside
+        // recording) get 0.
+        const appTake = /^harmony-/i.test(file.name || '');
+        const layer = {
           audioBuffer,
           videoBlob: isAudio ? null : file,
           audioOnly: isAudio,
           durationSec: audioBuffer.duration,
           gain: 1.0,
           bakeDownDelayMs: 0,
-        });
+          restoredFromFile: appTake,
+        };
+        if (appTake) {
+          Object.defineProperty(layer, 'bakeDownDelayMs', {
+            enumerable: true,
+            get() { return Math.round(Math.max(0, Math.min(1.5, btLatencyMs / 1000)) * 1000); },
+          });
+        }
+        harmonyStack.push(layer);
         updateStackIndicator();
         showRemuxIndicator(isAudio
           ? ('Backing track loaded (audio layer ' + harmonyStack.length + ')')
@@ -11961,11 +11978,12 @@
       if (loadTakeBtn && loadTakeFile) {
         loadTakeBtn.addEventListener('click', () => loadTakeFile.click());
         // Several files can be picked at once (rebuilding a stack from
-        // Downloads). They load one after another in name order, which for
-        // the app's own harmony-<timestamp> files is the order they were
-        // recorded in.
+        // Downloads). Outside files (the beat) load first, then the app's own
+        // harmony-<timestamp> takes in name order, which is the order they
+        // were recorded in.
         loadTakeFile.addEventListener('change', async (e) => {
-          const files = Array.from((e.target.files) || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+          const key = (f) => (/^harmony-/i.test(f.name || '') ? '1' : '0') + (f.name || '').replace(/^harmony-(audio-)?/i, '');
+          const files = Array.from((e.target.files) || []).sort((a, b) => key(a).localeCompare(key(b)));
           e.target.value = '';
           for (const f of files) await loadTakeFromFile(f);
         });
