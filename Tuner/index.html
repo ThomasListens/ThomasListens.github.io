@@ -1184,6 +1184,8 @@
         right: auto;
         max-width: none;
       }
+      /* Strip is at the top here, so the layers pill can use the width. */
+      body.record-mode #stackIndicator { max-width: none; }
       /* Standalone level slider: in landscape, drop near the bottom-right
          clear of the right-side record dock. (Mobile portrait lifts it
          above the centered recBtn — see the base rule.) */
@@ -1399,6 +1401,11 @@
     }
     body.record-mode #droneRecordStrip {
       display: flex;
+    }
+    /* Settings open (settings-hidden off): the FILT / VOL / VRB / DLY
+       sliders step aside so they don't sit on the panel (2026-10-23). */
+    body.record-mode:not(.settings-hidden) #droneRecordStrip {
+      display: none !important;
     }
     #droneRecordStrip .drs-row {
       display: flex;
@@ -1836,6 +1843,16 @@
       pointer-events: auto;
     }
     #stackIndicator.visible { display: inline-flex; }
+    /* Portrait: the slider strip sits bottom-left, so when the pill gets
+       long ("Download reel (12.3 MB)" etc.) it wraps onto a second row,
+       growing upward, instead of running into the sliders (2026-10-23).
+       200px = strip width (4 sliders) + its left margin + a gap. */
+    body.record-mode #stackIndicator {
+      max-width: calc(100vw - 200px - env(safe-area-inset-left) - env(safe-area-inset-right));
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      row-gap: 4px;
+    }
     /* The stack count is now a button (tap to open per-layer volume
        panel). Strip default button chrome so it still reads as a
        label inside the indicator pill. */
@@ -1927,6 +1944,12 @@
       color: #dcebff; font-size: 11px; line-height: 1; cursor: pointer; touch-action: manipulation;
     }
     #layerVolumePanel .lv-move button:disabled { opacity: 0.25; cursor: default; }
+    #layerVolumePanel .lv-remove {
+      margin-left: 6px; flex-shrink: 0; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 6px;
+      border: 1px solid rgba(255, 120, 120, 0.45); background: rgba(120, 30, 30, 0.35);
+      color: #ffc9c9; font-size: 11px; line-height: 1; cursor: pointer; touch-action: manipulation;
+    }
+    #layerVolumePanel .lv-remove.armed { background: rgba(200, 60, 60, 0.95); color: #fff; border-color: #ff9a9a; }
     #layerVolumePanel .lv-slot { min-width: 14px; text-align: center; font-size: 11px; color: #cfe6ff; }
     #layerVolumePanel .lv-foot {
       margin-top: 6px;
@@ -9761,6 +9784,18 @@
     // the UI is "Undo" — single-step pop matches that affordance.
     // Stops any currently-scheduled monitor sources so the speakers go
     // quiet before the array shrinks.
+    // Remove one take from the stack (any position). Each take's MP4 is
+    // just its own singer (see above), so a middle take can go without
+    // touching the others. Not during a take: the monitor mix is playing.
+    function removeLayer(layer) {
+      if (mediaRecorder && mediaRecorder.state === 'recording') return;
+      const i = harmonyStack.indexOf(layer);
+      if (i < 0) return;
+      stopActiveLayerSources();
+      harmonyStack.splice(i, 1);
+      updateStackIndicator();
+    }
+
     function undoLastLayer() {
       if (!harmonyStack.length) return;
       stopActiveLayerSources();
@@ -10043,11 +10078,31 @@
           mv.appendChild(mk('\u25B6', 1, 'Move to a later place'));
           row.appendChild(mv);
         }
+        // Remove this take from the reel. Two taps: the first arms it
+        // (turns red), the second removes. Arming times out after 3 s.
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'lv-remove';
+        rm.textContent = '\u2715';
+        rm.title = 'Remove L' + (origIdx + 1) + ' from the reel (tap twice)';
+        rm.setAttribute('aria-label', rm.title);
+        let armT = null;
+        rm.addEventListener('click', () => {
+          if (!rm.classList.contains('armed')) {
+            rm.classList.add('armed');
+            rm.textContent = 'Remove?';
+            armT = setTimeout(() => { rm.classList.remove('armed'); rm.textContent = '\u2715'; }, 3000);
+            return;
+          }
+          clearTimeout(armT);
+          removeLayer(layer);
+        });
+        row.appendChild(rm);
         panel.appendChild(row);
       });
       const foot = document.createElement('div');
       foot.className = 'lv-foot';
-      foot.textContent = 'Volume applies live to the monitor during recording and to each layer in the exported reel. The arrows set where a layer sits in the reel; place 1 is the largest.';
+      foot.textContent = 'Volume applies live to the monitor during recording and to each layer in the exported reel. The arrows set where a layer sits in the reel; place 1 is the largest. \u2715 removes a take (tap twice).';
       panel.appendChild(foot);
     }
 
