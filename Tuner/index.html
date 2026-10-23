@@ -2466,8 +2466,12 @@
         <input type="range" id="droneRecordVolume" class="vertical slider-blue" orient="vertical" min="0" max="100" value="30" aria-label="Drone volume">
       </div>
       <div class="drs-col">
-        <span class="dr-label" title="Reverb mix">MIX</span>
-        <input type="range" id="audioFXMixSlider" class="vertical slider-green" orient="vertical" min="0" max="100" value="50" aria-label="Reverb mix">
+        <span class="dr-label" title="Reverb send">VRB</span>
+        <input type="range" id="audioFXMixSlider" class="vertical slider-green" orient="vertical" min="0" max="100" value="50" aria-label="Reverb send">
+      </div>
+      <div class="drs-col">
+        <span class="dr-label" title="Delay send (0 = off)">DLY</span>
+        <input type="range" id="audioFXDelaySlider" class="vertical slider-green" orient="vertical" min="0" max="100" value="0" aria-label="Delay send">
       </div>
     </div>
   </div>
@@ -10794,6 +10798,15 @@
         mixStrip.disabled = !voiceFX.reverb;
       }
 
+      // Delay send on the strip: shows 0 when the delay is off, else its mix.
+      const dlyStrip   = document.getElementById('audioFXDelaySlider');
+      const dlyCb      = document.getElementById('fxDelayToggle');
+      const dlyDockSld = document.getElementById('dockDelayMix');
+      const dlyPct = Math.round(voiceFXDelayMix * 100);
+      if (dlyStrip)   dlyStrip.value = voiceFX.delay ? dlyPct : 0;
+      if (dlyCb)      dlyCb.checked = !!voiceFX.delay;
+      if (dlyDockSld) dlyDockSld.value = dlyPct;
+
       if (mixDock)     mixDock.value   = mixPct;
       if (mixDockLbl)  mixDockLbl.textContent = mixPct + '%';
       if (tailDock)    tailDock.value  = tailPct;
@@ -11578,6 +11591,7 @@
           persistVoiceFXFlags();
           applyVoiceFX();
           updateVoiceProcNote();
+          syncVoiceFXUI();
         });
       }
       if (dockDelayFramesSld) {
@@ -11599,6 +11613,7 @@
         if (dockDelayMixLbl) dockDelayMixLbl.textContent = Math.round(voiceFXDelayMix * 100) + '%';
         dockDelayMixSld.addEventListener('input', (e) => {
           setVoiceDelayMix(parseInt(e.target.value, 10) / 100);
+          syncVoiceFXUI();
         });
       }
 
@@ -12148,6 +12163,24 @@
       if (afxMixStrip) {
         afxMixStrip.addEventListener('input', (e) => {
           setVoiceReverbMix(parseInt(e.target.value, 10) / 100);
+          syncVoiceFXUI();
+        });
+      }
+      // Second vocal send: the frame-locked delay. Its short repeats with
+      // feedback read as room/verb, so it needs its own fader next to VRB
+      // (Thomas, 2026-10-23: "still verbed out" with the reverb mix at 0).
+      const afxDlyStrip = document.getElementById('audioFXDelaySlider');
+      if (afxDlyStrip) {
+        afxDlyStrip.addEventListener('input', (e) => {
+          const v = parseInt(e.target.value, 10) / 100;
+          const want = v > 0;
+          if (want) setVoiceDelayMix(v);
+          if (want !== !!voiceFX.delay) {
+            voiceFX.delay = want;
+            persistVoiceFXFlags();
+            applyVoiceFX();
+            updateVoiceProcNote();
+          }
           syncVoiceFXUI();
         });
       }
