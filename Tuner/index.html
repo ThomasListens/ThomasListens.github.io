@@ -1598,7 +1598,7 @@
          #layerVolumePanel still pops up from bottom: 126px (attached to
          the indicator pill), and the slider + meters hide via :has()
          while it's open so the panel has the right-edge column. */
-      bottom: calc(144px + env(safe-area-inset-bottom));
+      bottom: calc(144px + var(--stack-lift, 0px) + env(safe-area-inset-bottom));
       right: 12px;
       left: auto;
       transform: none;
@@ -1711,7 +1711,7 @@
       position: fixed;
       /* Stacked above the level slider (which tops out at ~184px from
          viewport bottom). 190px gives a 6px gap. */
-      bottom: calc(190px + env(safe-area-inset-bottom));
+      bottom: calc(190px + var(--stack-lift, 0px) + env(safe-area-inset-bottom));
       right: 12px;
       width: 130px;
       z-index: 250;
@@ -1742,7 +1742,7 @@
          right-edge stack ordered top-down: MIC, then LUFS, then the
          level slider, then the #stackIndicator pill, then the record
          essentials row at the bottom. */
-      bottom: calc(206px + env(safe-area-inset-bottom));
+      bottom: calc(206px + var(--stack-lift, 0px) + env(safe-area-inset-bottom));
       right: 12px;
       width: 130px;
       z-index: 250;
@@ -1877,7 +1877,7 @@
     #layerVolumePanel {
       position: fixed;
       right: calc(10px + env(safe-area-inset-right));
-      bottom: calc(126px + env(safe-area-inset-bottom));
+      bottom: calc(126px + var(--stack-lift, 0px) + env(safe-area-inset-bottom));
       z-index: 202;
       display: none;
       flex-direction: column;
@@ -10106,6 +10106,27 @@
       panel.appendChild(foot);
     }
 
+    // When the Layers pill wraps onto extra rows (Download reel shows up
+    // after an export), it grows upward into the master level slider,
+    // which sits above it in z-order and swallowed taps on Layers /
+    // Export reel (2026-11-04). Lift the slider, the LUFS / MIC readouts
+    // and the per-layer panel by however much taller than one row the
+    // pill is. 36px = one row with the 26px Download button.
+    // Called directly after the pill's buttons change, and from a
+    // ResizeObserver for anything else (export progress text, rotation).
+    function syncStackLift() {
+      const ind = document.getElementById('stackIndicator');
+      if (!ind) return;
+      const h = ind.classList.contains('visible') ? ind.getBoundingClientRect().height : 0;
+      const lift = Math.max(0, Math.round(h - 36));
+      document.documentElement.style.setProperty('--stack-lift', lift + 'px');
+    }
+    (function watchStackIndicatorHeight() {
+      const ind = document.getElementById('stackIndicator');
+      if (ind && typeof ResizeObserver !== 'undefined') new ResizeObserver(syncStackLift).observe(ind);
+      syncStackLift();
+    })();
+
     // Update the on-screen stack pill. Hidden when stack is empty;
     // visible with "Layers: N" otherwise. Also toggles the "+ layer"
     // chip's visibility (only present when there's a take to push and
@@ -10156,6 +10177,7 @@
       if (!pendingExportBlob) {
         btn.classList.remove('visible');
         btn.textContent = 'Download reel';
+        syncStackLift();
         return;
       }
       const bytes = pendingExportBlob.size;
@@ -10167,6 +10189,7 @@
       }
       btn.textContent = 'Download reel (' + sizeLabel + ')';
       btn.classList.add('visible');
+      syncStackLift();
     }
 
     function finalizeDiscard() {
