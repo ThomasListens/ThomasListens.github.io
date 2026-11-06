@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#151518">
+<title>Flashcard Reels</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700&family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #151518; --panel: #1f1f24; --line: #2e2e35; --text: #f1efe9; --dim: #9a98a0;
+    --accent: #e0b25a; --accent-ink: #1b1608; --danger: #e46a5e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { background: var(--bg); color: var(--text); }
+  body { font-family: "Noto Sans", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 16px; line-height: 1.4; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+
+  /* ---------- editor ---------- */
+  #edit { max-width: 640px; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 16px calc(110px + env(safe-area-inset-bottom)); }
+  header h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.3px; }
+  header p { color: var(--dim); font-size: 14px; margin-top: 2px; }
+  section { margin-top: 22px; }
+  section > h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+  section > h2 span { text-transform: none; letter-spacing: 0; font-weight: 400; }
+
+  .card { display: grid; grid-template-columns: 72px 1fr auto; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px; margin-bottom: 8px; }
+  .thumb { width: 72px; height: 72px; border-radius: 10px; background: #2a2a31 center/cover no-repeat; border: 1px dashed #4a4a55; display: grid; place-items: center; color: var(--dim); font-size: 12px; text-align: center; line-height: 1.2; cursor: pointer; }
+  .thumb.has { border: 0; color: transparent; }
+  .fields { display: grid; gap: 4px; min-width: 0; }
+  .fields input { width: 100%; min-width: 0; background: transparent; border: 0; border-bottom: 1px solid transparent; padding: 2px 0; outline: none; }
+  .fields input:focus { border-bottom-color: var(--accent); }
+  .fields .hz { font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif; font-weight: 700; font-size: 22px; }
+  .fields .py { color: var(--accent); }
+  .fields .en { color: var(--dim); font-size: 14px; }
+  .tools { display: grid; grid-template-columns: repeat(2, 34px); gap: 2px; }
+  .tools button { background: none; border: 0; color: var(--dim); width: 34px; height: 30px; border-radius: 8px; font-size: 16px; cursor: pointer; }
+  .tools button:active { background: #2a2a31; }
+  .tools .del { color: var(--danger); }
+
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; cursor: pointer; }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+  .btn.ghost { background: transparent; }
+  textarea { width: 100%; min-height: 120px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-top: 8px; }
+
+  .set { display: grid; grid-template-columns: 1fr auto; gap: 10px 12px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+  .set label { font-size: 15px; }
+  .set small { display: block; color: var(--dim); font-size: 12px; }
+  .set select, .set input[type=text], .set input[type=number] { background: #2a2a31; border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; max-width: 170px; }
+  .set input[type=number] { width: 80px; }
+  .note { color: var(--dim); font-size: 13px; margin-top: 8px; }
+
+  .dock { position: fixed; left: 0; right: 0; bottom: 0; background: linear-gradient(transparent, var(--bg) 30%); padding: 18px 16px calc(14px + env(safe-area-inset-bottom)); }
+  .dock .row { max-width: 640px; margin: 0 auto; flex-wrap: nowrap; }
+  .dock .btn { flex: 1; padding: 14px; font-size: 17px; text-align: center; }
+
+  /* ---------- stage ---------- */
+  #stage { position: fixed; inset: 0; background: #000; display: grid; place-items: center; overflow: hidden; }
+  #reel { height: 100dvh; width: calc(100dvh * 9 / 16); max-width: 100vw; max-height: calc(100vw * 16 / 9); background: #000; }
+  .overlay { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+  .overlay > * { pointer-events: auto; }
+  #count { font-size: 140px; font-weight: 700; color: #fff; text-shadow: 0 4px 30px rgba(0,0,0,.5); pointer-events: none; }
+  #startRec { font-size: 20px; padding: 18px 30px; border-radius: 999px; }
+  .topbar { position: absolute; top: max(12px, env(safe-area-inset-top)); left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: center; pointer-events: none; }
+  .topbar > * { pointer-events: auto; }
+  .pill { background: rgba(0,0,0,.55); color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: 999px; padding: 8px 14px; font-size: 15px; cursor: pointer; }
+  .rec-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #ff4b4b; margin-right: 6px; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+  #hint { position: absolute; bottom: calc(24px + env(safe-area-inset-bottom)); left: 16px; right: 16px; text-align: center; color: #fff; font-size: 15px; text-shadow: 0 1px 8px #000; pointer-events: none; }
+
+  /* ---------- result ---------- */
+  #result { max-width: 640px; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); }
+  #result video { display: block; width: 100%; max-height: 70dvh; background: #000; border-radius: 14px; margin: 12px 0; object-fit: contain; }
+  #result .row .btn { flex: 1; text-align: center; }
+
+  /* ---------- picture sheet ---------- */
+  #sheet { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: flex-end; justify-content: center; z-index: 10; }
+  #sheet .panel { background: var(--panel); width: 100%; max-width: 640px; max-height: 88dvh; border-radius: 18px 18px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px; }
+  #sheet .head { display: flex; justify-content: space-between; align-items: center; }
+  #sheet .head b { font-size: 20px; font-family: "Noto Sans TC", sans-serif; }
+  #sheet .search { display: flex; gap: 8px; }
+  #sheet .search input { flex: 1; min-width: 0; background: #2a2a31; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  #grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; overflow-y: auto; min-height: 120px; }
+  #grid img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 10px; background: #2a2a31; cursor: pointer; display: block; }
+  #grid .msg { grid-column: 1 / -1; color: var(--dim); font-size: 14px; padding: 12px 0; }
+  #sheet .credit { color: var(--dim); font-size: 12px; }
+  #sheet .credit a { color: var(--dim); }
+</style>
+</head>
+<body>
+
+<main id="edit">
+  <header>
+    <h1>Flashcard Reels</h1>
+    <p>Picture → 3, 2, 1 → the word. Your reaction films underneath.</p>
+  </header>
+
+  <section>
+    <h2>Words <span id="wordCount"></span></h2>
+    <div id="cards"></div>
+    <div class="row">
+      <button class="btn" id="addWord">+ Add a word</button>
+      <button class="btn ghost" id="pasteToggle">Paste a list</button>
+    </div>
+    <div id="pasteBox" hidden>
+      <textarea id="pasteText" placeholder="One word per line: hanzi, pinyin, English&#10;垃圾袋, le4se4dai4, garbage bag"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn primary" id="pasteAdd">Add these</button>
+        <button class="btn ghost" id="pasteReplace">Replace the list</button>
+      </div>
+    </div>
+    <p class="note">Tap a square to take or choose a photo. Pinyin can use tone numbers: le4se4dai4 becomes lèsèdài.</p>
+  </section>
+
+  <section>
+    <h2>Look and sound</h2>
+    <div class="set">
+      <label for="sBg">Background</label>
+      <select id="sBg"><option value="random">Random</option><option>light blue</option><option>cream</option><option>mint</option><option>blush</option></select>
+      <label for="sSpeed">Seconds per number</label>
+      <input type="number" id="sSpeed" min="0.4" max="2" step="0.1">
+      <label for="sRecap">Recap round</label>
+      <select id="sRecap"><option value="1">On</option><option value="0">Off</option></select>
+      <label for="sHandle">Handle</label>
+      <input type="text" id="sHandle" placeholder="@ThomasListens">
+      <label for="sBell">Bells<small id="bellNote"></small></label>
+      <select id="sBell"><option value="bianzhong">Bianzhong</option><option value="bronze">MonoDrum bronze</option></select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn ghost" id="loadBells">Load bianzhong sounds</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Voice</h2>
+    <div class="set">
+      <label for="sVoice">Spoken voice<small>Azure Speech, free tier</small></label>
+      <select id="sVoice"><option value="on">On</option><option value="off">Off</option></select>
+      <label for="sAzKey">Azure key<small>Your Speech resource → Keys → Key 1</small></label>
+      <input type="text" id="sAzKey" placeholder="paste key" autocomplete="off" spellcheck="false">
+      <label for="sAzRegion">Region<small>Shown next to the key, e.g. eastasia</small></label>
+      <input type="text" id="sAzRegion" placeholder="eastasia" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <label for="sZhVoice">Mandarin voice<small>Taiwan</small></label>
+      <select id="sZhVoice"><option value="zh-TW-HsiaoChenNeural">HsiaoChen (f)</option><option value="zh-TW-HsiaoYuNeural">HsiaoYu (f)</option><option value="zh-TW-YunJheNeural">YunJhe (m)</option></select>
+      <label for="sAsk">Question<small>Said as the picture appears</small></label>
+      <input type="text" id="sAsk" placeholder="What's this called?">
+      <label for="sAskWhen">Ask on</label>
+      <select id="sAskWhen"><option value="every">Every card</option><option value="first">First card only</option><option value="off">Never</option></select>
+      <label for="sEnVoice">Question voice</label>
+      <select id="sEnVoice"><option value="en-US-AvaNeural">Ava (f)</option><option value="en-US-AndrewNeural">Andrew (m)</option><option value="en-US-JennyNeural">Jenny (f)</option><option value="en-US-GuyNeural">Guy (m)</option></select>
+    </div>
+    <div class="row" style="margin-top:8px"><button class="btn ghost" id="testVoice">▶ Test the voice</button></div>
+    <p class="note">The answer is spoken in Taiwan Mandarin on the reveal. Tap 🔊 on a word to check how it's read. Each word is fetched once, then kept on this phone.</p>
+  </section>
+
+  <section>
+    <h2>Pictures</h2>
+    <div class="set">
+      <label for="sPixabay">Pixabay key<small>Free photo search · <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener" style="color:inherit">get one</a></small></label>
+      <input type="text" id="sPixabay" placeholder="paste key" autocomplete="off" spellcheck="false">
+      <label for="sOpenai">OpenAI key<small>Optional: generate pictures (about 1¢ each)</small></label>
+      <input type="text" id="sOpenai" placeholder="optional" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="row" style="margin-top:8px"><button class="btn" id="fillMissing">Fill missing pictures</button></div>
+    <p class="note">Keys stay on this phone. Pixabay photos are free to use, no credit needed.</p>
+  </section>
+
+  <section>
+    <h2>Recording</h2>
+    <div class="set">
+      <label for="sListen">Listening on<small>Earbuds give the cleanest voice</small></label>
+      <select id="sListen"><option value="earbuds">Earbuds</option><option value="speaker">Phone speaker</option></select>
+      <label for="sLook">Camera look</label>
+      <select id="sLook"><option value="bronze">Bronze</option><option value="natural">Natural</option></select>
+      <label for="sMirror">Mirror the camera</label>
+      <select id="sMirror"><option value="1">Yes</option><option value="0">No</option></select>
+    </div>
+    <p class="note" id="formatNote"></p>
+  </section>
+
+  <div class="dock">
+    <div class="row">
+      <button class="btn" id="previewBtn">▶ Preview</button>
+      <button class="btn primary" id="recordBtn">● Record</button>
+    </div>
+  </div>
+</main>
+
+<div id="stage" hidden>
+  <canvas id="reel" width="1080" height="1920"></canvas>
+  <div class="overlay"><button class="btn primary" id="startRec" hidden>Start</button><div id="count" hidden></div></div>
+  <div class="topbar">
+    <button class="pill" id="stopBtn">✕ Stop</button>
+    <span class="pill" id="recBadge" hidden><span class="rec-dot"></span><span id="recTime">0:00</span></span>
+  </div>
+  <div id="hint"></div>
+</div>
+
+<div id="result" hidden>
+  <header><h1>Your reel</h1><p id="resultInfo"></p></header>
+  <video id="resultVideo" controls playsinline></video>
+  <div class="row">
+    <button class="btn primary" id="saveBtn">Save / share</button>
+    <button class="btn" id="againBtn">Record again</button>
+  </div>
+  <div class="row" style="margin-top:8px"><button class="btn ghost" id="backBtn">Back to the words</button></div>
+</div>
+
+<div id="sheet" hidden>
+  <div class="panel">
+    <div class="head"><b id="sheetTitle"></b><button class="btn ghost" id="sheetClose">Close</button></div>
+    <div class="row">
+      <button class="btn" id="sheetCamera">📷 Take or choose</button>
+      <button class="btn" id="sheetGenerate">✨ Generate</button>
+    </div>
+    <div class="search"><input id="sheetQuery" placeholder="search pictures" enterkeyhint="search"><button class="btn primary" id="sheetSearch">Search</button></div>
+    <div id="grid"></div>
+    <div class="credit">Photos from <a href="https://pixabay.com" target="_blank" rel="noopener">Pixabay</a></div>
+  </div>
+</div>
+
+<input type="file" id="photoPick" accept="image/*" hidden>
+<input type="file" id="bellPick" accept="audio/*,.wav" multiple hidden>
+
+<script>
+"use strict";
+/* Flashcard Reels: the phone version of make_reel.py (B:\Mandarin Flashcard Reel).
+   Same layout, same just-intonation sound design, MonoDrum sounds from sfx/.
+   Words, photos and loaded bell sounds stay on this device (IndexedDB); nothing is uploaded. */
+
+const W = 1080, H = 1920, HALF = 960;
+const IMG_BOX = [100, 60, 980, 540];
+const DIAL_CY = 735, DIAL_R = 118;
+const HANZI_FONT = '"Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif';
+const LATIN_FONT = '"Noto Sans", "Noto Sans TC", system-ui, sans-serif';
+
+const CFG = {
+  appear: 0.25, countFrom: 3, reveal: 1.3, recapPerCard: 0.5, recapTitle: 0.8, end: 2.0,
+  endText: "How many did you get?",
+  palette: { "light blue": "#DCEBF7", "cream": "#F7F0DF", "mint": "#DDF2E6", "blush": "#F7E1E1" },
+  bottom: "#1E1E22", text: "#23262B", accent: "#3D5A80",
+  sizes: { hanzi: 150, pinyin: 62, english: 42, countdown: 120, handle: 34, end: 72 },
+  handleOpacity: 0.45, handleSpeed: [150, 105], handleColors: ["#3D5A80", "#B5651D", "#5B8C5A", "#8E5572", "#C9A227"],
+  // sound: a small composition in just intonation
+  tickVolume: 0.35, tonic: 220, countRatios: [7, 5, 3], revealRatio: 1, ghosts: [3, 5, 7, 9, 11, 13], ghostDb: -16,
+  recapBase: 110, recapFirst: 4, endChord: [1, 3, 5, 7], endRoll: 0.07,
+  bellRange: [750, 1800], bellCount: 0.18, bellReveal: 0.32, bellEnd: 0.35, subGain: 0.35, bellEndRatios: [1, 3],
+};
+
+const DEFAULT_WORDS = [
+  ["垃圾袋", "lèsèdài", "garbage bag"], ["杯子", "bēizi", "cup"], ["鑰匙", "yàoshi", "key"], ["雨傘", "yǔsǎn", "umbrella"],
+  ["牙刷", "yáshuā", "toothbrush"], ["眼鏡", "yǎnjìng", "glasses"], ["手機", "shǒujī", "phone"], ["枕頭", "zhěntou", "pillow"],
+  ["筷子", "kuàizi", "chopsticks"], ["蘋果", "píngguǒ", "apple"], ["電腦", "diànnǎo", "computer"], ["襪子", "wàzi", "socks"],
+];
+
+/* ------------------------------------------------------------ storage (IndexedDB) */
+const db = (() => {
+  let p;
+  const open = () => p || (p = new Promise((res, rej) => {
+    const r = indexedDB.open("flashcard-reels", 1);
+    r.onupgradeneeded = () => { r.result.createObjectStore("kv"); r.result.createObjectStore("blobs"); };
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  }));
+  const run = (store, mode, fn) => open().then(d => new Promise((res, rej) => {
+    const tx = d.transaction(store, mode), q = fn(tx.objectStore(store));
+    tx.oncomplete = () => res(q && q.result); tx.onerror = () => rej(tx.error);
+  }));
+  return {
+    get: (store, k) => run(store, "readonly", s => s.get(k)).catch(() => undefined),
+    set: (store, k, v) => run(store, "readwrite", s => s.put(v, k)).catch(e => console.warn(e)),
+    del: (store, k) => run(store, "readwrite", s => s.delete(k)).catch(() => {}),
+    keys: (store) => run(store, "readonly", s => s.getAllKeys()).catch(() => []),
+  };
+})();
+
+/* ------------------------------------------------------------ pinyin */
+const TONES = { a: "āáǎà", e: "ēéěè", i: "īíǐì", o: "ōóǒò", u: "ūúǔù", "ü": "ǖǘǚǜ" };
+function markSyllable(syl, tone) {
+  const s = syl.replace(/u:/g, "ü").replace(/v/g, "ü").replace(/U:/g, "Ü").replace(/V/g, "Ü");
+  if (tone === 0 || tone === 5) return s;
+  const low = s.toLowerCase();
+  let i;
+  if (low.includes("a")) i = low.indexOf("a");
+  else if (low.includes("e")) i = low.indexOf("e");
+  else if (low.includes("ou")) i = low.indexOf("o");
+  else { i = Math.max(...[..."iuoü"].map(v => low.lastIndexOf(v))); if (i < 0) return s; }
+  const ch = s[i], marked = TONES[ch.toLowerCase()][tone - 1];
+  return s.slice(0, i) + (ch !== ch.toLowerCase() ? marked.toUpperCase() : marked) + s.slice(i + 1);
+}
+function fixPinyin(p) {
+  p = (p || "").trim().normalize("NFC");
+  if (!/[a-zA-ZüÜ:]+[0-5]/.test(p)) return p;
+  return p.replace(/([a-zA-ZüÜ:]+)([0-5])/g, (_, syl, t) => markSyllable(syl, +t));
+}
+
+/* ------------------------------------------------------------ state */
+let deck = [];            // [{id, hanzi, pinyin, english, photo: bool}]
+let settings = { bg: "random", speed: 0.9, recap: true, handle: "@ThomasListens", bell: "bianzhong", listen: "earbuds", look: "bronze", mirror: true, pixabay: "", openai: "",
+                 voice: "on", azKey: "", azRegion: "", zhVoice: "zh-TW-HsiaoChenNeural", enVoice: "en-US-AvaNeural", ask: "What's this called?", askWhen: "every" };
+const photoCache = new Map();   // id -> objectURL
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+const save = () => db.set("kv", "deck", deck);
+const saveSettings = () => db.set("kv", "settings", settings);
+const $ = id => document.getElementById(id);
+
+async function loadState() {
+  const d = await db.get("kv", "deck");
+  deck = Array.isArray(d) ? d : DEFAULT_WORDS.map(([hanzi, pinyin, english]) => ({ id: uid(), hanzi, pinyin, english, photo: false }));
+  Object.assign(settings, (await db.get("kv", "settings")) || {});
+  for (const c of deck) if (c.photo) {
+    const b = await db.get("blobs", "photo:" + c.id);
+    if (b) photoCache.set(c.id, URL.createObjectURL(b)); else c.photo = false;
+  }
+}
+
+/* ------------------------------------------------------------ editor UI */
+function renderCards() {
+  const box = $("cards");
+  box.innerHTML = "";
+  deck.forEach((c, i) => {
+    const el = document.createElement("div");
+    el.className = "card";
+    const url = photoCache.get(c.id);
+    el.innerHTML = `
+      <div class="thumb ${url ? "has" : ""}" ${url ? `style="background-image:url('${url}')"` : ""}>add<br>photo</div>
+      <div class="fields">
+        <input class="hz" lang="zh-Hant-TW" placeholder="漢字" autocomplete="off">
+        <input class="py" placeholder="pinyin (le4se4dai4)" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <input class="en" placeholder="English" autocomplete="off">
+      </div>
+      <div class="tools">
+        <button title="Move up" class="up">↑</button>
+        <button title="Hear it" class="say">🔊</button>
+        <button title="Move down" class="down">↓</button>
+        <button title="Delete" class="del">✕</button>
+      </div>`;
+    const [hz, py, en] = el.querySelectorAll("input");
+    hz.value = c.hanzi; py.value = c.pinyin; en.value = c.english;
+    hz.oninput = () => { c.hanzi = hz.value.trim(); save(); };
+    en.oninput = () => { c.english = en.value.trim(); save(); };
+    py.oninput = () => { c.pinyin = py.value.trim(); save(); };
+    py.onblur = () => { const f = fixPinyin(py.value); if (f !== py.value) { py.value = f; c.pinyin = f; save(); } };
+    el.querySelector(".thumb").onclick = () => openSheet(c);
+    el.querySelector(".say").onclick = () => sayNow([[c.hanzi, settings.zhVoice]]);
+    el.querySelector(".up").onclick = () => { if (i > 0) { [deck[i - 1], deck[i]] = [deck[i], deck[i - 1]]; save(); renderCards(); } };
+    el.querySelector(".down").onclick = () => { if (i < deck.length - 1) { [deck[i + 1], deck[i]] = [deck[i], deck[i + 1]]; save(); renderCards(); } };
+    el.querySelector(".del").onclick = () => {
+      if (!confirm(`Remove ${c.hanzi || "this word"}?`)) return;
+      deck.splice(i, 1); db.del("blobs", "photo:" + c.id); save(); renderCards();
+    };
+    box.appendChild(el);
+  });
+  const missing = deck.filter(c => !c.photo).length;
+  $("wordCount").textContent = `${deck.length} words` + (missing ? ` · ${missing} without a photo` : "");
+}
+
+let photoTarget = null;
+function pickPhoto(card) { photoTarget = card; $("photoPick").value = ""; $("photoPick").click(); }
+$("photoPick").onchange = async e => {
+  const f = e.target.files[0], c = photoTarget;
+  if (!f || !c) return;
+  await setPhoto(c, f);
+  closeSheet();
+};
+async function setPhoto(c, fileOrBlob) {
+  const blob = await shrinkPhoto(fileOrBlob);
+  await db.set("blobs", "photo:" + c.id, blob);
+  if (photoCache.has(c.id)) URL.revokeObjectURL(photoCache.get(c.id));
+  photoCache.set(c.id, URL.createObjectURL(blob));
+  c.photo = true; save(); renderCards();
+}
+
+/* ------------------------------------------------------------ finding pictures: Pixabay search, or generated */
+let sheetCard = null;
+function openSheet(c) {
+  sheetCard = c;
+  $("sheetTitle").textContent = [c.hanzi, c.english].filter(Boolean).join(" · ") || "Picture";
+  $("sheetQuery").value = c.english || "";
+  $("sheetGenerate").hidden = !settings.openai;
+  $("sheet").hidden = false;
+  if (c.english && settings.pixabay) searchPictures();
+  else $("grid").innerHTML = `<div class="msg">${settings.pixabay ? "Type what to search for." : "Add a free Pixabay key under Pictures to search photos here."}</div>`;
+}
+function closeSheet() { $("sheet").hidden = true; sheetCard = null; }
+$("sheetClose").onclick = closeSheet;
+$("sheet").onclick = e => { if (e.target.id === "sheet") closeSheet(); };
+$("sheetCamera").onclick = () => pickPhoto(sheetCard);
+$("sheetSearch").onclick = () => searchPictures();
+$("sheetQuery").onkeydown = e => { if (e.key === "Enter") searchPictures(); };
+
+// Pixabay search -> [{small, large, alt}]. Pictures are downloaded into the deck, never hotlinked.
+async function pixabay(query, n = 16) {
+  const u = `https://pixabay.com/api/?key=${encodeURIComponent(settings.pixabay)}&q=${encodeURIComponent(query)}&image_type=photo&orientation=horizontal&safesearch=true&per_page=${Math.max(3, n)}`;
+  const r = await fetch(u);
+  if (r.status === 400 || r.status === 401 || r.status === 403) throw new Error("The Pixabay key wasn't accepted.");
+  if (r.status === 429) throw new Error("Pixabay says slow down. Wait a minute and try again.");
+  if (!r.ok) throw new Error(`Pixabay said ${r.status}.`);
+  return ((await r.json()).hits || []).slice(0, n).map(h => ({ small: h.webformatURL, large: h.largeImageURL || h.webformatURL, alt: h.tags }));
+}
+async function searchPictures() {
+  const q = $("sheetQuery").value.trim(), grid = $("grid");
+  if (!q) return;
+  if (!settings.pixabay) { grid.innerHTML = `<div class="msg">Add a free Pixabay key under Pictures first.</div>`; return; }
+  grid.innerHTML = `<div class="msg">Searching…</div>`;
+  try {
+    const photos = await pixabay(q);
+    if (!photos.length) { grid.innerHTML = `<div class="msg">Nothing for “${q}”. Try another word${settings.openai ? ", or Generate" : ""}.</div>`; return; }
+    grid.innerHTML = "";
+    for (const ph of photos) {
+      const img = document.createElement("img");
+      img.src = ph.small; img.alt = ph.alt || q; img.loading = "lazy";
+      img.onclick = () => usePicture(ph.large, img);
+      grid.appendChild(img);
+    }
+  } catch (e) { grid.innerHTML = `<div class="msg">${e.message}</div>`; }
+}
+async function usePicture(url, img) {
+  const c = sheetCard; if (!c) return;
+  if (img) img.style.opacity = 0.4;
+  try { await setPhoto(c, await (await fetch(url)).blob()); closeSheet(); }
+  catch (e) { alert("Couldn't get that picture: " + e.message); if (img) img.style.opacity = 1; }
+}
+
+const genPrompt = c => `A plain, generic stock photo of ${c.english || c.hanzi}${c.english && c.hanzi ? ` (${c.hanzi}, as found in Taiwan)` : ""}: one object, centered, on a plain light background, soft natural light, no text, no people.`;
+async function generate(c) {
+  const r = await fetch("https://api.openai.com/v1/images/generations", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + settings.openai },
+    body: JSON.stringify({ model: "gpt-image-1", prompt: genPrompt(c), size: "1536x1024", quality: "low", n: 1 }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error((j.error && j.error.message) || `OpenAI said ${r.status}.`);
+  const bin = atob(j.data[0].b64_json), u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return new Blob([u8], { type: "image/png" });
+}
+$("sheetGenerate").onclick = async () => {
+  const c = sheetCard; if (!c) return;
+  $("grid").innerHTML = `<div class="msg">Generating ${c.english || c.hanzi}… (about 15 seconds)</div>`;
+  try { await setPhoto(c, await generate(c)); closeSheet(); }
+  catch (e) { $("grid").innerHTML = `<div class="msg">${e.message}</div>`; }
+};
+
+$("fillMissing").onclick = async () => {
+  const todo = deck.filter(c => !c.photo && (c.english || c.hanzi));
+  if (!todo.length) return alert("Every word has a picture.");
+  if (!settings.pixabay && !settings.openai) return alert("Add a Pixabay key (free) under Pictures first.");
+  const btn = $("fillMissing"); btn.disabled = true;
+  let done = 0; const failed = [];
+  for (const c of todo) {
+    btn.textContent = `Finding pictures… ${done + 1} / ${todo.length}`;
+    try {
+      const ph = settings.pixabay && c.english ? (await pixabay(c.english, 1))[0] : null;
+      if (ph) await setPhoto(c, await (await fetch(ph.large)).blob());
+      else if (settings.openai) await setPhoto(c, await generate(c));
+      else failed.push(c.english || c.hanzi);
+    } catch (e) { failed.push(c.english || c.hanzi); }
+    done++;
+  }
+  btn.disabled = false; btn.textContent = "Fill missing pictures";
+  if (failed.length) alert("No picture found for: " + failed.join(", ") + ". Tap those squares to search or take one.");
+};
+async function shrinkPhoto(file) {          // keep photos small on the device (the reel shows them at most 880 px wide)
+  const img = await loadImage(URL.createObjectURL(file));
+  const s = Math.min(1, 1400 / Math.max(img.naturalWidth, img.naturalHeight));
+  const cv = document.createElement("canvas");
+  cv.width = Math.round(img.naturalWidth * s); cv.height = Math.round(img.naturalHeight * s);
+  cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+  URL.revokeObjectURL(img.src);
+  return new Promise(res => cv.toBlob(b => res(b || file), "image/jpeg", 0.9));
+}
+function loadImage(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
+
+$("addWord").onclick = () => { deck.push({ id: uid(), hanzi: "", pinyin: "", english: "", photo: false }); save(); renderCards(); $("cards").lastChild.querySelector(".hz").focus(); };
+$("pasteToggle").onclick = () => { $("pasteBox").hidden = !$("pasteBox").hidden; };
+function parsePaste() {
+  return $("pasteText").value.split(/\n/).map(l => l.split(/\t|,|，/).map(s => s.trim())).filter(p => p[0])
+    .map(([hanzi, pinyin = "", english = ""]) => ({ id: uid(), hanzi, pinyin: fixPinyin(pinyin), english, photo: false }));
+}
+$("pasteAdd").onclick = () => { deck.push(...parsePaste()); $("pasteText").value = ""; $("pasteBox").hidden = true; save(); renderCards(); };
+$("pasteReplace").onclick = () => {
+  const rows = parsePaste(); if (!rows.length) return;
+  if (!confirm(`Replace all ${deck.length} words (and their photos) with these ${rows.length}?`)) return;
+  deck.forEach(c => db.del("blobs", "photo:" + c.id)); deck = rows; $("pasteText").value = ""; $("pasteBox").hidden = true; save(); renderCards();
+};
+
+function bindSettings() {
+  const map = [["sBg", "bg"], ["sSpeed", "speed", Number], ["sRecap", "recap", v => v === "1", v => v ? "1" : "0"], ["sHandle", "handle"],
+               ["sBell", "bell"], ["sListen", "listen"], ["sPixabay", "pixabay", v => v.trim()], ["sOpenai", "openai", v => v.trim()], ["sLook", "look"], ["sMirror", "mirror", v => v === "1", v => v ? "1" : "0"],
+               ["sVoice", "voice"], ["sAzKey", "azKey", v => v.trim()], ["sAzRegion", "azRegion", v => v.trim()], ["sZhVoice", "zhVoice"], ["sEnVoice", "enVoice"],
+               ["sAsk", "ask", v => v.trim()], ["sAskWhen", "askWhen"]];
+  for (const [id, key, parse = v => v, show = v => v] of map) {
+    const el = $(id);
+    el.value = show(settings[key]);
+    el.onchange = el.oninput = () => { settings[key] = parse(el.value); saveSettings(); if (key === "bell") bellNote(); };
+  }
+}
+
+/* ------------------------------------------------------------ bell samples loaded on the device */
+$("loadBells").onclick = () => { $("bellPick").value = ""; $("bellPick").click(); };
+$("bellPick").onchange = async e => {
+  let n = 0, skipped = [];
+  for (const f of e.target.files) {
+    const m = f.name.match(/([\d.]+)\s*hz/i);          // the pitch is in the file name: bianzhong_788.59Hz.wav
+    if (!m) { skipped.push(f.name); continue; }
+    await db.set("blobs", "bell:" + parseFloat(m[1]).toFixed(2), f); n++;
+  }
+  bells = null;
+  await bellNote();
+  alert(`Loaded ${n} bell sound${n === 1 ? "" : "s"}.` + (skipped.length ? `\nSkipped (no pitch in the name): ${skipped.join(", ")}` : ""));
+};
+async function bellNote() {
+  const n = (await db.keys("blobs")).filter(k => String(k).startsWith("bell:")).length;
+  $("bellNote").textContent = settings.bell === "bianzhong"
+    ? (n ? `${n} strikes loaded on this phone` : "None loaded yet: MonoDrum bronze plays instead")
+    : "Made with MonoDrum";
+}
+
+/* ------------------------------------------------------------ audio */
+let ac = null, bank = null, bells = null;
+function audio() {
+  if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: "interactive" });
+  if (ac.state === "suspended") ac.resume();
+  return ac;
+}
+async function decode(buf) { return await new Promise((res, rej) => audio().decodeAudioData(buf, res, rej)); }
+async function loadBank() {
+  if (bank) return bank;
+  const meta = await (await fetch("sfx/bank.json")).json();
+  bank = {};
+  await Promise.all(meta.sounds.map(async s => {
+    const b = await decode(await (await fetch("sfx/" + encodeURIComponent(s.file))).arrayBuffer());
+    (bank[s.kind] = bank[s.kind] || []).push({ hz: s.hz, buf: b });
+  }));
+  return bank;
+}
+async function loadBells() {
+  if (bells) return bells;
+  bells = [];
+  for (const k of await db.keys("blobs")) {
+    if (!String(k).startsWith("bell:")) continue;
+    try { bells.push({ hz: parseFloat(String(k).slice(5)), buf: await decode(await (await db.get("blobs", k)).arrayBuffer()) }); }
+    catch (e) { console.warn("bell", k, e); }
+  }
+  bells.sort((a, b) => a.hz - b.hz);
+  return bells;
+}
+const nearest = (list, hz) => list.reduce((a, b) => Math.abs(Math.log(hz / b.hz)) < Math.abs(Math.log(hz / a.hz)) ? b : a);
+
+/* ------------------------------------------------------------ the spoken voice (Azure Speech, called from the phone; each clip is kept in IndexedDB) */
+const voiceReady = () => settings.voice === "on" && settings.azKey && settings.azRegion;
+const azRegion = () => settings.azRegion.toLowerCase().replace(/[^a-z0-9]/g, "");
+const xmlEsc = s => s.replace(/[<>&'"]/g, ch => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" }[ch]));
+const voiceMem = new Map();
+async function speak(text, voice) {                  // -> { buf, lead, len }: the clip, where the speech starts, and how long it lasts
+  const key = `tts:${voice}:${text}`;
+  if (voiceMem.has(key)) return voiceMem.get(key);
+  let blob = await db.get("blobs", key);
+  if (!blob) {
+    const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${voice.slice(0, 5)}"><voice name="${voice}">${xmlEsc(text)}</voice></speak>`;
+    for (let attempt = 0; ; attempt++) {
+      let r;
+      try {
+        r = await fetch(`https://${azRegion()}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+          method: "POST", body: ssml,
+          headers: { "Ocp-Apim-Subscription-Key": settings.azKey, "Content-Type": "application/ssml+xml", "X-Microsoft-OutputFormat": "audio-48khz-192kbitrate-mono-mp3" },
+        });
+      } catch (e) { throw new Error(`Couldn't reach Azure. Check the region (“${settings.azRegion}”) and the connection.`); }
+      if (r.status === 429 && attempt < 4) { await new Promise(res => setTimeout(res, 1000 * (+r.headers.get("Retry-After") || 6))); continue; }   // the free tier allows ~20 a minute
+      if (r.status === 401 || r.status === 403) throw new Error("The Azure key or region wasn't accepted.");
+      if (!r.ok) throw new Error(`Azure said ${r.status}.`);
+      blob = await r.blob();
+      break;
+    }
+    await db.set("blobs", key, blob);
+  }
+  const buf = await decode(await blob.arrayBuffer());
+  const d = buf.getChannelData(0), thr = 0.01;
+  let a = 0, b = d.length - 1;
+  while (a < d.length && Math.abs(d[a]) < thr) a++;
+  while (b > a && Math.abs(d[b]) < thr) b--;
+  const clip = { buf, lead: Math.max(0, a / buf.sampleRate - 0.02), len: Math.max(0.1, (b - a) / buf.sampleRate) };
+  voiceMem.set(key, clip);
+  return clip;
+}
+async function sayNow(list) {                        // the 🔊 buttons and "Test the voice"
+  if (!voiceReady()) return alert(settings.voice === "on" ? "Add your Azure key and region under Voice first." : "Turn the spoken voice on under Voice first.");
+  const items = list.filter(([text]) => text);
+  if (!items.length) return;
+  try {
+    const ctx = audio(); let t = ctx.currentTime + 0.05;
+    for (const [text, voice] of items) {
+      const c = await speak(text, voice);
+      t = Math.max(t, ctx.currentTime + 0.05);
+      const src = ctx.createBufferSource(); src.buffer = c.buf; src.connect(ctx.destination); src.start(t, c.lead);
+      t += c.len + 0.5;
+    }
+  } catch (e) { alert(e.message); }
+}
+async function loadVoice(cards) {                    // null when the voice is off; otherwise the question and one answer per card
+  if (!voiceReady()) return null;
+  const askOn = settings.ask && settings.askWhen !== "off";
+  const answers = [];
+  for (let i = 0; i < cards.length; i++) {
+    $("hint").textContent = `Getting the voice… ${i + 1} / ${cards.length}`;
+    answers.push(await speak(cards[i].hanzi, settings.zhVoice));
+  }
+  const ask = askOn ? await speak(settings.ask, settings.enVoice) : null;
+  $("hint").textContent = "";
+  return { ask, answers };
+}
+const VOICE = { askAt: 0.05, answerAt: 0.12, after: 0.45, gain: 0.9 };
+function voiceEvents(segs, voice) {                  // [time, clip]
+  if (!voice) return [];
+  const ev = [];
+  for (const s of segs) {
+    if (s.kind === "appear" && voice.ask && (settings.askWhen === "every" || s.i === 0)) ev.push([s.start + VOICE.askAt, voice.ask]);
+    if (s.kind === "reveal") ev.push([s.start + VOICE.answerAt, voice.answers[s.i]]);
+  }
+  return ev;
+}
+function scheduleVoice(events, t0, out) {
+  const ctx = audio(), srcs = [];
+  for (const [t, c] of events) {
+    const src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = c.buf; g.gain.value = VOICE.gain;
+    src.connect(g).connect(out);
+    src.start(t0 + t, c.lead);
+    srcs.push(src);
+  }
+  return () => srcs.forEach(s => { try { s.stop(); } catch (e) {} });
+}
+
+/* the reel's music, as [time, kind, Hz, gain] (the same composition as make_reel.py) */
+function compose(segs, cards, bellKind) {
+  const f0 = CFG.tonic, cr = CFG.countRatios, ghostGain = Math.pow(10, CFG.ghostDb / 20);
+  const bellHz = hz => {
+    if (bellKind !== "bianzhong") return hz;
+    while (hz < CFG.bellRange[0]) hz *= 2;
+    while (hz > CFG.bellRange[1]) hz /= 2;
+    return hz;
+  };
+  const ev = []; let recapN = 0;
+  for (const s of segs) {
+    const t = s.start;
+    if (s.kind === "count") {
+      const hz = f0 * cr[(CFG.countFrom - s.extra) % cr.length];
+      ev.push([t, "shutter", hz, 1.0], [t + 0.005, bellKind, bellHz(hz), CFG.bellCount]);
+    } else if (s.kind === "reveal") {
+      const one = f0 * CFG.revealRatio;
+      ev.push([t, "ding", one, 1.0], [t, bellKind, bellHz(one), CFG.bellReveal], [t + 0.01, "ding", one / 2, CFG.subGain]);
+      ev.push([t + 0.04, "ding", one * CFG.ghosts[s.i % CFG.ghosts.length], ghostGain]);
+    } else if (s.kind === "recap") {
+      ev.push([t, "tap", CFG.recapBase * (CFG.recapFirst + recapN++), 0.55]);
+    } else if (s.kind === "end") {
+      CFG.endChord.forEach((r, k) => ev.push([t + k * CFG.endRoll, "ding", f0 * r, 0.8]));
+      CFG.bellEndRatios.forEach(r => ev.push([t, bellKind, bellHz(f0 * r), CFG.bellEnd]));
+      ev.push([t, "ding", f0 * CFG.revealRatio / 2, CFG.subGain]);
+    }
+  }
+  return ev;
+}
+
+/* schedule every sound; bianzhong strikes take turns among those within a fifth, and bloom in softly */
+function schedule(events, t0, out) {
+  const ctx = audio(), srcs = [];
+  let turn = 0;
+  for (const [t, kind, hz, gain] of events) {
+    let pick;
+    if (kind === "bianzhong") {
+      const near = bells.filter(b => hz / b.hz >= 1 / 1.5 && hz / b.hz <= 1.5);
+      pick = near.length ? near[turn++ % near.length] : nearest(bells, hz);
+    } else pick = nearest(bank[kind] || bank.ding, hz);
+    const src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = pick.buf;
+    src.playbackRate.value = hz / pick.hz;            // exact just-intonation pitch by resampling
+    const at = t0 + t, v = gain * CFG.tickVolume;
+    if (kind === "bianzhong") { g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(v, at + 0.012); }
+    else g.gain.value = v;
+    src.connect(g).connect(out);
+    src.start(at);
+    srcs.push(src);
+  }
+  return () => srcs.forEach(s => { try { s.stop(); } catch (e) {} });
+}
+
+/* ------------------------------------------------------------ timeline */
+function timeline(n, voice) {
+  const segs = []; let t = 0;
+  const add = (kind, i, dur, extra) => { segs.push({ kind, i, dur, extra, start: t }); t += dur; };
+  for (let i = 0; i < n; i++) {
+    add("appear", i, CFG.appear);
+    for (let k = CFG.countFrom; k > 0; k--) add("count", i, settings.speed, k);
+    add("reveal", i, Math.max(CFG.reveal, voice ? VOICE.answerAt + voice.answers[i].len + VOICE.after : 0));   // long words get the time to be said
+  }
+  if (settings.recap) { add("recap_title", -1, CFG.recapTitle); for (let i = 0; i < n; i++) add("recap", i, CFG.recapPerCard); }
+  add("end", -1, CFG.end);
+  return { segs, total: t };
+}
+
+/* ------------------------------------------------------------ drawing */
+const reel = $("reel"), g = reel.getContext("2d");
+reel.lang = "zh-Hant-TW";
+
+function centered(ctx, text, cx, cy, font, fill, alpha = 1) {
+  ctx.font = font; ctx.fillStyle = fill; ctx.globalAlpha = alpha;
+  ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+  const m = ctx.measureText(text);
+  const x = cx - (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2 + m.actualBoundingBoxLeft;
+  const y = cy + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
+  ctx.fillText(text, x, y);
+  ctx.globalAlpha = 1;
+}
+function fitFont(ctx, text, size, maxW, make) {
+  while (size > 20) { ctx.font = make(size); if (ctx.measureText(text).width <= maxW) return make(size); size -= 4; }
+  return make(size);
+}
+const hanziFont = s => `700 ${s}px ${HANZI_FONT}`;
+const latinFont = (s, bold) => `${bold ? 700 : 400} ${s}px ${LATIN_FONT}`;
+const pinyinFont = s => `400 ${s}px ${LATIN_FONT}`;
+
+function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
+
+/* each card's picture, prepared once: the photo fitted into IMG_BOX with rounded corners, or a placeholder */
+async function prepareCard(c) {
+  const bw = IMG_BOX[2] - IMG_BOX[0], bh = IMG_BOX[3] - IMG_BOX[1];
+  const cv = document.createElement("canvas"), ctx = cv.getContext("2d");
+  const url = photoCache.get(c.id);
+  if (url) {
+    const img = await loadImage(url);
+    const s = Math.min(bw / img.naturalWidth, bh / img.naturalHeight);
+    cv.width = Math.max(1, Math.round(img.naturalWidth * s)); cv.height = Math.max(1, Math.round(img.naturalHeight * s));
+    roundRect(ctx, 0, 0, cv.width, cv.height, 34); ctx.clip();
+    ctx.drawImage(img, 0, 0, cv.width, cv.height);
+  } else {
+    cv.width = Math.round(bw * 0.8); cv.height = Math.round(bh * 0.9);
+    roundRect(ctx, 1.5, 1.5, cv.width - 3, cv.height - 3, 36);
+    ctx.fillStyle = "rgba(255,255,255,0.67)"; ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.16)"; ctx.lineWidth = 3; ctx.stroke();
+    centered(ctx, c.english || "?", cv.width / 2, cv.height / 2 - 30, latinFont(56, true), CFG.text, 0.8);
+    centered(ctx, "add a photo for this card", cv.width / 2, cv.height / 2 + 45, latinFont(30), "#000", 0.43);
+  }
+  return cv;
+}
+
+/* the handle drifting like the DVD logo, worked out from the time so it is the same at any frame rate */
+function handleAt(t, ctx) {
+  ctx.font = latinFont(CFG.sizes.handle, true);
+  const m = ctx.measureText(settings.handle);
+  const w = m.width, h = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
+  const axis = (p0, v, span) => {
+    const L = Math.max(1, span), p = p0 + v * t, k = Math.floor(p / L), r = p - k * L;
+    return { pos: k % 2 === 0 ? r : L - r, hits: k };
+  };
+  const x = axis(37, CFG.handleSpeed[0], W - w), y = axis(23, CFG.handleSpeed[1], HALF - h);
+  return { x: x.pos, y: y.pos + m.actualBoundingBoxAscent, color: CFG.handleColors[(x.hits + y.hits) % CFG.handleColors.length] };
+}
+
+function drawTop(ctx, bg, t) {
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, HALF);
+  if (settings.handle) {                          // drawn first, so it passes under the pictures and the text
+    const p = handleAt(t, ctx);
+    ctx.globalAlpha = CFG.handleOpacity; ctx.fillStyle = p.color; ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+    ctx.fillText(settings.handle, p.x, p.y);
+    ctx.globalAlpha = 1;
+  }
+}
+function drawPicture(ctx, pic, alpha = 1, scale = 1) {
+  const w = pic.width * scale, h = pic.height * scale;
+  const cx = (IMG_BOX[0] + IMG_BOX[2]) / 2, cy = (IMG_BOX[1] + IMG_BOX[3]) / 2;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.shadowColor = `rgba(0,0,0,${0.28 * alpha})`; ctx.shadowBlur = 28; ctx.shadowOffsetX = 4; ctx.shadowOffsetY = 14;
+  ctx.drawImage(pic, cx - w / 2, cy - h / 2, w, h);
+  ctx.restore();
+}
+function drawDial(ctx, number, remaining) {
+  const cx = W / 2, cy = DIAL_CY, r = DIAL_R, wid = 16;
+  ctx.beginPath(); ctx.arc(cx, cy, r - wid, 0, Math.PI * 2); ctx.fillStyle = "rgba(255,255,255,0.59)"; ctx.fill();
+  ctx.lineWidth = wid;
+  ctx.beginPath(); ctx.arc(cx, cy, r - wid / 2, 0, Math.PI * 2); ctx.strokeStyle = "rgba(0,0,0,0.11)"; ctx.stroke();
+  if (remaining > 0.002) {
+    ctx.beginPath(); ctx.arc(cx, cy, r - wid / 2, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * remaining);
+    ctx.strokeStyle = CFG.accent; ctx.stroke();
+  }
+  centered(ctx, String(number), cx, cy, latinFont(CFG.sizes.countdown, true), CFG.text);
+}
+function drawAnswer(ctx, c, alpha, rise) {
+  const dy = 18 * (1 - rise), s = CFG.sizes;
+  centered(ctx, c.hanzi, W / 2, 665 + dy, fitFont(ctx, c.hanzi, s.hanzi, 980, hanziFont), CFG.text, alpha);
+  centered(ctx, c.pinyinShow, W / 2, 790 + dy, fitFont(ctx, c.pinyinShow, s.pinyin, 980, pinyinFont), CFG.accent, alpha);
+  centered(ctx, c.english, W / 2, 868 + dy, fitFont(ctx, c.english, s.english, 980, z => latinFont(z)), CFG.text, alpha * 0.75);
+}
+const label = (ctx, text, y, size, alpha = 0.9) => centered(ctx, text, W / 2, y, latinFont(size, true), CFG.accent, alpha);
+
+function drawFrame(ctx, run, t) {
+  const { segs, cards, pics, bg } = run;
+  let s = segs[segs.length - 1];
+  for (const x of segs) if (t < x.start + x.dur) { s = x; break; }
+  t = Math.max(0, t);
+  const local = Math.min(1, Math.max(0, (t - s.start) / s.dur));
+  drawTop(ctx, bg, t);
+  if (s.kind === "appear") drawPicture(ctx, pics[s.i], local, 0.92 + 0.08 * local);
+  else if (s.kind === "count") { drawPicture(ctx, pics[s.i]); drawDial(ctx, s.extra, 1 - local); }
+  else if (s.kind === "reveal") {
+    const x = Math.min(1, (t - s.start) / 0.18);
+    drawPicture(ctx, pics[s.i]); drawAnswer(ctx, cards[s.i], x, x);
+  } else if (s.kind === "recap_title") { label(ctx, "Recap round", 430, 78); label(ctx, "say each one before it changes", 530, 40); }
+  else if (s.kind === "recap") { drawPicture(ctx, pics[s.i]); label(ctx, `${s.i + 1} / ${cards.length}`, 700, 52); }
+  else if (s.kind === "end") {
+    centered(ctx, CFG.endText, W / 2, 420, fitFont(ctx, CFG.endText, CFG.sizes.end, 960, z => latinFont(z, true)), CFG.text);
+    centered(ctx, `${cards.length} words`, W / 2, 530, latinFont(44), CFG.accent);
+    centered(ctx, "你答對了幾個？", W / 2, 640, hanziFont(56), CFG.text);
+  }
+}
+
+/* ------------------------------------------------------------ camera, graded on the GPU (the Bronze look from make_reel.py) */
+let cam = null;
+const camVideo = document.createElement("video");
+camVideo.playsInline = true; camVideo.muted = true;
+const grade = (() => {
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = HALF;
+  const gl = cv.getContext("webgl", { preserveDrawingBuffer: true, premultipliedAlpha: false });
+  if (!gl) return null;
+  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; };
+  const prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, "attribute vec2 p; varying vec2 uv; void main(){ uv = p * 0.5 + 0.5; gl_Position = vec4(p, 0.0, 1.0); }"));
+  gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, `precision mediump float;
+    varying vec2 uv; uniform sampler2D v; uniform vec4 crop; uniform float mirror; uniform float look;
+    void main() {
+      vec2 q = vec2(mirror > 0.5 ? 1.0 - uv.x : uv.x, uv.y);
+      vec3 c = texture2D(v, crop.xy + q * crop.zw).rgb;
+      if (look > 0.5) {
+        float L = dot(c, vec3(0.2126, 0.7152, 0.0722));
+        vec3 s = 0.55 * c + 0.45 * c * c * (3.0 - 2.0 * c);        // film S-curve
+        s = 0.055 + 0.915 * s;                                    // lifted blacks, soft whites
+        s += vec3(-0.035, 0.012, 0.050) * (1.0 - L) * (1.0 - L)   // cool shadows
+           + vec3(0.085, 0.035, -0.070) * L * L;                  // warm bronze highlights
+        float m = (s.r + s.g + s.b) / 3.0;
+        c = m + 0.85 * (s - m);
+      }
+      gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+    }`));
+  gl.linkProgram(prog); gl.useProgram(prog);
+  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+  for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  const U = n => gl.getUniformLocation(prog, n);
+  return function (video) {
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !vh) return null;
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, video);
+    const want = W / HALF;
+    let cx = 0, cy = 0, cw = 1, ch = 1;
+    if (vw / vh > want) { cw = vh * want / vw; cx = (1 - cw) / 2; }
+    else { ch = vw / want / vh; cy = (1 - ch) * 0.6; }            // keep a little more headroom than footroom
+    gl.uniform4f(U("crop"), cx, cy, cw, ch);
+    gl.uniform1f(U("mirror"), settings.mirror ? 1 : 0);
+    gl.uniform1f(U("look"), settings.look === "bronze" ? 1 : 0);
+    gl.viewport(0, 0, W, HALF);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    return cv;
+  };
+})();
+
+function drawBottom(ctx) {
+  if (cam && camVideo.readyState >= 2) {
+    const graded = grade && grade(camVideo);
+    if (graded) { ctx.drawImage(graded, 0, HALF); return; }
+    ctx.save(); ctx.beginPath(); ctx.rect(0, HALF, W, HALF); ctx.clip();       // no WebGL: plain cover-crop
+    const s = Math.max(W / camVideo.videoWidth, HALF / camVideo.videoHeight), w = camVideo.videoWidth * s, h = camVideo.videoHeight * s;
+    if (settings.mirror) { ctx.translate(W, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(camVideo, (W - w) / 2, HALF + (HALF - h) / 2, w, h);
+    ctx.restore();
+    return;
+  }
+  ctx.fillStyle = CFG.bottom; ctx.fillRect(0, HALF, W, HALF);
+}
+
+async function openCamera() {
+  const earbuds = settings.listen === "earbuds";
+  cam = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "user", width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+    // on the phone speaker, echo cancellation keeps the reel's sounds out of the mic (they are recorded cleanly anyway)
+    audio: { echoCancellation: !earbuds, noiseSuppression: true, autoGainControl: false },
+  });
+  camVideo.srcObject = cam;
+  await camVideo.play().catch(() => {});
+}
+function closeCamera() { if (cam) cam.getTracks().forEach(t => t.stop()); cam = null; camVideo.srcObject = null; }
+
+/* ------------------------------------------------------------ run: preview or record */
+let run = null;
+
+async function prepareRun() {
+  const cards = deck.filter(c => c.hanzi).map(c => ({ ...c, pinyinShow: fixPinyin(c.pinyin) }));
+  if (!cards.length) { alert("Add a word first."); return null; }
+  const pal = CFG.palette, names = Object.keys(pal);
+  const bg = pal[settings.bg] || pal[names[Math.floor(Math.random() * names.length)]];
+  const texts = [CFG.endText, "Recap round", "say each one before it changes", "你答對了幾個？", "0123456789 /words", settings.handle,
+                 ...cards.flatMap(c => [c.hanzi, c.pinyinShow, c.english])].join(" ");
+  await Promise.all([hanziFont(150), latinFont(56, true), latinFont(40), pinyinFont(62)].map(f => document.fonts.load(f, texts).catch(() => {})));
+  await loadBank();
+  let bellKind = "bronze";
+  if (settings.bell === "bianzhong" && (await loadBells()).length) bellKind = "bianzhong";
+  let voice = null;
+  try { voice = await loadVoice(cards); }
+  catch (e) { $("hint").textContent = ""; alert(e.message + "\nThe reel will play without the voice."); }
+  const { segs, total } = timeline(cards.length, voice);
+  const pics = await Promise.all(cards.map(prepareCard));
+  return { cards, pics, bg, segs, total, events: compose(segs, cards, bellKind), voiceEvents: voiceEvents(segs, voice) };
+}
+
+function showStage(on) { $("edit").hidden = on; $("stage").hidden = !on; $("result").hidden = true; }
+
+let loopId = 0, stopSounds = null, wakeLock = null;
+function startLoop(fn) { const id = ++loopId; const tick = () => { if (id !== loopId) return; fn(); requestAnimationFrame(tick); }; requestAnimationFrame(tick); }
+function stopLoop() { loopId++; }
+
+async function preview() {
+  audio();
+  showStage(true);
+  $("hint").textContent = ""; $("recBadge").hidden = true; $("startRec").hidden = true;
+  run = await prepareRun();
+  if (!run) return backToEdit();
+  const ctx = audio(), bus = ctx.createGain(); bus.connect(ctx.destination);
+  const t0 = ctx.currentTime + 0.15;
+  const s1 = schedule(run.events, t0, bus), s2 = scheduleVoice(run.voiceEvents, t0, bus);
+  stopSounds = () => { s1(); s2(); };
+  startLoop(() => {
+    const t = ctx.currentTime - t0;
+    drawFrame(g, run, t); drawBottom(g);
+    if (t > run.total + 0.3) backToEdit();
+  });
+}
+
+let recorder = null, chunks = [], recMime = "", recStopped = null;
+function pickMime() {
+  const c = ["video/mp4;codecs=avc1.640028,mp4a.40.2", "video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4;codecs=avc1,mp4a", "video/mp4",
+             "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+  return window.MediaRecorder ? (c.find(m => MediaRecorder.isTypeSupported(m)) || "") : null;
+}
+
+async function record() {
+  audio();
+  if (pickMime() === null || !reel.captureStream) { alert("This browser can't record video. Try Chrome or Safari."); return; }
+  showStage(true);
+  $("recBadge").hidden = true; $("startRec").hidden = true;
+  $("hint").textContent = "Getting the camera…";
+  try { await openCamera(); }
+  catch (e) { alert("The camera or microphone wasn't allowed: " + e.message); return backToEdit(); }
+  run = await prepareRun();
+  if (!run) return backToEdit();
+  // framing: the first picture on top, you underneath
+  $("hint").textContent = "Frame yourself in the bottom half, then tap Start.";
+  $("startRec").hidden = false;
+  startLoop(() => { drawFrame(g, run, 0.001); drawBottom(g); });
+  $("startRec").onclick = goRecord;
+}
+
+async function goRecord() {
+  $("startRec").hidden = true; $("hint").textContent = "";
+  const ctx = audio();
+  // get ready 3, 2, 1 (not recorded)
+  const count = $("count"); count.hidden = false;
+  for (const n of [3, 2, 1]) { count.textContent = n; await new Promise(r => setTimeout(r, 700)); }
+  count.hidden = true;
+  if (wakeLock === null && navigator.wakeLock) navigator.wakeLock.request("screen").then(w => wakeLock = w).catch(() => {});
+
+  // sound: the reel's sounds (heard + recorded), your voice (recorded only), ducked under your voice, limited
+  const sfx = ctx.createGain(), duck = ctx.createGain(), mix = ctx.createGain(), dest = ctx.createMediaStreamDestination();
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -2; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.002; limiter.release.value = 0.08;
+  sfx.connect(ctx.destination); sfx.connect(duck); duck.connect(mix); mix.connect(limiter); limiter.connect(dest);
+  const spoken = ctx.createGain(); spoken.connect(ctx.destination); spoken.connect(mix);     // the computer voice: heard and recorded, never ducked
+  const mic = ctx.createMediaStreamSource(cam);
+  const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 80;
+  const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -30; comp.knee.value = 8; comp.ratio.value = 3.5; comp.attack.value = 0.005; comp.release.value = 0.15;
+  const voice = ctx.createGain(); voice.gain.value = 2.2;
+  const meter = ctx.createAnalyser(); meter.fftSize = 1024;
+  mic.connect(hp).connect(comp).connect(voice); voice.connect(mix); voice.connect(meter);
+  const level = new Float32Array(meter.fftSize);
+
+  const stream = new MediaStream([...reel.captureStream(30).getVideoTracks(), ...dest.stream.getAudioTracks()]);
+  recMime = pickMime();
+  recorder = new MediaRecorder(stream, Object.assign({ videoBitsPerSecond: 10000000, audioBitsPerSecond: 192000 }, recMime ? { mimeType: recMime } : {}));
+  chunks = [];
+  recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  recStopped = new Promise(r => recorder.onstop = r);
+  recorder.start(1000);
+
+  const t0 = ctx.currentTime + 0.25;
+  const s1 = schedule(run.events, t0, sfx), s2 = scheduleVoice(run.voiceEvents, t0, spoken);
+  stopSounds = () => { s1(); s2(); };
+  $("recBadge").hidden = false;
+  let done = false;
+  const myLoop = loopId + 1;     // a timer as well as the frame loop, so the recording always ends (frames pause when the screen is hidden)
+  setTimeout(() => { if (!done && loopId === myLoop) { done = true; finishRecording(); } }, (t0 - ctx.currentTime + run.total + 0.5) * 1000);
+  startLoop(() => {
+    const t = ctx.currentTime - t0;
+    drawFrame(g, run, t); drawBottom(g);
+    meter.getFloatTimeDomainData(level);
+    let sum = 0; for (const v of level) sum += v * v;
+    const talking = Math.sqrt(sum / level.length) > 0.03;
+    duck.gain.setTargetAtTime(talking ? 0.55 : 1, ctx.currentTime, talking ? 0.04 : 0.3);
+    const sec = Math.max(0, Math.floor(t)); $("recTime").textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+    if (!done && t > run.total + 0.4) { done = true; finishRecording(); }
+  });
+}
+
+async function finishRecording() {
+  stopLoop();
+  if (recorder && recorder.state !== "inactive") recorder.stop();
+  await recStopped;
+  closeCamera();
+  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  const type = (recMime || chunks[0]?.type || "video/webm").split(";")[0];
+  const blob = new Blob(chunks, { type });
+  showResult(blob, type);
+}
+
+let resultBlob = null, resultUrl = null;
+function showResult(blob, type) {
+  resultBlob = blob;
+  if (resultUrl) URL.revokeObjectURL(resultUrl);
+  resultUrl = URL.createObjectURL(blob);
+  $("stage").hidden = true; $("edit").hidden = true; $("result").hidden = false;
+  $("resultVideo").src = resultUrl;
+  const ext = type.includes("mp4") ? "mp4" : "webm";
+  $("resultInfo").textContent = `${(blob.size / 1048576).toFixed(1)} MB · ${ext.toUpperCase()}` + (ext === "webm" ? " · this browser can't save MP4; Instagram may need it converted" : "");
+}
+$("saveBtn").onclick = async () => {
+  if (!resultBlob) return;
+  const ext = resultBlob.type.includes("mp4") ? "mp4" : "webm";
+  const d = new Date(), stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}`;
+  const file = new File([resultBlob], `Flashcard reel ${stamp}.${ext}`, { type: resultBlob.type });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); return; } catch (e) { if (e.name === "AbortError") return; }
+  }
+  const a = document.createElement("a"); a.href = resultUrl; a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
+};
+$("againBtn").onclick = () => record();
+$("backBtn").onclick = () => backToEdit();
+
+function backToEdit() {
+  stopLoop();
+  if (stopSounds) { stopSounds(); stopSounds = null; }
+  if (recorder && recorder.state !== "inactive") { recorder.onstop = null; recorder.stop(); }
+  recorder = null;
+  closeCamera();
+  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  $("count").hidden = true; $("startRec").hidden = true;
+  $("stage").hidden = true; $("result").hidden = true; $("edit").hidden = false;
+}
+$("stopBtn").onclick = () => {
+  if (recorder && recorder.state === "recording" && chunks.length && confirm("Stop here and keep what's recorded so far?")) { finishRecording(); if (stopSounds) stopSounds(); return; }
+  backToEdit();
+};
+$("testVoice").onclick = () => sayNow([[settings.askWhen !== "off" ? settings.ask : "", settings.enVoice], [deck.find(c => c.hanzi)?.hanzi, settings.zhVoice]]);
+$("previewBtn").onclick = preview;
+$("recordBtn").onclick = record;
+
+/* ------------------------------------------------------------ start */
+(async () => {
+  await loadState();
+  bindSettings(); renderCards(); bellNote();
+  const m = pickMime();
+  $("formatNote").textContent = m === null ? "This browser can't record video." :
+    (m.startsWith("video/mp4") ? "Saves an MP4, ready for Instagram." : "This browser records WebM; Chrome or Safari on a phone saves MP4.");
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+})();
+</script>
+</body>
+</html>

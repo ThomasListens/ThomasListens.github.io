@@ -1,0 +1,161 @@
+{
+ "tonic_hz": 220.0,
+ "made_with": "MonoDrum (TLM JSFX) in REAPER",
+ "sounds": [
+  {
+   "kind": "shutter",
+   "hz": 1540.0,
+   "file": "shutter_1540.00Hz.wav"
+  },
+  {
+   "kind": "shutter",
+   "hz": 1100.0,
+   "file": "shutter_1100.00Hz.wav"
+  },
+  {
+   "kind": "shutter",
+   "hz": 660.0,
+   "file": "shutter_660.00Hz.wav"
+  },
+  {
+   "kind": "ding",
+   "hz": 220.0,
+   "file": "ding_220.00Hz.wav"
+  },
+  {
+   "kind": "ding",
+   "hz": 660.0,
+   "file": "ding_660.00Hz.wav"
+  },
+  {
+   "kind": "ding",
+   "hz": 1100.0,
+   "file": "ding_1100.00Hz.wav"
+  },
+  {
+   "kind": "ding",
+   "hz": 1540.0,
+   "file": "ding_1540.00Hz.wav"
+  },
+  {
+   "kind": "ding",
+   "hz": 1980.0,
+   "file": "ding_1980.00Hz.wav"
+  },
+  {
+   "kind": "ding",
+   "hz": 2420.0,
+   "file": "ding_2420.00Hz.wav"
+  },
+  {
+   "kind": "ding",
+   "hz": 2860.0,
+   "file": "ding_2860.00Hz.wav"
+  },
+  {
+   "kind": "bronze",
+   "hz": 1540.0,
+   "file": "bronze_1540.00Hz.wav"
+  },
+  {
+   "kind": "bronze",
+   "hz": 1100.0,
+   "file": "bronze_1100.00Hz.wav"
+  },
+  {
+   "kind": "bronze",
+   "hz": 660.0,
+   "file": "bronze_660.00Hz.wav"
+  },
+  {
+   "kind": "bronze",
+   "hz": 220.0,
+   "file": "bronze_220.00Hz.wav"
+  },
+  {
+   "kind": "ding",
+   "hz": 110.0,
+   "file": "ding_110.00Hz.wav"
+  },
+  {
+   "kind": "tap",
+   "hz": 440.0,
+   "file": "tap_440.00Hz.wav"
+  },
+  {
+   "kind": "tap",
+   "hz": 550.0,
+   "file": "tap_550.00Hz.wav"
+  },
+  {
+   "kind": "tap",
+   "hz": 660.0,
+   "file": "tap_660.00Hz.wav"
+  },
+  {
+   "kind": "tap",
+   "hz": 770.0,
+   "file": "tap_770.00Hz.wav"
+  },
+  {
+   "kind": "tap",
+   "hz": 880.0,
+   "file": "tap_880.00Hz.wav"
+  },
+  {
+   "kind": "tap",
+   "hz": 990.0,
+   "file": "tap_990.00Hz.wav"
+  },
+  {
+   "kind": "tap",
+   "hz": 1100.0,
+   "file": "tap_1100.00Hz.wav"
+  },
+  {
+   "kind": "tap",
+   "hz": 1210.0,
+   "file": "tap_1210.00Hz.wav"
+  },
+  {
+   "kind": "tap",
+   "hz": 1320.0,
+   "file": "tap_1320.00Hz.wav"
+  },
+  {
+   "kind": "tap",
+   "hz": 1430.0,
+   "file": "tap_1430.00Hz.wav"
+  },
+  {
+   "kind": "tap",
+   "hz": 1540.0,
+   "file": "tap_1540.00Hz.wav"
+  },
+  {
+   "kind": "tap",
+   "hz": 1650.0,
+   "file": "tap_1650.00Hz.wav"
+  },
+  {
+   "kind": "tap",
+   "hz": 1760.0,
+   "file": "tap_1760.00Hz.wav"
+  },
+  {
+   "kind": "tap",
+   "hz": 1870.0,
+   "file": "tap_1870.00Hz.wav"
+  },
+  {
+   "kind": "tap",
+   "hz": 1980.0,
+   "file": "tap_1980.00Hz.wav"
+  },
+  {
+   "kind": "tap",
+   "hz": 2090.0,
+   "file": "tap_2090.00Hz.wav"
+  }
+ ]
+}
