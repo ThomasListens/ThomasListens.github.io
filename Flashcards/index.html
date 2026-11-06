@@ -1103,17 +1103,45 @@ function drawBottom(ctx) {
   ctx.fillStyle = CFG.bottom; ctx.fillRect(0, HALF, W, HALF);
 }
 
+let aecMode = "off", loopback = null;
 async function openCamera() {
   const earbuds = settings.listen === "earbuds";
   cam = await navigator.mediaDevices.getUserMedia({
     video: { facingMode: "user", width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
-    // on the phone speaker, echo cancellation keeps the reel's sounds out of the mic (they are recorded cleanly anyway)
-    audio: { echoCancellation: !earbuds, noiseSuppression: true, autoGainControl: false },
+    // on the phone speaker, echo cancellation keeps the reel's sounds out of the mic (they are recorded cleanly anyway).
+    // "all" asks Chrome to cancel this page's own sounds too; browsers that don't know it read it as plain true.
+    audio: { echoCancellation: earbuds ? false : "all", noiseSuppression: true, autoGainControl: false },
   });
+  const ec = cam.getAudioTracks()[0]?.getSettings().echoCancellation;
+  aecMode = earbuds ? "off" : ec === "all" ? "all" : "basic";
   camVideo.srcObject = cam;
   await camVideo.play().catch(() => {});
 }
-function closeCamera() { if (cam) cam.getTracks().forEach(t => t.stop()); cam = null; camVideo.srcObject = null; }
+function closeCamera() {
+  if (cam) cam.getTracks().forEach(t => t.stop()); cam = null; camVideo.srcObject = null;
+  if (loopback) { loopback.close(); loopback = null; }
+}
+
+/* Chrome only echo-cancels sound that arrives over a call. So on the speaker, when it can't cancel "all",
+   the reel's sounds go out through a call to ourselves: then the mic's echo canceller knows them and removes them.
+   This is only what you hear; the recording still takes the sounds straight from the mix. */
+async function aecLoopback(ctx) {
+  const into = ctx.createMediaStreamDestination();
+  const a = new RTCPeerConnection(), b = new RTCPeerConnection();
+  a.onicecandidate = e => e.candidate && b.addIceCandidate(e.candidate).catch(() => {});
+  b.onicecandidate = e => e.candidate && a.addIceCandidate(e.candidate).catch(() => {});
+  const got = new Promise(r => b.ontrack = e => r(e.streams[0] || new MediaStream([e.track])));
+  into.stream.getAudioTracks().forEach(t => a.addTrack(t, into.stream));
+  const offer = await a.createOffer();
+  await a.setLocalDescription(offer); await b.setRemoteDescription(offer);
+  const answer = await b.createAnswer();
+  answer.sdp = answer.sdp.replace(/a=fmtp:(\d+) (.*useinbandfec.*)/, "a=fmtp:$1 $2;stereo=1;maxaveragebitrate=256000");   // music quality, not phone-call quality
+  await b.setLocalDescription(answer); await a.setRemoteDescription(answer);
+  const stream = await Promise.race([got, new Promise((_, no) => setTimeout(() => no(new Error("no loopback")), 4000))]);
+  const el = new Audio(); el.srcObject = stream; el.autoplay = true;
+  await el.play();
+  return { node: into, close: () => { el.pause(); el.srcObject = null; a.close(); b.close(); } };
+}
 
 /* ------------------------------------------------------------ run: preview or record */
 let run = null;
@@ -1187,9 +1215,12 @@ async function record() {
 async function goRecord() {
   $("startRec").hidden = true; $("hint").textContent = "";
   const ctx = audio();
-  // get ready 3, 2, 1 (not recorded)
+  // get ready 3, 2, 1 (not recorded); the speaker's echo-cancel route connects meanwhile
   const count = $("count"); count.hidden = false;
+  const route = aecMode === "basic" && window.RTCPeerConnection && !loopback
+    ? aecLoopback(ctx).then(l => { loopback = l; aecMode = "call"; }).catch(e => console.warn("loopback", e)) : null;
   for (const n of [3, 2, 1]) { count.textContent = n; await new Promise(r => setTimeout(r, 700)); }
+  if (route) await route;
   count.hidden = true;
   if (wakeLock === null && navigator.wakeLock) navigator.wakeLock.request("screen").then(w => wakeLock = w).catch(() => {});
 
@@ -1197,15 +1228,19 @@ async function goRecord() {
   const sfx = ctx.createGain(), duck = ctx.createGain(), mix = ctx.createGain(), dest = ctx.createMediaStreamDestination();
   const limiter = ctx.createDynamicsCompressor();
   limiter.threshold.value = -2; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.002; limiter.release.value = 0.08;
-  sfx.connect(ctx.destination); sfx.connect(duck); duck.connect(mix); mix.connect(limiter); limiter.connect(dest);
-  const spoken = ctx.createGain(); spoken.connect(ctx.destination); spoken.connect(mix);     // the computer voice: heard and recorded, never ducked
+  const monitor = loopback ? loopback.node : ctx.destination;                                 // what you hear
+  sfx.connect(monitor); sfx.connect(duck); duck.connect(mix); mix.connect(limiter); limiter.connect(dest);
+  const spoken = ctx.createGain(); spoken.connect(monitor); spoken.connect(mix);     // the computer voice: heard and recorded, never ducked
+  const ref = ctx.createAnalyser(); ref.fftSize = 1024; sfx.connect(ref); spoken.connect(ref);   // the reel's own sound, to tell its echo from your voice
   const mic = ctx.createMediaStreamSource(cam);
   const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 80;
   const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -30; comp.knee.value = 8; comp.ratio.value = 3.5; comp.attack.value = 0.005; comp.release.value = 0.15;
   const voice = ctx.createGain(); voice.gain.value = 2.2;
   const meter = ctx.createAnalyser(); meter.fftSize = 1024;
   mic.connect(hp).connect(comp).connect(voice); voice.connect(mix); voice.connect(meter);
-  const level = new Float32Array(meter.fftSize);
+  const level = new Float32Array(meter.fftSize), refLevel = new Float32Array(ref.fftSize);
+  const rms = (an, buf) => { an.getFloatTimeDomainData(buf); let q = 0; for (const v of buf) q += v * v; return Math.sqrt(q / buf.length); };
+  const speaker = settings.listen === "speaker";
 
   const stream = new MediaStream([...reel.captureStream(30).getVideoTracks(), ...dest.stream.getAudioTracks()]);
   recMime = pickMime();
@@ -1225,9 +1260,8 @@ async function goRecord() {
   startLoop(() => {
     const t = ctx.currentTime - t0;
     drawFrame(g, run, t); drawBottom(g);
-    meter.getFloatTimeDomainData(level);
-    let sum = 0; for (const v of level) sum += v * v;
-    const talking = Math.sqrt(sum / level.length) > 0.03;
+    // on the speaker, whatever echo is left must not count as you talking (or the sounds pump)
+    const you = rms(meter, level), talking = you > 0.03 && (!speaker || you > 0.35 * rms(ref, refLevel));
     duck.gain.setTargetAtTime(talking ? 0.55 : 1, ctx.currentTime, talking ? 0.04 : 0.3);
     const sec = Math.max(0, Math.floor(t)); $("recTime").textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
     if (!done && t > run.total + 0.4) { done = true; finishRecording(); }
@@ -1253,7 +1287,8 @@ function showResult(blob, type) {
   $("stage").hidden = true; $("edit").hidden = true; $("result").hidden = false;
   $("resultVideo").src = resultUrl;
   const ext = type.includes("mp4") ? "mp4" : "webm";
-  $("resultInfo").textContent = `${(blob.size / 1048576).toFixed(1)} MB · ${ext.toUpperCase()}` + (ext === "webm" ? " · this browser can't save MP4; Instagram may need it converted" : "");
+  const ec = { all: " · echo cancel: all sounds", call: " · echo cancel: call route", basic: " · echo cancel: basic" }[aecMode] || "";
+  $("resultInfo").textContent = `${(blob.size / 1048576).toFixed(1)} MB · ${ext.toUpperCase()}${ec}` + (ext === "webm" ? " · this browser can't save MP4; Instagram may need it converted" : "");
 }
 $("saveBtn").onclick = async () => {
   if (!resultBlob) return;
