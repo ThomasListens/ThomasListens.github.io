@@ -263,8 +263,7 @@ const HANZI_FONT = '"Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-se
 const LATIN_FONT = '"Noto Sans", "Noto Sans TC", system-ui, sans-serif';
 
 const CFG = {
-  appear: 0.25, countFrom: 3, reveal: 1.3, recapPerCard: 0.5, recapTitle: 0.8, end: 2.0,
-  endText: "How many did you get?",
+  appear: 0.25, countFrom: 3, reveal: 1.3, recapPerCard: 0.5, recapTitle: 0.8, end: 2.6, collageStagger: 0.05,
   palette: { "light blue": "#DCEBF7", "cream": "#F7F0DF", "mint": "#DDF2E6", "blush": "#F7E1E1" },
   bottom: "#1E1E22", text: "#23262B", accent: "#3D5A80",
   sizes: { hanzi: 150, pinyin: 62, english: 42, countdown: 120, handle: 34, end: 72 },
@@ -974,6 +973,32 @@ function drawPicture(ctx, pic, alpha = 1, scale = 1) {
   ctx.drawImage(pic, cx - w / 2, cy - h / 2, w, h);
   ctx.restore();
 }
+/* the ending: every picture from the quiz in one grid, landing with the chord */
+function drawCollage(ctx, pics, t) {
+  const n = pics.length, X0 = 40, Y0 = 40, AW = W - 80, AH = HALF - 80, gap = 14, ar = 4 / 3;
+  let best = null;
+  for (let cols = 1; cols <= n; cols++) {
+    const rows = Math.ceil(n / cols), cw = AW / cols, ch = AH / rows;
+    const tw = Math.min(cw, ch * ar) - gap;
+    if (!best || tw > best.tw) best = { cols, rows, tw };
+  }
+  const { cols, rows, tw } = best, th = tw / ar, pw = tw + gap, ph = th + gap;
+  const top = Y0 + (AH - rows * ph) / 2 + gap / 2;
+  pics.forEach((pic, k) => {
+    const r = Math.floor(k / cols), c = k % cols, inRow = Math.min(cols, n - r * cols);
+    const x = X0 + (AW - inRow * pw) / 2 + gap / 2 + c * pw, y = top + r * ph;
+    const a = Math.min(1, Math.max(0, (t - k * CFG.collageStagger) / 0.2));
+    if (a <= 0) return;
+    const sc = 0.94 + 0.06 * a, w = tw * sc, h = th * sc;
+    let sw = pic.width, sh = pic.height;                          // crop to fill the tile
+    if (sw / sh > ar) sw = sh * ar; else sh = sw / ar;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.shadowColor = `rgba(0,0,0,${0.22 * a})`; ctx.shadowBlur = 16; ctx.shadowOffsetY = 6;
+    ctx.drawImage(pic, (pic.width - sw) / 2, (pic.height - sh) / 2, sw, sh, x + (tw - w) / 2, y + (th - h) / 2, w, h);
+    ctx.restore();
+  });
+}
 function drawDial(ctx, number, remaining) {
   const cx = W / 2, cy = DIAL_CY, r = DIAL_R, wid = 16;
   ctx.beginPath(); ctx.arc(cx, cy, r - wid, 0, Math.PI * 2); ctx.fillStyle = "rgba(255,255,255,0.59)"; ctx.fill();
@@ -1008,9 +1033,7 @@ function drawFrame(ctx, run, t) {
   } else if (s.kind === "recap_title") { label(ctx, "Recap round", 430, 78); label(ctx, "say each one before it changes", 530, 40); }
   else if (s.kind === "recap") { drawPicture(ctx, pics[s.i]); label(ctx, `${s.i + 1} / ${cards.length}`, 700, 52); }
   else if (s.kind === "end") {
-    centered(ctx, CFG.endText, W / 2, 420, fitFont(ctx, CFG.endText, CFG.sizes.end, 960, z => latinFont(z, true)), CFG.text);
-    centered(ctx, `${cards.length} words`, W / 2, 530, latinFont(44), CFG.accent);
-    centered(ctx, "你答對了幾個？", W / 2, 640, hanziFont(56), CFG.text);
+    drawCollage(ctx, pics, t - s.start);
   }
 }
 
@@ -1100,7 +1123,7 @@ async function prepareRun() {
   if (!cards.length) { alert("Add a word first."); return null; }
   const pal = CFG.palette, names = Object.keys(pal);
   const bg = pal[settings.bg] || pal[names[Math.floor(Math.random() * names.length)]];
-  const texts = [CFG.endText, "Recap round", "say each one before it changes", "你答對了幾個？", "0123456789 /words", settings.handle,
+  const texts = ["Recap round", "say each one before it changes", "0123456789 /", settings.handle,
                  ...cards.flatMap(c => [c.hanzi, c.pinyinShow, c.english])].join(" ");
   await Promise.all([hanziFont(150), latinFont(56, true), latinFont(40), pinyinFont(62)].map(f => document.fonts.load(f, texts).catch(() => {})));
   await loadBank();
